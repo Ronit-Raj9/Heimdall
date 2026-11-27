@@ -1,10 +1,10 @@
 {
 	"title": "Billing",
-	"subtitle": "Your plan, what you used this month against its limits, and your invoices.",
+	"subtitle": "",
 	"loadError": "Could not load billing",
-	"off": "Billing is off on this server. Limits are shown so you know them, but nothing is enforced and nothing is charged.",
-	"testMode": "Payments run in Stripe test mode: use a Stripe test card, no real money moves.",
-	"checkoutDone": "Thanks. Your payment went through; the plan changes here as soon as Stripe confirms it, usually within a minute.",
+	"off": "Billing is off. Limits are shown but not enforced, and nothing is charged.",
+	"testMode": "Stripe test mode. Use a test card. No money moves.",
+	"checkoutDone": "Payment received. The plan updates when Stripe confirms, usually within a minute.",
 	"checkoutCancelled": "Checkout was cancelled. Nothing was charged.",
 	"plan": {
 		"title": "Current plan",
@@ -50,11 +50,11 @@
 		"of": "{{used}} of {{limit}}",
 		"noLimit": "No limit",
 		"reached": "Limit reached",
-		"reachedOff": "Over the plan's limit (not enforced while billing is off)",
+		"reachedOff": "Over limit, not enforced while billing is off",
 		"notAvailable": "Not available",
 		"seatsHint": "Members plus open invitations.",
-		"minutesHint": "Time your runs held a slot on Heimdall's shared worker. Runs on your own worker do not count.",
-		"judgeHint": "Every judge runs on your own key today, so this stays at 0."
+		"minutesHint": "Shared worker slot time. Your own worker does not count.",
+		"judgeHint": "Judges use your own key. Stays at 0."
 	},
 	"features": {
 		"title": "What your plan includes",
@@ -88,7 +88,7 @@
 	},
 	"usage": {
 		"title": "Heimdall usage",
-		"description": "What your organization used of Heimdall itself, per day (UTC): shared worker minutes, runs, evaluations and storage.",
+		"description": "Daily use of Heimdall itself (UTC).",
 		"day": "Day",
 		"minutes": "Shared worker minutes",
 		"runs": "Runs",

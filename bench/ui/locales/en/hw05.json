@@ -12,6 +12,6 @@
 		"confirmKeep": "Keep it"
 	},
 	"runners": {
-		"installLine": "Or install on a fresh Linux box in one line (after step 1):"
+		"installLine": "Or install on a fresh Linux box (after step 1):"
 	}
 }

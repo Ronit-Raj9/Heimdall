@@ -1,10 +1,10 @@
 {
 	"live": {
-		"heroTitle": "Compare versions on real traffic",
-		"heroMessage": "Heimdall reads real sessions from your gateway and tells you whether the new version of your agent does better or worse than the current one. No answer key needed.",
+		"heroTitle": "Compare versions on traffic",
+		"heroMessage": "Score versions on gateway sessions. No answer key needed.",
 		"heroAction": "Set up live scoring",
 		"setupTitle": "Set up live scoring",
-		"setupDescription": "Three steps. Heimdall writes the settings file for you.",
+		"setupDescription": "Three steps.",
 		"stepSplit": "How can Heimdall tell the two versions apart?",
 		"stepGateway": "Where is your gateway?",
 		"stepSave": "Save",
@@ -12,11 +12,11 @@
 		"reconfigure": "Change setup"
 	},
 	"canaries": {
-		"heroTitle": "Catch your agent or model quietly getting worse",
-		"heroMessage": "A drift monitor re-runs a small, frozen test on a schedule and warns you when results drop.",
+		"heroTitle": "Catch quiet regressions",
+		"heroMessage": "Reruns a frozen test on a schedule, warns on drops.",
 		"heroAction": "Create a drift monitor",
 		"newAction": "New drift monitor",
-		"cli": "Prefer the terminal? heimdall canary init",
+		"cli": "Terminal: heimdall canary init",
 		"stepWhat": "What to test",
 		"stepWhere": "Which models",
 		"stepWhen": "When, and how much to spend",
@@ -24,7 +24,7 @@
 	},
 	"schedules": {
 		"heroTitle": "",
-		"heroMessage": "Pick a comparison, a time and a daily spending limit. Heimdall starts it for you.",
+		"heroMessage": "Pick a comparison, time and daily spending limit.",
 		"heroAction": "Add a repeat run",
 		"newAction": "Add schedule",
 		"stepWhat": "What to run",
@@ -32,7 +32,7 @@
 		"stepCap": "Daily spending limit",
 		"close": "Close",
 		"integrations": "Integrations",
-		"integrationsHint": "Get a message when results get worse or a run fails",
+		"integrationsHint": "Alerts on worse results or failed runs.",
 		"advanced": "Advanced",
 		"pillOk": "Worked",
 		"pillFailed": "Failed",
@@ -40,11 +40,11 @@
 		"pillProblem": "Needs your attention"
 	},
 	"inbox": {
-		"heroTitle": "Turn production failures into tests",
-		"heroMessage": "Connect your gateway or tracing tool. Heimdall collects failed requests so you can turn the important ones into new test tasks.",
+		"heroTitle": "Failures into tests",
+		"heroMessage": "Connect your gateway or tracing tool.",
 		"heroAction": "Connect a tool",
 		"integrations": "Integrations",
-		"integrationsHint": "Tools to pull failures from, and access tokens for tools that send them in",
+		"integrationsHint": "Pull sources and push tokens.",
 		"sources": "Where failures come from",
 		"cli": "From a terminal"
 	}

@@ -1,6 +1,6 @@
 {
 	"pause": "Pause",
-	"pauseHint": "Runs already going finish; no new run starts until you resume.",
+	"pauseHint": "Running runs finish. No new run starts until resume.",
 	"resume": "Resume",
 	"pausedBadge": "Paused",
 	"draining_one": "Pausing: {{count}} run still going",
@@ -8,10 +8,10 @@
 	"pausedBy": "Paused by {{who}}",
 	"pauseError": "Could not pause",
 	"resumeError": "Could not resume",
-	"reason": "Reason (optional, kept in the change log)",
+	"reason": "Reason (optional)",
 	"panel": {
 		"title": "Run controls",
-		"intro": "Change how this comparison runs while it runs. Every change is kept in a tamper-evident change log.",
+		"intro": "Every change is logged.",
 		"concurrency": "Runs at once",
 		"concurrencyHint": "Frozen: {{value}}. 0 uses the frozen value.",
 		"cap": "Spend cap (USD)",
@@ -22,7 +22,7 @@
 		"save": "Apply",
 		"saved": "Applied",
 		"saveError": "Could not apply",
-		"exploratory": "Exploratory rerun of {{parent}}: its result never counts toward the original comparison or any leaderboard.",
+		"exploratory": "Exploratory rerun of {{parent}}. Never counts toward any result.",
 		"cancelled": "Waiting for a requeue",
 		"superseded": "Requeued runs (kept, not counted)"
 	},
@@ -41,7 +41,7 @@
 			"lease_lost": "Worker lost the run",
 			"infra_error": "Platform error after the agent started",
 			"invalid_evaluator": "Grader could not decide",
-			"agent_failure": "Agent failed (fail, timeout, budget, crash, refusal)",
+			"agent_failure": "Agent failed",
 			"integrity_violation": "Safety rule broken"
 		},
 		"retries": {
@@ -79,18 +79,18 @@
 	},
 	"run": {
 		"cancel": "Cancel run",
-		"confirmCancel": "Cancel run {{id}}? It is not counted and uses no attempt. It waits for a requeue.",
+		"confirmCancel": "Cancel run {{id}}? It is not counted and waits for a requeue.",
 		"confirm": "Cancel run",
 		"keep": "Keep running",
 		"requeue": "Requeue",
-		"requeueHint": "Run this task again. This run is kept and marked as replaced; it is not counted and uses no attempt.",
+		"requeueHint": "Run again. This run is kept, not counted.",
 		"cancelError": "Could not cancel the run",
 		"requeueError": "Could not requeue the run",
 		"superseded": "Replaced by a requeue: not counted"
 	},
 	"rerun": {
 		"button": "Rerun failures",
-		"hint": "Runs the failed tasks again as a new, exploratory comparison. Its result never changes this one.",
+		"hint": "Reruns failed tasks as a new comparison.",
 		"started": "Started {{id}}: {{tasks}} tasks",
 		"open": "Open",
 		"error": "Could not rerun failures",

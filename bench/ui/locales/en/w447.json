@@ -1,21 +1,27 @@
 {
-	"nav": { "replays": "Shadow replay" },
-	"jobs": { "kinds": { "replay.run": "Shadow replay" } },
+	"nav": {
+		"replays": "Shadow replay"
+	},
+	"jobs": {
+		"kinds": {
+			"replay.run": "Shadow replay"
+		}
+	},
 	"setup": {
-		"what": "A replay sends recorded production sessions to another model and compares its answers with the recorded ones. Two things are needed first:",
-		"turnOn": "Turn on shadow replay for this organization (the switch below).",
+		"what": "Sends recorded sessions to another model and compares answers. Needs:",
+		"turnOn": "Turn on shadow replay below.",
 		"connect": "Connect a recorded session source.",
 		"connectAction": "Connect a source",
 		"done": "Done",
-		"formFolded": "New replay (usable once both are done)"
+		"formFolded": "New replay"
 	},
 	"page": {
 		"title": "Replay on a new model",
-		"intro": "Replay recorded sessions against another model. Tools are answered from the recording and never run. This is a comparison, not a benchmark result."
+		"intro": "Tools are answered from the recording, never run."
 	},
 	"settings": {
 		"toggle": "Allow shadow replay for this organization",
-		"confirm": "Recorded sessions, cleaned of keys and personal data, will be sent to the model you pick, through your own model key. Tools are never run.",
+		"confirm": "Sessions, cleaned of keys and personal data, go to your chosen model on your key. Tools never run.",
 		"turnOn": "Turn on",
 		"cancel": "Cancel",
 		"off": "Shadow replay is off. Ask an org admin to turn it on.",
@@ -37,16 +43,16 @@
 		"mode": "Mode",
 		"modeFixed": "Same inputs, one step at a time",
 		"modeTrajectory": "Let the new model carry on",
-		"modeFixedHelp": "Each step gets the recorded inputs, so every answer is compared on equal terms.",
-		"modeTrajectoryHelp": "The new model keeps going from its own answers instead of the recorded ones.",
+		"modeFixedHelp": "Each step gets the recorded inputs.",
+		"modeTrajectoryHelp": "Continues from its own answers.",
 		"candidate": "New model",
 		"candidateHint": "provider/model, for example openai/gpt-4o-mini",
 		"judge": "Judge for text answers (optional)",
 		"cap": "Spending cap",
-		"capHint": "In US dollars, shared by the new model and the judge.",
-		"confirmCost": "I understand this replay makes paid model calls up to the spending cap",
+		"capHint": "USD, shared by the model and judge.",
+		"confirmCost": "I accept paid model calls up to the cap",
 		"start": "Start replay",
-		"started": "Replay started. It shows below when it is done.",
+		"started": "Replay started.",
 		"badModel": "Write the model as provider/model."
 	},
 	"list": {
@@ -61,7 +67,7 @@
 		"loadError": "This replay could not be loaded.",
 		"equivalentShare": "Same answer in {{share}} of {{n}} compared steps (95% interval {{low}} to {{high}})",
 		"leftOut": "{{count}} steps left out: not sent or not enough recorded data",
-		"medians": "Median cost per step: {{new}} new, {{recorded}} recorded ({{paired}} steps with both). Median latency: {{newMs}} ms new, {{recordedMs}} ms recorded.",
+		"medians": "Median cost per step: {{new}} new, {{recorded}} recorded ({{paired}} paired). Median latency: {{newMs}} ms new, {{recordedMs}} ms recorded.",
 		"stoppedAt": "stopped at step {{n}}",
 		"toolAgreement": "tool agreement {{share}}",
 		"writeSame": "write calls the same",

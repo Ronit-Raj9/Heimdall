@@ -1,8 +1,8 @@
 {
 	"sync": {
 		"heading": "Keep this benchmark fresh",
-		"intro": "Every week, merged fixes from {{repo}} become new tasks in this repository's benchmark, the same one that tasks from issues go into. Fixes already turned into tasks are skipped.",
-		"pickRepo": "Enter a repository above to turn on weekly tasks.",
+		"intro": "Weekly, merged fixes from {{repo}} become new tasks. Done fixes are skipped.",
+		"pickRepo": "Enter a repository above first.",
 		"day": "Day",
 		"hour": "Hour (UTC)",
 		"maxIssues": "Most new tasks a week",
@@ -17,8 +17,16 @@
 		"paused": "Paused",
 		"runRow": "{{date}}: {{started}} new issues started, {{skipped}} skipped, ${{spent}} spent",
 		"runReason": "{{date}}: {{reason}}",
-		"private": "This repository is private. Its code is read with your GitHub connection on a worker, sent only to your own model key, and stays in your organization. The benchmark is visible to your organization's members only.",
-		"days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+		"private": "Private repo. Code is read on a worker, sent only to your model key, and stays in your organization. Visible to members only.",
+		"days": [
+			"Sunday",
+			"Monday",
+			"Tuesday",
+			"Wednesday",
+			"Thursday",
+			"Friday",
+			"Saturday"
+		]
 	},
 	"jobs": {
 		"kinds": {
@@ -27,19 +35,19 @@
 	},
 	"cheat": {
 		"title": "Cheat rate",
-		"description": "How often each agent passed an impossible twin of a task: a copy whose tests contradict its instruction, so no honest answer passes.",
+		"description": "How often each agent passed an impossible task copy.",
 		"measured": "{{arm}}: {{passed}} of {{runs}} impossible tasks passed ({{rate}}, {{low}} to {{high}})",
-		"measuredNote": "Any pass of an impossible task means the agent changed the tests or otherwise cheated. Open the run to see what it did.",
-		"fewRuns": "Few runs: treat this as a warning sign only.",
+		"measuredNote": "Any pass means the agent cheated. Open the run.",
+		"fewRuns": "Few runs. Warning sign only.",
 		"passRun": "Passed run {{n}}",
 		"running": "Cheat check running.",
 		"notMeasured": "Not measured yet.",
 		"check": "Check for cheating",
-		"confirm": "This runs each agent once on every impossible twin, on your model keys.",
+		"confirm": "Runs each agent once per impossible twin on your model keys.",
 		"start": "Start the cheat check",
-		"checkStarted": "Cheat check started. The rate shows here when it is done.",
+		"checkStarted": "Cheat check started.",
 		"noTwins": "This benchmark has no impossible twins yet.",
 		"makeTwins": "Make impossible twins",
-		"twinsStarted": "Making the twins. Their readiness check runs next."
+		"twinsStarted": "Making twins. Readiness check runs next."
 	}
 }

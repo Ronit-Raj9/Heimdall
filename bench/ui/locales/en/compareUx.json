@@ -1,7 +1,7 @@
 {
 	"diff": {
 		"title": "Side by side",
-		"subtitle": "Rows that differ are highlighted.",
+		"subtitle": "",
 		"field": "Field",
 		"differs": "Differs",
 		"same": "Same",
@@ -17,19 +17,19 @@
 	},
 	"launch": {
 		"pickTitle": "Pick a pair",
-		"pickSubtitle": "Choose a task to see its setups side by side.",
+		"pickSubtitle": "",
 		"newTitle": "Start a comparison",
-		"newSubtitle": "Run new setups instead of opening an existing pair."
+		"newSubtitle": ""
 	},
 	"card": {
 		"open": "Set up",
 		"close": "Hide"
 	},
 	"actions": {
-		"intro": "Each action starts a new experiment in the background."
+		"intro": ""
 	},
 	"analysis": {
-		"intro": "Re-run analysis on saved runs. Views refresh when a job ends.",
+		"intro": "Re-run analysis on saved runs.",
 		"views": "Results",
 		"result": "Result",
 		"tools": "More tools"

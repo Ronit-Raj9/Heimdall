@@ -3,10 +3,10 @@
 		"showing": "Showing re-score {{id}} from {{date}}.",
 		"showingNote": "Showing re-score {{id}} from {{date}}: {{note}}.",
 		"showOriginal": "Show original result",
-		"original": "Showing the original result. A newer re-score {{id}} from {{date}} exists.",
+		"original": "Original result. Newer re-score {{id}} from {{date}}.",
 		"showLatest": "Show re-score"
 	},
 	"gradeNote": {
-		"reading": "Reading grade source {{source}}. The task grid still shows saved outcomes."
+		"reading": "Grade source {{source}}. Task grid shows saved outcomes."
 	}
 }

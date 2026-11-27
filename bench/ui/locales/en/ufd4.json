@@ -4,8 +4,8 @@
 		"neverAdminOnly": "Only an admin can make a link that never expires.",
 		"org": {
 			"title": "Shared links",
-			"description": "Every read-only link anyone in this organization has made. Turning a link off ends it for everyone who has it.",
-			"empty": "No one in this organization has made a share link yet.",
+			"description": "Turning a link off ends it for everyone.",
+			"empty": "No share links yet.",
 			"loadError": "Could not load the share links.",
 			"link": "Link",
 			"by": "Made by",

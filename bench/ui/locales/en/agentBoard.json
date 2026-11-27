@@ -4,9 +4,9 @@
 		"byBenchmark": "By benchmark"
 	},
 	"title": "Agents",
-	"description": "One row per agent version and model, from your organization's real runs. Each score is the share of runs solved on that capability's benchmarks (newest version of each, clean runs), with a 95% range over tasks. A score is ranked once it has {{runs}} runs over {{tasks}} tasks.",
+	"description": "Share of clean runs solved per capability, newest benchmark versions, 95% range over tasks. Ranked at {{runs}} runs over {{tasks}} tasks.",
 	"loadError": "Could not load the agent leaderboard.",
-	"empty": "No agent has finished runs yet. Run an evaluation to fill this board.",
+	"empty": "No finished runs yet.",
 	"emptyFiltered": "No agent matches these filters.",
 	"resetFilters": "Clear filters",
 	"filters": {
@@ -26,9 +26,9 @@
 	"baseline": "built-in",
 	"baselineHint": "A ready-made agent from the Heimdall library",
 	"simulatedCustomer": "simulated customer",
-	"simulatedCustomerHint": "A model played the customer ({{simulator}}). Ranked on its own, never mixed with scripted customers.",
+	"simulatedCustomerHint": "A model played the customer ({{simulator}}). Ranked separately from scripted customers.",
 	"noVersion": "version not recorded",
-	"noVersionHint": "This run was not started from an evaluation, so its agent version was not recorded.",
+	"noVersionHint": "Not started from an evaluation. No version recorded.",
 	"noScore": "not measured",
 	"range": "95% range {{low}} to {{high}}, {{runs}} runs over {{tasks}} tasks",
 	"openReportCard": "Open the report card for {{agent}}",
@@ -53,7 +53,7 @@
 		"benchmark": "Benchmark",
 		"all": "All",
 		"includePractice": "Include practice runs",
-		"includePracticeHint": "Practice runs are the made-up example benchmarks. They are left out unless you tick this.",
+		"includePracticeHint": "Made-up example benchmarks. Left out unless ticked.",
 		"emptyFiltered": "No runs of {{agent}} match these filters.",
 		"clearFilters": "Clear filters"
 	},
@@ -64,12 +64,12 @@
 		"budget": "Ran out of budget",
 		"refusal": "Refused the task"
 	},
-	"notMeasuredHint": "No run of this agent used this capability's benchmarks, so it has no score.",
+	"notMeasuredHint": "No runs on this capability's benchmarks.",
 	"tooFew": "Too few runs ({{runs}})",
-	"rankAllHint": "Place by the All score: the share solved over every capability with enough runs",
-	"tieHint": "Its 95% range overlaps the row above, so the two are not clearly apart",
+	"rankAllHint": "Ranked by All score over capabilities with enough runs.",
+	"tieHint": "95% range overlaps the row above.",
 	"best": "Best",
 	"scoreHeader": "Solved ({{capability}})",
-	"scoreHint": "Share of runs solved on this capability's benchmarks: higher is better",
+	"scoreHint": "Share of runs solved. Higher is better.",
 	"perRun": "{{cost}} per run"
 }

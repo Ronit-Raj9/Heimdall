@@ -1,7 +1,7 @@
 {
 	"live": {
 		"terminal": "(Terminal: heimdall livescore init)",
-		"existing": "This organization already has live scoring settings. Tick Replace to overwrite them.",
+		"existing": "Live scoring settings exist. Tick Replace to overwrite them.",
 		"tickToSave": "Tick Replace to save over the current settings."
 	},
 	"invite": {

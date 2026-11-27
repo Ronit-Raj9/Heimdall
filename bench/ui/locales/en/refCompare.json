@@ -1,19 +1,19 @@
 {
 	"compare": {
 		"title": "Compare two git refs",
-		"description": "Run one agent at two branches, tags or commits on the same tasks.",
-		"agent": "Agent (base config)",
+		"description": "One agent at two refs, on the same tasks.",
+		"agent": "Base agent",
 		"agentPlaceholder": "Pick an agent",
 		"noAgents": "No agents yet. Create one on the Agents page first.",
 		"suite": "Benchmark",
 		"repo": "Repository",
-		"repoProject": "This project's own git repository (local server only)",
+		"repoProject": "This project's repository, local server only",
 		"repoLoading": "Loading repositories...",
 		"pickRepo": "Pick a GitHub repository",
 		"pickRepoFirst": "Pick a GitHub repository first.",
 		"connectHosted": "Connect GitHub to compare two versions from your repository.",
 		"connect": "Connect GitHub to pick a repository and its branches",
-		"connectHint": "A hosted project has no git history: connect GitHub, or type the refs of a local repository when running the server on your machine.",
+		"connectHint": "A hosted project has no git history. Connect GitHub, or run the server locally and type local refs.",
 		"refA": "Baseline ref (Setup A)",
 		"refB": "Candidate ref (Setup B)",
 		"refPlaceholder": "main, v1.2.0 or a commit",
@@ -21,20 +21,20 @@
 		"tasks": "Task ids (optional, comma-separated)",
 		"tasksPlaceholder": "all tasks of the benchmark",
 		"trials": "Trials per task",
-		"budget": "Budget (USD, required unless both setups are scripted)",
+		"budget": "Budget in USD, required unless both setups are scripted",
 		"run": "Compare refs",
 		"confirm": "Read the agent files at both refs, write the experiment and start it?",
 		"missing": "Pick an agent, a benchmark and two different refs.",
-		"same": "The two refs are the same: pick two different refs."
+		"same": "The two refs are the same. Pick two different refs."
 	},
 	"replay": {
 		"title": "Replay blamed failures (tier 2)",
-		"description": "Runs each blamed team failure again with the suspect swapped for a stub agent, through your workers, and writes the replay verdict into blame.json. Runs agents again, so it costs model calls.",
+		"description": "Reruns each blamed team failure with the suspect swapped for a stub agent, on your workers, and writes the verdict to blame.json. Costs model calls.",
 		"stub": "Stub agent",
 		"stubDefault": "The experiment's attribution.stub",
 		"run": "Replay",
 		"confirm": "Replay blamed failures of {{expId}}? Each replay runs two agent runs.",
 		"result": "{{replayed}} of {{candidates}} blamed failures replayed",
-		"none": "No blamed team failure to replay: run Blame first, tier 2 only tests failures pinned on one team member."
+		"none": "No blamed team failure to replay. Run Blame first. Tier 2 only tests failures pinned on one team member."
 	}
 }

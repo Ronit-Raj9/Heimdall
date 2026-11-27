@@ -1,6 +1,6 @@
 {
 	"title": "Import from a platform",
-	"subtitle": "Your agent already lives on Vapi, Retell, ElevenLabs, Bedrock AgentCore, Agentforce, Copilot Studio, Vertex AI or LangGraph Platform? Give its id and the key, and Heimdall reads its prompt, tools and settings and connects it for you.",
+	"subtitle": "Vapi, Retell, ElevenLabs, Bedrock, Agentforce, Copilot Studio, Vertex AI, LangGraph.",
 	"open": "Import an agent by its id",
 	"close": "Hide",
 	"platform": "Platform",
@@ -10,7 +10,7 @@
 	},
 	"imports": "Reads: {{list}}",
 	"docs": "Platform docs",
-	"secretHelp": "Name of an org secret (Settings > Secrets) that holds it. The value never leaves the server.",
+	"secretHelp": "Org secret name. The value stays on the server.",
 	"name": "Agent name in Heimdall",
 	"nameHelp": "Lowercase letters, digits, '.', '_' or '-'.",
 	"read": "Read the agent",

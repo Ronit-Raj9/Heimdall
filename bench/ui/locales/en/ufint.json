@@ -11,16 +11,16 @@
 		"stopAll": "Stop runs for every organization?"
 	},
 	"live": {
-		"judgeConfirm": "Pull and also grade the new sessions with a model? Grading is paid: it uses your model key."
+		"judgeConfirm": "Pull and grade new sessions with a model? Grading uses your model key."
 	},
 	"canary": {
 		"confirmTitle": "Start drift monitor {{name}}?",
-		"confirmBody": "It runs on its schedule until you turn it off, and each run uses your model key.",
-		"runConfirm": "Run this drift monitor now? It runs once and can spend up to ${{usd}}.",
-		"runConfirmNoCap": "Run this drift monitor now? It runs once in practice mode: a scripted model answers, so there is no model cost."
+		"confirmBody": "Runs on schedule until turned off. Each run uses your model key.",
+		"runConfirm": "Run this drift monitor once? Up to ${{usd}}.",
+		"runConfirmNoCap": "Run once in practice mode? A scripted model answers, no model cost."
 	},
 	"redTeam": {
-		"admitConfirm": "Run the readiness check of every task in {{suite}}? It plays fixed attacks on a worker and calls no model."
+		"admitConfirm": "Run the readiness check of every task in {{suite}}? Fixed attacks on a worker, no model calls."
 	},
 	"settings": {
 		"tabShares": "Shared links"

@@ -24,7 +24,7 @@
 		"commit": "commit {{commit}}"
 	},
 	"common": {
-		"loadError": "This page could not load its data from the server.",
+		"loadError": "Could not load this page's data.",
 		"retry": "Try again",
 		"draft": "Draft, under legal review",
 		"draftBody": "This text is a working draft that is still being reviewed by counsel. It describes how this Heimdall server works today, but it is not yet a binding agreement. Questions: use the contact on the Security page.",
@@ -33,64 +33,76 @@
 	},
 	"landing": {
 		"eyebrow": "Agent benchmarking",
-		"title": "Benchmark the agent you ship, not just the model behind it.",
-		"body": "Heimdall runs your agent on real benchmarks and on your own tasks, breaks its tools and model on purpose, and hands you a report card with intervals and cost per task. Gate every pull request on it.",
+		"title": "Benchmark the agent you ship.",
+		"body": "Report cards with cost per task, gating every pull request.",
 		"ctaSignUp": "Get started",
 		"ctaSignIn": "Sign in",
 		"ctaDocs": "Read the docs",
 		"ctaLibrary": "Browse the benchmarks",
-		"inviteOnly": "Sign-up on this server is by invitation. Ask your admin for an invite link.",
+		"inviteOnly": "Sign-up is by invitation. Ask your admin for a link.",
 		"stats": {
 			"label": "The library on this server",
 			"benchmarks": "benchmarks",
 			"tasks": "tasks",
 			"ready": "ready to run",
 			"packs": "evaluation packs",
-			"none": "This server has no built-in benchmark library yet. You can still evaluate on your own tasks."
+			"none": "No built-in benchmarks yet. Use your own tasks."
 		},
 		"agentFirst": {
 			"title": "Agent first",
-			"body": "Model leaderboards tell you which model is smart. They do not tell you whether your agent, with its prompts, tools, memory and retries, does the job. Heimdall tests the whole thing.",
+			"body": "Leaderboards rank models. Heimdall tests the whole agent.",
 			"bring": {
 				"title": "Bring the agent as it is",
-				"body": "A command line agent, an HTTP endpoint, a container image or a framework like OpenAI Agents or LangGraph. No rewrite."
+				"body": "Command line, HTTP, container, OpenAI Agents or LangGraph. No rewrite."
 			},
 			"faults": {
 				"title": "See how it fails",
-				"body": "Clean runs, then the same tasks with the model down, a broken tool or a misleading instruction. Failures are grouped into patterns you can act on."
+				"body": "Clean runs, then faults. Failures grouped into patterns."
 			},
 			"decide": {
 				"title": "Decide with numbers",
-				"body": "Scores with 95% intervals, paired comparisons between versions, and cost and time per task, so a release decision is not a guess."
+				"body": "95% intervals, paired comparisons, cost and time per task."
 			}
 		},
 		"how": {
 			"title": "How it works",
-			"step1": { "title": "Connect your agent", "body": "Register it once from the app, the command line, the SDKs or your MCP client." },
-			"step2": { "title": "Pick what to test", "body": "Choose benchmarks from the library or import your own tasks and tickets." },
-			"step3": { "title": "Run on your own key", "body": "Every model call goes to your provider on your key. Heimdall shows the cost before it starts." },
-			"step4": { "title": "Read the report card", "body": "Share it, or let the pull request gate fail the build when a version gets worse." }
+			"step1": {
+				"title": "Connect your agent",
+				"body": "From the app, CLI, SDKs or MCP."
+			},
+			"step2": {
+				"title": "Pick what to test",
+				"body": "Library benchmarks or your own tasks."
+			},
+			"step3": {
+				"title": "Run on your own key",
+				"body": "Model calls use your provider key. Cost shows before start."
+			},
+			"step4": {
+				"title": "Read the report card",
+				"body": "Share it, or fail the build on a regression."
+			}
 		},
 		"bifrost": {
 			"title": "Built on Bifrost",
-			"body": "Every model call of every evaluation passes through Bifrost, the open source AI gateway. That is how Heimdall counts tokens and cost per task, records a trace of each step, and injects faults without touching your code.",
+			"body": "Every model call goes through Bifrost, the open source AI gateway.",
 			"point1": "One gateway for every provider and model your agent uses",
-			"point2": "A per-evaluation key, so spend and traces belong to one run",
+			"point2": "A per-evaluation key for spend and traces",
 			"point3": "Faults injected at the gateway: outages, slow answers, broken tools"
 		},
 		"libraryTitle": "Packs in the library",
-		"libraryBody": "Each pack groups the benchmarks for one kind of agent. Counts are read from this server.",
+		"libraryBody": "",
 		"packBenchmarks_one": "{{count}} benchmark",
 		"packBenchmarks_other": "{{count}} benchmarks",
 		"devTitle": "Works where you work",
-		"devBody": "The command line tool, Python and TypeScript SDKs and a remote MCP endpoint, all served by this server.",
+		"devBody": "CLI, Python and TypeScript SDKs, remote MCP.",
 		"devCta": "See downloads",
 		"finalTitle": "Start with one agent and one benchmark.",
 		"finalBody": "Free during beta. Bring your own model key."
 	},
 	"library": {
 		"title": "Benchmark library",
-		"subtitle": "Every benchmark this server offers, with its size, readiness and licence. Task content is shown only inside an organization.",
+		"subtitle": "Task content is shown only inside an organization.",
 		"search": "Search benchmarks",
 		"allPacks": "All",
 		"tasks": "Tasks",
@@ -108,12 +120,12 @@
 		"totals": "{{benchmarks}} benchmarks, {{tasks}} tasks, {{ready}} ready",
 		"totalsFiltered": "Showing {{shown}} of {{benchmarks}} benchmarks: {{tasks}} tasks, {{ready}} ready",
 		"signInToOpen": "Sign in to open",
-		"readyHint": "Ready tasks passed the readiness checks and still match their locked files.",
+		"readyHint": "Passed readiness checks and match their locked files.",
 		"cta": "Evaluate your agent on these"
 	},
 	"pricing": {
 		"title": "Pricing",
-		"subtitle": "Every limit that applies to you is shown before you launch.",
+		"subtitle": "Every limit is shown before you launch.",
 		"beta": "Beta",
 		"limits": "Limits",
 		"ctaSignUp": "Get started",
@@ -122,12 +134,12 @@
 	},
 	"downloads": {
 		"title": "Downloads",
-		"subtitle": "The command line tool, the SDKs and MCP, served by this server and built at the commit it runs. Nothing comes from GitHub or a package registry.",
+		"subtitle": "Built at this server's commit. Nothing from GitHub or registries.",
 		"builtAt": "Built at commit {{commit}}, version {{version}}",
-		"none": "This server has no downloads yet. They are built with the server image (docs: Downloads).",
+		"none": "No downloads yet. They are built with the server image.",
 		"cli": {
 			"title": "Command line tool",
-			"body": "One static binary. Check it against SHA256SUMS, then put it on your PATH as heimdall.",
+			"body": "Check it against SHA256SUMS, then put it on PATH as heimdall.",
 			"os": "System",
 			"size": "Size",
 			"sha": "SHA-256",
@@ -135,30 +147,40 @@
 			"linux": "Linux",
 			"darwin": "macOS"
 		},
-		"python": { "title": "Python SDK", "body": "Standard library only, Python 3.9 or newer.", "sdist": "Source package" },
-		"typescript": { "title": "TypeScript SDK", "body": "ES modules, Node 18 or newer, no dependencies." },
+		"python": {
+			"title": "Python SDK",
+			"body": "Standard library only, Python 3.9 or newer.",
+			"sdist": "Source package"
+		},
+		"typescript": {
+			"title": "TypeScript SDK",
+			"body": "ES modules, Node 18 or newer, no dependencies."
+		},
 		"mcp": {
 			"title": "MCP",
-			"body": "Connect Claude Code or any MCP client to this server with an org API token from Settings. No install.",
+			"body": "Connect any MCP client with an org API token from Settings.",
 			"local": "Or run it locally from the command line tool"
 		},
 		"ci": {
 			"title": "Pull request gate",
-			"body": "The workflows the agent page generates download the tool from this server with a checksum check.",
+			"body": "Generated workflows download the tool here with a checksum check.",
 			"github": "GitHub Actions step",
 			"gitlab": "GitLab CI include"
 		},
-		"source": { "title": "Source", "body": "The bench module at this server's commit, what a worker builds from." },
+		"source": {
+			"title": "Source",
+			"body": "The bench module at this server's commit."
+		},
 		"checksums": "All checksums",
 		"manifest": "Manifest (JSON)",
 		"copy": "Copy"
 	},
 	"security": {
 		"title": "Security",
-		"subtitle": "How this Heimdall server protects your agents, keys and evidence, and how to report a problem.",
+		"subtitle": "",
 		"report": {
 			"title": "Report a vulnerability",
-			"body": "Send reports to the contact in security.txt. Include the steps to reproduce and what you could reach. We aim to answer within three working days and do not take action against good-faith research that avoids other people's data and does not degrade the service.",
+			"body": "Send reports to the security.txt contact with steps to reproduce. We aim to answer within three working days. We take no action against good-faith research that avoids other people's data and does not degrade the service.",
 			"cta": "Open security.txt"
 		},
 		"sections": {
@@ -268,7 +290,9 @@
 			},
 			{
 				"title": "9. Contact",
-				"body": ["Questions about these terms go to the contact listed on the Security page."]
+				"body": [
+					"Questions about these terms go to the contact listed on the Security page."
+				]
 			}
 		]
 	},
@@ -335,11 +359,31 @@
 			"purpose": "What it does",
 			"data": "Data it handles",
 			"rows": [
-				{ "name": "Microsoft Azure", "purpose": "Hosting of the server, database, workers and backups", "data": "All data listed above, encrypted in transit" },
-				{ "name": "GitHub", "purpose": "Sign-in with GitHub and repository connections, only when you use them", "data": "GitHub user id, name, email; repositories you connect" },
-				{ "name": "Let's Encrypt or ZeroSSL", "purpose": "HTTPS certificates for the server's address", "data": "The server's domain name only" },
-				{ "name": "Your model providers", "purpose": "Model calls of your evaluations, on your own key and account", "data": "Prompts and answers of your agent's runs" },
-				{ "name": "Your sandbox platforms (Modal, Daytona, E2B) or your own worker", "purpose": "Running evaluations, only when your organization connects one", "data": "Agent code, task files and run results of those evaluations" }
+				{
+					"name": "Microsoft Azure",
+					"purpose": "Hosting of the server, database, workers and backups",
+					"data": "All data listed above, encrypted in transit"
+				},
+				{
+					"name": "GitHub",
+					"purpose": "Sign-in with GitHub and repository connections, only when you use them",
+					"data": "GitHub user id, name, email; repositories you connect"
+				},
+				{
+					"name": "Let's Encrypt or ZeroSSL",
+					"purpose": "HTTPS certificates for the server's address",
+					"data": "The server's domain name only"
+				},
+				{
+					"name": "Your model providers",
+					"purpose": "Model calls of your evaluations, on your own key and account",
+					"data": "Prompts and answers of your agent's runs"
+				},
+				{
+					"name": "Your sandbox platforms (Modal, Daytona, E2B) or your own worker",
+					"purpose": "Running evaluations, only when your organization connects one",
+					"data": "Agent code, task files and run results of those evaluations"
+				}
 			]
 		}
 	}

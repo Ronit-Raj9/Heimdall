@@ -1,6 +1,6 @@
 {
 	"tab": "Analysis",
-	"intro": "Run the analysis commands on this experiment's saved runs. Each button starts a background job with a live log; the views below refresh when it ends.",
+	"intro": "Each button starts a background job.",
 	"jobs": {
 		"title": "Analysis jobs",
 		"running": "Running",
@@ -28,7 +28,7 @@
 			"title": "Blame",
 			"description": "Find which agent caused each multi-agent failure.",
 			"button": "Compute blame",
-			"single": "Each setup here runs one agent, so there is no blame to split. Blame is for team runs."
+			"single": "One agent per setup, nothing to blame."
 		},
 		"clusters": {
 			"title": "Failure clusters",
@@ -44,11 +44,11 @@
 	"result": {
 		"check": "Verdict {{decision}}, action {{action}}",
 		"verdict": {
-			"score": "Score saved. This comparison has one setup, so there is no release decision.",
+			"score": "Score saved. One setup, no release decision.",
 			"improved": "B is better than A.",
 			"regressed": "B is worse than A.",
 			"inconclusive": "No clear difference between A and B yet.",
-			"invalid": "The test was broken, so there is no verdict."
+			"invalid": "Broken test, no verdict."
 		},
 		"action": {
 			"ship": "Ready to release.",
@@ -72,9 +72,9 @@
 	},
 	"views": {
 		"verdict": "Current verdict",
-		"verdictNone": "No verdict yet. Run a check once the experiment has saved runs.",
+		"verdictNone": "No verdict yet.",
 		"awareness": "Eval awareness",
-		"awarenessNone": "No awareness report yet. Start a scan above.",
+		"awarenessNone": "No awareness report yet.",
 		"awarenessArm": "Setup {{arm}}: {{withSignals}} of {{scanned}} scanned runs with signals ({{signals}} signals)",
 		"awarenessNotScanned_one": "{{count}} run not scanned",
 		"awarenessNotScanned_other": "{{count}} runs not scanned",
@@ -85,19 +85,19 @@
 	},
 	"links": {
 		"title": "Cost",
-		"costExplain": "Why one setup cost more (cost explain)",
-		"pareto": "Cost against verified success (pareto)",
-		"leaderboardPareto": "Leaderboard pareto across experiments"
+		"costExplain": "Why one cost more",
+		"pareto": "Cost vs success",
+		"leaderboardPareto": "Leaderboard pareto"
 	},
 	"audit": {
 		"title": "Audit a published table",
-		"description": "Paste a per-task CSV (task,a_pass,a_n,b_pass,b_n) for a paired verdict.",
+		"description": "Per-task CSV: task,a_pass,a_n,b_pass,b_n",
 		"file": "CSV file",
 		"paste": "Or paste the table",
 		"placeholder": "task,a_pass,a_n,b_pass,b_n\nt01,1,3,2,3",
 		"submit": "Audit table",
 		"empty": "Choose a CSV file or paste a table first.",
-		"tooLarge": "The table is larger than 1 MiB. Trim it or run `heimdall audit` locally.",
+		"tooLarge": "Over 1 MiB. Trim it or run `heimdall audit` locally.",
 		"result": "Verdict {{decision}}, action {{action}}",
 		"effect": "Effect {{effect}} pp over {{tasks}} tasks",
 		"mde": "Minimal detectable effect {{mde}} pp",

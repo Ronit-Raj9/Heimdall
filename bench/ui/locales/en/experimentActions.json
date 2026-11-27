@@ -1,6 +1,6 @@
 {
 	"tab": "Actions",
-	"intro": "Buy more evidence, add failure tests, or compare models. Each action writes a new experiment, freezes it and starts it as a background job.",
+	"intro": "Each action starts a new frozen experiment.",
 	"job": {
 		"follow": "Follow the job",
 		"running": "Job {{status}}",
@@ -18,7 +18,7 @@
 		"trials": "More trials of the same tasks",
 		"tasks": "Tasks this experiment did not run",
 		"count": "How many",
-		"force": "Extend anyway (the verdict is not inconclusive)",
+		"force": "Extend anyway",
 		"run": "Extend",
 		"confirm": "Start a follow-up experiment of {{expId}}? It spends model budget.",
 		"notInconclusive": "The verdict is not inconclusive: tick \"Extend anyway\" to run a follow-up regardless.",
@@ -26,7 +26,7 @@
 	},
 	"probe": {
 		"title": "Fault test",
-		"description": "Re-run each setup with faults added, on the same tasks, to see how it holds up.",
+		"description": "Re-run each setup with faults on the same tasks.",
 		"loading": "Loading the fault list",
 		"catalog": "Faults to add",
 		"own": "This benchmark's own failure tests",

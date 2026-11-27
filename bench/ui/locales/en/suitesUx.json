@@ -57,8 +57,8 @@
 	"details": "Details",
 	"detailsHint": "Environment, grader, frozen version and failure tests",
 	"tasksTitle": "Tasks",
-	"tasksDescription": "Each row is one job the agent must do. Click a task to see what the agent is asked and how it is checked.",
-	"subtitle": "Each benchmark is a set of tasks. Open one to see its tasks and run it.",
+	"tasksDescription": "",
+	"subtitle": "",
 	"pageSubtitle_one": "A set of {{count}} task that tests {{skill}}.",
 	"pageSubtitle_other": "A set of {{count}} tasks that test {{skill}}.",
 	"pageSkill": "Tests {{skill}}.",
@@ -69,7 +69,7 @@
 		"builtin": "Benchmarks",
 		"builtinHint": "Full real benchmarks, ready to run.",
 		"org": "Added by your team",
-		"practice": "Test benchmarks (left by automated checks)"
+		"practice": "Test benchmarks"
 	},
 	"builtIn": "Built in",
 	"builtinReadOnly": "Built-in benchmark, read-only",
@@ -82,7 +82,7 @@
 		"sourceAll": "All",
 		"sourceBuiltin": "Built in",
 		"sourceTeam": "Added by your team",
-		"noMatch": "No benchmarks match. Clear the search or filters.",
+		"noMatch": "No benchmarks match.",
 		"clear": "Clear search and filters",
 		"categories": {
 			"terminal": "Terminal",
@@ -96,6 +96,6 @@
 			"other": "Other"
 		}
 	},
-	"builtinMakeOwn": "To build, edit or review tasks, make your own benchmark.",
+	"builtinMakeOwn": "To edit tasks, make your own benchmark.",
 	"builtinMakeOwnLink": "Add a benchmark"
 }

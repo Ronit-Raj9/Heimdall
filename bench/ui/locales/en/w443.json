@@ -2,16 +2,16 @@
 	"tabs": {
 		"findings": "Tracked"
 	},
-	"intro": "Failures you track until a rerun proves them fixed. One reopens by itself when one of its tasks fails again.",
+	"intro": "Reopens when a task fails again.",
 	"loadError": "Could not load the tracked failures",
 	"search": "Search tracked failures",
 	"clearSearch": "Clear search",
 	"noMatch": "No tracked failure matches this search.",
 	"emptyTitle": "No tracked failures yet",
-	"emptyBody": "Find out why a comparison failed, keep a cause you agree with, then rerun to check the fix.",
-	"emptyTrackedBody": "Keep a cause from an investigation below to track it.",
-	"empty": "No tracked failures yet. Find out why a comparison failed, keep a cause you agree with, then rerun to check the fix.",
-	"emptyTracked": "No tracked failures yet. Keep a cause from an investigation below to track it.",
+	"emptyBody": "",
+	"emptyTrackedBody": "Keep a cause below to track it.",
+	"empty": "No tracked failures yet.",
+	"emptyTracked": "No tracked failures yet.",
 	"states": {
 		"open": "Open",
 		"expected": "Known, not fixing",
@@ -37,12 +37,12 @@
 		"runs": "Runs",
 		"tasks": "Tasks",
 		"cause": "Possible cause",
-		"hypothesisLabel": "Hypothesis written by a model. Quotes were checked against the recorded steps.",
+		"hypothesisLabel": "Written by a model. Quotes checked against steps.",
 		"quotes": "Quotes",
 		"step": "step {{seq}}",
 		"history": "History",
 		"event": "{{date}}: {{from}} to {{to}}. {{reason}}",
-		"fixed": "Fixed: the fixed agent passed {{k}} of {{n}} runs; the old agent passed {{a}} of {{b}}.",
+		"fixed": "Fixed: new agent passed {{k}} of {{n}}, old passed {{a}} of {{b}}.",
 		"close": "Close",
 		"from": "Comparison it came from",
 		"arm": "setup {{arm}}"
@@ -54,23 +54,23 @@
 		"reason": "Why is it not being fixed?",
 		"save": "Save",
 		"cancel": "Cancel",
-		"judge": "Read the rerun results"
+		"judge": "Read results"
 	},
 	"checkFix": {
-		"experiment": "Comparison the failure came from",
+		"experiment": "Source comparison",
 		"from": "From comparison {{name}}",
 		"change": "Change",
 		"verb": "Rerun",
 		"startPaid": "Rerun, about ${{usd}}",
 		"startPaidUnknown": "Rerun, cost not known yet",
-		"ask": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times each, old and fixed agent)? About ${{usd}}, from the cost per run of the source comparison.",
-		"askUnknown": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times each, old and fixed agent)? The cost is not known yet: the source comparison has no finished runs with a cost.",
+		"ask": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times, old and fixed agent)? About ${{usd}}.",
+		"askUnknown": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times, old and fixed agent)? Cost not known yet.",
 		"yes": "Yes, rerun",
 		"arm": "Setup that failed",
 		"trials": "Runs per task",
-		"confirm": "Reruns {{n}} tasks {{trials}} times with the old agent and the fixed agent. These runs are kept apart from your benchmark results.",
-		"start": "Start the rerun",
-		"started": "Rerun started. Read the results here once it has finished."
+		"confirm": "Old and fixed agent, {{n}} tasks, {{trials}} times. Kept apart from benchmark results.",
+		"start": "Start rerun",
+		"started": "Rerun started."
 	},
 	"investigations": {
 		"title": "Investigations",
@@ -79,19 +79,19 @@
 		"option": "{{name}}, {{count}} failed runs",
 		"verb": "Start investigation",
 		"startPaid": "Start, up to ${{cap}} (uses your model key)",
-		"ask": "Start an investigation of {{name}}? A model reads its failed runs and spends at most ${{cap}} of your model key.",
+		"ask": "Investigate {{name}}? A model reads failed runs and spends up to ${{cap}} on your model key.",
 		"yes": "Yes, start",
-		"findOutPaid": "Find out why (paid, up to {{cap}} by default)",
+		"findOutPaid": "Find out why, up to {{cap}}",
 		"loadError": "Could not load the investigations",
 		"spent": "spent ${{usd}}",
 		"stopped": "stopped: {{reason}}",
-		"cap": "Spending cap in dollars",
-		"start": "Start the investigation",
-		"started": "Investigation started. Its report appears here when it is done.",
+		"cap": "Spending cap ($)",
+		"start": "Start investigation",
+		"started": "Investigation started.",
 		"empty": "No investigations yet.",
 		"keep": "Track this cause",
 		"kept": "Tracked",
 		"runs": "{{count}} runs",
-		"note": "These are hypotheses written by a model. Each quote was checked against the run's recorded steps. The run results themselves come from the tasks' tests."
+		"note": "Model-written hypotheses. Quotes checked against recorded steps."
 	}
 }

@@ -24,7 +24,7 @@
 			"refusal": "The agent refused the task",
 			"integrity_violation": "Cheating detected",
 			"invalid_evaluator": "The grader could not score the run",
-			"infra_error": "Infrastructure error, not the agent",
+			"infra_error": "Infrastructure error",
 			"aborted_infra": "Stopped by an infrastructure error",
 			"other": "Did not pass"
 		}
@@ -51,7 +51,7 @@
 		"scoredRuns": "Scored runs on this version",
 		"scoredRunsCount_one": "{{count}} scored run on this version",
 		"scoredRunsCount_other": "{{count}} scored runs on this version",
-		"oneHint": "Change Setup and save to make v2, then compare them.",
+		"oneHint": "Save a Setup change to make v2.",
 		"openSetup": "Open Setup"
 	},
 	"ci": {

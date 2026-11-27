@@ -2,6 +2,6 @@
 	"diffPicker": {
 		"unsaved": "Unsaved setup",
 		"showSystem": "Show system checks ({{count}})",
-		"showSystemHint": "Heimdall's own controls: scripted agents such as oracle (right answer) and noop (does nothing), and setups only readiness checks ran. They are not versions of your agents."
+		"showSystemHint": "Heimdall's scripted controls, such as oracle and noop. Not your agents."
 	}
 }

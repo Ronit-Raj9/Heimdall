@@ -3,8 +3,8 @@
 		"runVerb": "Run failure test",
 		"confirmTitle": "Start this failure test?",
 		"confirmKnown": "Start {{runs}} runs for up to {{cost}}?",
-		"confirmCap": "Start {{runs}} runs? The price is not known. Spending stops at {{cap}}.",
-		"confirmUnknown": "Start {{runs}} runs? The price is not known.",
+		"confirmCap": "Start {{runs}} runs? Price unknown. Spending stops at {{cap}}.",
+		"confirmUnknown": "Start {{runs}} runs? Price unknown.",
 		"confirmOk": "Start",
 		"confirmCancel": "Cancel",
 		"runsPlanned_one": "Up to {{count}} run",
@@ -12,13 +12,13 @@
 		"budgetTotal": "Up to {{amount}} in total.",
 		"faultsPicked_one": "{{count}} fault picked",
 		"faultsPicked_other": "{{count}} faults picked",
-		"defaultsTicked_one": "{{count}} common fault is ticked to start.",
-		"defaultsTicked_other": "{{count}} common faults are ticked to start.",
+		"defaultsTicked_one": "",
+		"defaultsTicked_other": "",
 		"selectAll": "Select all",
 		"clearGroup": "Clear",
 		"benchmarksLoadError": "Could not load your benchmarks.",
 		"searchBenchmarks": "Search benchmarks",
-		"onlyRunnable": "Only benchmarks this agent can run",
+		"onlyRunnable": "Runnable only",
 		"benchmarksPicked_one": "{{count}} benchmark picked",
 		"benchmarksPicked_other": "{{count}} benchmarks picked",
 		"noMatch": "No benchmark matches.",
@@ -28,8 +28,8 @@
 		"pastChange": "Change from clean"
 	},
 	"runs": {
-		"graderBroken": "The grader crashed; this run does not count",
-		"searchHint": "Searches step text, tool calls and outputs",
+		"graderBroken": "Grader crashed, run does not count.",
+		"searchHint": "Steps, tool calls and outputs",
 		"filters": "Filters",
 		"filtersCount": "Filters ({{count}})",
 		"openRun": "Open run {{task}}"
@@ -38,17 +38,17 @@
 		"gatewayLink": "Gateway report card",
 		"yourAddress": "Your MCP address:",
 		"badUrl": "Enter a full https:// address",
-		"historyTitle": "Recent checks in this browser",
+		"historyTitle": "Recent checks",
 		"historyUnreached": "Did not answer",
 		"manageSecrets": "Manage secrets",
-		"youGet": "You get: a pass or fail per check, the tools the server lists, and what to fix."
+		"youGet": ""
 	},
 	"replays": {
 		"statusOff": "Shadow replay: Off",
 		"statusOn": "Shadow replay: On",
 		"turnOn": "Turn on",
 		"turnOff": "Turn off",
-		"noSources": "No recorded sessions yet. Connect Bifrost in Production failures",
+		"noSources": "No recorded sessions yet.",
 		"connect": "Connect Bifrost",
 		"why": "To start: {{list}}.",
 		"needOn": "turn shadow replay on",
@@ -59,7 +59,7 @@
 		"needCap": "enter a cap above $0",
 		"capEstimate": "Up to {{sessions}} sessions; spending stops at {{cap}}.",
 		"stop": "Stop replay",
-		"stopped": "Stop asked. No new paid calls start."
+		"stopped": "Stopping. No new paid calls."
 	},
 	"lanes": {
 		"model_request": "Asked the model",
@@ -76,7 +76,7 @@
 		"error": "Error"
 	},
 	"pair": {
-		"legend": "Each dot is one attempt: green solved, red not solved.",
+		"legend": "Green solved, red not solved.",
 		"noFault": "No fault"
 	},
 	"picker": {
@@ -88,7 +88,7 @@
 		"keyNotWorking": "{{name}} (key not working)",
 		"noKey": "{{name}} (no key)",
 		"other": "Other {{name}} model...",
-		"more": "More providers (needs a key)...",
+		"more": "More providers...",
 		"open": "open",
 		"openTitle": "Open-weight model",
 		"modelId": "Model id"

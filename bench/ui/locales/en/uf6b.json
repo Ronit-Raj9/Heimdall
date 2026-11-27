@@ -7,7 +7,7 @@
 		},
 		"catalog": {
 			"label": "From the catalog",
-			"needs": "Nothing. Pick a public benchmark and add it."
+			"needs": "Nothing needed."
 		},
 		"api": {
 			"label": "Tasks from your API",
@@ -51,7 +51,7 @@
 		"advanced": "Advanced"
 	},
 	"catalog": {
-		"addHint": "Adds the benchmark to your project. Nothing runs and nothing is charged.",
+		"addHint": "Nothing runs. Nothing is charged.",
 		"importHint": "Import, about 2 min, no model cost.",
 		"importWhat_one": "Imports up to {{count}} task from your copy of the data. No model runs and nothing is charged.",
 		"importWhat_other": "Imports up to {{count}} tasks from your copy of the data. No model runs and nothing is charged.",
@@ -69,7 +69,7 @@
 		"emptyAdd": "Empty. Add items",
 		"start_one": "Start labelling ({{count}})",
 		"start_other": "Start labelling ({{count}})",
-		"created": "Queue {{name}} is created. Now add the runs people will label.",
+		"created": "Queue {{name}} created. Add runs to label.",
 		"openQueue": "Open the queue",
 		"done": "Done"
 	},
@@ -95,13 +95,13 @@
 	"serve": {
 		"hoursRange": "The time limit is 0.1 to 24 hours.",
 		"stopTitle": "Stop serving {{model}}?",
-		"noEvaluation": "No evaluation (stops at the time limit)"
+		"noEvaluation": "No evaluation, stops at the time limit"
 	},
 	"fromApi": {
 		"problem": {
 			"benchmark": "Benchmark id: use 1 to 63 lowercase letters, digits, '.', '-' or '_', starting with a letter or digit.",
 			"app": "Tool prefix: start with a letter, then up to 31 lowercase letters, digits, '-' or '_'.",
-			"appReserved": "Tool prefix: \"customer\" is taken by the simulated customer; pick another.",
+			"appReserved": "Tool prefix: \"customer\" is reserved for the simulated customer. Pick another.",
 			"maxUsd": "Cost cap: type an amount above 0 in US dollars, or leave it empty."
 		}
 	}

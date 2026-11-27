@@ -1,6 +1,6 @@
 {
 	"share": {
-		"labelExists": "A link with this label already exists. Add a word or a date so the two can be told apart."
+		"labelExists": "A link with this label exists. Add a word or date."
 	},
 	"members": {
 		"invited": "Invitation made for {{email}}. Copy the link below.",
@@ -9,13 +9,13 @@
 		"inviteRevoked": "Invitation for {{email}} turned off."
 	},
 	"models": {
-		"whereKeyGoes": "Your key is stored encrypted. A worker receives it only for the length of a run and keeps it in memory; your agent's own container only ever gets a per-run key, never this one.",
-		"testAfterSave": "Test comes right after you save: it is free for most providers (for Sarvam it makes one tiny call).",
+		"whereKeyGoes": "Stored encrypted. A worker holds it in memory only during a run. Your agent's container gets a per-run key instead.",
+		"testAfterSave": "Test runs after save, free for most providers. Sarvam makes one tiny call.",
 		"whereDoc": "How keys are kept",
-		"returnCancelled": "No key was added. You can add one later.",
+		"returnCancelled": "No key was added.",
 		"setupLine": "Key added. The next set-up step is on Home.",
 		"setupAction": "Back to set-up",
-		"freeCheck": "You can still check that an agent runs, for free, with Check agent on its page."
+		"freeCheck": "Check agent on its page runs it for free."
 	},
 	"audit": {
 		"estimate": "{{actor}} checked the cost of {{what}} {{target}}",
@@ -24,10 +24,10 @@
 	},
 	"jobs": {
 		"retryFree": "Retry (free)",
-		"retryFreeTitle": "A replay answers from the recording and calls no model, so it costs nothing."
+		"retryFreeTitle": "Replays from the recording. No model calls, no cost."
 	},
 	"password": {
 		"setTitle": "Set a password",
-		"setDescription": "You sign in with GitHub, so this account has no password yet. Set one to also sign in with your email and a password."
+		"setDescription": "Set one to also sign in with email and password."
 	}
 }

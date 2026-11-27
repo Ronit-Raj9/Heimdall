@@ -1,9 +1,9 @@
 {
 	"title": "Through Bifrost",
-	"description": "What the Bifrost gateway did for this run's model calls: which provider and model answered, fallbacks, cache hits, faults applied, tokens, cost and time per call.",
+	"description": "",
 	"loadError": "Could not load the Bifrost facts for this run",
-	"empty": "This run has no Bifrost records. Its model calls did not go through Bifrost, or the run is not finished yet.",
-	"incomplete": "Bifrost did not return every call of this run, so the numbers below may be low.",
+	"empty": "No Bifrost records for this run.",
+	"incomplete": "Some calls missing. Numbers may be low.",
 	"source": {
 		"bifrost_logs": "From Bifrost's request logs",
 		"plugin_usage": "From the Heimdall Bifrost plugin",
@@ -22,9 +22,9 @@
 		"latency": "Average time per call"
 	},
 	"faultPath": {
-		"plugin": "{{n}} (inside Bifrost, by the Heimdall plugin)",
-		"proxy": "{{n}} (by the fault proxy behind Bifrost)",
-		"mixed": "{{n}} (some by the plugin, some by the proxy)"
+		"plugin": "{{n}} by the plugin",
+		"proxy": "{{n}} by the proxy",
+		"mixed": "{{n}} by plugin and proxy"
 	},
 	"costUnknown": "not reported",
 	"costPartial": "{{known}} of {{calls}} calls reported a cost",

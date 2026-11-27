@@ -22,7 +22,7 @@
 		"clearSelection": "Clear selection"
 	},
 	"traces": {
-		"testHelp": "Test the endpoint and the token without your agent: run this request. An answer of 200 means both work; 401 means the token is wrong. It sends no trace, so this page keeps waiting.",
+		"testHelp": "Tests the endpoint and token without your agent. 200 means both work. 401 means a wrong token. It sends no trace and this page keeps waiting.",
 		"testLabel": "Test request"
 	},
 	"tools": {

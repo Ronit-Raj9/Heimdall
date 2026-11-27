@@ -21,6 +21,6 @@
 		"rejected": "Rejected: longer system prompt (-2)"
 	},
 	"emergencyStop": {
-		"banner": "Emergency stop is on: new runs are stopped for every organization."
+		"banner": "Emergency stop on: no new runs for any organization."
 	}
 }

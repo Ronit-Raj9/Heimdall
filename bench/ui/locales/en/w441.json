@@ -27,12 +27,12 @@
 		"final": "Final result, checked by the task's tests: {{armA}} {{resultA}}, {{armB}} {{resultB}}.",
 		"passed": "Passed",
 		"failed": "Failed",
-		"note": "This is the first difference we saw, not a proven cause.",
+		"note": "First difference seen. Not proven as the cause.",
 		"same": "The two runs did the same steps."
 	},
 	"behaviour": {
 		"title": "Behaviour checks",
-		"description": "Things the agent did that a reviewer should know about, read from its steps. They do not change the score.",
+		"description": "These do not change the score.",
 		"loading": "Reading the steps of this run.",
 		"error": "Could not run the behaviour checks.",
 		"seen": "Seen",

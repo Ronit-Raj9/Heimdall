@@ -1,9 +1,9 @@
 {
-	"intro": "Turn merged pull requests that close an issue into tasks: the issue text is the instruction, the repository before the fix is the start, the pull request's tests grade the agent.",
+	"intro": "Turn merged pull requests that close issues into tasks.",
 	"repo": "Repository",
 	"repoPlaceholder": "owner/repository or a GitHub link",
-	"repoInvalid": "Type a repository as owner/repository, for example marshmallow-code/marshmallow, or paste its GitHub link.",
-	"connectFirst": "Connect GitHub in Settings > GitHub (any account). GitHub needs a sign-in to list a repository's pull requests, public ones included.",
+	"repoInvalid": "Enter owner/repository or a GitHub link.",
+	"connectFirst": "Connect GitHub in Settings > GitHub. GitHub needs sign-in to list pull requests.",
 	"scan": "Find issues",
 	"scanning": "Looking for issues...",
 	"funnel": {
@@ -14,10 +14,10 @@
 		"reason": "Dropped because",
 		"count": "Count"
 	},
-	"consent": "Send your code to your model provider with your key to build and check each issue",
+	"consent": "Send your code to your model provider with your key",
 	"start": "Build and check",
 	"provider": "Model provider",
-	"model": "Model for building and checking",
+	"model": "Model",
 	"modelDefault": "server default",
 	"running": "Working...",
 	"log": "Live log",
@@ -60,17 +60,17 @@
 	},
 	"none": "No usable issues in this repository.",
 	"stage": {
-		"build": "Building the environment on a worker",
-		"validate": "Running the tests on a worker",
+		"build": "Building on a worker",
+		"validate": "Testing on a worker",
 		"checks": "Checking the issue text"
 	},
 	"showLog": "Show log",
 	"hideLog": "Hide log",
 	"readiness": {
-		"noWorker": "No worker online: building and testing issues runs on a worker, never on the server. Add a worker or turn on the shared worker.",
-		"noGateway": "This server has no model gateway, so environments can not be built. The operator starts the shared-runner profile.",
-		"openWorkers": "Open Settings > Workers",
-		"startNoWorker": "Start needs a worker online",
-		"startNoGateway": "Start needs the server's model gateway"
+		"noWorker": "No worker online. Add a worker or turn on the shared worker.",
+		"noGateway": "No model gateway, environments cannot be built. Ask the operator.",
+		"openWorkers": "Open Workers",
+		"startNoWorker": "Needs a worker online",
+		"startNoGateway": "Needs the model gateway"
 	}
 }

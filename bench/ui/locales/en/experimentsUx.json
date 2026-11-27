@@ -1,5 +1,5 @@
 {
-	"subtitle": "A and B on the same tasks: which is better, and at what cost.",
+	"subtitle": "Two setups on the same tasks.",
 	"newComparison": "New comparison",
 	"quickRun": "Quick run on {{suite}}",
 	"armsVs": "{{arms}} on {{suite}}",
@@ -40,8 +40,8 @@
 		"drift": "Drift check",
 		"debug": "Debug run (not scored)"
 	},
-	"hiddenMatches_one": "{{count}} match is hidden (checks, practice runs and single benchmarks of evaluations).",
-	"hiddenMatches_other": "{{count}} matches are hidden (checks, practice runs and single benchmarks of evaluations).",
+	"hiddenMatches_one": "{{count}} match is hidden.",
+	"hiddenMatches_other": "{{count}} matches are hidden.",
 	"showHiddenMatches": "Show them",
 	"col": {
 		"experiment": "Comparison",
@@ -61,8 +61,8 @@
 		"driftDeleted": "Drift monitor {{name}} (deleted)",
 		"tag": "automatic check",
 		"toggle": "Show {{count}} system runs",
-		"toggleHint": "Automatic checks Heimdall runs by itself (benchmark readiness checks, agent checks and drift monitors), runs on the practice benchmarks, and the one-setup benchmarks of an evaluation. Debug runs replay, fork or step through one recorded run and never count toward results. None of them compares two setups.",
-		"hidden": "({{count}} hidden: checks, practice runs, debug runs and single benchmarks of evaluations)"
+		"toggleHint": "Automatic checks, practice runs and debug runs. None compares setups.",
+		"hidden": "({{count}} hidden)"
 	},
 	"debug": {
 		"replay": "Replay of run {{run}}",
@@ -72,6 +72,6 @@
 	},
 	"picker": {
 		"showHidden": "Also show checks, practice runs and debug runs ({{count}})",
-		"showHiddenHint": "Readiness checks, agent checks and drift monitors Heimdall runs by itself, runs on the practice benchmarks, and replay, fork or step runs of one recorded run."
+		"showHiddenHint": "Automatic checks, practice runs and debug runs."
 	}
 }

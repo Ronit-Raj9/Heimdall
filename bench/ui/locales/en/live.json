@@ -40,7 +40,7 @@
 		"run_recovered": "Run picked up again",
 		"slot_skipped": "Run skipped",
 		"lease_held": "Waiting for a free worker",
-		"budget_stop": "Stopped: spending limit reached. Raise the budget and continue.",
+		"budget_stop": "Spending limit reached. Raise the budget to continue.",
 		"experiment_done": "Finished",
 		"cancelled": "Cancelled",
 		"error": "Something went wrong",

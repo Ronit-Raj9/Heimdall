@@ -2,14 +2,14 @@
 	"agent": {
 		"selected": "{{agent}} selected",
 		"versionOf": "Version of {{agent}}",
-		"versionsHint": "This agent has {{n}} saved versions. Latest is v{{max}}.",
-		"testAgentsHidden": "Test agents such as oracle and noop are not listed: they only check benchmarks.",
-		"notFound": "No agent is called {{id}}. Pick one below, or register it."
+		"versionsHint": "{{n}} saved versions. Latest is v{{max}}.",
+		"testAgentsHidden": "Test agents such as oracle and noop are hidden.",
+		"notFound": "No agent called {{id}}. Pick or register one."
 	},
 	"link": {
-		"putAside": "Started a new evaluation from the link. Your earlier draft was put aside.",
+		"putAside": "New evaluation from link. Earlier draft put aside.",
 		"goBack": "Go back to my draft",
-		"badMode": "The link asked for an unknown comparison ({{mode}}), so this starts with Its score."
+		"badMode": "Unknown comparison ({{mode}}). Starting with Its score."
 	},
 	"learn": {
 		"setupA": " (Setup A)",

@@ -8,9 +8,9 @@
 			"max": "a daily spending limit above 0"
 		},
 		"toAdd": "To add it: {{list}}.",
-		"limitHint": "Leave the limit empty only for a practice comparison file; any other comparison needs one.",
+		"limitHint": "Only practice comparison files may skip a limit.",
 		"alerts": {
-			"removeAsk": "Remove the alert that sends to {{name}}? Checks stop sending to it.",
+			"removeAsk": "Remove the alert to {{name}}?",
 			"removeConfirm": "Remove alert"
 		}
 	},

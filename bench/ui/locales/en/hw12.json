@@ -1,10 +1,10 @@
 {
 	"header": {
 		"partial": "Result not final",
-		"partialHint": "The comparison is still running; its result counts only finished runs.",
+		"partialHint": "Still running, counts finished runs only.",
 		"followUp": "Follow-up of",
 		"evaluationCrumb": "Evaluation: {{name}}",
-		"readyTasks": "See which tasks are ready",
+		"readyTasks": "Ready tasks",
 		"solved": "Solved",
 		"notSolved": "Not solved"
 	}

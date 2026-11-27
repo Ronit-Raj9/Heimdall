@@ -1,22 +1,22 @@
 {
 	"title": "Upload",
-	"subtitle": "Bring work from your computer into Heimdall as a zip file. Pick what kind of zip it is.",
+	"subtitle": "Upload a zip from your computer.",
 	"tabs": {
 		"runs": "Saved results",
 		"project": "Project folder",
 		"agent": "Agent folder"
 	},
 	"help": {
-		"runs": "Results of comparisons you ran on your own computer. Heimdall checks they were not changed after the run; anything that fails this check is refused.",
-		"project": "Your agents, benchmarks, comparisons and release rules (folders agents/, benchmarks/, experiments/, policies/). Files are added; old versions are kept.",
-		"agent": "One agent's folder. It is saved in agents/<name>/. Leave the name empty to use the zip's folder name."
+		"runs": "Results run on your computer. Changed results are refused.",
+		"project": "agents/, benchmarks/, experiments/, policies/. Files are added, old versions kept.",
+		"agent": "Saved in agents/<name>/. Empty name uses the folder name."
 	},
 	"drop": {
 		"prompt": "Drop a .zip here",
 		"limit": "Up to {{mb}} MiB",
 		"selected": "{{name}} ({{size}})",
 		"notZip": "Choose a .zip file.",
-		"tooLarge": "This zip is larger than {{mb}} MiB; split it into several zips.",
+		"tooLarge": "Zip over {{mb}} MiB. Split it into several zips.",
 		"browse": "or click to browse"
 	},
 	"agentName": "Agent name (optional)",
@@ -27,7 +27,7 @@
 	"failed": "Upload failed. Check the zip and try again.",
 	"runs": {
 		"summary": "{{imported}} added, {{skipped}} skipped, {{refused}} refused ({{runs}} saved runs)",
-		"empty": "The zip had no comparison folder. To upload agents or benchmarks, pick the Project folder tab instead.",
+		"empty": "No comparison folder. For agents or benchmarks, use Project folder.",
 		"openExperiments": "Open comparisons",
 		"status": {
 			"imported": "Added",

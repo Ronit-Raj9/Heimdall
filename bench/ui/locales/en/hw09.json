@@ -4,19 +4,19 @@
 	},
 	"reliability": {
 		"notMeasured": "Not measured",
-		"needsTries": "needs 2 or more tries per task; this ran {{k}}"
+		"needsTries": "needs 2+ tries per task, this ran {{k}}"
 	},
 	"leaderboard": {
 		"tasksSolved": "{{solved}} of {{tasks}} tasks solved",
 		"tasksRunsPassed": "{{tasks}} / {{runs}} ({{passed}} passed)",
-		"successHint": "Average over tasks of each task's share of solved runs. A task counts as solved when every one of its runs passed."
+		"successHint": "Mean per-task share of solved runs."
 	},
 	"result": {
-		"partial": "Still running: {{done}} of {{total}} runs done. The result below counts only finished runs and is not final.",
+		"partial": "Still running: {{done}} of {{total}} runs done. Result not final.",
 		"system": {
-			"readiness": "This is a readiness check, not a comparison. Its result is on the benchmark's Build tab.",
-			"agent": "This is an automatic agent check, not a comparison.",
-			"drift": "This is an automatic drift monitor run, not a comparison.",
+			"readiness": "Readiness check. Result is on the Build tab.",
+			"agent": "Automatic agent check.",
+			"drift": "Automatic drift monitor run.",
 			"open": "Open the Build tab"
 		}
 	},
@@ -25,7 +25,7 @@
 		"setup": "Setup",
 		"solved": "Solved",
 		"pVsLeader": "p vs leader",
-		"pHint": "The chance that the gap to the leader is luck, over the tasks both ran. Lower means the gap is real.",
+		"pHint": "Chance the gap to the leader is luck. Lower is stronger.",
 		"group": "Group",
 		"top": "Top group",
 		"leader": "Leader",

@@ -1,7 +1,7 @@
 {
 	"resume": {
-		"confirm": "Resuming starts the runs that were waiting. They run on your model key and spend money.",
-		"done": "Resumed. New runs start now."
+		"confirm": "Resume waiting runs? They use your model key and cost money.",
+		"done": "Resumed."
 	},
 	"picks": {
 		"runs_one": "{{count}} run",

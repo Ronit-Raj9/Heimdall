@@ -19,12 +19,12 @@
 		"openedOnAll": "No new failures. {{count}} already handled are shown.",
 		"emptyState": "No failures with status {{state}}.",
 		"showAll": "Show all ({{count}})",
-		"emptyFirst": "No production failures yet. Connect a source to pull them in, or send them in with an inbox token.",
+		"emptyFirst": "No production failures yet.",
 		"emptyFirstAction": "Connect a source",
 		"model": "Model",
 		"noModel": "-",
-		"sourcesLine_one": "{{count}} source, last pull {{last}}. Open to manage.",
-		"sourcesLine_other": "{{count}} sources, last pull {{last}}. Open to manage.",
+		"sourcesLine_one": "{{count}} source, last pull {{last}}",
+		"sourcesLine_other": "{{count}} sources, last pull {{last}}",
 		"never": "never"
 	},
 	"source": {
@@ -35,14 +35,14 @@
 	"ingest": {
 		"step1": "Generate an inbox token below (organization admins).",
 		"step2": "Store it where your tool runs as",
-		"step3": "Send failures with the request below: it sends the token as Authorization: Bearer.",
+		"step3": "Send failures with the request below.",
 		"howTo": "Each token is shown once. Store it where your tool runs as {{env}}."
 	},
 	"kept": {
 		"title": "What is kept",
-		"sentence": "Heimdall keeps the failed conversation: the request, the answer and the tool calls, with keys, tokens, email addresses, phone numbers, long numbers and home folder names removed. Names and street addresses are not removed.",
+		"sentence": "Keys, tokens, emails, phones, long numbers and home folder names are removed. Names and street addresses are not.",
 		"kept": "Kept",
-		"keptList": "The request, the answer, the tool calls with their arguments, the model and the times.",
+		"keptList": "Request, answer, tool calls, model, times.",
 		"removed": "Removed before storage",
 		"kinds": {
 			"secret": "Keys and tokens",
@@ -74,7 +74,7 @@
 		"openComparison": "Open comparison"
 	},
 	"why": {
-		"noAgents": "No agent yet. Connect one, evaluate it, and its failure patterns show here.",
+		"noAgents": "No agent yet.",
 		"connect": "Connect an agent"
 	},
 	"bulk": {

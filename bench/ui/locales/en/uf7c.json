@@ -1,10 +1,10 @@
 {
 	"page": {
 		"howTitle": "What a feature test is",
-		"howDef": "A feature test runs the same agent on the same benchmark twice, once with a Bifrost feature off and once with it on, and shows what the feature changed in score, cost and time.",
-		"how1": "Connect your Bifrost below, so Heimdall can read which features are on.",
+		"howDef": "Same agent and benchmark, Bifrost feature off then on. Compares score, cost and time.",
+		"how1": "Connect your Bifrost below.",
 		"how2": "Pick a feature and press Test it. Choose a benchmark and an agent; the estimate shows before anything runs.",
-		"how3": "Open the result to see the effect, then use the setting in Bifrost if it helped.",
+		"how3": "Open the result. Turn the setting on in Bifrost if it helped.",
 		"builtIn": "Built-in gateway: {{host}}, version {{version}}",
 		"builtInNoVersion": "Built-in gateway: {{host}} (version not reported)",
 		"connectFirst": "Connect your Bifrost first",
@@ -12,7 +12,7 @@
 		"featuresTitle": "Features",
 		"comingLater": "Coming later",
 		"tracesTitle": "Send production traces",
-		"tracesText": "Bifrost can also send its traces to Heimdall.",
+		"tracesText": "",
 		"tracesAgents": "Build an agent from traces",
 		"tracesInbox": "See production failures",
 		"addSecret": "Add a secret",
@@ -29,19 +29,19 @@
 			"unknown": "Not known"
 		},
 		"notTested": "Not tested",
-		"noneMeasured": "No feature has been tested yet. Pick one below and press Test it.",
+		"noneMeasured": "No feature tested yet.",
 		"start": "Test it",
-		"seeResult": "See the test result",
+		"seeResult": "See result",
 		"what": {
 			"complexity_router": "Checks if sending easy tasks to a cheaper model keeps the score.",
 			"prompt_version": "Checks if a new prompt version scores better than the one you use.",
-			"mcp_tools": "Checks how the agent does with a different set of tools, and that blocked tools stay blocked.",
-			"semantic_cache": "Checks how much the cache saves and how often it gives a wrong cached answer.",
+			"mcp_tools": "Checks another tool set, and that blocked tools stay blocked.",
+			"semantic_cache": "Checks cache savings and how often cached answers are wrong.",
 			"skill_version": "Checks if a new skill version helps the agent.",
 			"providers": "Checks if the same model scores and costs the same on other providers.",
 			"budget_curve": "Checks how the score changes with smaller budgets per task.",
 			"gateway_overhead": "Checks how much time the gateway adds to each call.",
-			"batch": "Would check if sending judge calls in batches saves money. Coming later."
+			"batch": "Would check if batching judge calls saves money. Coming later."
 		}
 	},
 	"dialog": {
@@ -53,11 +53,11 @@
 		"confirm": "Start this test? About ${{est}}, at most ${{budget}}.",
 		"confirmUnknown": "Start this test? At most ${{budget}}.",
 		"confirmYes": "Yes, start",
-		"trialsHint": "How many times each task runs per setup (more is surer, costs more).",
+		"trialsHint": "Runs per task per setup. More is surer, costlier.",
 		"trialsMin": "At least 1",
 		"modelRequired": "Model",
-		"modelHint": "Both setups use this model. Leave empty to keep the agent's own model.",
-		"modelNeeded": "Both setups use this model. This test needs one.",
+		"modelHint": "Both setups use it. Empty keeps the agent's model.",
+		"modelNeeded": "Both setups use this model. Required.",
 		"suiteOption": "{{name}}, {{count}} tasks",
 		"agentOption": "{{name}}, {{model}}",
 		"details": "Details",
@@ -74,17 +74,17 @@
 			},
 			"cheap_model": {
 				"label": "Cheaper model",
-				"hint": "The model used for easy requests. Must differ from the strong model.",
+				"hint": "For easy requests. Must differ from the strong model.",
 				"placeholder": ""
 			},
 			"tolerance": {
 				"label": "Allowed score drop",
-				"hint": "How much lower the router may score than the strong model alone and still count as fine, from 0.01 to 0.5. Default 0.03.",
+				"hint": "Accepted drop below the strong model. 0.01 to 0.5, default 0.03.",
 				"placeholder": "0.03"
 			},
 			"router_when": {
 				"label": "Rule for hard requests",
-				"hint": "The Bifrost rule that sends a request to the strong model. It must use complexity_tier.",
+				"hint": "Sends requests to the strong model. Must use complexity_tier.",
 				"placeholder": "complexity_tier == \"COMPLEX\""
 			},
 			"prompt_id": {
@@ -99,32 +99,32 @@
 			},
 			"control_version": {
 				"label": "Compare against",
-				"hint": "The version it is compared with. Leave empty to compare with no prompt.",
+				"hint": "Empty compares with no prompt.",
 				"placeholder": "1"
 			},
 			"tools_a": {
 				"label": "Tool set A (today)",
-				"hint": "The tools the agent sees today, separated by commas. Leave empty for every tool.",
+				"hint": "Comma-separated. Empty means every tool.",
 				"placeholder": ""
 			},
 			"tools_b": {
 				"label": "Tool set B",
-				"hint": "The tools to try instead, separated by commas. At least one.",
+				"hint": "Comma-separated. At least one.",
 				"placeholder": "search, read_file"
 			},
 			"tools_c": {
 				"label": "Tool set C (optional)",
-				"hint": "A third set to try, separated by commas.",
+				"hint": "A third set, comma-separated.",
 				"placeholder": ""
 			},
 			"forbidden": {
 				"label": "Tools that must be blocked",
-				"hint": "Heimdall calls each of these through Bifrost before each run; Bifrost should refuse them.",
+				"hint": "Called through Bifrost before each run. Bifrost should refuse them.",
 				"placeholder": ""
 			},
 			"poison_probe": {
 				"label": "Poisoned tool check",
-				"hint": "A fault that serves a tool with a misleading description, to see if the agent follows it. Optional.",
+				"hint": "Serves a tool with a misleading description. Optional.",
 				"placeholder": ""
 			},
 			"grid": {
@@ -134,7 +134,7 @@
 			},
 			"target": {
 				"label": "Largest share of wrong cached answers",
-				"hint": "The highest share of wrong answers you accept from the cache, between 0 and 1. Default 0.02.",
+				"hint": "Most wrong cached answers you accept, 0 to 1. Default 0.02.",
 				"placeholder": "0.02"
 			},
 			"ttl": {
@@ -144,7 +144,7 @@
 			},
 			"control_path": {
 				"label": "Skill today",
-				"hint": "The skill folder the agent uses today. Leave empty for None.",
+				"hint": "Folder the agent uses today. Empty for None.",
 				"placeholder": "None"
 			},
 			"variant_path": {
@@ -154,12 +154,12 @@
 			},
 			"targets": {
 				"label": "Providers to compare",
-				"hint": "2 to 5 provider and model pairs separated by commas, the one you use today first.",
+				"hint": "2 to 5 provider:model pairs, comma-separated, current first.",
 				"placeholder": "anthropic:claude-sonnet-4-5, openai:gpt-6"
 			},
 			"budgets": {
 				"label": "Budgets per task to try",
-				"hint": "3 to 5 amounts in USD, smallest first, each from 0.01 to 20, separated by commas.",
+				"hint": "3 to 5 USD amounts, smallest first, 0.01 to 20 each.",
 				"placeholder": "0.25, 0.5, 1, 2"
 			},
 			"current": {
@@ -175,7 +175,7 @@
 		}
 	},
 	"effect": {
-		"unknownNext": "This test could not show an effect: {{reason}}. Check that the setting is on in Bifrost, then run it again.",
+		"unknownNext": "No effect shown: {{reason}}. Check the setting is on in Bifrost, then rerun.",
 		"rawData": "Raw data",
 		"entries_one": "{{count}} entry",
 		"entries_other": "{{count}} entries",
@@ -207,14 +207,14 @@
 	"use": {},
 	"agents": {
 		"connect": "Connect your Bifrost to list its agents.",
-		"create": "Create agent from this",
+		"create": "Create agent",
 		"willBe": "The new agent will be called {{name}}.",
-		"go": "Create the agent and open it"
+		"go": "Create and open"
 	},
 	"watch": {
 		"providersHint": "Up to five providers."
 	},
 	"skill": {
-		"openTools": "Open the agent's Tools tab"
+		"openTools": "Open Tools tab"
 	}
 }

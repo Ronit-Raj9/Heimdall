@@ -3,7 +3,7 @@
 		"part": "The run stopped while {{stage}}, before a result was reached.",
 		"tool": "The tool server {{server}} answered {{status}} to {{tool}} at step {{seq}}. This is likely infrastructure, not the agent.",
 		"invalidEvaluator": "The grader could not grade this run: {{reason}}",
-		"noChecks": "The grader ran no checks, so this result is not a real fail.",
+		"noChecks": "The grader ran no checks. This fail is not valid.",
 		"mode": "The grader compared the final {{what}} with the expected one; it did not match.",
 		"checks": "{{failures}} of {{ran}} hidden checks failed.",
 		"title": "Why this run did not succeed",
@@ -22,13 +22,13 @@
 		"matched": "matched",
 		"notMatched": "did not match",
 		"reason": "Grader's reason: {{reason}}",
-		"afterTool": "{{reason}}. This follows from the tool server error above: the run broke before the agent's work could be graded, so it does not show that the agent's change was wrong."
+		"afterTool": "{{reason}}. Caused by the tool server error above. The agent's change was not graded."
 	},
 	"verdict": {
 		"toolError": "Not solved (tool server error)",
 		"checkInfra": "Check infrastructure",
-		"checkInfraHint": "A tool server failed during this run, so the result may not reflect the agent.",
-		"brokenComparison": "This comparison was marked as a broken test: its result is not the agent's fault."
+		"checkInfraHint": "A tool server failed. The result may not reflect the agent.",
+		"brokenComparison": "Marked as a broken test. The result is not the agent's fault."
 	},
 	"page": {
 		"title": "Task {{task}} · Setup {{arm}}",
@@ -41,8 +41,8 @@
 		"copyId": "Copy run id",
 		"copied": "Copied",
 		"more": "More",
-		"rerun": "Run this benchmark again (1 task)",
-		"rerunHint": "Opens the evaluate wizard with this benchmark, agent and model, set to 1 task. The evaluation picks the task, so it can be a different task of the same benchmark. Nothing starts until you confirm the cost.",
+		"rerun": "Rerun 1 task",
+		"rerunHint": "Opens Evaluate with 1 task, maybe another one. Nothing starts until you confirm the cost.",
 		"details": "Run facts and metrics",
 		"setupB": "Setup {{arm}}: {{value}}",
 		"suite": "Benchmark {{name}}"
@@ -76,6 +76,6 @@
 		"add": "Add a review"
 	},
 	"evidence": {
-		"empty": "This run recorded no evidence record: no evidence contract, hashes or fault record."
+		"empty": "No evidence record for this run."
 	}
 }

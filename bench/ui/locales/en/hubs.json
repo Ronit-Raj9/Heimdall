@@ -18,6 +18,6 @@
 	},
 	"quickRun": {
 		"link": "Advanced: one benchmark, one run",
-		"hint": "One benchmark, one agent and one model, without a report card."
+		"hint": "No report card."
 	}
 }

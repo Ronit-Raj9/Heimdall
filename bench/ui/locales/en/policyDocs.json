@@ -1,16 +1,16 @@
 {
 	"tab": "Policy",
-	"intro": "Upload a policy or SOP (PDF, DOCX, Markdown or text). Heimdall splits it into numbered clauses and drafts three support conversations per clause: a normal case, an edge case and a customer who insists on breaking the rule. Drafts wait for your review; accepted ones become tasks, and the readiness check proves a compliant reply passes and a violating one fails.",
-	"noShape": "Policy tasks are support conversations, and this benchmark has no task with a simulated customer.",
-	"reviewEmpty": "No drafts to review yet. Make some with Draft with a model above.",
+	"intro": "Upload a policy (PDF, DOCX, Markdown or text). Heimdall drafts three test conversations per clause for your review.",
+	"noShape": "This benchmark has no task with a simulated customer.",
+	"reviewEmpty": "No drafts yet.",
 	"reviewEmptyLink": "Or draft from a policy document",
-	"viewerNote": "Policy documents and their drafts include reference replies, so only members can open them. The report is below.",
+	"viewerNote": "Only members can open drafts. They hold reference replies.",
 	"upload": {
 		"title": "Upload a policy",
 		"file": "Policy file",
 		"preview": "Preview clauses",
 		"save": "Upload",
-		"previewNote": "Preview only: nothing is saved yet. {{count}} clauses found."
+		"previewNote": "Preview only, nothing saved. {{count}} clauses found."
 	},
 	"docs": {
 		"title": "Policy documents",
@@ -26,7 +26,7 @@
 		"title": "Clauses",
 		"skipped": "skipped",
 		"edit": "Edit clauses",
-		"editHint": "Fix the split, or tick Skip on clauses with nothing to test (definitions, contact details). Keep the number of a clause that has drafted tasks.",
+		"editHint": "Fix the split or Skip clauses with nothing to test. Keep numbers of clauses with drafts.",
 		"number": "Number",
 		"heading": "Title",
 		"text": "Text",
@@ -38,7 +38,7 @@
 		"title": "Draft scenarios",
 		"model": "Model",
 		"budget": "Budget (USD)",
-		"budgetHint": "Generation stops when this is spent. Hosted cap: $5.",
+		"budgetHint": "Stops when spent. Hosted cap $5.",
 		"estimate": "Estimate cost",
 		"start": "Draft scenarios",
 		"confirm": "Draft scenarios with {{provider}}/{{model}} on your own key, up to ${{budget}}?",
@@ -62,16 +62,16 @@
 		"reject": "Reject",
 		"acceptAll": "Accept all pending",
 		"judgeLabel": "Reply judge (grades these tasks)",
-		"judgeHint": "Pick the reply judge first. Policy tasks are graded by a judge model.",
+		"judgeHint": "Pick the reply judge first.",
 		"switchTitle": "Switch this benchmark to judged checks?",
 		"switchBody": "Accepting moves {{suite}} to checks graded by {{provider}}/{{model}}. Its other {{count}} task(s) need their readiness checks again.",
 		"switchConfirm": "Switch and accept",
 		"switchCancel": "Cancel",
-		"switchNote": "This benchmark does not use grader checks with a pinned reply judge yet. Accepting switches it; its other tasks then need their readiness checks again."
+		"switchNote": "Accepting switches this benchmark to judged checks. Its other tasks need readiness checks again."
 	},
 	"report": {
 		"title": "Compliance report",
-		"empty": "No counted runs of accepted tasks yet. Run an evaluation of this benchmark first.",
+		"empty": "No runs yet. Evaluate this benchmark first.",
 		"summary": "{{tested}} of {{clauses}} clauses tested, {{runs}} runs.",
 		"clause": "Clause",
 		"passRate": "Pass rate",

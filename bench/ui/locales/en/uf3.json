@@ -15,6 +15,6 @@
 		"keyOk": "Key: {{label}} ...{{last4}}"
 	},
 	"link": {
-		"task": "Running one task of {{suite}} again, one try. The evaluation picks the task itself, so it can be a different task than {{task}}."
+		"task": "Running one task of {{suite}} again, one try. It may not be {{task}}."
 	}
 }

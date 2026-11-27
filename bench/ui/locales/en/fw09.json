@@ -3,7 +3,7 @@
 		"html": "Download HTML",
 		"markdown": "Download Markdown",
 		"pdf": "Save as PDF",
-		"pdfFailed": "Could not open the print view. Download HTML and print it from your browser.",
+		"pdfFailed": "Could not open print view. Download HTML and print it.",
 		"reproduce": "Download reproduce kit"
 	},
 	"release": {

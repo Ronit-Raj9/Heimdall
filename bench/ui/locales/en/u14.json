@@ -1,9 +1,9 @@
 {
 	"releases": {
-		"subtitle": "Who released which version, on what evidence.",
+		"subtitle": "",
 		"new": "Record a release",
 		"newTitle": "Record a release",
-		"newHint": "Pick a finished comparison of two versions of your agent, check its result, then record who approved the new version.",
+		"newHint": "Pick a finished comparison, then record the approver.",
 		"close": "Close",
 		"more": "More actions",
 		"timeline": "History",
@@ -14,7 +14,7 @@
 		"override": "Released with an override",
 		"evidence": "Download evidence",
 		"details": "Audit details",
-		"empty": "No release recorded yet. Record the first one after a comparison finishes.",
+		"empty": "No releases yet.",
 		"policy": "Release rules",
 		"noPolicy": "No release rules checked",
 		"config": "Agent version",
@@ -26,8 +26,8 @@
 		"tools": "Audit tools",
 		"packs": "Compliance reports",
 		"title": "Releases",
-		"tamperHint": "Each record carries a fingerprint of the one before it, so any later edit, deletion or reordering is detected.",
-		"overrideHint": "Someone approved this release even though the result or the release rules said not to. Their reason is shown below.",
+		"tamperHint": "Each record fingerprints the one before. Later edits are detected.",
+		"overrideHint": "Approved against the result or release rules. Reason below.",
 		"shipped": "Released",
 		"recordId": "Record id",
 		"replaces": "{{name}} replaces {{prev}}",
@@ -47,11 +47,11 @@
 			"loading": "Loading the comparison's result...",
 			"error": "Could not load this comparison's result: {{error}}",
 			"approver": "Write who approves this release.",
-			"blocked": "The result or the release rules say not to release. Tick Release anyway and give a reason to continue.",
+			"blocked": "Result or rules say do not release. Tick Release anyway and give a reason.",
 			"reason": "Write why you release anyway.",
 			"noneListed": "No finished comparison of two versions yet."
 		},
-		"emptyNoComparison": "A release records which version won a comparison. Evaluate two versions first.",
+		"emptyNoComparison": "Evaluate two versions first.",
 		"linkedFirst": "First record in the log",
 		"overrideUnclear": "Released without a clear result",
 		"overrideLine": "Released although the result said {{action}}.",
@@ -59,7 +59,7 @@
 		"reason": "Reason: {{reason}}"
 	},
 	"policies": {
-		"subtitle": "Release rules: checks a new version must pass before it ships.",
+		"subtitle": "Checks a new version must pass before release.",
 		"rulesTitle": "Rules",
 		"when": "If",
 		"then": "then",
@@ -89,31 +89,31 @@
 		}
 	},
 	"review": {
-		"subtitle": "Needs review: runs a human should look at. Your review is stored next to the run and never changes the original evidence.",
+		"subtitle": "Your review never changes the original evidence.",
 		"all": "All",
 		"inbox": "Inbox",
 		"title": "Needs review"
 	},
 	"monitors": {
-		"subtitle": "Test a safety rule on past runs: how many bad runs it catches and how many good runs it flags.",
+		"subtitle": "Bad runs caught, good runs flagged.",
 		"catchRate": "Bad runs caught",
 		"noAttacks": "No bad runs to test on",
 		"labelled": "{{honest}} good runs, {{attacks}} bad runs",
-		"empty": "No safety rule tested yet. A test needs a finished comparison to check against, so run one first.",
+		"empty": "No tests yet. Run a comparison first.",
 		"open": "Open",
 		"certifyNew": "Test a safety rule",
 		"warnings_one": "{{count}} warning",
 		"warnings_other": "{{count}} warnings",
 		"title": "Safety rule tests",
-		"disclaimer": "Which runs count as bad comes from Heimdall's safety checks: a run is bad when a failure test caught cheating or an unsafe action. A monitor is only tested on bad behaviour those checks can see.",
-		"catchRateHint": "Share of bad runs the monitor flagged, while flagging at most the stated share of good runs by mistake.",
+		"disclaimer": "Bad runs are those Heimdall's failure tests caught. Behavior they miss is not tested.",
+		"catchRateHint": "Share of bad runs flagged, at the stated false alarm rate.",
 		"falseAlarm": "at {{fpr}} false alarms",
 		"back": "All monitors"
 	},
 	"dataset": {
 		"changed": "Benchmark changed since baseline",
-		"compared_one": "compared on the 1 task both ran ({{added}} new or changed, {{dropped}} no longer run)",
-		"compared_other": "compared on the {{count}} tasks both ran ({{added}} new or changed, {{dropped}} no longer run)",
+		"compared_one": "compared on 1 shared task ({{added}} new or changed, {{dropped}} dropped)",
+		"compared_other": "compared on {{count}} shared tasks ({{added}} new or changed, {{dropped}} dropped)",
 		"notCompared": "not compared: no task in common with the baseline"
 	},
 	"promote": {
@@ -125,7 +125,7 @@
 		"approverPlaceholder": "your name or email",
 		"note": "Note (optional)",
 		"override": "Release anyway, with a reason",
-		"overrideReason": "Why release despite this?",
+		"overrideReason": "Reason",
 		"submit": "Release {{name}}",
 		"covers_one": "Covers {{count}} benchmark.",
 		"covers_other": "Covers all {{count}} benchmarks.",
@@ -154,8 +154,8 @@
 		"verdictButton": "Promote this version",
 		"useModel": "Use model {{model}}",
 		"useModelUnknown": "Use setup B's model",
-		"useModelHint": "Only the model differs between the two setups, so there is no agent version to promote. Open Model switch to apply the model.",
-		"exception": "No clear winner yet. Promoting now records the release as an exception to your release rules.",
+		"useModelHint": "Only the model differs. Open Model switch to apply it.",
+		"exception": "No clear winner. Promoting records an exception to your release rules.",
 		"checkSwitch": "Check switching to {{model}}"
 	}
 }

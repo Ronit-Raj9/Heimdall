@@ -3,12 +3,12 @@
 		"labelTasks": "Extend by {{count}} tasks",
 		"labelTrials": "Extend by {{count}} more tries",
 		"labelPriced": "{{base}}, about {{cost}}",
-		"confirmPriced": "This adds {{count}} more {{what}} as a follow-up comparison. It stops after {{runs}} runs, so the number of runs is what limits the spend.",
-		"confirmNoPrice": "This adds {{count}} more {{what}} as a follow-up comparison. It stops after {{runs}} runs, so the number of runs is what limits the spend; the price per run is not known.",
+		"confirmPriced": "Adds {{count}} more {{what}} as a follow-up comparison. It stops after {{runs}} runs, which caps spend.",
+		"confirmNoPrice": "Adds {{count}} more {{what}} as a follow-up comparison. It stops after {{runs}} runs, which caps spend. Price per run is not known.",
 		"confirmUnknown": "This adds {{count}} more {{what}} as a follow-up comparison. The number of runs and the price are not known."
 	},
 	"actions": {
-		"suiteGone": "The benchmark {{suite}} no longer exists, so nothing can be set up on it here."
+		"suiteGone": "Benchmark {{suite}} no longer exists."
 	},
 	"summary": {
 		"medianCost": "Median cost per run"
@@ -17,8 +17,8 @@
 		"noteTooFew": "Only {{count}} shared tasks, too few to tell these setups apart. Add tasks.",
 		"noteApart": "On {{count}} shared tasks, {{leader}} and the setups in its group did better than the setups behind them.",
 		"cardCost": "Median cost per run {{cost}}",
-		"cheapestTie": "The scores cannot be told apart, so the cheapest setup is the better buy: {{setup}} at {{cost}} a run (median).",
-		"serverNote": "The analysis note, for statisticians"
+		"cheapestTie": "Scores tie, so {{setup}} is the better buy at {{cost}} a run (median).",
+		"serverNote": "Statistical note"
 	},
 	"section": {
 		"slow": "Could not load this part"
@@ -48,7 +48,7 @@
 		"clear": "Clear",
 		"title_one": "Archive {{count}} comparison?",
 		"title_other": "Archive {{count}} comparisons?",
-		"body": "Archived comparisons leave the list but are not deleted. Turn on Show archived to see them and bring them back.",
+		"body": "Archived comparisons leave the list but are not deleted. Show archived brings them back.",
 		"confirm_one": "Archive {{count}} comparison",
 		"confirm_other": "Archive {{count}} comparisons",
 		"cancel": "Keep them",

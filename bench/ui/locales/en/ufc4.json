@@ -3,6 +3,6 @@
 		"loadError": "Could not load the list of models."
 	},
 	"claim": {
-		"passedNoChecks": "No hidden check ran: the grader passed it on the reference answer alone, not on tests."
+		"passedNoChecks": "No hidden check ran. Passed on the reference answer only."
 	}
 }

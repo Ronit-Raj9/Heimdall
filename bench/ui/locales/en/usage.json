@@ -1,13 +1,13 @@
 {
 	"title": "Usage and spend",
-	"subtitle": "How much your runs cost, how many tokens they used and how much each provider key has spent.",
+	"subtitle": "",
 	"from": "From",
 	"to": "To",
 	"groupBy": "Group by",
 	"link": {
-		"badDate": "The date {{value}} in the link is not a valid date, so the last 30 days are shown.",
-		"badGroup": "The grouping {{value}} in the link is not one of {{groups}}, so {{fallback}} is used.",
-		"badScope": "The scope {{value}} in the link is not available to you, so this organization is shown."
+		"badDate": "Invalid date {{value}} in the link. Showing the last 30 days.",
+		"badGroup": "Grouping {{value}} is not one of {{groups}}. Using {{fallback}}.",
+		"badScope": "Scope {{value}} is not available to you. Showing this organization."
 	},
 	"group": {
 		"day": "Day",
@@ -24,7 +24,7 @@
 		"tokens": "Tokens",
 		"runs": "Finished runs",
 		"keys": "Provider key spend this month",
-		"unknown": "{{count}} run(s) have no known cost and are left out of the total. Set a price on the provider key in Settings > Model keys to include them."
+		"unknown": "{{count}} run(s) with no known cost are left out. Set a price in Settings > Model keys."
 	},
 	"table": {
 		"group": "Group",
@@ -43,14 +43,14 @@
 		"budget": "Monthly budget",
 		"spent": "Spent this month",
 		"noBudget": "No limit",
-		"empty": "No provider keys yet. Add one in Settings > Model keys so runs use your own model account.",
+		"empty": "No provider keys yet.",
 		"add": "Add a key"
 	},
 	"chart": {
 		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}",
 		"title": "Cost"
 	},
-	"empty": "No finished runs between {{from}} and {{to}}. Evaluate an agent, or pick a wider date range.",
+	"empty": "No finished runs from {{from}} to {{to}}.",
 	"emptyAction": "Evaluate an agent",
 	"error": "Could not load usage: {{message}}",
 	"admin": {

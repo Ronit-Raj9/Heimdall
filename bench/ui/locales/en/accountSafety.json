@@ -1,25 +1,25 @@
 {
 	"resetLink": {
 		"button": "Reset link",
-		"question": "Make a one-time password reset link for {{email}}? Any earlier link stops working.",
+		"question": "Make a one-time reset link for {{email}}? Earlier links stop working.",
 		"confirm": "Make link",
 		"cancel": "Cancel",
 		"created": "Reset link for {{email}}",
 		"link": "Password reset link",
-		"hint": "Send this link to {{email}} yourself (the server sends no email). It works once and expires {{when}}. Using it signs them out everywhere.",
+		"hint": "Send it to {{email}} yourself, no email is sent. Works once, expires {{when}}. Signs them out everywhere.",
 		"error": "Could not make a reset link"
 	},
 	"reset": {
 		"title": "Choose a new password",
-		"subtitle": "For {{email}}. After this you are signed out everywhere and sign in with the new password.",
+		"subtitle": "For {{email}}. Signs you out everywhere.",
 		"loading": "Checking your reset link",
 		"missing": "This page needs a reset link",
-		"missingBody": "Open the full link your organization owner sent you. If you do not have one, ask an owner to make a reset link from Settings > Members.",
+		"missingBody": "Open the full link you were sent, or ask an owner for one from Settings > Members.",
 		"invalid": "This reset link does not work",
-		"invalidBody": "It was already used, has expired, or was replaced by a newer one. Ask your organization owner for a new link.",
+		"invalidBody": "Used, expired or replaced. Ask your owner for a new link.",
 		"password": "New password",
 		"confirm": "Repeat new password",
-		"hint": "At least 12 characters. A long phrase of a few words works well.",
+		"hint": "At least 12 characters.",
 		"mismatch": "The two passwords do not match.",
 		"submit": "Set new password",
 		"error": "Could not set the password",
@@ -30,8 +30,8 @@
 	},
 	"captcha": {
 		"label": "Prove you are human",
-		"loadError": "The captcha could not load. Check your connection or ad blocker, then reload the page.",
-		"noSiteKey": "Sign-up needs a captcha but the server has no site key set. Ask the server owner to set HEIMDALL_CAPTCHA_SITEKEY.",
+		"loadError": "Captcha did not load. Check connection or ad blocker, then reload.",
+		"noSiteKey": "Captcha site key missing. Ask the server owner to set HEIMDALL_CAPTCHA_SITEKEY.",
 		"required": "Complete the captcha first."
 	}
 }

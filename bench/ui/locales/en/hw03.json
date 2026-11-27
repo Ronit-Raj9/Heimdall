@@ -1,6 +1,6 @@
 {
 	"invite": {
-		"revokeQuestion": "Revoke the invitation for {{email}}? The link stops working at once.",
+		"revokeQuestion": "Revoke the invitation for {{email}}? The link stops working immediately.",
 		"revokeConfirm": "Revoke invitation",
 		"revokeCancel": "Keep it"
 	}

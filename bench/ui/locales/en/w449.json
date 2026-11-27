@@ -1,9 +1,9 @@
 {
 	"banner": {
-		"changed": "This result changed after a re-score on {{date}}: it was \"{{before}}\", it is now \"{{after}}\". {{note}}",
+		"changed": "Re-scored on {{date}}: was \"{{before}}\", now \"{{after}}\". {{note}}",
 		"seeWhat": "See what changed",
 		"gotIt": "Got it",
-		"stale": "A check this comparison used has been updated since it ran. Re-score it to see whether the result changes."
+		"stale": "A check used here was updated. Re-score to see if the result changes."
 	},
 	"page": {
 		"heading": "Changed results",
@@ -12,20 +12,20 @@
 		"was": "Was",
 		"isNow": "Is now",
 		"why": "Why",
-		"empty": "No comparison was graded by a check that has changed since.",
+		"empty": "No comparison used a changed check.",
 		"scan": "Scan for affected comparisons",
-		"scanStarted": "The check has started. Come back in a minute.",
+		"scanStarted": "Scan started. Check back in a minute.",
 		"couldChange": "Could change if re-scored",
-		"noneStale": "No comparison uses a check that was updated since it ran.",
+		"noneStale": "No comparison uses an updated check.",
 		"updatedChecks": "Updated checks: {{gates}}",
-		"intro": "When a grading check is fixed, old results can change. This page lists those comparisons.",
+		"intro": "",
 		"changedHeading": "Changed after a re-score",
 		"scanning": "Scanning...",
 		"seeJobs": "See Jobs",
 		"scanHelp": "No model calls.",
 		"lastScan": "Last scan: {{date}}.",
 		"scanFailed": "The scan could not run.",
-		"scanDone": "Scan finished. The lists are up to date.",
+		"scanDone": "Scan finished.",
 		"loadError": "Could not load the changed results.",
 		"wasIsNow": "Was, is now",
 		"became": "became",

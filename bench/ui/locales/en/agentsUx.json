@@ -1,10 +1,10 @@
 {
-	"subtitle": "An agent is the AI program you want to test, plus the model it uses. Pick one to run, check or edit.",
+	"subtitle": "",
 	"adapter": {
 		"command": "Runs as a command-line program",
 		"remote_http": "Runs as a web service (HTTP)",
 		"a2a": "Talks over the agent-to-agent protocol (A2A)",
-		"scripted": "Practice agent (no real model, free)",
+		"scripted": "Practice agent (free)",
 		"other": "Custom setup",
 		"pull": "Runs in your code"
 	},
@@ -22,8 +22,8 @@
 		"open": "Open {{name}}"
 	},
 	"list": {
-		"testAgents": "Test and demo agents (used by the example benchmarks)",
-		"testAgentsHint": "Built-in perfect and do-nothing agents, test doubles from the example benchmarks and leftover check agents. They are not real agents.",
+		"testAgents": "Test and demo agents",
+		"testAgentsHint": "Built-in, example and leftover check agents.",
 		"noModel": "No model chosen",
 		"runs": "{{count}} runs",
 		"runs_one": "{{count}} run",
@@ -57,7 +57,7 @@
 	},
 	"checks": {
 		"title": "Is this agent ready?",
-		"subtitle": "Run each step to confirm this agent works before you test it on a benchmark.",
+		"subtitle": "",
 		"lastRun": "Last run {{when}}",
 		"options": "Advanced options",
 		"step": {
@@ -66,10 +66,10 @@
 			"diff": "Compare versions"
 		},
 		"hint": {
-			"check": "A free practice run on one task. No real model and no API key are used.",
-			"build": "Packages the agent so it can run in its own isolated container.",
-			"buildNone": "Uses a ready-made container. Nothing to prepare.",
-			"diff": "What changed between the two newest versions of this agent."
+			"check": "Free practice run on one task, no model or key.",
+			"build": "Packages the agent into its own container.",
+			"buildNone": "Uses a ready-made container.",
+			"diff": "Changes between the two newest versions."
 		},
 		"state": {
 			"passed": "Works",

@@ -3,12 +3,12 @@
 		"menu": "Organizations",
 		"create": "Create organization",
 		"createTitle": "Create an organization",
-		"createIntro": "You become its owner. Its benchmarks, agents and results are kept apart from your other organizations.",
+		"createIntro": "You become its owner. Data is kept separate.",
 		"name": "Name",
 		"namePlaceholder": "Acme research",
 		"slug": "Short id",
-		"slugHint": "Used in links: 2 to 40 lowercase letters, digits or hyphens.",
-		"badSlug": "The short id needs 2 to 40 lowercase letters, digits or hyphens, and cannot start or end with a hyphen.",
+		"slugHint": "2 to 40 lowercase letters, digits or hyphens.",
+		"badSlug": "Use 2 to 40 lowercase letters, digits or hyphens. No hyphen at either end.",
 		"cancel": "Cancel",
 		"submit": "Create",
 		"createError": "Could not create the organization: {{error}}"
@@ -38,7 +38,7 @@
 	"mcp": {
 		"secretName": "Secret name",
 		"secretNamePlaceholder": "MY_SERVER_TOKEN",
-		"secretNameHint": "Type the name of an organization secret. Viewers cannot see the list of secret names."
+		"secretNameHint": "Name of an organization secret."
 	},
 	"account": {
 		"switchOrg": "Switch organization",

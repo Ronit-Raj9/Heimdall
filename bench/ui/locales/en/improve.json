@@ -1,12 +1,12 @@
 {
 	"title": "Auto-improve",
-	"subtitle": "Your agent rewrites its own prompt, notes and skills over rounds. Each change is kept only when it wins on tasks the agent never saw.",
+	"subtitle": "Your agent rewrites itself. Kept only if it wins unseen tasks.",
 	"loadError": "Could not load improvement runs",
 	"empty": {
 		"title": "No improvement runs yet",
 		"message": "Ask an organization admin to start one.",
 		"cli": "heimdall improve create -f improvements/my-agent.yaml -run",
-		"messageAdmin": "Pick an agent and a benchmark; the improver keeps only changes that win on unseen tasks. Each round costs model calls."
+		"messageAdmin": "Each round costs model calls."
 	},
 	"list": {
 		"name": "Run",
@@ -64,11 +64,11 @@
 	},
 	"curve": {
 		"title": "Learning curve",
-		"description": "The kept version after each round on each task set, against what version 0 reaches with the same spend.",
+		"description": "Kept version per round against version 0 at equal spend.",
 		"round": "Round {{n}}",
 		"band": "Version 0 with the same spend",
 		"null": "Edits made without feedback",
-		"summary": "Scores after each of {{count}} rounds on practice, check and held-out tasks.",
+		"summary": "Scores after each of {{count}} rounds.",
 		"event": {
 			"base": "Start",
 			"committed": "Kept",
@@ -80,7 +80,7 @@
 	},
 	"lineage": {
 		"title": "Version lineage",
-		"description": "Every version the agent wrote, rejected ones included. Entries are hash-chained, so a rewrite shows.",
+		"description": "Every version, rejected ones included. Hash-chained.",
 		"chainOk": "Chain verifies",
 		"chainBroken": "Chain broken: {{error}}",
 		"author": {
@@ -92,7 +92,7 @@
 	},
 	"integrity": {
 		"title": "Integrity",
-		"description": "Checks on what the agent wrote and on how it behaved. Any hit pauses the run for your approval.",
+		"description": "Any hit pauses the run for your approval.",
 		"clean": "No hits",
 		"overridden": "Approved by a person",
 		"vetoes": "Flagged runs {{a}} to {{b}}",
@@ -130,7 +130,7 @@
 	},
 	"cost": {
 		"title": "Spend",
-		"description": "Every dollar the run spent, by phase.",
+		"description": "",
 		"baseline": "Version 0 scoring",
 		"improver": "Agent rewriting itself",
 		"screen": "Practice checks",
@@ -141,9 +141,9 @@
 	},
 	"create": {
 		"open": "New improvement run",
-		"adminOnly": "Only organization admins can start an improvement run, because it spends the organization's model keys.",
+		"adminOnly": "Only organization admins can start this. It spends model keys.",
 		"title": "New improvement run",
-		"description": "The agent rewrites the files you pick, round by round. A change is kept only when it wins on tasks the agent never saw.",
+		"description": "A change is kept only if it wins unseen tasks.",
 		"name": "Name",
 		"nameError": "Use lowercase letters, digits and dashes, up to 63 characters.",
 		"agent": "Agent",
@@ -153,14 +153,14 @@
 		"benchmarkPick": "Pick a benchmark",
 		"files": "Files the agent may change",
 		"filesLoading": "Reading the agent's files",
-		"noFiles": "This agent has no files Heimdall can change (its settings have no files section). Add a prompt or notes file on the agent's Setup tab first.",
+		"noFiles": "No files Heimdall can change. Add a prompt or notes file on the Setup tab.",
 		"filesNone": "Tick at least one file.",
 		"folder": "folder",
 		"rounds": "Rounds",
 		"roundsError": "Pick 1 to 20 rounds.",
 		"budget": "Budget per round (dollars)",
 		"budgetError": "The budget must be above 0.",
-		"roundNote": "Each round runs the agent on practice, check and held-out tasks of the benchmark and spends up to the round budget on the improver.",
+		"roundNote": "Each round spends up to the round budget on the improver.",
 		"submit": "Start run, up to ${{limit}}",
 		"cancel": "Cancel",
 		"cli": "Use the command line instead",

@@ -1,8 +1,8 @@
 {
 	"title": "Server admin",
-	"subtitle": "Manage who uses this server: users, organizations, limits and workers.",
-	"notAdmin": "Only server admins can open this page. On the server, run heimdall admin grant -email you@example.com, or add your email to HEIMDALL_SERVER_ADMINS and confirm it from the link we sent you.",
-	"localMode": "The server admin page is for hosted servers. A local bench has one organization and no quotas.",
+	"subtitle": "",
+	"notAdmin": "Only server admins can open this page. Run heimdall admin grant -email you@example.com, or add your email to HEIMDALL_SERVER_ADMINS.",
+	"localMode": "For hosted servers only.",
 	"loadFailed": "Could not load: {{message}}",
 	"retry": "Retry",
 	"tabs": {
@@ -19,7 +19,7 @@
 		"users": "Users",
 		"orgs": "Organizations",
 		"slots": "Runs in progress",
-		"stubQuota": "Limits are not saved: this server keeps them in memory, so edits are lost when it restarts. Turn on the Postgres limit store (shared workers) to keep them."
+		"stubQuota": "Limits are kept in memory and lost on restart. Turn on the Postgres limit store to keep them."
 	},
 	"kill": {
 		"title": "Emergency stop",
@@ -27,12 +27,12 @@
 		"off": "Off: runs start normally.",
 		"turnOn": "Stop new runs",
 		"turnOff": "Resume runs",
-		"confirmOn": "Stop every organization from starting new runs? Runs in progress keep going.",
+		"confirmOn": "Stop all organizations from starting runs? Runs in progress continue.",
 		"badgeOn": "Runs paused",
 		"badgeOff": "Running"
 	},
 	"users": {
-		"empty": "No users yet. The first sign-up creates the owner.",
+		"empty": "No users. The first sign-up becomes owner.",
 		"email": "Email",
 		"name": "Name",
 		"orgs": "Orgs",
@@ -43,11 +43,11 @@
 		"serverAdmin": "Server admin",
 		"disable": "Disable",
 		"enable": "Enable",
-		"confirmDisable": "Disable {{email}}? They are signed out and can not sign in until enabled again.",
+		"confirmDisable": "Disable {{email}}? They are signed out until enabled again.",
 		"search": "Filter by email or name"
 	},
 	"orgs": {
-		"empty": "No organizations yet. Each sign-up creates one.",
+		"empty": "No organizations yet.",
 		"slug": "Short name",
 		"name": "Name",
 		"members": "Members",
@@ -65,7 +65,7 @@
 		"runtimeRunsc": "gVisor",
 		"runtimeRunc": "runc",
 		"runtimeRunscHint": "Agents run under gVisor on the shared worker.",
-		"runtimeRuncHint": "Agents share the host kernel. The shared worker serves this organization only when the operator set HEIMDALL_SHARED_ALLOW_RUNC; on a worker with gVisor they still run under gVisor."
+		"runtimeRuncHint": "Shares the host kernel. Shared worker needs HEIMDALL_SHARED_ALLOW_RUNC, and uses gVisor if present."
 	},
 	"quota": {
 		"title": "Limits for {{org}}",
@@ -73,11 +73,11 @@
 		"maxPerDay": "Runs per day",
 		"maxSpend": "Spend per day (USD)",
 		"maxImage": "Largest agent image (GiB)",
-		"allowCustom": "Allow custom agent images (each needs approval)",
+		"allowCustom": "Allow custom images",
 		"sharedPool": "Use the shared worker",
 		"runtime": "Sandbox type",
-		"runc": "Standard (runc, shares the host kernel)",
-		"runsc": "Extra isolation (gVisor runsc, default)",
+		"runc": "Standard (runc)",
+		"runsc": "gVisor (default)",
 		"save": "Save limits",
 		"reset": "Use defaults",
 		"cancel": "Cancel",
@@ -85,11 +85,11 @@
 		"zeroHint": "0 means no limit.",
 		"noLimit": "No limit",
 		"defaultsLoading": "Loading this server's defaults...",
-		"runcWarning": "runc shares the host kernel. The shared worker serves runc organizations only when the operator sets HEIMDALL_SHARED_ALLOW_RUNC, and runs them under gVisor when the host has it."
+		"runcWarning": "runc shares the host kernel. Shared worker needs HEIMDALL_SHARED_ALLOW_RUNC, and uses gVisor if present."
 	},
 	"images": {
-		"empty": "No image requests here. Organizations ask for one on their Workers page; approving it also lets that org run custom images.",
-		"unavailable": "Image approval is not available on this server yet (shared workers are not turned on).",
+		"empty": "No image requests.",
+		"unavailable": "Shared workers are off on this server.",
 		"ref": "Image",
 		"org": "Organization",
 		"size": "Size",
@@ -105,7 +105,7 @@
 		"cancel": "Cancel"
 	},
 	"usage": {
-		"unavailable": "Platform usage is not available on this server yet.",
+		"unavailable": "Usage is not available here yet.",
 		"empty": "No usage recorded in this period.",
 		"from": "From",
 		"to": "To",
@@ -118,7 +118,7 @@
 		"orgError": "Could not read this organization's runs: {{error}}"
 	},
 	"containers": {
-		"empty": "No workers registered. Hosted runs need the shared workers or a worker per organization.",
+		"empty": "No workers registered.",
 		"org": "Organization",
 		"runner": "Worker",
 		"pool": "Shared group",
@@ -131,7 +131,7 @@
 		"refresh": "Refresh",
 		"remove": "Remove",
 		"removeCancel": "Cancel",
-		"confirmRemove": "Remove the record of worker {{runner}} from {{org}}? It is offline. If it still has a valid token it joins again when it starts.",
+		"confirmRemove": "Remove offline worker {{runner}} from {{org}}? With a valid token it rejoins on start.",
 		"removeError": "Could not remove the worker: {{message}}"
 	},
 	"localAction": "Open Operations",

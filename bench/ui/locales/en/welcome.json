@@ -1,13 +1,13 @@
 {
 	"title": "Welcome to Heimdall",
-	"subtitle": "Heimdall tests an AI agent on real tasks and tells you how it did. Five short steps, a result in minutes.",
-	"agentVsModel": "A model benchmark scores the AI model alone; Heimdall scores your whole agent, with its prompts, tools and settings, on top of whichever model you pick. That way you learn whether your agent got better, not just whether a new model is smarter.",
+	"subtitle": "Five short steps to a first result.",
+	"agentVsModel": "",
 	"evaluateNotice": {
 		"title": "There is a newer way to start.",
-		"body": "Evaluate your agent on many benchmarks at once and get one report card per version and model.",
+		"body": "One report card per version and model.",
 		"open": "Evaluate your agent"
 	},
-	"skip": "Skip, go to Home",
+	"skip": "Skip to Home",
 	"back": "Back",
 	"next": "Continue",
 	"startOver": "Start over",
@@ -20,33 +20,33 @@
 	},
 	"suite": {
 		"heading": "What should the agent work on?",
-		"help": "Each benchmark is a set of tasks. Every task is checked automatically.",
+		"help": "",
 		"recommended": "Recommended",
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
-		"empty": "There are no benchmarks yet. Add one from the catalog in one click.",
+		"empty": "No benchmarks yet.",
 		"browseCatalog": "Browse the catalog",
 		"import": "Import from a public benchmark",
 		"loadError": "Could not load the benchmarks."
 	},
 	"agent": {
 		"heading": "Which agent should try the tasks?",
-		"help": "The starter agents work right away, no setup needed.",
+		"help": "Starter agents need no setup.",
 		"defaultModel": "Default model: {{model}}",
-		"empty": "No agents yet. Create one from a template: Codex, Claude Code, mini-swe and more.",
-		"create": "Create agent from template",
+		"empty": "No agents yet.",
+		"create": "Create from template",
 		"createAnother": "New from template",
 		"loadError": "Could not load the agents."
 	},
 	"model": {
 		"heading": "Which AI model should the agent use?",
-		"help": "Pick a provider that has a working key, then pick a model.",
+		"help": "Pick a provider with a working key.",
 		"addKey": "Add a model key",
 		"required": "Choose a model to continue."
 	},
 	"run": {
 		"heading": "Ready to start",
-		"help": "A small first test. Most finish in a few minutes.",
+		"help": "Most finish in a few minutes.",
 		"suite": "Benchmark",
 		"agent": "Agent",
 		"model": "Model",
@@ -54,19 +54,19 @@
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
 		"trialNote": "Each task is tried once",
-		"button": "Start the test",
+		"button": "Start test",
 		"starting": "Starting...",
-		"noLauncher": "This server cannot start tests right now: no worker is online. Ask the server owner to turn on the shared workers.",
-		"notFound": "This server cannot start a test in one click yet. Set it up step by step instead.",
+		"noLauncher": "No worker is online. Ask the server owner to turn on shared workers.",
+		"notFound": "One-click start is not set up here. Set it up step by step.",
 		"failed": "The test did not start: {{message}}",
 		"advanced": "Set it up step by step",
-		"readOnly": "Your role can view results but not start tests. Ask an owner for member access."
+		"readOnly": "Your role can only view results. Ask an owner for member access."
 	},
 	"verdict": {
 		"heading": "Your result",
-		"waiting": "Running. You can leave this page: the test keeps going and Home shows its progress.",
+		"waiting": "Running. Home shows progress if you leave.",
 		"analyzing": "All runs are saved. Working out the result...",
-		"failed": "The test stopped before it could give a result. Open it to see which runs failed and why.",
+		"failed": "The test stopped before a result. Open it to see which runs failed.",
 		"loadError": "Could not load the test.",
 		"passRate": "{{num}} of {{den}} runs solved the task",
 		"headline": {
@@ -77,10 +77,10 @@
 			"score": "Here is your score"
 		},
 		"explain": {
-			"improved": "Setup B solved clearly more tasks than setup A, more than chance would explain.",
+			"improved": "B solved clearly more tasks than A, beyond chance.",
 			"regressed": "Setup B solved clearly fewer tasks than setup A. Hold off on releasing it.",
 			"inconclusive": "Not enough evidence to tell the two apart. Run more tasks.",
-			"invalid": "Something went wrong while measuring, not the agent's fault. Fix it and run again.",
+			"invalid": "The measurement broke. Fix it and run again.",
 			"score": "The share of tasks your setup solved, with a 95% range."
 		},
 		"open": "See full results",
@@ -89,17 +89,17 @@
 		"done": "Go to Home",
 		"meaningTitle": "What does this mean?",
 		"meaning": {
-			"improved": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved more of them, and the gap is bigger than the random ups and downs you would see if you ran the same setup twice. That makes it safe to say B is the better version.",
-			"regressed": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved fewer of them, and the gap is bigger than random ups and downs. Releasing B would likely make things worse.",
-			"inconclusive": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). Any difference is small enough that it could just be luck. This does not mean they are equal: it means a few tasks are not enough to tell. Run more tasks or more tries per task.",
-			"invalid": "Some runs broke for reasons that have nothing to do with the agent, for example the workspace failed to start or the grader gave an unreliable answer. Heimdall refuses to give a result from broken measurements. The full results page shows which runs broke and why.",
-			"score": "Heimdall ran your setup on the tasks and graded each run. The score is the share it solved; the range shows how much it could move on other tasks like these. Nothing was compared, so there is no better or worse."
+			"improved": "Same tasks, setup A (baseline) and B (candidate). B solved more, by more than run-to-run noise.",
+			"regressed": "Same tasks, setup A (baseline) and B (candidate). B solved fewer, by more than run-to-run noise. Releasing B would likely make things worse.",
+			"inconclusive": "Same tasks, setups A and B. The gap could be luck. That does not make them equal. Run more tasks or tries.",
+			"invalid": "Some runs broke for reasons outside the agent, such as a workspace failing to start. No result comes from broken runs.",
+			"score": "Each run was graded. The score is the share solved. The range shows how much it could move. Nothing was compared."
 		}
 	},
 	"home": {
 		"welcomeTitle": "New here? Get a result in about five minutes.",
-		"welcomeBody": "The guided setup walks you through benchmark, agent and model, then runs a small test.",
-		"welcomeOpen": "Start the guided setup",
+		"welcomeBody": "",
+		"welcomeOpen": "Start guided setup",
 		"suitesCatalog": "Browse the catalog",
 		"recentRun": "Run your first test"
 	},
@@ -109,7 +109,7 @@
 	},
 	"docs": {
 		"title": "Docs",
-		"subtitle": "Guides for every part of Heimdall.",
+		"subtitle": "",
 		"search": "Search guides",
 		"empty": "No guide matches this filter.",
 		"none": "This server ships no guides.",
@@ -119,16 +119,16 @@
 		"start": "Start here",
 		"onThisPage": "On this page",
 		"onGitHub": "(on GitHub)",
-		"localAddressNote": "Addresses in this guide that pointed to a local server now point to this server.",
-		"noGuide": "There is no guide named {{name}}. Pick one from the list.",
+		"localAddressNote": "Local server addresses in this guide now point here.",
+		"noGuide": "No guide named {{name}}.",
 		"noMatch": "No guide mentions {{q}}.",
 		"searching": "Searching the guides"
 	},
 	"stepHelp": {
-		"suite": "Choose a benchmark: a set of tasks with automatic checks.",
-		"agent": "Choose the agent program that will try the tasks.",
-		"model": "Choose the AI model the agent thinks with.",
-		"run": "Check your choices and start the test.",
-		"verdict": "See how many tasks were solved and what it means."
+		"suite": "A set of tasks with automatic checks.",
+		"agent": "",
+		"model": "",
+		"run": "",
+		"verdict": ""
 	}
 }

@@ -1,6 +1,6 @@
 {
 	"orgReset": {
-		"text": "This tab was showing an organization you can no longer open, so it now shows {{name}}.",
+		"text": "You can no longer open the organization this tab showed. It now shows {{name}}.",
 		"close": "Close"
 	},
 	"agentNotFound": {

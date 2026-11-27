@@ -8,7 +8,7 @@
 		"run_trace": "this run",
 		"leaderboard": "this leaderboard view"
 	},
-	"intro": "Anyone with the link can view a read-only copy. They do not need an account. Secrets are never shown.",
+	"intro": "Anyone with the link can view. Secrets are never shown.",
 	"expiry": "Link expires",
 	"expiryOption": {
 		"1": "1 day",
@@ -24,14 +24,14 @@
 	"create": "Create link",
 	"creating": "Creating...",
 	"createError": "Could not create the link.",
-	"readOnlyRole": "Viewers can see which links exist, but only members can create or copy them.",
+	"readOnlyRole": "Only members can create or copy links.",
 	"copy": "Copy",
 	"copied": "Copied",
 	"copyFailed": "Could not copy",
 	"links": "Links to this item",
 	"noLinks": "No links yet.",
 	"revoke": "Turn off",
-	"revokeConfirm": "Turn this link off? Anyone who has it loses access at once.",
+	"revokeConfirm": "Turn this link off? Anyone with it loses access.",
 	"state": {
 		"active": "Active",
 		"expired": "Expired",
@@ -43,11 +43,11 @@
 	"html": "HTML",
 	"markdown": "Markdown",
 	"pdf": "PDF",
-	"pdfHint": "Opens your browser's print dialog. Pick Save as PDF.",
+	"pdfHint": "Opens the print dialog. Pick Save as PDF.",
 	"reproduce": "Reproduce bundle",
-	"reproduceHelp": "Evaluation spec, agent version configs, benchmark locks and the commands to run it again.",
+	"reproduceHelp": "Spec, configs, locks and commands to rerun.",
 	"badge": "Badge for a README",
-	"badgeHelp": "Shows the score and links to the shared page while the link is active.",
+	"badgeHelp": "Shows the score while the link is active.",
 	"close": "Close",
 	"page": {
 		"sharedBy": "Shared by {{org}}",
@@ -57,7 +57,7 @@
 		"promptsHidden": "Prompts and agent text are hidden in this view.",
 		"loading": "Loading the shared page...",
 		"notFound": "This link does not exist.",
-		"gone": "This link has expired or was turned off. Ask the person who sent it for a new one.",
+		"gone": "Link expired or turned off. Ask the sender for a new one.",
 		"error": "Could not load the shared page.",
 		"retry": "Try again",
 		"poweredBy": "Measured with Heimdall",
@@ -84,7 +84,7 @@
 		"runs": "Runs",
 		"rank": "Rank",
 		"timeline": "Steps",
-		"noSteps": "No steps were recorded for this run.",
+		"noSteps": "No steps recorded.",
 		"stepsTruncated": "Showing the first {{count}} steps.",
 		"noRows": "Nothing on this board yet."
 	}

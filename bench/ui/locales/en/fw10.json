@@ -1,6 +1,6 @@
 {
 	"releases": {
 		"showQuick": "Show quick runs ({{count}})",
-		"showQuickHint": "Quick runs have a name Heimdall made up (quick-<date>). They are hidden so the list shows the comparisons you named."
+		"showQuickHint": ""
 	}
 }

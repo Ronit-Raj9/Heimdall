@@ -10,7 +10,7 @@
 		},
 		"signedOut": {
 			"what": "Your session ended.",
-			"why": "You were signed out after a while away. Sign in again; what you typed is kept."
+			"why": "Sign in again. What you typed is kept."
 		},
 		"forbidden": {
 			"what": "Your role cannot do this.",
@@ -18,11 +18,11 @@
 		},
 		"notFound": {
 			"what": "This no longer exists.",
-			"why": "It was deleted, or the link is old. It may belong to another organization."
+			"why": "Deleted, old link, or another organization."
 		},
 		"conflict": {
 			"what": "This changed while you were editing.",
-			"why": "Someone else saved first. Reload to see the latest; your text is kept."
+			"why": "Someone saved first. Reload, your text is kept."
 		},
 		"invalid": {
 			"what": "Some fields need fixing.",
@@ -38,11 +38,11 @@
 		},
 		"rateLimited": {
 			"what": "Too many requests.",
-			"why": "The server limits requests per minute. Wait a moment and try again."
+			"why": "Wait a moment and try again."
 		},
 		"server": {
 			"what": "Heimdall could not finish this.",
-			"why": "A server error; it was logged. Try again; if it keeps failing, copy the details for support."
+			"why": "Try again. If it keeps failing, copy the details for support."
 		},
 		"workerRefused": {
 			"what": "The worker refused this run.",
@@ -50,7 +50,7 @@
 		},
 		"noModelKey": {
 			"what": "No model key for this provider.",
-			"why": "Runs call the model with your organization's key. Add one in Settings, Model keys."
+			"why": "Add one in Settings, Model keys."
 		},
 		"budgetReached": {
 			"what": "Stopped: the budget is reached.",
@@ -62,13 +62,13 @@
 		},
 		"unknown": {
 			"what": "Something went wrong.",
-			"why": "Try again; if it keeps failing, copy the details for support."
+			"why": "Try again. If it keeps failing, copy the details for support."
 		},
 		"details": "Details from the server",
-		"otherOrg": "It may belong to another organization. Switch organization in the menu at the top.",
+		"otherOrg": "May belong to another organization. Switch in the top menu.",
 		"refused": {
 			"what": "The server refused this.",
-			"why": "This server does not allow the change; the details say why."
+			"why": "Not allowed on this server. See details."
 		}
 	},
 	"loading": {
@@ -85,10 +85,10 @@
 		"noModelCall": "-",
 		"notApplicable": "n/a",
 		"hint": {
-			"notMeasured": "Nothing was measured here, so there is no number.",
+			"notMeasured": "Nothing was measured here.",
 			"notRun": "This did not run.",
 			"notTested": "This was not tested.",
-			"noModelCall": "No model call, so no tokens and no cost.",
+			"noModelCall": "No model call, no tokens, no cost.",
 			"notApplicable": "This does not apply here."
 		}
 	},
@@ -110,7 +110,7 @@
 		"deleteSelected_other": "Delete {{count}} comparisons",
 		"confirmTitle_one": "Delete {{count}} comparison?",
 		"confirmTitle_other": "Delete {{count}} comparisons?",
-		"confirmBody": "This deletes the selected comparisons and their runs. It cannot be undone.",
+		"confirmBody": "Deletes the selected comparisons and runs. Cannot be undone.",
 		"deleted_one": "{{count}} comparison deleted.",
 		"deleted_other": "{{count}} comparisons deleted.",
 		"deleteError": "Could not delete every selected comparison."

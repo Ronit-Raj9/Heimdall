@@ -1,7 +1,7 @@
 {
 	"quickstart": {
 		"signedOutTitle": "Run these on your own benchmark",
-		"signedOutBody": "Sign in to see the mined tasks that need review and to start an evaluation.",
+		"signedOutBody": "Sign in to review mined tasks and start an evaluation.",
 		"signIn": "Sign in to start",
 		"signUp": "Create an account"
 	}

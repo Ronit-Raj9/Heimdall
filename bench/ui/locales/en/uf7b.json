@@ -5,7 +5,7 @@
 			"daily": "Every day at a time",
 			"hourly": "Every hour",
 			"weekly": "Every week on a day at a time",
-			"manual": "Only when I press Check now",
+			"manual": "Only on Check now",
 			"custom": "Custom (cron)"
 		},
 		"zone": "Time zone",
@@ -21,12 +21,12 @@
 			"fri": "Friday",
 			"sat": "Saturday"
 		},
-		"cron": "Cron line (minute hour day month weekday)",
-		"cronHelp": "Enter a cron line. Example: 0 2 * * * is every day at 02:00.",
-		"invalid": "Not a valid schedule. Example: 0 2 * * * is every day at 02:00.",
-		"next": "Next runs: {{list}} ({{zone}}). The first is {{utc}} UTC.",
+		"cron": "Cron line",
+		"cronHelp": "Example: 0 2 * * * runs daily at 02:00.",
+		"invalid": "Not a valid schedule. Example: 0 2 * * *",
+		"next": "Next runs: {{list}} ({{zone}}). First: {{utc}} UTC.",
 		"nextUtc": "Next runs: {{list}} (UTC).",
-		"invalidShort": "a valid schedule (example: 0 2 * * * is every day at 02:00)"
+		"invalidShort": "a valid schedule, like 0 2 * * *"
 	},
 	"canary": {
 		"modelN": "Model {{n}}",
@@ -42,21 +42,21 @@
 		"setUpChannel": "Set one up",
 		"channelSlack": "Slack: {{name}}",
 		"channelHook": "Web address: {{name}}",
-		"thresholdNote": "Each check is compared with the baseline; a drop beyond the noise of the benchmark sends the alert.",
+		"thresholdNote": "",
 		"stepTell": "Tell me when",
 		"stepBudget": "Budget",
 		"createUpTo": "Create, up to {{day}} a day",
-		"baselineNote": "After you create it, record a baseline (one run, up to {{perRun}}).",
+		"baselineNote": "Then record a baseline: one run, up to {{perRun}}.",
 		"cliLead": "Prefer the terminal?"
 	},
 	"cost": {
-		"line_one": "At most {{count}} run a day, up to {{perRun}} a run, at most {{day}} a day and {{month}} a month.",
-		"line_other": "At most {{count}} runs a day, up to {{perRun}} a run, at most {{day}} a day and {{month}} a month.",
+		"line_one": "Up to {{count}} run a day, {{perRun}} a run, {{day}} a day, {{month}} a month.",
+		"line_other": "Up to {{count}} runs a day, {{perRun}} a run, {{day}} a day, {{month}} a month.",
 		"lineLast_one": "At most {{count}} run a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
 		"lineLast_other": "At most {{count}} runs a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
-		"hourlyCapped_one": "Every hour, but the daily limit stops it after {{count}} run.",
-		"hourlyCapped_other": "Every hour, but the daily limit stops it after {{count}} runs.",
-		"unknown": "Price per run not known yet. The daily limit caps it at {{day}} a day and {{month}} a month."
+		"hourlyCapped_one": "Hourly, but the daily limit stops it after {{count}} run.",
+		"hourlyCapped_other": "Hourly, but the daily limit stops it after {{count}} runs.",
+		"unknown": "Price per run unknown. Capped at {{day}} a day, {{month}} a month."
 	},
 	"schedules": {
 		"more": "More"
@@ -65,7 +65,7 @@
 		"createUpTo": "Add repeat run, up to {{day}} a day"
 	},
 	"alerts": {
-		"kinds": "Only web addresses (webhooks) and Slack for now.",
+		"kinds": "Webhooks and Slack only.",
 		"pickSecret": "Pick a secret",
 		"formatHook": "Web address",
 		"formatSlack": "Slack",
@@ -77,13 +77,13 @@
 			"run_errors": "Runs failed with errors",
 			"schedule_failed": "A repeat run failed",
 			"canary_drifted": "A drift monitor dropped",
-			"canary_model_changed": "A watched model changed under the same name",
+			"canary_model_changed": "A watched model changed",
 			"live_signal_threshold": "A live check crossed its limit",
-			"live_comparison_worse": "A live comparison found the new version worse"
+			"live_comparison_worse": "A live comparison got worse"
 		}
 	},
 	"live": {
-		"notEndpoint": "{{agent}} has no remote endpoint, so it cannot be live monitored. Use a drift monitor instead.",
+		"notEndpoint": "{{agent}} has no remote endpoint. Use a drift monitor.",
 		"useDrift": "Set up a drift monitor",
 		"problem": {
 			"name": "Give the monitor a name.",
@@ -99,8 +99,8 @@
 		"runPaid": "Run now (paid)",
 		"runTitle": "Run this check now?",
 		"runConfirm": "Run now",
-		"runAsk": "Run {{name}} now? One check can spend up to {{usd}}; {{left}} of today's budget is left.",
-		"runAskUnknown": "Run {{name}} now? It calls the agent and spends model budget; the price of one check is not known."
+		"runAsk": "Run {{name}} now? Up to {{usd}}. {{left}} left today.",
+		"runAskUnknown": "Run {{name}} now? This spends model budget. Price unknown."
 	},
 	"repeatAsk": {
 		"title": {
@@ -117,15 +117,15 @@
 		"limitOnly": "Daily limit: {{limit}}.",
 		"limitLabel": "Daily limit ($)",
 		"limitPlaceholder": "No limit",
-		"limitBad": "Type an amount above $0, or leave it empty.",
+		"limitBad": "Enter an amount above $0, or leave empty.",
 		"created": "Repeat run created.",
 		"confirm": "Create repeat run",
 		"cancel": "Cancel"
 	},
 	"promote": {
-		"onlyOne": "{{name}} is already the live version, so there is nothing new to release. Save a new version of {{agent}}, evaluate it against the live one, then come back here.",
+		"onlyOne": "{{name}} is already live. Save a new version of {{agent}} and evaluate it against the live one.",
 		"newVersion": "Save a new version",
-		"evaluateNew": "Evaluate the new version against the live one"
+		"evaluateNew": "Evaluate new version"
 	},
 	"releases": {
 		"liveLabel": "Live now:",
@@ -134,17 +134,17 @@
 		"evaluateAgent": "Evaluate an agent",
 		"validityLink": "Results affected by grader changes",
 		"validityLinkCount": "Results affected by grader changes ({{count}})",
-		"noNumbers": "No numbers were recorded with this release.",
-		"openComparison": "Open the comparison",
-		"copyLink": "Copy link to this release",
+		"noNumbers": "No numbers recorded.",
+		"openComparison": "Open comparison",
+		"copyLink": "Copy link",
 		"copied": "Link copied",
-		"print": "Print this release",
+		"print": "Print",
 		"version": "Version released",
 		"arm": "Setup and its fingerprint"
 	},
 	"checks": {
 		"title": "Checks",
-		"subtitle": "Tests that run on their own: drift monitors compare with a baseline, repeat runs repeat an evaluation, live monitors probe a deployed agent.",
+		"subtitle": "",
 		"tab": {
 			"drift": "Drift monitors",
 			"schedules": "Repeat runs",
@@ -152,8 +152,8 @@
 		}
 	},
 	"releaseForm": {
-		"noComparison": "No finished comparison of two versions yet. Evaluate the new version against the live one first.",
-		"fromEvaluation": "Releasing from an evaluation? Open it and use Promote this version:"
+		"noComparison": "No finished comparison yet. Evaluate the new version against the live one.",
+		"fromEvaluation": "From an evaluation? Use Promote this version:"
 	},
 	"evidence": {
 		"this_one": "This evaluation ({{count}} run)",
@@ -162,21 +162,21 @@
 		"earlier_other": "Earlier run ({{count}} runs)"
 	},
 	"monitors": {
-		"fprProblem": "Use numbers between 0 and 1, split by commas. Example: 0.01, 0.001.",
+		"fprProblem": "Use numbers from 0 to 1, comma separated. Example: 0.01, 0.001.",
 		"gradeOriginal": "The original scores"
 	},
 	"integrations": {
 		"tracesTitle": "Production traces",
-		"tracesText": "Traces from your live agent come in through the failure inbox, or can start a new agent from what it already does.",
-		"tracesAgents": "Start an agent from traces",
-		"tracesInbox": "Open the failure inbox",
-		"localUrl": "This address is on your own machine or network, so the hosted server cannot reach it. Use a public https address.",
-		"noEvents": "Tick at least one event, or the hook never sends anything.",
-		"badRoutingKey": "A PagerDuty routing key is 20 to 64 letters and digits, from the PagerDuty service's Events API v2 integration."
+		"tracesText": "",
+		"tracesAgents": "Start from traces",
+		"tracesInbox": "Open failure inbox",
+		"localUrl": "This address is private, the server cannot reach it. Use a public https address.",
+		"noEvents": "Tick at least one event.",
+		"badRoutingKey": "A PagerDuty routing key is 20 to 64 letters and digits."
 	},
 	"operate": {
 		"backupLabel": "Saved results, {{date}}, {{size}}",
-		"which": "Which comparison (type to search)",
+		"which": "Comparison",
 		"all": "All comparisons"
 	},
 	"policies": {

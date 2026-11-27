@@ -1,7 +1,7 @@
 {
 	"integrity": {
 		"noiseFloorTitle": "Noise floor",
-		"noiseFloorOneSetup": "The noise floor compares two setups. This run scored one setup, so there is no difference to test against noise.",
+		"noiseFloorOneSetup": "Needs two setups. This run has one.",
 		"notScanned_one": "{{count}} run could not be scanned",
 		"notScanned_other": "{{count}} runs could not be scanned",
 		"notScannedRun": "Open run {{runId}}",

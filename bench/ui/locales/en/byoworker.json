@@ -1,14 +1,14 @@
 {
 	"title": "Your own workers",
-	"subtitle": "Run your agents on compute you own: a cloud sandbox, your Kubernetes cluster or your own VM. Each worker shows up here with its health and capacity.",
+	"subtitle": "Run agents on compute you own.",
 	"connect": "Connect a worker",
 	"cancel": "Cancel",
-	"empty": "No worker of your own yet. Evaluations run on the shared worker until you connect one.",
+	"empty": "No workers yet. Runs use the shared worker.",
 	"loadError": "Could not load your workers",
 	"default": {
 		"label": "New evaluations run on",
 		"shared": "Shared worker",
-		"hint": "An evaluation can still pick another worker when you launch it.",
+		"hint": "Each evaluation can pick another worker.",
 		"saved": "Saved",
 		"badge": "Runs go here"
 	},
@@ -43,17 +43,17 @@
 		"title": "Connect a worker",
 		"platform": "Where it runs",
 		"name": "Name",
-		"nameHint": "Letters, digits, '.', '_' or '-'. Evaluations pick the worker by this name.",
+		"nameHint": "Letters, digits, '.', '_' or '-'. Evaluations use this name.",
 		"submit": "Connect",
 		"submitting": "Connecting...",
 		"startNow": "Start it now",
 		"done": "Done",
-		"secretHint": "Kept encrypted. Heimdall only uses it to start and stop this worker.",
-		"vmHint": "Heimdall gives you one command. Run it on an Ubuntu or Debian machine with Docker and at least 20 GB free; the worker installs itself as a service and connects.",
+		"secretHint": "Encrypted. Used only to start and stop this worker.",
+		"vmHint": "Run our command on Ubuntu or Debian with Docker and 20 GB free. It installs as a service.",
 		"installTitle": "Run this on your VM",
-		"installHint": "It holds this worker's token: copy it now, keep it private. Admins can show it again from the worker's card.",
+		"installHint": "Holds this worker's token. Copy it now, keep it private. Admins can show it again.",
 		"connected": "{{name}} is connected.",
-		"startHint": "Start it to put it to work. It installs itself on first start, which takes a few minutes."
+		"startHint": "Start it to use it. First start installs, taking a few minutes."
 	},
 	"runloop": {
 		"secret": "Runloop API key",
@@ -80,13 +80,13 @@
 		"gpuCount": "GPUs (1 to 8)",
 		"cloudType": "Cloud",
 		"image": "Image (optional)",
-		"imageHint": "Needs a working Docker for the agent containers; the default CUDA image installs it if the pod allows.",
+		"imageHint": "Needs Docker for agent containers. The default CUDA image installs it if allowed.",
 		"disk": "Disk (GB)"
 	},
 	"kubernetes": {
 		"namespace": "Namespace",
 		"manifest": "Apply this first",
-		"manifestHint": "It creates a narrow account for Heimdall in the namespace and lets the worker change only its own run namespaces.",
+		"manifestHint": "Creates a narrow Heimdall account. The worker changes only its own run namespaces.",
 		"manifestLink": "Download the manifest",
 		"mode": "Credential",
 		"kubeconfig": "Kubeconfig",
@@ -96,11 +96,11 @@
 		"ca": "Certificate authority (PEM)",
 		"saToken": "Token",
 		"image": "Worker image",
-		"imageHint": "An image with heimdall and your project. Leave empty to use the server's image."
+		"imageHint": "Needs heimdall and your project. Empty uses the server's image."
 	},
 	"target": {
 		"label": "Runs go to",
-		"hint": "One setting for every run of the organization: the shared worker, a fresh sandbox per run on a platform you connected, or one of your own workers. An evaluation can still pick one of your own workers when you launch it.",
+		"hint": "Applies to every run in the organization. An evaluation can still pick one of your workers.",
 		"sandbox": "a fresh sandbox per run",
 		"error": "Could not change where runs go",
 		"loadError": "Could not load where runs go",
@@ -113,7 +113,7 @@
 		"askAdmin": "An admin can add a worker on the Workers page."
 	},
 	"shared": {
-		"hostCap": "This server's shared worker runs {{n}} at a time for all organizations together.",
-		"noRemove": "The shared worker is provided by this server, so it cannot be removed."
+		"hostCap": "Shared worker runs {{n}} at a time across all organizations.",
+		"noRemove": "Provided by this server. Cannot be removed."
 	}
 }

@@ -8,7 +8,7 @@
 		"none": "No choices yet.",
 		"clear": "Clear the choice",
 		"open": "Show the list",
-		"hiddenTests": "{{count}} test items hidden. Type \"test\" to see them."
+		"hiddenTests": "{{count}} test items hidden. Type \"test\"."
 	},
 	"leave": {
 		"noDraft": "What you changed here is not saved."

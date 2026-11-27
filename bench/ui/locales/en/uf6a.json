@@ -3,7 +3,7 @@
 		"search": "Search tasks",
 		"searchPlaceholder": "Task id or title",
 		"pageOf": "{{first}} to {{last}} of {{total}} tasks",
-		"pageOfFiltered": "{{first}} to {{last}} of {{total}} matching tasks ({{all}} in all)",
+		"pageOfFiltered": "{{first}} to {{last}} of {{total}} matching tasks, {{all}} in all",
 		"usedVersion": "The run used version {{rev}} of this benchmark.",
 		"columns": "Columns",
 		"moreColumns": "Show more columns",
@@ -13,13 +13,13 @@
 	},
 	"status": {
 		"draft": "Check failed",
-		"draftHint": "The readiness check ran and failed, so this task is not used in tests.",
+		"draftHint": "Readiness check failed. Not used in tests.",
 		"unchecked": "Not checked yet",
 		"uncheckedHint": "The readiness check has not run on this task yet."
 	},
 	"checklist": {
 		"title": "Make this benchmark ready",
-		"description": "Only ready tasks are used in tests. Do these three steps in order.",
+		"description": "Only ready tasks are used in tests.",
 		"steps": {
 			"lint": "Check files",
 			"freeze": "Freeze this version",
@@ -27,13 +27,13 @@
 		},
 		"hints": {
 			"lint": "Finds mistakes in the task files.",
-			"freeze": "Pins every task to its current files, so each run sees the same version.",
-			"admit": "Tries each task: a correct solution must pass and an agent that does nothing must fail."
+			"freeze": "Pins every task to its current files.",
+			"admit": "Correct solution must pass. Idle agent must fail."
 		},
 		"state": {
 			"todo": "To do",
 			"done": "Done",
-			"redo": "Files changed: do it again",
+			"redo": "Files changed, redo",
 			"partly": "{{ready}} of {{total}} tasks ready"
 		}
 	},
@@ -53,7 +53,7 @@
 	"private": {
 		"search": "Find a task to hold out",
 		"noMatch": "No task matches.",
-		"noneHeldOut": "No task is held out yet. Search above to find one."
+		"noneHeldOut": "No task is held out yet."
 	},
 	"tabs": {
 		"quality": "Quality",
@@ -65,7 +65,7 @@
 		"cheat": "Cheat checks"
 	},
 	"cheat": {
-		"hint": "Makes up to 50 impossible twins of these tasks: copies no honest agent can pass. A run that passes one has cheated.",
+		"hint": "Up to 50 impossible copies of these tasks. Passing one means cheating.",
 		"add": "Add cheat checks",
 		"confirm": "Make up to 50 impossible twins of this benchmark? They go into a new benchmark, and its readiness check runs next. No model is called."
 	},
@@ -79,8 +79,8 @@
 		"runs_one": "{{count}} run so far",
 		"runs_other": "{{count}} runs so far",
 		"noRuns": "no runs yet",
-		"notReady_one": "The task is not ready yet. Follow the 3 steps below.",
-		"notReady_other": "None of the {{count}} tasks is ready yet. Follow the 3 steps below.",
+		"notReady_one": "The task is not ready yet.",
+		"notReady_other": "None of the {{count}} tasks is ready yet.",
 		"makeReady": "Make it ready"
 	},
 	"onboard": {
@@ -112,7 +112,7 @@
 	},
 	"data": {
 		"everything": "Everything",
-		"noSecret": "{{name}} (no secret yet, add one)"
+		"noSecret": "{{name}}, no secret yet"
 	},
 	"edit": {
 		"rootFolder": "Benchmark files"

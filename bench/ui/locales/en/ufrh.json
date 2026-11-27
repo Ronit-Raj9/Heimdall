@@ -9,7 +9,7 @@
 	},
 	"findings": {
 		"noRunsTitle": "Run an evaluation first",
-		"noRunsBody": "There are no failed runs to look into yet. Evaluate an agent; its failures show up here.",
+		"noRunsBody": "No failed runs yet.",
 		"noRunsAction": "Evaluate an agent"
 	}
 }

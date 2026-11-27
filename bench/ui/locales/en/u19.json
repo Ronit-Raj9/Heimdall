@@ -2,48 +2,48 @@
 	"pitch": {
 		"eyebrow": "Heimdall",
 		"title": "Know if your AI agent change is safe to ship",
-		"body": "Heimdall tests the old and new version of your agent on the same tasks and tells you which is better, before your users find out.",
+		"body": "Tests old and new agent versions on the same tasks.",
 		"run": {
-			"title": "Test any agent on real tasks",
-			"body": "Coding, browser, voice, tools and more, with tasks checked to be fair."
+			"title": "Test any agent",
+			"body": "Coding, browser, voice, tools and more."
 		},
 		"bifrost": {
 			"title": "Every model call goes through Bifrost",
-			"body": "One gateway that records cost, can inject failures and keeps a full log of each call."
+			"body": "Records cost, injects failures, logs each call."
 		},
 		"sealed": {
-			"title": "Results you can trust",
-			"body": "Every pass, fail and slowdown is backed by saved, tamper-proof records."
+			"title": "Saved records",
+			"body": "Every result is backed by tamper-proof records."
 		},
 		"footer": "Built on Bifrost"
 	},
 	"login": {
 		"title": "Welcome back",
-		"subtitle": "Sign in to test and review your agents.",
+		"subtitle": "",
 		"orEmail": "or sign in with email"
 	},
 	"signup": {
 		"orEmail": "or sign up with email"
 	},
 	"banner": {
-		"detail": "Real results. You can look but not change anything."
+		"detail": "Read only."
 	},
 	"quickstart": {
 		"title": "Get started",
-		"subtitle": "Build the command line tool, then four commands take you from your code to a clear answer: is the new agent better or worse?",
+		"subtitle": "Build the CLI, then run four commands.",
 		"step": "Step {{n}}",
 		"copy": "Copy command",
 		"copied": "Copied",
 		"steps": {
-			"init": "Looks at your project (tests, agents, Docker) and writes a .heimdall/ settings folder.",
+			"init": "Scans your project and writes .heimdall/.",
 			"mine": "Turns past commits into tasks your agent must solve.",
 			"compare": "Runs the old and new agent side by side and says which is better.",
 			"ci": "Adds a GitHub check that comments on every pull request.",
-			"install": "Builds the Heimdall command line tool from this repository, once per machine."
+			"install": "Builds the CLI from this repository, once."
 		},
 		"costForecast": "Estimates the cost before it runs",
 		"minedTitle": "Tasks made from your commits",
-		"minedSubtitle": "Check the written instructions before you trust the results.",
+		"minedSubtitle": "Check the instructions before use.",
 		"needsReview_one": "{{count}} needs review",
 		"needsReview_other": "{{count}} need review",
 		"allReviewed": "All reviewed",
@@ -51,8 +51,8 @@
 		"showCommands": "Review commands",
 		"installTitle": "Install the Heimdall command line tool",
 		"web": {
-			"title": "Prefer the website? Evaluate an agent in 5 steps",
-			"body": "Pick an agent and benchmarks in the browser. Heimdall shows the cost before anything runs.",
+			"title": "Evaluate in the browser",
+			"body": "Cost is shown before anything runs.",
 			"evaluate": "Evaluate an agent",
 			"keys": "Add a model key"
 		}

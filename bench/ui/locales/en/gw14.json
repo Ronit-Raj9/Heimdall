@@ -1,11 +1,11 @@
 {
 	"slots": {
 		"perBenchmark": "{{count}} per benchmark",
-		"orgSlots_one": "; your organization has {{count}} worker slot",
-		"orgSlots_other": "; your organization has {{count}} worker slots",
+		"orgSlots_one": ", your organization has {{count}} worker slot",
+		"orgSlots_other": ", your organization has {{count}} worker slots",
 		"upTo_one": "Up to {{count}} run at once ({{detail}}).",
 		"upTo_other": "Up to {{count}} runs at once ({{detail}}).",
-		"worker_one": "Up to {{count}} run at once: the worker this evaluation uses runs {{n}} at a time.",
-		"worker_other": "Up to {{count}} runs at once: the worker this evaluation uses runs {{n}} at a time."
+		"worker_one": "Up to {{count}} run in parallel. Its worker runs {{n}} at a time.",
+		"worker_other": "Up to {{count}} runs in parallel. Its worker runs {{n}} at a time."
 	}
 }

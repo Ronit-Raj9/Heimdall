@@ -1,7 +1,7 @@
 {
 	"page": {
 		"title": "Gateway report card",
-		"subtitle": "Every Bifrost feature, what it checks, and its measured effect.",
+		"subtitle": "Each Bifrost feature and its measured effect.",
 		"gateway": "Bifrost {{version}} at {{host}}",
 		"gatewayNoVersion": "Gateway: {{host}} (version not reported)",
 		"unreachable": "Heimdall could not reach your gateway: {{error}}",
@@ -18,7 +18,7 @@
 		"save": "Connect",
 		"remove": "Disconnect",
 		"cancel": "Cancel",
-		"adminOnly": "Only an admin can change the connection."
+		"adminOnly": "Admins only."
 	},
 	"line": {
 		"inUse": "In use",
@@ -50,7 +50,7 @@
 		"options": "Settings for this test",
 		"required": "required",
 		"budget": "Budget (USD)",
-		"budgetHint": "Required. At most 50 USD here; larger tests use the New comparison form.",
+		"budgetHint": "Up to 50 USD. Larger tests: New comparison.",
 		"trials": "Trials",
 		"prepare": "Prepare",
 		"preparing": "Preparing",
@@ -64,7 +64,7 @@
 		"confirmYes": "Yes, start",
 		"cancel": "Cancel",
 		"needBudget": "Enter a budget above 0 and at most 50 USD.",
-		"needFields": "Pick a benchmark and an agent, and fill every required setting.",
+		"needFields": "Pick a benchmark and agent, fill required settings.",
 		"error": "Could not prepare the test: {{error}}"
 	},
 	"effect": {
@@ -91,13 +91,13 @@
 		"where": "Where: {{where}}",
 		"copy": "Copy",
 		"copied": "Copied",
-		"fixed": "Heimdall does not change your Bifrost. Paste this where it says, review it, then switch it on.",
+		"fixed": "Heimdall does not change your Bifrost. Paste, review, then switch on.",
 		"close": "Close"
 	},
 	"watch": {
 		"title": "Watch for new models",
-		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} that Bifrost enforces.",
-		"firstCheck": "The first check only records the models that exist today. Nothing runs until a new one appears.",
+		"text": "Checks the catalog {{schedule}}. New models run {{evaluation}} once next to {{current}}, budget {{usd}} enforced by Bifrost.",
+		"firstCheck": "First check records today's models. Nothing runs until a new one appears.",
 		"none": "No new model watch is set up.",
 		"model": "Model",
 		"found": "Found",

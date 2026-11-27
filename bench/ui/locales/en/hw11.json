@@ -2,7 +2,7 @@
 	"banner": {
 		"forkMessage": "Fork of run {{run}}: your message was added before model call {{call}}.",
 		"forkResponse": "Fork of run {{run}}: the model's answer at call {{call}} was replaced.",
-		"forkNone": "Fork of run {{run}} from model call {{call}} (no change).",
+		"forkNone": "Fork of run {{run}} from model call {{call}}, unchanged",
 		"showStep": "Show that step"
 	},
 	"replay": {

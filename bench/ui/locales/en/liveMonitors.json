@@ -1,12 +1,12 @@
 {
 	"title": "Live monitors",
-	"subtitle": "A few ready tasks run against your deployed agent on a schedule. A drop in pass rate over a rolling window, or the agent going down, opens one incident and alerts your channels.",
+	"subtitle": "Scheduled tasks against your deployed agent.",
 	"new": "New monitor",
 	"loadError": "Could not load live monitors",
 	"detailError": "Could not load this monitor",
-	"noTicker": "Checks do not fire on this server, so monitors only run when you press Run now.",
+	"noTicker": "Checks do not fire here. Use Run now.",
 	"emptyTitle": "Watch a deployed agent",
-	"emptyMessage": "Pick an agent with a remote endpoint. Heimdall runs a few of its ready benchmark tasks every hour and tells you when quality drops or the endpoint goes down.",
+	"emptyMessage": "Pick an agent with a remote endpoint.",
 	"list": {
 		"title": "Monitors",
 		"agent": "Agent",
@@ -27,7 +27,7 @@
 	"form": {
 		"name": "Name",
 		"agent": "Agent id",
-		"benchmark": "Benchmark (empty picks the agent's latest evaluated benchmark)",
+		"benchmark": "Benchmark (optional)",
 		"tasks": "Tasks per check",
 		"interval": "Every (minutes)",
 		"budget": "Budget per day (USD)",
@@ -50,7 +50,7 @@
 		"opened": "Opened {{at}}",
 		"resolved": "Resolved {{at}}",
 		"checks": "Checks",
-		"noSamples": "No checks yet. Press Run now or wait for the next check.",
+		"noSamples": "No checks yet.",
 		"badge": "Public status badge",
 		"badgeOn": "Turn badge on",
 		"badgeOff": "Turn badge off"
@@ -60,7 +60,7 @@
 		"resume": "Resume",
 		"run": "Run now",
 		"delete": "Delete",
-		"deleteConfirm": "Delete monitor {{name}}? Its history is removed."
+		"deleteConfirm": "Delete monitor {{name}} and its history?"
 	},
 	"connectAgent": "Connect an agent"
 }

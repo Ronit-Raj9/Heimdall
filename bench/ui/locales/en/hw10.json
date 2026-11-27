@@ -4,8 +4,8 @@
 		"own": "The comparison's choice",
 		"none": "None",
 		"applied": "Release rule set: {{file}}",
-		"noneApplied": "No release rule set applied: this comparison did not choose one.",
+		"noneApplied": "No release rule set: none chosen in this comparison.",
 		"noneChosen": "No release rule set applied: you chose none."
 	},
-	"routingNote": "A Bifrost routing file is made from an evaluation's model comparison. Use Actions > Compare models to make one."
+	"routingNote": "Make one with Actions > Compare models."
 }

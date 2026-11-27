@@ -1,6 +1,6 @@
 {
 	"title": "Integrations",
-	"subtitle": "Connect Heimdall to the tools you already use: GitHub, Slack, Microsoft Teams, PagerDuty, email and other analysis tools.",
+	"subtitle": "GitHub, Slack, Teams, PagerDuty, email and exports.",
 	"tabs": {
 		"ci": "Pull request checks",
 		"exports": "Download results",
@@ -8,31 +8,31 @@
 	},
 	"ci": {
 		"heading": "Check every pull request automatically",
-		"intro": "Adds a GitHub workflow that tests your agent on every pull request and comments whether it got better or worse.",
+		"intro": "",
 		"mode": "How to check",
-		"modeRecorded": "Use saved results (re-check a finished comparison, no worker needed)",
-		"modeLive": "Run fresh (old vs new agent, on your own worker)",
+		"modeRecorded": "Use saved results (no worker)",
+		"modeLive": "Run fresh on your worker",
 		"agent": "Agent both setups start from",
 		"pickAgent": "Pick an agent",
-		"installInSettings": "GitHub is connected. Pick the repository, branch and how to check in Settings > GitHub to open the setup pull request.",
+		"installInSettings": "GitHub is connected. Finish setup in Settings > GitHub.",
 		"openSettings": "Open Settings > GitHub",
 		"connect": "Connect GitHub",
-		"manual": "GitHub sign-in is not set up on this server. Copy the workflow below into .github/workflows/heimdall.yml in your repository by hand.",
+		"manual": "GitHub sign-in is off here. Copy the workflow to .github/workflows/heimdall.yml by hand.",
 		"preview": "Workflow preview",
 		"copy": "Copy",
 		"copied": "Copied",
-		"notConnected": "Connect GitHub in Settings > GitHub to open the setup pull request from there. Until then you can copy the workflow below into your repository by hand."
+		"notConnected": "Connect GitHub in Settings > GitHub, or copy the workflow below by hand."
 	},
 	"exports": {
 		"heading": "Download results for other tools",
-		"intro": "Makes a file you can open in other tools. It is prepared in the background and appears below when ready.",
+		"intro": "Files appear below when ready.",
 		"format": "Format",
 		"formats": {
-			"otlp": "Step-by-step traces for tracing tools (Langfuse, LangSmith, Phoenix, Jaeger, any OpenTelemetry tool)",
-			"eee": "Every Eval Ever records (shared results format)",
-			"csv": "Table of runs (CSV, for spreadsheets)",
-			"jsonl": "Table of runs (JSON lines)",
-			"harbor": "Harbor task folders (benchmark tasks, hidden checks left out)"
+			"otlp": "OpenTelemetry traces",
+			"eee": "Every Eval Ever records",
+			"csv": "CSV table of runs",
+			"jsonl": "JSON lines table of runs",
+			"harbor": "Harbor task folders (no hidden checks)"
 		},
 		"experiment": "Comparison",
 		"pickExperiment": "Pick a comparison",
@@ -41,15 +41,15 @@
 			"comparisons": "Comparisons",
 			"other": "Checks, practice and debug runs"
 		},
-		"showHidden": "Also show checks, practice runs and debug runs ({{count}})",
+		"showHidden": "Show hidden runs ({{count}})",
 		"suite": "Benchmark",
 		"pickSuite": "Pick a benchmark",
-		"payloads": "Include what the agent sent to and got back from its tools (private values hidden, size limited)",
-		"allowSynthetic": "Allow practice-mode results (marked as practice)",
+		"payloads": "Include tool inputs and outputs (secrets hidden, size limited)",
+		"allowSynthetic": "Allow practice results",
 		"run": "Make file",
-		"noExperiments": "No comparison yet. Run one first, then download it here.",
+		"noExperiments": "No comparison yet.",
 		"files": "Files ready",
-		"empty": "No files yet. Pick a format and a comparison above, then press Make file.",
+		"empty": "No files yet.",
 		"download": "Download",
 		"delete": "Delete",
 		"deleteConfirm": "Delete export {{name}}?",
@@ -59,7 +59,7 @@
 	},
 	"webhooks": {
 		"heading": "Send results and alerts to your tools",
-		"intro": "Heimdall posts to Slack, Microsoft Teams, PagerDuty or any web address when an evaluation finishes, an agent gets worse, a release is blocked, a scheduled check fails or a worker goes offline. Failed deliveries are retried for 24 hours.",
+		"intro": "Failed deliveries are retried for 24 hours.",
 		"hostedNote": "This server delivers only to public https URLs.",
 		"url": "Web address to send to",
 		"urlPlaceholder": "https://example.com/hooks/heimdall",
@@ -80,9 +80,9 @@
 		},
 		"add": "Add web address",
 		"adding": "Adding...",
-		"secretOnce": "Secret for checking messages are really from Heimdall. Shown once, store it now:",
+		"secretOnce": "Signing secret. Shown once, store it now:",
 		"dismiss": "I stored it",
-		"empty": "Nothing set up yet. Add Slack, Teams, PagerDuty or a web address to hear when an evaluation finishes or an agent gets worse.",
+		"empty": "Nothing set up yet.",
 		"test": "Send test",
 		"testOk": "Test delivered (HTTP {{code}})",
 		"testFail": "Test failed: {{error}}",
@@ -128,8 +128,8 @@
 		"keyEnding": "key ...{{last4}}"
 	},
 	"errors": {
-		"load": "Could not load this section. Reload the page; if it keeps failing, check that the server is running.",
-		"adminOnly": "Changing notifications needs the admin role. Ask an admin of your organization.",
+		"load": "Could not load this section. Reload, or check the server is running.",
+		"adminOnly": "Only admins can change notifications.",
 		"generic": "Something went wrong. Try again."
 	},
 	"cards": {
@@ -155,7 +155,7 @@
 	},
 	"deliveryLog": {
 		"heading": "Delivery log",
-		"intro": "Every webhook delivery, newest first. Failed deliveries are tried again with growing waits for up to 24 hours.",
+		"intro": "Failed deliveries are retried for up to 24 hours.",
 		"time": "Time",
 		"event": "Event",
 		"webhook": "Webhook",
@@ -171,21 +171,21 @@
 		},
 		"retry": "Retry",
 		"retrying": "Queued",
-		"empty": "No deliveries yet. They appear here when an event fires.",
+		"empty": "No deliveries yet.",
 		"unknownHook": "Deleted webhook"
 	},
 	"email": {
 		"heading": "Email me",
-		"intro": "Your own choice: what reaches {{email}} by email. Other members choose for themselves.",
-		"digest": "Weekly digest every Monday: your agents, their scores, what changed and what it cost",
+		"intro": "Only your own email to {{email}}.",
+		"digest": "Weekly digest (Mondays)",
 		"events": "Also email me when",
 		"save": "Save",
 		"saving": "Saving...",
 		"saved": "Saved",
 		"test": "Send test email",
 		"testSent": "Test email sent to {{to}}",
-		"testLogged": "Test email written to the server log for {{to}}: this server has no mail service yet",
-		"notDelivering": "This server cannot send email yet, so emails are only written to its log. Ask your server owner to set up email (the setup guide has the details).",
+		"testLogged": "No mail service here. Test email for {{to}} written to the server log.",
+		"notDelivering": "This server cannot send email yet, emails go to its log. Ask the server owner to set it up.",
 		"unavailable": "Email notifications are not available here: {{reason}}."
 	}
 }

@@ -1,7 +1,7 @@
 {
 	"failures": {
 		"title": "Failures",
-		"subtitle": "Failures from production and from your test runs, grouped, and tracked until a rerun proves them fixed.",
+		"subtitle": "Grouped and tracked until a rerun shows them fixed.",
 		"tabs": {
 			"label": "Ways to look at failures",
 			"production": "Production failures",

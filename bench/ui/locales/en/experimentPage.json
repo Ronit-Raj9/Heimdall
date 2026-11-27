@@ -4,20 +4,20 @@
 		"more": "More actions",
 		"copyId": "Id",
 		"moreActions": "Actions",
-		"systemBanner": "This is an automatic readiness check Heimdall ran on the benchmark's tasks, not a comparison you started.",
-		"systemBannerAgent": "This is an automatic agent check Heimdall ran, not a comparison you started.",
-		"systemBannerDrift": "This is an automatic drift monitor run: a small test Heimdall re-runs on a schedule to catch an agent or model silently getting worse. It is not a comparison you started.",
+		"systemBanner": "Automatic readiness check, not started by you.",
+		"systemBannerAgent": "Automatic agent check, not started by you.",
+		"systemBannerDrift": "Automatic drift monitor run, not started by you.",
 		"details": "Details",
-		"detailsHint": "Technical details: test recipe fingerprint, when it was frozen, and which scores are shown.",
+		"detailsHint": "Recipe fingerprint, freeze time and scores shown.",
 		"practice": "Practice mode",
-		"practiceHint": "Practice mode: no real model is called, results are scripted and it costs nothing. Use it to try Heimdall out.",
+		"practiceHint": "No model is called. Results are scripted and free.",
 		"subtitle": "Runs two setups (A and B) on the same tasks and tells you which one is better.",
 		"delete": "Delete",
 		"deleteConfirmTitle": "Delete this comparison?",
-		"deleteConfirm": "The comparison, its runs, traces and results are deleted. This cannot be undone.",
+		"deleteConfirm": "Deletes the comparison, its runs, traces and results. Cannot be undone.",
 		"deleteConfirmOk": "Delete comparison",
 		"deleteKeep": "Keep",
-		"deleteBusy": "Stop the comparison or wait for it to finish before deleting it.",
+		"deleteBusy": "Stop the comparison or let it finish first.",
 		"deleteAdminOnly": "Only admins can delete a comparison.",
 		"deleteError": "Could not delete: {{error}}"
 	},
@@ -45,8 +45,8 @@
 			"inconclusive": "No clear winner yet",
 			"sameScoreCheaper": "No difference in score. {{setup}} costs {{ratio}} times less.",
 			"unclearScoreCheaper": "No clear difference in score. {{setup}} costs {{ratio}} times less.",
-			"invalid": "Test was broken: fix it and re-check",
-			"invalidWhy": "Test was broken: {{why}}. This is not the agent's fault; fix it and press Re-check.",
+			"invalid": "Test was broken. Fix it and re-check.",
+			"invalidWhy": "Test was broken: {{why}}. Fix it and press Re-check.",
 			"setupsTied": "Cannot tell {{setups}} apart yet",
 			"setupsLeader": "{{leader}} is ahead of every other setup",
 			"partial": "Still running: no result yet"
@@ -54,21 +54,21 @@
 		"setupLabel": "{{arm}} ({{name}})",
 		"and": "and",
 		"safetyLine": "{{setup}} broke a safety rule on {{tasks}}.",
-		"partialHint": "The result is worked out once every run has finished.",
+		"partialHint": "",
 		"why": {
-			"fidelity": "the model gateway answered {{n}} of {{m}} runs of setup {{arm}} with a different model than the one asked for (model check)",
+			"fidelity": "the gateway used a different model in {{n}} of {{m}} runs of setup {{arm}}",
 			"coverage": "only {{o}} of {{n}} runs of setup {{arm}} were graded",
 			"gate": "the {{gate}} check fired in {{n}} of {{m}} runs"
 		},
 		"score": {
 			"title": "Score",
-			"hint": "One setup scored on its own. There is no second setup, so there is no better or worse here; run a comparison to get one.",
+			"hint": "One setup, scored alone.",
 			"interval": "95% range: {{lo}} to {{hi}}",
 			"noInterval": "Range not known: too few tasks with graded runs",
-			"bounds": "If the {{count}} ungraded runs had all failed or all passed: {{lo}} to {{hi}}",
+			"bounds": "If {{count}} ungraded runs all failed or passed: {{lo}} to {{hi}}",
 			"runs": "{{observed}} of {{runs}} runs graded, over {{tasks}} tasks",
 			"unknown": "not known",
-			"invalidHint": "Some runs broke for reasons that have nothing to do with the agent, so the score is not trusted. Fix it and run again.",
+			"invalidHint": "Some runs broke for reasons outside the agent. Fix it and run again.",
 			"compare": "Compare with another setup"
 		},
 		"passRate": "Share of tasks solved",
@@ -84,14 +84,14 @@
 		"next": {
 			"ship": "Use {{arm}}. Export the report to share it.",
 			"holdRegressed": "Keep {{arm}}. Open the runs where the new setup failed.",
-			"holdViolations": "Hold off. A safety rule or safety check failed; review it below.",
-			"no_decision": "Not enough evidence yet. Compare the runs that differ, or add more tasks.",
-			"fix_harness": "The measurement broke, not the agent. Check the failed runs, fix the problem, then re-score.",
-			"setupsTied": "Not enough evidence to pick one setup. Add more tasks; more tries per task do not help.",
+			"holdViolations": "Hold off. A safety rule or check failed. Review it below.",
+			"no_decision": "Not enough evidence yet. Add more tasks.",
+			"fix_harness": "The measurement broke. Fix the failed runs, then re-score.",
+			"setupsTied": "Not enough evidence. Add tasks, not tries.",
 			"setupsLeader": "Use {{leader}}.",
 			"setupsLeaderFlagged_one": "Hold off: {{leader}} broke a safety rule on {{count}} task.",
 			"setupsLeaderFlagged_other": "Hold off: {{leader}} broke a safety rule on {{count}} tasks.",
-			"partial": "Wait for the runs to finish; this page updates as they do."
+			"partial": "Wait for the runs to finish."
 		},
 		"button": {
 			"ship": "Export report",
@@ -99,12 +99,12 @@
 			"no_decision": "Compare runs",
 			"fix_harness": "Open runs"
 		},
-		"costUnknown": "Not known: this model has no price set",
+		"costUnknown": "Not known: no price set",
 		"metricsLoading": "Loading...",
 		"metricsError": "Could not load the costs.",
 		"notKnownReason": "Not known: {{reason}}",
-		"inconclusiveHint": "Not enough evidence to pick a winner. Run more tasks.",
-		"invalidHint": "Something went wrong while measuring (not the agent's fault). Fix it and re-check."
+		"inconclusiveHint": "",
+		"invalidHint": "Measuring failed. Fix it and re-check."
 	},
 	"sections": {
 		"guards": "Safety rules",
@@ -142,18 +142,18 @@
 		}
 	},
 	"sectionHints": {
-		"guards": "Limits B must stay within, such as cost or safety, even when it scores better.",
-		"gates": "Rules that fail a run that cheated or did something unsafe.",
-		"diagnostics": "How A and B did in the normal run and under each failure test.",
-		"meters": "Cost, effort, quality and safety numbers for each setup.",
-		"statistics": "The math behind the result, for experts.",
-		"changes": "The settings that differ between the two setups, and the raw solved counts.",
-		"policy": "Whether this result meets your rule for releasing a change.",
-		"tasks": "Each task, with how A and B did on it. Click a cell to compare the two runs.",
-		"guardsMany": "Limits each new setup must stay within, such as cost or safety, even when it scores better.",
-		"diagnosticsMany": "How the setups did in the normal run and under each failure test."
+		"guards": "Limits B must stay within, even when better.",
+		"gates": "A check that fires fails the run.",
+		"diagnostics": "",
+		"meters": "",
+		"statistics": "",
+		"changes": "",
+		"policy": "",
+		"tasks": "Click a cell to compare the two runs.",
+		"guardsMany": "Limits each new setup must stay within.",
+		"diagnosticsMany": ""
 	},
 	"exportTab": {
-		"description": "Download every saved run of this comparison as JSON lines or CSV, or as Every Eval Ever records."
+		"description": "JSON lines, CSV or Every Eval Ever records."
 	}
 }

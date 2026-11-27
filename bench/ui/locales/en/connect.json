@@ -1,6 +1,6 @@
 {
 	"title": "Connect an agent",
-	"subtitle": "Paste what you have. Heimdall works out how to call it, proves it with a real task and starts a first look.",
+	"subtitle": "Paste a URL or a curl command.",
 	"crumb": "Agents",
 	"paste": {
 		"label": "What do you want to connect?",
@@ -33,7 +33,7 @@
 	},
 	"mapping": {
 		"title": "How Heimdall will call your agent",
-		"saveNeedsProof": "Save works once a test request comes back. Fix the problem above, then press Detect again.",
+		"saveNeedsProof": "Save needs a test request to come back. Fix the problem, then Detect again.",
 		"own": "Your endpoint already uses Heimdall's format.",
 		"method": "Method",
 		"url": "URL",
@@ -64,7 +64,7 @@
 	},
 	"verify": {
 		"title": "Prove it",
-		"description": "Each row is a real request. The last row runs one benchmark task through the real run path on your worker; it is not counted.",
+		"description": "The last row runs one benchmark task on your worker. It is not counted.",
 		"start": "Send one real task",
 		"again": "Send one real task again",
 		"starting": "Starting",
@@ -99,10 +99,10 @@
 		"reference": "Reference: {{agent}} on {{model}} scored {{score}}%",
 		"start": "Start first look (uses your key)",
 		"starting": "Starting",
-		"note": "First look: {{count}} tasks. Too small for a verdict. Run the full benchmark for one.",
-		"notGate": "A first look is never a release gate and never shown on a leaderboard.",
+		"note": "First look: {{count}} tasks, too few for a verdict.",
+		"notGate": "Never a release gate or on a leaderboard.",
 		"bareTitle": "Compare with the bare model",
-		"bareHelp": "Optional. Runs the same {{tasks}} tasks on {{benchmark}} twice: your agent, and the bare model ({{model}} alone, no tools). It shows what your agent adds over the model.",
+		"bareHelp": "Optional. Same {{tasks}} tasks on {{benchmark}}, also with {{model}} alone, no tools.",
 		"bareStart": "Start the comparison",
 		"bareNone": "No bare-model comparison: {{reason}}"
 	},

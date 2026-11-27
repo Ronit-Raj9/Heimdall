@@ -3,13 +3,13 @@
 		"label": "Builder",
 		"matrix": "Compare agents and models",
 		"ab": "A/B config change",
-		"abHint": "Change one agent setting and test it against the baseline."
+		"abHint": "Test one setting change against the baseline."
 	},
 	"sections": {
 		"agents": "Agents",
 		"agentsHint": "One agent compares models; several compare agents.",
 		"models": "Models",
-		"modelsHint": "Leave empty to use each agent's own model."
+		"modelsHint": "Empty uses each agent's own model."
 	},
 	"fields": {
 		"name": "Comparison name",
@@ -19,23 +19,23 @@
 		"addModel": "Add model",
 		"removeModel": "Remove model {{n}}",
 		"modelN": "Model {{n}}",
-		"allowUnpriced": "Allow models without a price (cost per success will be unknown)",
+		"allowUnpriced": "Allow unpriced models. Cost per success unknown.",
 		"tasksFirst": "First",
 		"tasksFirstSuffix": "tasks of {{count}}",
 		"tasksFirstNone": "tasks",
 		"tasksAll": "All {{count}} tasks",
 		"trials": "Trials per task",
 		"adaptive": "Adaptive trials",
-		"adaptiveHint": "Stop a task early once every setup agrees on it. Tries becomes the maximum.",
+		"adaptiveHint": "Stop a task once all setups agree. Trials is the max.",
 		"adaptiveMin": "Minimum trials",
 		"probes": "Failure tests",
-		"probesHint": "The normal run always happens. Each failure test runs the same tasks again.",
+		"probesHint": "Normal run always happens. Each test reruns the tasks.",
 		"totalUsd": "Budget (USD)",
 		"concurrency": "Concurrency",
 		"seed": "Seed",
 		"runnerPool": "Worker group",
 		"token": "Access token",
-		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
+		"tokenHint": "Needed to plan, estimate and run. Stays in this tab.",
 		"tokenPlaceholder": "paste the serve write token",
 		"tasks": "Tasks",
 		"suiteOptionReady": "{{id}}@{{version}}, {{ready}} of {{total}} tasks ready to run",
@@ -50,7 +50,7 @@
 		"title": "Preview",
 		"description": "Setup A is the baseline for the verdict.",
 		"arms": "{{count}} setups",
-		"empty": "Pick at least one agent and fill in a model to see the setups.",
+		"empty": "Pick an agent and a model to see setups.",
 		"runs_one": "{{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries = {{count}} run at most",
 		"runs_other": "{{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries = {{count}} runs at most"
 	},
@@ -59,8 +59,8 @@
 		"plan": "Plan",
 		"run": "Start comparison",
 		"needsToken": "Enter the write token to estimate, plan and run.",
-		"needsPlan": "Plan the experiment first: the plan checks it and shows its power.",
-		"planStale": "The form changed after planning. Plan again before running.",
+		"needsPlan": "Plan first. The plan checks it and shows its power.",
+		"planStale": "Form changed. Plan again before running.",
 		"blocked": "The plan has errors. Fix them and plan again.",
 		"invalid": "Fix the highlighted fields first.",
 		"planError": "Planning failed",
@@ -72,11 +72,11 @@
 	},
 	"estimate": {
 		"title": "Estimate",
-		"costNoHistory": "Not known yet: nothing like this has run on this benchmark, so there is no history to estimate from.",
+		"costNoHistory": "Not known yet. No past runs on this benchmark.",
 		"costNoHistoryShort": "Not known yet (no history)",
 		"budgetCap": "The budget of {{budget}} stops the comparison when it is spent.",
 		"priceRef": "Model prices come from {{ref}}.",
-		"priceRefNoHistory": "Model prices come from {{ref}}. They are used once there is history to price.",
+		"priceRefNoHistory": "Model prices come from {{ref}}, used once there is history.",
 		"timeLimitBound": "at most {{high}} (from each agent's time limit)"
 	},
 	"plan": {
@@ -84,12 +84,12 @@
 		"timeCostSee": "Time and cost: see the Estimate."
 	},
 	"link": {
-		"agentMissing": "Agent {{id}} is not one of your agents, so the comparison starts with {{first}}."
+		"agentMissing": "Agent {{id}} is not yours. Starting with {{first}}."
 	},
 	"ready": {
-		"pending": "Checking which tasks are ready. The benchmark and task count update when that is known.",
+		"pending": "Checking which tasks are ready.",
 		"checking": "Checking which tasks are ready...",
-		"unknown": "Heimdall cannot tell which tasks of {{benchmark}} are ready. Run the readiness checks on its page first."
+		"unknown": "Cannot tell which tasks of {{benchmark}} are ready. Run its readiness checks first."
 	},
 	"errors": {
 		"nameRequired": "Give the experiment a name.",
@@ -97,8 +97,8 @@
 		"agentRequired": "Pick at least one agent.",
 		"modelEmpty": "Type a model name, or pick a second agent.",
 		"modelDuplicate": "This model is already listed.",
-		"tooFewArms": "A comparison needs at least 2 setups: add a model or an agent.",
-		"tooManyArms": "At most 26 setups: remove some agents or models.",
+		"tooFewArms": "At least 2 setups needed. Add a model or agent.",
+		"tooManyArms": "At most 26 setups. Remove agents or models.",
 		"taskCountRange": "Pick between 1 and the number of tasks in the benchmark.",
 		"trialsRange": "Trials must be a whole number from 1 to 50.",
 		"adaptiveTrials": "Adaptive trials need at least 2 trials per task.",
@@ -109,13 +109,13 @@
 	},
 	"steps": {
 		"what": "What to test",
-		"whatHint": "Pick a benchmark and give the comparison a name.",
+		"whatHint": "",
 		"who": "Who competes",
 		"whoHint": "Every agent runs with every model.",
 		"size": "How much",
 		"sizeHint": "Tasks, trials and the most it may spend.",
 		"extras": "Extras",
-		"extrasHint": "Failure tests, adaptive tries, concurrency, seed and pool."
+		"extrasHint": ""
 	},
 	"summary": {
 		"runs": "Max runs",

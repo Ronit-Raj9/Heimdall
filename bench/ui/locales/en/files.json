@@ -1,13 +1,13 @@
 {
 	"title": "Project files",
-	"subtitle": "The files behind your agents, benchmarks and release rules. Edit them here; every save keeps the old version.",
+	"subtitle": "Every save keeps the old version.",
 	"export": "Download project (zip)",
 	"sync": {
 		"title": "Sync with your machine",
 		"body": "Keep a copy of this project on your computer that matches the server. Set HEIMDALL_TOKEN to an API token, then run:",
-		"rules": "pull never overwrites a file you changed since the last sync, and push never overwrites a file changed here; both list the clashes and stop. Add -force to overwrite. Files up to 64 MiB sync; files over 1 MiB keep no old versions.",
-		"tokenLink": "Create an API token (Settings, API tokens)",
-		"localToken": "On a local server the token is its write token (BENCH_WRITE_TOKEN); pull works without one.",
+		"rules": "pull and push never overwrite a file changed on the other side. They list the clashes and stop. Add -force to overwrite. Files up to 64 MiB sync. Files over 1 MiB keep no old versions.",
+		"tokenLink": "Create an API token in Settings",
+		"localToken": "On a local server, use its write token, BENCH_WRITE_TOKEN. pull needs no token.",
 		"summary": "Sync with your computer using the command line"
 	},
 	"areas": {
@@ -19,7 +19,7 @@
 	},
 	"root": "Top",
 	"up": "Up one folder",
-	"empty": "This folder is empty. Create a file or upload a zip.",
+	"empty": "Empty folder. Create a file or upload a zip.",
 	"newFile": "New file",
 	"newFilePlaceholder": "name.yaml or folder/name.yaml",
 	"create": "Create",
@@ -30,10 +30,10 @@
 		"modified": "Modified"
 	},
 	"loadError": "Could not load the files: {{message}}",
-	"readOnly": "You can only read here. Ask an admin for the member role to edit.",
+	"readOnly": "Read only. Ask an admin for the member role to edit.",
 	"editor": {
 		"loading": "Loading file...",
-		"newFile": "New file: it is created when you save.",
+		"newFile": "New file, created on save.",
 		"binary": "This file is binary and cannot be edited here.",
 		"download": "Download",
 		"save": "Save",
@@ -42,7 +42,7 @@
 		"delete": "Delete",
 		"deleteConfirm": "Delete {{path}}? Its versions are kept.",
 		"note": "Note (optional)",
-		"conflict": "The file changed since you opened it. Reload to get the latest version, then apply your edit again.",
+		"conflict": "The file changed since you opened it. Reload, then apply your edit again.",
 		"reload": "Reload",
 		"close": "Close",
 		"error": "Save failed: {{message}}",
@@ -55,7 +55,7 @@
 		"hideHistory": "Hide history",
 		"unsaved": "Unsaved"
 	},
-	"emptyViewer": "This folder is empty. A member can add files here or from the catalog.",
+	"emptyViewer": "This folder is empty.",
 	"emptyUpload": "Upload a zip",
 	"emptyCatalog": "Browse the catalog",
 	"pickFile": "Pick a file on the left, or create a new one.",

@@ -4,13 +4,13 @@
 		"label": "How to write the task",
 		"guided": "Write it now",
 		"draft": "Draft to finish by hand",
-		"guidedHint": "Say what a correct agent does here. The task is written finished, with its checks, a reference and a mutant that must fail, so only its readiness check is left.",
-		"draftHint": "The task is written as a draft whose files are marked EDIT ME; finish them in the file editor, then run its readiness check."
+		"guidedHint": "Say what a correct agent does. Only the readiness check is left.",
+		"draftHint": "Files are marked EDIT ME. Finish them, then run the readiness check."
 	},
-	"golden": "This session went well, so what the agent did is filled in as the expected behaviour. Fix anything that was not right.",
+	"golden": "Filled in from this good session. Fix anything wrong.",
 	"instruction": {
 		"label": "Instruction (optional)",
-		"hint": "Empty keeps the user's first message as it was sent, after redaction."
+		"hint": "Empty keeps the user's first message, redacted."
 	},
 	"keepTurns_one": "Keep the user's later message in the instruction",
 	"keepTurns_other": "Keep the user's {{count}} later messages in the instruction, in order",
@@ -22,7 +22,7 @@
 		"recordedWrong": "This answer is wrong: it must fail"
 	},
 	"calls": {
-		"hint": "The calls the agent made, in order. Mark each one right (a correct agent makes it, with these arguments) or wrong (it must never happen), and add any call that was missing.",
+		"hint": "Mark each call right or wrong. Add missing calls.",
 		"none": "The session made no tool calls.",
 		"tool": "Tool name",
 		"toolPlaceholder": "tool name",
@@ -31,7 +31,7 @@
 		"wrong": "Wrong",
 		"skip": "Not checked",
 		"args": "Arguments of {{tool}}",
-		"argsPlaceholder": "arguments that must match, as JSON, for example {\"order_id\": \"A-1\"}",
+		"argsPlaceholder": "JSON to match, e.g. {\"order_id\": \"A-1\"}",
 		"badArgs": "Arguments must be a JSON object, or empty.",
 		"toolRequired": "Name every added call's tool.",
 		"required": "Mark at least one call right or wrong, or write a reply rubric.",
@@ -45,17 +45,17 @@
 	},
 	"switchGrader": {
 		"label": "Grade this benchmark by its checks",
-		"hint": "Tasks written here are graded by their checks file. Benchmarks that grade another way switch; their other tasks keep their own checks and need their readiness checks again."
+		"hint": "The benchmark's other tasks keep their checks and need readiness checks again."
 	},
 	"finished": "Ready for its readiness check: every file is written.",
 	"bulk": {
-		"title": "Accept several at once",
-		"hint": "Every ticked item becomes a task in one benchmark with the same settings. Failures listed below are left as they were.",
+		"title": "Accept several",
+		"hint": "Ticked items become tasks in one benchmark. Failures below stay as they were.",
 		"items": "Items",
 		"golden": "passing",
 		"suite": "Benchmark",
 		"suitePlaceholder": "Pick a benchmark",
-		"recorded": "The recorded sessions were right (goldens): use what the agent did as the expected behaviour",
+		"recorded": "Recorded sessions were right: use them as expected behaviour",
 		"rubric": "Shared reply rubric (optional)",
 		"switchGrader": "Grade the benchmark by its checks (tool-use and mcp benchmarks)",
 		"submit_one": "Accept {{count}} item",

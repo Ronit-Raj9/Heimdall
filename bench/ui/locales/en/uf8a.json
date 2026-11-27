@@ -20,29 +20,29 @@
 		"colWhere": "Where",
 		"keys": {
 			"name": "Model keys",
-			"what": "Your keys for AI model providers (OpenAI, Anthropic and others). Agents and graders use them to call models; the provider bills you.",
+			"what": "Your keys for AI model providers. The provider bills you.",
 			"who": "Agents and graders, during runs"
 		},
 		"secrets": {
 			"name": "Secrets",
-			"what": "Values your agent's tools need while a run is going, such as a web search key. Model provider keys do not go here.",
+			"what": "Values your agent's tools need during runs. Not model keys.",
 			"who": "Your agent's tools, during runs"
 		},
 		"tokens": {
 			"name": "Access tokens",
-			"what": "Tokens that let your own scripts, CI and the SDK call Heimdall as you. Most people do not need one.",
+			"what": "Let your scripts, CI and the SDK call Heimdall as you.",
 			"who": "Your scripts, CI and the SDK"
 		},
 		"runners": {
 			"name": "Worker tokens",
-			"what": "Where your runs execute: the shared worker, a cloud sandbox (Daytona, E2B, Modal), or your own machine. The tokens here only connect a worker.",
+			"what": "Tokens that connect a worker.",
 			"who": "A worker you run yourself"
 		},
 		"here": "You are here"
 	},
 	"models": {
 		"deleteError": "Could not delete the key.",
-		"secretsHint": "Keys your agent's tools need, such as a web search key, are Secrets, not model keys.",
+		"secretsHint": "Tool keys, such as web search, go in Secrets.",
 		"yourKeys": "Your keys",
 		"browse": "Browse providers",
 		"browseMeta": "{{count}} providers",
@@ -50,40 +50,40 @@
 		"test": "Test",
 		"testKey": "Test key",
 		"testFor": "Test {{name}}: asks the provider for its model list",
-		"testTitle": "Test asks the provider for its model list with the key, which is free. Sarvam has no list call, so for Sarvam it sends one tiny language check, which may be billed.",
+		"testTitle": "Free list call. For Sarvam, one tiny check that may be billed.",
 		"editFor": "Edit {{name}}",
 		"spent": "Charged to this key this month (UTC): {{spent}} of {{budget}}",
 		"spentNoLimit": "Charged to this key this month (UTC): {{spent}}",
 		"allModels_one": "All {{count}} {{provider}} model",
 		"allModels_other": "All {{count}} {{provider}} models",
 		"anyModel": "Every {{provider}} model",
-		"unlocks": "Leave Allowed models empty to unlock every {{provider}} model in the price list ({{count}}), for example {{first3}}.",
-		"unlocksAny": "Leave Allowed models empty to unlock every {{provider}} model.",
-		"storageHint": "Stored encrypted. Only the last 4 characters are shown again. Every member of this organization can run evaluations with it; only admins can change or delete it.",
+		"unlocks": "Empty unlocks all {{count}} {{provider}} models, such as {{first3}}.",
+		"unlocksAny": "Empty unlocks every {{provider}} model.",
+		"storageHint": "Stored encrypted, last 4 characters shown. All members can use it. Only admins can change or delete it.",
 		"optional": "(optional)",
 		"labelPlaceholder": "e.g. team {{provider}} key",
-		"budgetHint": "0 means no limit. At the limit, runs on this key stop and the key shows 'over budget' until the 1st of next month (UTC).",
+		"budgetHint": "0 means no limit. At the limit, runs on this key stop until the 1st of next month (UTC).",
 		"mustBeZeroOrMore": "Must be 0 or more",
 		"moreOptions": "More options",
 		"savedLine": "Key {{name}} saved.",
 		"done": "Done",
 		"returnSaved": "Key saved.",
 		"returnAction": "Back to your evaluation",
-		"unavailableAdmin": "This server cannot save model keys yet. Admin: set HEIMDALL_MASTER_KEY and restart (see the hosting guide).",
-		"unavailableViewer": "This server cannot save model keys yet. The person who runs this server can turn it on.",
+		"unavailableAdmin": "Saving model keys is off. Admin: set HEIMDALL_MASTER_KEY and restart.",
+		"unavailableViewer": "Saving model keys is off. The server owner can turn it on.",
 		"whoRuns": "See who runs this server",
 		"keyMissing": "No working {{provider}} key. Add one in Settings > Model keys.",
 		"keyMissingAction": "Add a key for {{provider}}"
 	},
 	"secrets": {
 		"nameUnusable": "Name not usable in agents",
-		"confirmRotate": "Replace the value of {{name}}? Runs that start after this use the new value; the old one cannot be recovered.",
+		"confirmRotate": "Replace {{name}}? New runs use the new value. The old one cannot be recovered.",
 		"confirmRotateLabel": "Replace",
 		"description": "Values are encrypted and can never be read back, only replaced.",
 		"howAgentsRead": "How agents read secrets"
 	},
 	"tokens": {
-		"description": "A token can do only what its role and scope allow. Send it in the Authorization: Bearer header to the API at /api/v1.",
+		"description": "Send as Authorization: Bearer to /api/v1. Role and scope limit it.",
 		"showRevoked": "Show revoked ({{count}})",
 		"hideRevoked": "Hide revoked",
 		"newToken": "New token",
@@ -102,7 +102,7 @@
 			"custom": "Custom"
 		},
 		"csv": "Download CSV",
-		"definition": "Spend: what the model calls for this organization's work cost, priced from the price list, counted on the day of the call, UTC.",
+		"definition": "Model call cost for this organization, from the price list, by UTC day.",
 		"cost": "Spend, {{from}} to {{to}}",
 		"costHint": "Priced from the price list. Runs on the shared key included.",
 		"keys": "Charged to your keys this month",
@@ -123,24 +123,24 @@
 	},
 	"unsaved": {
 		"title": "Leave without saving?",
-		"body": "You have changes on this page that are not saved. They are lost if you leave."
+		"body": "Unsaved changes are lost if you leave."
 	},
 	"retention": {
-		"confirm_one": "Delete comparisons older than {{count}} day now? Comparisons and their runs older than that are deleted. This cannot be undone.",
-		"confirm_other": "Delete comparisons older than {{count}} days now? Comparisons and their runs older than that are deleted. This cannot be undone.",
+		"confirm_one": "Delete comparisons and their runs older than {{count}} day? This cannot be undone.",
+		"confirm_other": "Delete comparisons and their runs older than {{count}} days? This cannot be undone.",
 		"confirmLabel": "Delete older data",
 		"confirmTitle": "Shorten data retention?",
 		"confirmCount": "Keep comparisons for {{days}} days? This deletes about {{runs}} runs in {{experiments}} comparisons at the next sweep. This cannot be undone."
 	},
 	"org": {
-		"dangerBody": "These settings delete data. Each one asks before it does."
+		"dangerBody": "These settings delete data. Each asks first."
 	},
 	"kill": {
 		"stateOn": "New runs are stopped for every organization. Runs already going finish.",
 		"stateOff": "New runs are allowed.",
 		"stop": "Stop all new runs",
 		"allow": "Allow new runs again",
-		"confirmOff": "Allow new runs on the whole server again? Queued runs start at once."
+		"confirmOff": "Allow new runs on the whole server? Queued runs start now."
 	},
 	"audit": {
 		"groups": {
@@ -152,7 +152,7 @@
 			"settings": "Settings"
 		},
 		"includeReads": "Include reads",
-		"pageOnly": "Search covers the whole log. Type and group filters apply to the page in view.",
+		"pageOnly": "Search covers the whole log. Filters apply to this page.",
 		"noMatch": "No entries on this page match the filters.",
 		"clearFilters": "Clear filters",
 		"details": "Details",

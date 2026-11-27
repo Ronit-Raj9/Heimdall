@@ -13,7 +13,7 @@
 		"label": "Delete",
 		"confirm": "Delete",
 		"cancel": "Cancel",
-		"suite": "Delete the benchmark {{name}}? Its tasks and files are removed. Past results stay.",
+		"suite": "Delete the benchmark {{name}}? Tasks and files are removed. Past results stay.",
 		"agent": "Delete the agent {{name}}? Past results stay."
 	}
 }

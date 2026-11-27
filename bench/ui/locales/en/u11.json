@@ -1,6 +1,6 @@
 {
 	"models": {
-		"subtitle": "Model keys let your agents (and the graders) call an AI model. You pay the provider for what they use.",
+		"subtitle": "Your provider bills you for what agents and graders use.",
 		"addKey": "Add API key",
 		"keysCount_one": "{{count}} key",
 		"keysCount_other": "{{count}} keys",

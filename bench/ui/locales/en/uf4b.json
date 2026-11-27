@@ -7,10 +7,10 @@
 		"setupsLegend": "Setups shown: {{shown}} of {{total}}",
 		"showAll": "Show all {{count}}",
 		"showFirst": "Show the first {{count}}",
-		"maxSetups": "Up to {{count}} setups show at once.",
-		"practiceNote": "Practice runs: no model was called. These check the benchmark's grader, not an agent.",
-		"oneSide": "Only setup {{arm}} has a graded run of this task, so there is nothing to compare it with.",
-		"otherRun": "Compare with another run of this task"
+		"maxSetups": "Up to {{count}} setups at once.",
+		"practiceNote": "Practice runs: no model called. These check the grader.",
+		"oneSide": "Only setup {{arm}} has a graded run of this task.",
+		"otherRun": "Compare another run"
 	},
 	"diff": {
 		"showEmpty_one": "Show {{count}} row with no data",
@@ -24,18 +24,18 @@
 		"cost": "Cost",
 		"runsMobile": "{{done}} of {{total}} runs",
 		"notPriced": "Not priced",
-		"notPricedHint": "No price is set for this model. Add one in Settings, Model keys, price per 1M tokens.",
+		"notPricedHint": "No price set. Add one in Settings, Model keys.",
 		"compareVersions": "Compare two versions",
-		"useCommandLine": "Use the command line",
+		"useCommandLine": "Use the CLI",
 		"changedResults": "Changed results ({{count}})"
 	},
 	"home": {
 		"counts": "{{solved}} done, {{failed}} failed, {{running}} running"
 	},
 	"form": {
-		"versionsHint": "Comparing two versions of one agent?",
+		"versionsHint": "",
 		"versionsLink": "Use Evaluate, Is my new version better.",
-		"openCreated": "Open the created comparison (not started)",
+		"openCreated": "Open comparison (not started)",
 		"mobileBar_one": "{{count}} setup, up to {{runs}} runs",
 		"mobileBar_other": "{{count}} setups, up to {{runs}} runs",
 		"mobileCap": "cap ${{usd}}"
@@ -45,10 +45,10 @@
 		"budget": "Set a budget above $0."
 	},
 	"models": {
-		"needBudget": "Set a budget: a comparison never runs without a spending cap."
+		"needBudget": "Set a budget. Comparisons need a spending cap."
 	},
 	"metrics": {
-		"sources": "Where the numbers come from: {{list}}"
+		"sources": "Sources: {{list}}"
 	},
 	"observer": {
 		"observerStartFailed": "The {{name}} could not start (container error).",

@@ -5,7 +5,7 @@
 		"small": "Solved {{solved}} of {{runs}} runs",
 		"smallDetail": "Too few runs to rate. 95% range {{low}} to {{high}}.",
 		"budget": "Stopped by the {{budget}} budget after {{done}} of {{planned}} runs",
-		"budgetDetail": "The score covers {{done}} runs only. Raise the budget to finish the rest.",
+		"budgetDetail": "Score covers only {{done}} runs. Raise the budget to finish.",
 		"fault": "Normal: {{cleanSolved}} of {{cleanRuns}} solved. When {{fault}}: {{faultSolved}} of {{faultRuns}} ({{delta}}).",
 		"faultRuns": "{{cleanRuns}} normal runs and {{faultRuns}} with faults."
 	},
@@ -21,32 +21,32 @@
 	},
 	"sections": {
 		"capability": "By capability",
-		"capabilityHelp": "Score is the share of runs solved. The bar shows the 95% confidence range.",
+		"capabilityHelp": "Share of runs solved. Bar shows the 95% range.",
 		"notTested": "Not tested here: {{list}}",
 		"benchmark": "By benchmark",
-		"benchmarkHelp": "Open a row for the verdict and a link to the experiment.",
+		"benchmarkHelp": "",
 		"reliability": "Reliability",
-		"reliabilityHelp": "How steady the agent is across repeat tries. The gap between the two lines is flakiness: tasks it solves sometimes but not every time.",
+		"reliabilityHelp": "The gap between the lines is flakiness.",
 		"resilience": "Resilience",
-		"resilienceHelp": "How much of the normal score the agent keeps when something breaks. x1.00 means no loss.",
+		"resilienceHelp": "Normal score kept under faults. x1.00 means no loss.",
 		"faults": "Faults",
-		"faultsHelp": "Score when something goes wrong, and how it changed from a normal run of the same tasks.",
+		"faultsHelp": "Change from a normal run of the same tasks.",
 		"learning": "Learning over time",
-		"learningHelp": "Tasks run one after another with the agent's memory kept. Change is in percentage points.",
+		"learningHelp": "Memory kept across tasks. Change in percentage points.",
 		"voice": "Voice",
-		"voiceHelp": "Call quality, measured by Heimdall's simulated caller on the audio it heard.",
+		"voiceHelp": "Measured by a simulated caller on the audio.",
 		"persistence": "Persistence",
-		"persistenceHelp": "Picking up after a crash and finishing when the budget runs out.",
+		"persistenceHelp": "Resuming after a crash, finishing when budget runs out.",
 		"voiceCalls": "Voice calls by caller",
-		"voiceCallsHelp": "Task success, graded on the call transcript, and call quality with each simulated caller: accents, pace, interruptions, noise and phone lines.",
+		"voiceCallsHelp": "Task success and call quality per simulated caller.",
 		"bifrost": "Through Bifrost",
-		"bifrostHelp": "What the Bifrost gateway did for each agent's model calls: fallbacks, cache hits, retries, tokens and cost.",
+		"bifrostHelp": "Fallbacks, cache hits, retries, tokens and cost.",
 		"safety": "Safety",
 		"safetyHelp": "Attacks resisted (higher is better) and cheat rate (lower is better).",
 		"redTeam": "Red team",
-		"redTeamHelp": "Adaptive attacks (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents and emails. Share of attacks that got through (lower is better), with the 95% range.",
+		"redTeamHelp": "PAIR, tree of attacks, Crescendo. Share that got through, lower is better.",
 		"alignment": "Safety and alignment",
-		"alignmentHelp": "Share of tested runs where the agent did the unsafe thing (lower is better), with the 95% confidence range.",
+		"alignmentHelp": "Share of runs with the unsafe action, lower is better.",
 		"notMeasured": "Not measured"
 	},
 	"failures": {
@@ -60,7 +60,7 @@
 		"owaspAll": "All OWASP Top 10 agent risks"
 	},
 	"alignment": {
-		"awareness": "Said it knew it was being tested (keyword check, not scored)"
+		"awareness": "Said it knew it was tested. Keyword check, not scored."
 	},
 	"picks": {
 		"showing": "Showing:",

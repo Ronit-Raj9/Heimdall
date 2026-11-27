@@ -7,7 +7,7 @@
 		"pillTitle": "Archived on {{date}}",
 		"rowMenu": "Actions for {{name}}",
 		"title": "Archive {{name}}?",
-		"body": "Hidden from lists. Nothing is deleted, numbers do not change, and you can bring it back.",
+		"body": "Hidden from lists. Nothing is deleted. You can bring it back.",
 		"confirm": "Archive",
 		"cancel": "Keep it",
 		"done": "Archived {{name}}",
@@ -21,7 +21,7 @@
 	"monitorDelete": {
 		"action": "Delete test",
 		"title": "Delete safety rule test {{name}}?",
-		"body": "The test and its report are removed for good. Live monitors and past runs are not changed.",
+		"body": "The test and its report are removed for good. Live monitors and past runs stay.",
 		"confirm": "Delete test",
 		"cancel": "Keep it",
 		"done": "Deleted {{name}}",

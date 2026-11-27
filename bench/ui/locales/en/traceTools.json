@@ -2,7 +2,7 @@
 	"search": {
 		"placeholder": "Search inside traces",
 		"label": "Search inside run traces",
-		"help": "All words must match, in steps, tool calls and their arguments, model errors, the answer and the grade. Use quotes for a phrase and field terms such as tool:, agent:, outcome:, benchmark:, version:. Example: tool:refund_order \"all tests pass\"",
+		"help": "All words must match. Quotes for phrases. Fields: tool:, agent:, outcome:, benchmark:, version:.",
 		"heading": "Trace matches",
 		"total_one": "{{count}} run matches",
 		"total_other": "{{count}} runs match",
@@ -27,12 +27,12 @@
 	},
 	"maxim": {
 		"tab": "Maxim",
-		"desc": "Send every finished run's trace to your Maxim log repository, and open runs in Maxim.",
+		"desc": "Send finished run traces to Maxim.",
 		"connected": "Connected",
 		"notConnected": "Not connected",
 		"apiKey": "API key",
 		"apiKeyPlaceholder": "Paste your Maxim API key",
-		"storedKey": "Stored key ending in {{last4}}. Leave empty to keep it.",
+		"storedKey": "Key ending {{last4}} stored. Leave empty to keep.",
 		"workspace": "Workspace id",
 		"repo": "Log repository id",
 		"autoPush": "Send finished runs automatically",
@@ -59,7 +59,7 @@
 	},
 	"mismatches": {
 		"chip": "Mismatches",
-		"hint": "Steps where two records of the run disagree, such as the agent's own stream and the gateway log. They are not errors of the agent: hover a row to read the difference."
+		"hint": "Records of the run disagree. Not agent errors."
 	},
-	"errorsHint": "Counts steps that failed and tool calls the tool server answered with an error ({{count}}). The tool call errors are listed under Tool calls below."
+	"errorsHint": "Failed steps and tool errors ({{count}}). Listed under Tool calls."
 }

@@ -2,8 +2,8 @@
 	"tab": "Review",
 	"draft": {
 		"title": "Draft with a model",
-		"description": "A model on your own key drafts the parts you would otherwise write: rubric criteria, one wrong reply per criterion, near-miss wrong answers and a gaming attempt per task. Every drafted field is labelled, and the task waits for your review before it counts.",
-		"answerOnly": "Drafting works on question-and-answer benchmarks. This benchmark grades code or workspace state with its own tests.",
+		"description": "Drafts rubrics, wrong replies and a gaming attempt on your own key. Tasks wait for your review.",
+		"answerOnly": "Drafting works only on question-and-answer benchmarks.",
 		"ops": "What to draft",
 		"op": {
 			"rubric": "Rubric criteria",
@@ -12,16 +12,16 @@
 			"exploit": "A gaming attempt"
 		},
 		"opHint": {
-			"rubric": "2 to 6 weighted criteria from the reference reply, for tasks with no rubric. Judge-graded benchmarks only.",
-			"criterion_wrong": "Each reply meets every criterion but one, so the readiness check shows each criterion is enforced.",
-			"near_miss_wrong": "A swapped name, a missing step, a broken rule or a wrong number.",
-			"exploit": "Claims the work is done, quotes the rules, or flatters the grader. It must fail."
+			"rubric": "2 to 6 weighted criteria. Judge-graded benchmarks only.",
+			"criterion_wrong": "Each reply misses exactly one criterion.",
+			"near_miss_wrong": "Wrong name, step, rule or number.",
+			"exploit": "Claims done or flatters the grader. Must fail."
 		},
 		"provider": "Provider",
 		"model": "Model",
-		"modelHint": "Pick a model from your model keys. Choose another family than the judge and the agent you test, so one model does not grade its own words.",
+		"modelHint": "Use a different family from the judge and agent.",
 		"budget": "Budget (USD)",
-		"budgetHint": "A hard cap for the whole job, charged to your own model key.",
+		"budgetHint": "Hard cap for the job, on your model key.",
 		"estimate": "Estimate the cost",
 		"run": "Draft",
 		"confirm": "Draft with {{model}} on your own key, up to ${{budget}}? Drafted tasks wait for your review.",
@@ -31,8 +31,8 @@
 	},
 	"queue": {
 		"title": "Generated tasks",
-		"description": "A generated task counts in no evaluation, gate, release or report card until a person accepts it. Run the readiness check first: it shows whether each drafted wrong answer fails.",
-		"empty": "No generated tasks. Drafted tasks appear here for review.",
+		"description": "Generated tasks count nowhere until a person accepts them. Run the readiness check first.",
+		"empty": "No generated tasks.",
 		"counts": "{{pending}} waiting, {{accepted}} accepted, {{rejected}} rejected",
 		"fields": "Drafted fields",
 		"cost": "${{usd}}",
@@ -50,7 +50,7 @@
 	},
 	"quality": {
 		"title": "Quality checks",
-		"description": "Finds duplicate tasks in this benchmark and tasks whose words already appear in public benchmarks of the library. Free: no model is called.",
+		"description": "Finds duplicates and text from public benchmarks. Free.",
 		"run": "Check",
 		"duplicates": "Duplicates",
 		"exact": "same text",
@@ -62,7 +62,7 @@
 	},
 	"split": {
 		"title": "Hold out tasks automatically",
-		"description": "Picks a share of tasks to keep out of every public view, the same way each time for the same seed, and marks their instructions so copies can be traced. Public tasks (imported or found in the library) are held out only if you confirm.",
+		"description": "Hides a share of tasks from public views and marks them for tracing. Public tasks need your confirm.",
 		"pct": "Share held out (%)",
 		"seed": "Seed",
 		"stratify": "Balance by",
@@ -76,7 +76,7 @@
 		"confirmPublic": "Hold out public tasks too",
 		"preview": "Preview",
 		"apply": "Hold out",
-		"applyConfirm": "Hold out {{count}} tasks? Their instructions change, so freeze this version and run the readiness check again.",
+		"applyConfirm": "Hold out {{count}} tasks? Instructions change. Freeze and rerun readiness checks after.",
 		"result": "{{held}} held out, {{public}} public",
 		"refused": "Public data, not held out: {{tasks}}"
 	}

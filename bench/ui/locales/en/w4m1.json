@@ -1,9 +1,9 @@
 {
 	"agentDiff": {
-		"noBaseline": "No earlier version of {{agent}} ran a benchmark this version ran. Pick version A by hand."
+		"noBaseline": "No earlier version of {{agent}} ran these benchmarks. Pick version A."
 	},
 	"versions": {
-		"noFile": "This agent has no settings file, so it has no versions. Its runs still show on the Runs tab."
+		"noFile": "No settings file, so no versions."
 	},
 	"runs": {
 		"noneFailed": "No run of this agent failed."
@@ -19,10 +19,10 @@
 		"waitReason": "Wait for the cost estimate."
 	},
 	"tokens": {
-		"ingestPanel": "Ingest tokens are listed on the Inbox page, under Push failures in, where you can turn them off.",
-		"ingestAccess": "Ingest tokens for traces and failures are managed on the Inbox page."
+		"ingestPanel": "Manage ingest tokens on the Inbox page.",
+		"ingestAccess": "Ingest tokens are managed on the Inbox page."
 	},
 	"secrets": {
-		"nameHint": "Names use capital letters, digits and underscores. What you type is changed to fit."
+		"nameHint": "Capitals, digits and underscores."
 	}
 }

@@ -1,8 +1,8 @@
 {
 	"form": {
 		"surfaces": "What may change",
-		"instructions": "Standing instructions (added before every task)",
-		"folder": "(folder: the improver may add skills here)",
+		"instructions": "Standing instructions",
+		"folder": "Improver may add skills here.",
 		"fixed": "Kept fixed: model, tools, settings, budgets.",
 		"surfaceNone": "Tick at least one thing the improver may change.",
 		"size": "Size",
@@ -10,7 +10,7 @@
 		"limitError": "The spending limit must be above 0.",
 		"ideas": "Ideas per round",
 		"ideasError": "Pick 1 to 8 ideas per round.",
-		"improver": "Heimdall rewrites the files using your agent's model"
+		"improver": "Rewrites use your agent's model."
 	},
 	"preset": {
 		"small": "Small",
@@ -18,20 +18,20 @@
 		"large": "Large",
 		"custom": "Custom",
 		"line": "{{rounds}} rounds, {{ideas}} ideas per round, about {{pool}} tasks",
-		"customLine": "Pick rounds, ideas per round and the spending limit"
+		"customLine": "Pick rounds, ideas and spending limit."
 	},
 	"estimate": {
 		"title": "Estimate",
-		"studyLimit": "Total for {{loops}} loops: at most ${{total}} (${{each}} for each loop)",
-		"loading": "Estimating the cost and what this run can confirm",
-		"splits": "{{pool}} tasks: {{practice}} to practise on, {{gate}} to decide, {{held_out}} kept hidden until the end.",
-		"detectable": "Smallest gain this run can confirm: about {{held_out_points}} points.",
-		"notEnough": "Smallest gain this run can confirm: not enough tasks to estimate.",
+		"studyLimit": "{{loops}} loops: up to ${{total}} (${{each}} each)",
+		"loading": "Estimating...",
+		"splits": "{{pool}} tasks: {{practice}} practice, {{gate}} check, {{held_out}} hidden.",
+		"detectable": "Smallest confirmable gain: about {{held_out_points}} points.",
+		"notEnough": "Smallest confirmable gain: too few tasks.",
 		"cost": "Estimated cost: ${{low}} to ${{high}}, about {{minutes_low}} to {{minutes_high}} minutes. Hard stop at ${{limit}}.",
 		"improver": "Improver: Heimdall on {{model}}.",
 		"improverTeacher": "Improver: Heimdall on {{teacher}}, teacher-assisted.",
 		"unavailable": "The estimate is not available: {{error}}",
-		"waiting": "The estimate appears when the form is complete."
+		"waiting": "Complete the form for an estimate."
 	},
 	"reason": {
 		"name": "Give the run a name.",
@@ -51,8 +51,8 @@
 	},
 	"continue": {
 		"title": "Continue with more budget",
-		"confirm": "Continue this run? It spends up to ${{usd}} more on {{runs}} runs. The result is tested again with a reserved part of the error budget.",
-		"loading": "Working out what a second look costs",
+		"confirm": "Continue? Spends up to ${{usd}} more on {{runs}} runs. Retested with reserved error budget.",
+		"loading": "Estimating cost...",
 		"submit": "Continue",
 		"cancel": "Cancel"
 	},
@@ -61,15 +61,15 @@
 		"stage": {
 			"improve": "writing ideas",
 			"screen": "trying ideas on practice tasks",
-			"audit": "testing the best idea on held-back check tasks",
+			"audit": "testing the best idea on check tasks",
 			"final": "scoring the final version on hidden tasks",
-			"retries": "retrying version 0 for the comparison",
+			"retries": "rerunning version 0",
 			"other": "working"
 		}
 	},
 	"resume": {
 		"button": "Resume",
-		"confirm": "Resume this run? It continues from its last saved step; nothing already paid for runs again."
+		"confirm": "Resume from last saved step? Paid steps do not rerun."
 	},
 	"timeline": {
 		"title": "Timeline",
@@ -90,8 +90,8 @@
 	},
 	"explain": {
 		"title": "What changed and why",
-		"description": "Each kept version against the one before it, up to the final version: each file the improver changed, each edit with its reason and result.",
-		"none": "No new version was kept, so nothing changed.",
+		"description": "",
+		"none": "No new version kept.",
 		"loading": "Reading what changed",
 		"error": "Could not read what changed in this version.",
 		"rationale": "The improver's reasoning",

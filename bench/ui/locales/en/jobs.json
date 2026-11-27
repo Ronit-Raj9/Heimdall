@@ -1,6 +1,6 @@
 {
 	"title": "Jobs",
-	"subtitle": "Work Heimdall does in the background, like checks, imports and downloads. Watch the log, stop a job or try it again.",
+	"subtitle": "",
 	"filters": {
 		"kind": "Type of job",
 		"status": "Status",
@@ -15,7 +15,7 @@
 		"created": "Started",
 		"actions": "Actions"
 	},
-	"empty": "No jobs yet. Buttons like Import, Make tasks, Check grader and Download start a job, and it shows up here.",
+	"empty": "No jobs yet.",
 	"emptyFiltered": "No job matches these filters.",
 	"loadError": "Could not load jobs",
 	"loadMore": "Load older jobs",
@@ -41,9 +41,9 @@
 		"open": "Open job page",
 		"close": "Close",
 		"cancel": "Cancel job",
-		"queued": "Waiting to start. It begins when a worker is free.",
+		"queued": "Waiting for a free worker.",
 		"failed": "The job failed:",
-		"addRunner": "No worker online. Open Settings > Workers to add a worker or check the shared worker",
+		"addRunner": "No worker online. Add one in Settings > Workers.",
 		"succeeded": "Finished.",
 		"cancelled": "Cancelled.",
 		"startError": "Could not start the job",
@@ -54,7 +54,7 @@
 		"open": "Log"
 	},
 	"jobOf": "{{kind}}, {{target}}",
-	"retryConfirm": "Run this {{kind}} again? It calls models again and can cost up to {{budget}}.",
+	"retryConfirm": "Run this {{kind}} again? Calls models again, up to {{budget}}.",
 	"retryConfirmNoBudget": "Run this {{kind}} again? It calls models again.",
 	"retryConfirmLabel": "Run again",
 	"actionErrorFor": "{{job}}: {{message}}",

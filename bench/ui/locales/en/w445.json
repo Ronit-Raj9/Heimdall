@@ -1,7 +1,7 @@
 {
 	"import": {
 		"button": "Import a session file",
-		"help": "A Claude Code session (in ~/.claude/projects) or a Codex session (in ~/.codex/sessions). The file is cleaned of keys, emails and home folder names before it is kept.",
+		"help": "A Claude Code session from ~/.claude/projects or a Codex session from ~/.codex/sessions. Keys, emails and home folder names are removed before it is kept.",
 		"tooLarge": "This file is larger than 32 MB. Export a shorter session.",
 		"notSession": "This is not a Claude Code or Codex session file.",
 		"busy": "Importing the session...",
@@ -21,12 +21,12 @@
 		"cancel": "Cancel",
 		"drafting": "The model is drafting what should have happened...",
 		"suggested": "Suggested by a model",
-		"noQuote": "No quote found for this; check it yourself.",
+		"noQuote": "No quote found. Check it yourself.",
 		"dropped_one": "{{count}} suggestion had no quote found in the session and was left out.",
 		"dropped_other": "{{count}} suggestions had no quote found in the session and were left out.",
 		"approve": "Add task to the benchmark",
 		"saveOnly": "Save without checking",
-		"proving": "Proving the task: the reference must pass, an agent that does nothing must fail, and the recorded mistake must fail.",
+		"proving": "Proving the task. The reference must pass, a do-nothing agent and the recorded mistake must fail.",
 		"added": "Added to {{benchmark}}.",
 		"saved": "Saved to {{benchmark}} without the readiness check."
 	},

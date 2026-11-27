@@ -12,7 +12,7 @@
 	},
 	"kpi": {
 		"agents": "Agents with results",
-		"agentsHint": "Agents with at least one evaluation",
+		"agentsHint": "",
 		"evaluations": "Evaluations",
 		"evaluationsHint_one": "{{count}} in progress",
 		"evaluationsHint_other": "{{count}} in progress",
@@ -50,7 +50,7 @@
 	"evaluations": {
 		"title": "Recent evaluations",
 		"viewAll": "See all",
-		"empty": "No evaluations yet. Evaluate your agent on a few benchmarks to get its report card.",
+		"empty": "No evaluations yet.",
 		"untitled": "Untitled evaluation",
 		"benchmarks_one": "{{count}} benchmark",
 		"benchmarks_other": "{{count}} benchmarks",
@@ -83,7 +83,7 @@
 	},
 	"onboarding": {
 		"title": "Set up Heimdall",
-		"body": "Five steps to your agent's first report card. This card stays until one evaluation has finished.",
+		"body": "Five steps to your agent's first report card.",
 		"viewer": "Nothing has been tested yet. See who can run tests in Members.",
 		"done": "Done",
 		"first": "First: {{step}}",
@@ -97,5 +97,5 @@
 			"report": "Read the report card"
 		}
 	},
-	"intro": "Heimdall tests your AI agent, not just its model, on real tasks and gives it a report card you can trust."
+	"intro": ""
 }

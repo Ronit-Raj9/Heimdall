@@ -6,13 +6,13 @@
 		"tryBuiltin": "Try a built-in agent:",
 		"scheduled": "Scheduled checks",
 		"builtin": "Built-in",
-		"noneEvaluated_one": "Your agent has no report card yet. Evaluate it to see its scores here.",
-		"noneEvaluated_other": "None of your {{count}} agents has a report card yet. Evaluate one to see its scores here.",
+		"noneEvaluated_one": "No report card yet. Evaluate your agent.",
+		"noneEvaluated_other": "None of your {{count}} agents has a report card yet.",
 		"members": "See who is in this organization",
 		"addTasks": "Add your own tasks"
 	},
 	"agents": {
-		"empty": "No agents yet. Connect an agent or start from a template.",
+		"empty": "No agents yet.",
 		"fromTemplate": "Start from a template",
 		"connect": "Connect an agent",
 		"jobsError": "Could not load recent runs. Last run and check may be old.",
@@ -38,13 +38,13 @@
 		},
 		"more": "More actions for {{name}}",
 		"emptyTitle": "No agents yet",
-		"emptyBody": "Connect an agent or start from a template."
+		"emptyBody": ""
 	},
 	"onboard": {
 		"builder": {
 			"openapi": "Build tasks from your OpenAPI file and policy",
 			"github": "Make tasks from this repository's commits"
 		},
-		"judgeNeeded": "Pick the judge model first: rubric grading needs one."
+		"judgeNeeded": "Pick the judge model first. Rubric grading needs one."
 	}
 }

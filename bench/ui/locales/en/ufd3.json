@@ -1,15 +1,15 @@
 {
-  "freeCheck": {
-    "title": "Try a free check first",
-    "what": "Runs your own agent on one task of {{suite}} with a practice model instead of a real one: it costs $0 and shows the agent starts and finishes. It needs a worker online and gives no score; a full evaluation calls real models and costs money.",
-    "button": "Run the free check",
-    "builtin": "The free check is for your own agents: {{agent}} is built in and already checked.",
-    "ownsModel": "The free check cannot run on {{agent}}: it calls its own model, so the practice model cannot stand in for it.",
-    "noAgent": "Pick one of your own agents in step 1 to try the free check.",
-    "noBenchmark": "Pick a benchmark in step 3 to try the free check: it uses that benchmark's first task."
-  },
-  "suitesCli": {
-    "summary": "From the command line",
-    "intro": "On your own machine, this fetches the source and adds it as a benchmark of your organization."
-  }
+	"freeCheck": {
+		"title": "Try a free check first",
+		"what": "One task of {{suite}} with a practice model. $0, no score, needs a worker online. Full evaluations call real models and cost money.",
+		"button": "Run the free check",
+		"builtin": "{{agent}} is built in and already checked.",
+		"ownsModel": "{{agent}} calls its own model, so the free check cannot run.",
+		"noAgent": "Pick one of your own agents in step 1 to try the free check.",
+		"noBenchmark": "Pick a benchmark in step 3. The check uses its first task."
+	},
+	"suitesCli": {
+		"summary": "From the command line",
+		"intro": "Fetches the source and adds it as a benchmark."
+	}
 }

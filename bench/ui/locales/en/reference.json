@@ -1,13 +1,13 @@
 {
 	"title": "Reference scores",
-	"subtitle": "How known agents score on the built-in benchmarks. Every number comes from real runs the Heimdall team ran and checked, not from anyone's claims.",
+	"subtitle": "Known agents on built-in benchmarks.",
 	"tab": "Reference",
 	"loading": "Loading reference scores...",
 	"loadError": "Could not load the reference scores",
-	"empty": "No reference scores are published yet. When the Heimdall team publishes measured runs of known agents, they appear here.",
+	"empty": "No reference scores yet.",
 	"emptyBenchmark": "No reference scores are published for this benchmark yet.",
 	"updated": "Updated {{date}}",
-	"provenance": "Runs by {{org}}. Each score is the share of runs the benchmark's own checks verified as solved, with a 95% range. The fingerprint identifies the exact runs; the report card shows them.",
+	"provenance": "Runs by {{org}}. Score is the verified solve share, 95% range.",
 	"publicLink": "Public page",
 	"col": {
 		"agent": "Agent",
@@ -32,7 +32,7 @@
 	},
 	"benchmark": {
 		"title": "How known agents score here",
-		"description": "Measured by the Heimdall team on this benchmark's ready tasks.",
+		"description": "Heimdall team runs on ready tasks.",
 		"all": "All reference scores"
 	},
 	"hint": {

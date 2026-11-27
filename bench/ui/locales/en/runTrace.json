@@ -1,59 +1,59 @@
 {
-  "filters": {
-    "label": "Filter steps",
-    "all": "All",
-    "model": "Model thinking",
-    "tools": "Tool uses",
-    "commands": "Commands",
-    "errors": "Errors"
-  },
-  "search": "Search steps",
-  "live": "Live",
-  "autoScroll": "Auto-scroll",
-  "shown": "{{shown}} of {{total}} steps",
-  "noMatch": "No step matches this filter.",
-  "empty": "No steps recorded yet.",
-  "waiting": "Waiting for the first step.",
-  "input": "Input",
-  "output": "Output",
-  "record": "Step record",
-  "expand": "Show details of step {{seq}}",
-  "tokens": "{{value}} tokens",
-  "cost": "${{value}}",
-  "duration": "{{value}}",
-  "kind": {
-    "model": "Model thinking",
-    "tool": "Used a tool",
-    "command": "Ran a command",
-    "file": "Edited a file",
-    "verifier": "Grader checked",
-    "other": "Step"
-  },
-  "export": {
-    "button": "Export",
-    "json": "Full record (JSON)",
-    "jsonNote": "Steps and events",
-    "otlp": "OTLP JSON",
-    "otlpNote": "OpenTelemetry format, saved runs only",
-    "jsonl": "Agent log (JSONL)",
-    "jsonlNote": "One step per line"
-  },
-  "judgeCriteria": {
-    "title": "Judge criteria",
-    "score": "{{score}} of the weight met, {{need}} needed",
-    "weight": "weight {{weight}}",
-    "met": "Met",
-    "notMet": "Not met"
-  },
-  "overview": {
-    "agentSaid": "What the agent said vs what the grader found",
-    "steps": "Model turns",
-    "stepsHint": "Model turns that got an answer. The Step by step tab also counts tool uses and commands.",
-    "toolCalls": "Tool uses",
-    "cost": "Cost",
-    "time": "Time taken",
-    "details": "Details",
-    "allMetrics": "All measurements",
-    "running": "Running"
-  }
+	"filters": {
+		"label": "Filter steps",
+		"all": "All",
+		"model": "Model thinking",
+		"tools": "Tool uses",
+		"commands": "Commands",
+		"errors": "Errors"
+	},
+	"search": "Search steps",
+	"live": "Live",
+	"autoScroll": "Auto-scroll",
+	"shown": "{{shown}} of {{total}} steps",
+	"noMatch": "No step matches this filter.",
+	"empty": "No steps recorded yet.",
+	"waiting": "Waiting for the first step.",
+	"input": "Input",
+	"output": "Output",
+	"record": "Step record",
+	"expand": "Show details of step {{seq}}",
+	"tokens": "{{value}} tokens",
+	"cost": "${{value}}",
+	"duration": "{{value}}",
+	"kind": {
+		"model": "Model thinking",
+		"tool": "Used a tool",
+		"command": "Ran a command",
+		"file": "Edited a file",
+		"verifier": "Grader checked",
+		"other": "Step"
+	},
+	"export": {
+		"button": "Export",
+		"json": "Full record (JSON)",
+		"jsonNote": "Steps and events",
+		"otlp": "OTLP JSON",
+		"otlpNote": "OpenTelemetry format, saved runs only",
+		"jsonl": "Agent log (JSONL)",
+		"jsonlNote": "One step per line"
+	},
+	"judgeCriteria": {
+		"title": "Judge criteria",
+		"score": "{{score}} of the weight met, {{need}} needed",
+		"weight": "weight {{weight}}",
+		"met": "Met",
+		"notMet": "Not met"
+	},
+	"overview": {
+		"agentSaid": "Agent claim vs grader",
+		"steps": "Model turns",
+		"stepsHint": "Model turns only. Step by step also counts tools.",
+		"toolCalls": "Tool uses",
+		"cost": "Cost",
+		"time": "Time taken",
+		"details": "Details",
+		"allMetrics": "All measurements",
+		"running": "Running"
+	}
 }
