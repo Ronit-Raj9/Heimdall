@@ -8,6 +8,8 @@ import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, Hourglass, Tr
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import "./uf4aI18n";
+import "@/components/share/ufd4I18n";
+import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import {
 	DECISION_TONE,
 	formatPp,
@@ -17,6 +19,7 @@ import {
 	metricUnit,
 	formatSignedEffect,
 	plainInvalidReason,
+	rateOrTooFew,
 	type Tone,
 } from "./verdict.utils";
 
@@ -189,8 +192,11 @@ function ArmPanel({
 }) {
 	const { t } = useTranslation("experimentPage");
 	const { t: tu } = useTranslation("uf4a");
+	const { t: td } = useTranslation("ufd4");
 	const locale = getLocale();
-	const rate = ratio && ratio.den > 0 ? ratio.num / ratio.den : null;
+	// Under 10 runs the rate is not a score: the same rule as the shared comparison page.
+	const { rate: measured, tooFew } = rateOrTooFew(ratio);
+	const rate = tooFew ? null : measured;
 	const value = (name: string, kind: "usd" | "tokens") => {
 		const v = metrics?.[name];
 		if (v && v.state === "observed" && typeof v.v === "number") {
@@ -226,9 +232,15 @@ function ArmPanel({
 				<span className="min-w-0 text-sm font-semibold break-words" title={arm}>
 					{label}
 				</span>
-				<span className="text-2xl font-semibold tabular-nums">
-					{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}
-				</span>
+				{tooFew ? (
+					<span className="text-right text-sm font-semibold" data-testid={`verdict-summary-too-few-${arm}`}>
+						{td("shared.tooFew")}
+					</span>
+				) : (
+					<span className="text-2xl font-semibold tabular-nums">
+						{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}
+					</span>
+				)}
 			</div>
 			<div className="flex items-center gap-2">
 				<span className="text-muted-foreground w-3 shrink-0 font-mono text-xs font-semibold" aria-hidden="true">
@@ -250,6 +262,7 @@ function ArmPanel({
 			</div>
 			<span className="text-muted-foreground text-xs">
 				{ratio ? t("summary.passCount", { num: ratio.num, den: ratio.den }) : t("summary.passRate")}
+				{tooFew && ratio ? ` · ${td("shared.tooFewDetail", { den: ratio.den, min: DEFAULT_MIN_RUNS })}` : ""}
 			</span>
 			{thrown > 0 && (
 				<Link

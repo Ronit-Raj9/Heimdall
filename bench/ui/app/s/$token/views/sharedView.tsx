@@ -17,11 +17,11 @@ import "./hw16I18n";
 import "@/components/share/uf8bI18n";
 import "@/components/share/ufd4I18n";
 import { headline, costNumbers } from "@/components/verdict/verdictSummary";
-import { armOrder } from "@/components/verdict/verdict.utils";
+import { armOrder, rateOrTooFew } from "@/components/verdict/verdict.utils";
 import { observedNumber } from "@/components/verdict/armCost";
 import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import { getLocale } from "@/lib/i18n";
-import type { Ratio, Value } from "@/lib/types/bench";
+import type { Value } from "@/lib/types/bench";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
 interface AgentReportCard {
@@ -242,15 +242,8 @@ interface SharedExperiment {
 	setups?: { arm: string; agent?: string; model?: string }[];
 }
 
-/**
- * One setup's rate line (M8-68): the rate with the runs it rests on, or "too few runs to rate"
- * under DEFAULT_MIN_RUNS runs, the rule the app uses. Exported for tests.
- */
-export function rateOrTooFew(r: Ratio | undefined, min = DEFAULT_MIN_RUNS): { rate: number | null; tooFew: boolean } {
-	const rate = naiveScore(r);
-	if (rate === null) return { rate: null, tooFew: false };
-	return { rate, tooFew: (r?.den ?? 0) < min };
-}
+// One setup's rate line (M8-68): the shared rule of the app's verdict panel (components/verdict/verdict.utils). Re-exported for tests.
+export { rateOrTooFew };
 
 /** Total spend of the shared experiment: the observed Value, or a bare number from an older server. Exported for tests. */
 export function spentNumber(spent: SharedExperiment["spent_usd"]): number | null {

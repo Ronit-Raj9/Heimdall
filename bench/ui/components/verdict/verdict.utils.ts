@@ -1,3 +1,4 @@
+import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import i18n from "@/lib/i18n";
 import type {
 	Decision,
@@ -289,4 +290,15 @@ export function guardTasks(detail: string | undefined): string | null {
 /** The tone of a verdict decision word as sent by the server; a word this UI does not know is neutral. */
 export function decisionTone(decision: string | undefined): Tone {
 	return decision && decision in DECISION_TONE ? DECISION_TONE[decision as Decision] : "neutral";
+}
+
+/**
+ * One setup's pass rate and whether it rests on too few runs to rate: under DEFAULT_MIN_RUNS
+ * (10) runs the rate is not shown as a score. The one rule of the app's verdict panel, the shared
+ * comparison page and the leaderboard floor. Pure.
+ */
+export function rateOrTooFew(r: { num: number; den: number } | undefined, min = DEFAULT_MIN_RUNS): { rate: number | null; tooFew: boolean } {
+	const rate = r && r.den > 0 ? r.num / r.den : null;
+	if (rate === null) return { rate: null, tooFew: false };
+	return { rate, tooFew: (r?.den ?? 0) < min };
 }

@@ -38,6 +38,30 @@ describe("VerdictSummary", () => {
 		}
 		expect(html).toContain('role="meter"');
 	});
+	it("says too few runs to rate under 10 runs, the rule of the shared page", () => {
+		const few = renderToStaticMarkup(
+			<VerdictSummary
+				verdict={verdictWith({ decision: "inconclusive", action: "no_decision" })}
+				arms={arms}
+				naive={Object.fromEntries(arms.map((arm) => [arm, { num: 3, den: 9, unknown: 0 }]))}
+				armMetrics={diagnosticsFixture.arm_metrics}
+				onNext={() => undefined}
+			/>,
+		);
+		expect(few).toContain(`data-testid="verdict-summary-too-few-${arms[0]}"`);
+		expect(few).toContain("Too few runs to rate");
+		expect(few).toContain("9 runs; at least 10 are needed to rate");
+		const enough = renderToStaticMarkup(
+			<VerdictSummary
+				verdict={verdictWith({ decision: "inconclusive", action: "no_decision" })}
+				arms={arms}
+				naive={Object.fromEntries(arms.map((arm) => [arm, { num: 5, den: 10, unknown: 0 }]))}
+				armMetrics={diagnosticsFixture.arm_metrics}
+				onNext={() => undefined}
+			/>,
+		);
+		expect(enough).not.toContain("Too few runs to rate");
+	});
 });
 
 describe("VerdictSummary cost and tokens (D8.cost)", () => {
