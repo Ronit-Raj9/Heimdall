@@ -50,7 +50,7 @@
 		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}",
 		"title": "Cost"
 	},
-	"empty": "No finished runs between {{from}} and {{to}}. Run a comparison, or pick a wider date range.",
+	"empty": "No finished runs between {{from}} and {{to}}. Evaluate an agent, or pick a wider date range.",
 	"emptyAction": "Evaluate an agent",
 	"error": "Could not load usage: {{message}}",
 	"admin": {

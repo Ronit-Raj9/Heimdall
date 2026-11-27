@@ -163,7 +163,12 @@ export function modelComboItems(groups: readonly ModelGroup[], t: PickerText): C
 	const items: ComboboxItem[] = [];
 	for (const g of groups) {
 		const group = g.keyState === "ok" ? g.name : g.keyState === "invalid" ? t("picker.keyNotWorking", { name: g.name }) : t("picker.noKey", { name: g.name });
-		for (const m of g.models) items.push({ value: `${g.provider}\u0000${m.id}`, label: optionLabel(m, g, dup.has(m.id)), group, hint: m.id });
+		for (const m of g.models) {
+			const value = `${g.provider}\u0000${m.id}`;
+			// Q-73: a provider that lists a model twice still gives one item (one key per item in the list).
+			if (items.some((i) => i.value === value)) continue;
+			items.push({ value, label: optionLabel(m, g, dup.has(m.id)), group, hint: m.id });
+		}
 		items.push({ value: `${OTHER}${g.provider}`, label: t("picker.other", { name: g.name }), group });
 	}
 	return items;
