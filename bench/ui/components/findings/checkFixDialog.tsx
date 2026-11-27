@@ -39,7 +39,7 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 			? t("checkFix.askUnknown", { runs: estimate.runs, n, trials })
 			: t("checkFix.ask", { runs: estimate.runs, n, trials, usd });
 
-	// Paid work: PaidButton always asks first, naming the runs and the estimate (M7-26). A rerun has
+	// Paid work: PaidButton asks first (auto: a rerun has no cap, so it always asks), naming the runs and the estimate (M7-26). A rerun has
 	// no server cap, so the label says it uses the model key.
 	const start = async () => {
 		const res = await rerun({
@@ -127,7 +127,8 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 					capUsd={null}
 					estimateRuns={estimate.runs}
 					estimateUsd={estimate.usd}
-					confirm="always"
+					confirm="auto"
+					kind="form"
 					confirmText={ask}
 					disabled={!expId || !armValue || state.isLoading}
 					onConfirm={start}

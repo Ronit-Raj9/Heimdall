@@ -267,12 +267,13 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 								data-testid="proposal-budget"
 							/>
 						</label>
-						{/* The cap and the cost were just shown above, so the click starts without a second ask. */}
+						{/* The cap and the cost were just shown above: a budget up to $1 starts on this click, a larger one asks once more. */}
 						<PaidButton
 							size="sm"
 							verb={f("accept.draftVerb")}
 							capUsd={Number(budget) > 0 ? Number(budget) : null}
-							confirm="never"
+							confirm="auto"
+							kind="form"
 							disabled={starting || !provider.trim() || !model.trim() || !(Number(budget) > 0)}
 							onConfirm={startDraft}
 							testId="proposal-start"

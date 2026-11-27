@@ -6,6 +6,7 @@ import { checkCost, HowOften, howOftenCron, howOftenOf, newHowOften, usd, type H
 import "@/components/canaries/uf7bI18n";
 import { cronProblem, runsPerDay } from "@/lib/utils/cron";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
 import { Input } from "@/components/ui/input";
 import {
 	errorMessage,
@@ -20,7 +21,7 @@ import {
 import type { AlertConfig, Schedule, ScheduleRow, SchedulesFile, SchedulesResponse } from "@/lib/types/schedules";
 import { type Evaluation, useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import { ConfirmButton } from "@/components/platform/badges";
-import { type ConfirmFn, useConfirm } from "@/components/platform/confirmDialog";
+import type { ConfirmFn } from "@/components/platform/confirmDialog";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
@@ -33,13 +34,16 @@ import { useTranslation } from "react-i18next";
  * (fix wave 3, N231). Resolves true when the person confirmed. Exported for tests.
  */
 export function confirmRunNow(confirm: ConfirmFn, t: TFunction<"schedules">, r: ScheduleRow): Promise<boolean> {
+	return confirm(runNowMessage(t, r), { title: t("runNowTitle"), confirmLabel: t("runNow"), cancelLabel: t("runNowCancel") });
+}
+
+/** The sentence the Run now confirm shows: what runs again and what is left of the daily limit. Exported for tests. */
+export function runNowMessage(t: TFunction<"schedules">, r: ScheduleRow): string {
 	const what = r.evaluation || r.experiment || r.job || r.name;
 	const limit = r.max_usd_per_day ?? 0;
-	const message =
-		limit > 0
-			? t("runNowAsk", { name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) })
-			: t("runNowAskNoLimit", { name: r.name, evaluation: what });
-	return confirm(message, { title: t("runNowTitle"), confirmLabel: t("runNow"), cancelLabel: t("runNowCancel") });
+	return limit > 0
+		? t("runNowAsk", { name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) })
+		: t("runNowAskNoLimit", { name: r.name, evaluation: what });
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -402,7 +406,6 @@ function ScheduleTable({
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
-	const confirm = useConfirm();
 	const [run, runState] = useRunScheduleMutation();
 	const [setPaused, pauseState] = useSetSchedulePausedMutation();
 	const [note, setNote] = useState<string | null>(null);
@@ -411,8 +414,8 @@ function ScheduleTable({
 		const res = await setPaused({ name, paused });
 		if ("error" in res && res.error) setNote(errorMessage(res.error, "not changed"));
 	};
+	// The PaidButton (kind runNow) has already asked, naming the daily limit, before this runs.
 	const runNow = async (row: ScheduleRow) => {
-		if (!(await confirmRunNow(confirm, t, row))) return;
 		const name = row.name;
 		setNote(null);
 		const res = await run(name);
@@ -481,15 +484,18 @@ function ScheduleTable({
 								</td>
 								<td className="px-4 py-3">
 									<div className="flex justify-end gap-2">
-										<Button
+										<PaidButton
 											size="sm"
 											variant="outline"
+											verb={t("runNow")}
+											capUsd={r.max_usd_per_day ? r.max_usd_per_day : null}
+											confirm="auto"
+											kind="runNow"
+											confirmText={runNowMessage(t, r)}
 											disabled={runState.isLoading}
-											onClick={() => void runNow(r)}
-											data-testid={`schedule-run-${r.name}`}
-										>
-											{t("runNow")}
-										</Button>
+											onConfirm={() => runNow(r)}
+											testId={`schedule-run-${r.name}`}
+										/>
 										<Button
 											size="sm"
 											variant="outline"
