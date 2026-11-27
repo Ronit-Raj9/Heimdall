@@ -298,10 +298,13 @@ export function NewCanaryForm({
 	onCreated,
 	onClose,
 	initial,
+	agent,
 }: {
 	onCreated?(name: string): void;
 	onClose?(): void;
 	initial?: CanaryDefinition;
+	/** The agent a new monitor starts with, from "Watch this agent for drift" (?agent=). */
+	agent?: string;
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
@@ -319,7 +322,7 @@ export function NewCanaryForm({
 	const [msg, setMsg] = useState<string | null>(null);
 	const [serverProblems, setServerProblems] = useState<FieldProblem[]>([]);
 	const [taskFilter, setTaskFilter] = useState("");
-	const [f, setF] = useState<CanaryFormFields>(() => (initial ? canaryFormFields(initial) : newCanaryFields()));
+	const [f, setF] = useState<CanaryFormFields>(() => (initial ? canaryFormFields(initial) : { ...newCanaryFields(), ...(agent ? { agent } : {}) }));
 	// The task list needs the picked benchmark's full entry (the light list carries no tasks): one
 	// benchmark from GET /suites/{id} (N194), only fetched once the user asks to pick some tasks.
 	const full = useGetSuiteQuery(f.suite.split("@")[0], { skip: f.tasksAll || !f.suite });
