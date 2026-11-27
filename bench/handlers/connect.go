@@ -130,6 +130,10 @@ type ConnectFirstLookResponse struct {
 	// Nil when it does not fit; BareModelReason says why.
 	BareModel       *schemas.EvaluationSpec `json:"bare_model,omitempty"`
 	BareModelReason string                  `json:"bare_model_reason,omitempty"`
+	// EstimateUSD is what the first look is expected to cost on the
+	// caller's key, by the evaluation estimate; sent only with ?estimate=1
+	// and when the estimate could be made.
+	EstimateUSD *EvalCostRange `json:"estimate_usd,omitempty"`
 }
 
 // ConnectExplainRequest is POST /connect/explain: a run or check error.
@@ -757,6 +761,9 @@ func (h *connectHandler) firstLook(ctx *fasthttp.RequestCtx) {
 	out.BareModel, out.BareModelReason = h.bareModelCard(work, cfg, req, model, pick)
 	if FirstLookReference != nil {
 		out.Reference = FirstLookReference(work, pick.Benchmark, model)
+	}
+	if string(ctx.QueryArgs().Peek("estimate")) == "1" {
+		out.EstimateUSD = h.firstLookCost(work, ev)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
