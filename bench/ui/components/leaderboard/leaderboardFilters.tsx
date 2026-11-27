@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import type { LeaderboardScope, LeaderboardSynthetic } from "@/lib/types/bench";
 import type { TFunction } from "i18next";
 import { cn, controlledSelectValue } from "@/lib/utils";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface LeaderboardFiltersProps {
@@ -27,6 +27,8 @@ export interface LeaderboardFiltersProps {
 	/** The track filter; null or absent shows every track. */
 	track?: string | null;
 	onTrack?: (track: string | null) => void;
+	/** More switches for the same row (for example the score source picker). */
+	children?: ReactNode;
 }
 
 /** The track filter's value for "every track". Not snake_case, so never a real track. */
@@ -63,7 +65,7 @@ export function LeaderboardFilters(props: LeaderboardFiltersProps) {
 
 	return (
 		<div
-			className="flex flex-wrap items-end gap-4"
+			className="flex flex-wrap items-end gap-x-4 gap-y-3"
 			role="group"
 			aria-label={t("leaderboard.filters.label")}
 			data-testid="leaderboard-filters"
@@ -125,6 +127,7 @@ export function LeaderboardFilters(props: LeaderboardFiltersProps) {
 				disabled={disabled}
 				testId="leaderboard-synthetic"
 			/>
+			{props.children}
 		</div>
 	);
 }
@@ -152,7 +155,7 @@ function Picker({ label, value, options, labels, groups, placeholder, onChange, 
 		</SelectItem>
 	);
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
@@ -188,14 +191,14 @@ interface SegmentedProps<T extends string> {
 function Segmented<T extends string>({ label, value, options, onChange, disabled, testId }: SegmentedProps<T>) {
 	const id = useId();
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col gap-1.5">
 			<span id={id} className="text-muted-foreground text-xs">
 				{label}
 			</span>
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
+				className="bg-muted inline-flex h-(--control-h) w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid={testId}
 			>
 				{options.map((option) => {

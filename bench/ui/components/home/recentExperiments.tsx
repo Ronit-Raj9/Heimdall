@@ -95,7 +95,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 						)}
 					</span>
 				</span>
-				<span className="text-muted-foreground hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block">
+				<span className="text-muted-foreground hidden w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums sm:block">
 					{when ? (
 						<time dateTime={when} title={formatWhen(when, locale) ?? undefined}>
 							{formatRelative(when, locale)}

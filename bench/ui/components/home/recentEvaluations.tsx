@@ -62,7 +62,7 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 					{/* The shared status pill: icon plus the one status word (Spec 4). */}
 					<StatusPill raw={status} className="shrink-0 self-start sm:self-auto" data-status={status} testId={`home-evaluation-status-${ev.id}`} />
 				</span>
-				<span className="text-muted-foreground hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block">
+				<span className="text-muted-foreground hidden w-24 shrink-0 text-right text-xs whitespace-nowrap tabular-nums sm:block">
 					{ev.created_at ? (
 						<time dateTime={ev.created_at} title={formatWhen(ev.created_at, locale) ?? undefined}>
 							{formatRelative(ev.created_at, locale)}

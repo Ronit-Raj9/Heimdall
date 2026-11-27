@@ -41,7 +41,7 @@ export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSumma
 			</ul>
 			{practice.length > 0 && (
 				<details className="min-w-0" data-testid="home-suites-practice">
-					<summary className="text-muted-foreground cursor-pointer px-1 text-xs">
+					<summary className="text-muted-foreground cursor-pointer px-1 py-3 text-xs sm:py-0">
 						{t("sections.practice")} ({practice.length})
 					</summary>
 					<ul className={`${list} mt-2`}>
@@ -78,7 +78,7 @@ function SuiteRow({ suite }: { suite: SuiteSummary }) {
 			>
 				<span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
 				{!suite.error && (
-					<span className="text-muted-foreground shrink-0 text-xs tabular-nums">{t("suites.tasks", { count: suite.task_count })}</span>
+					<span className="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:inline">{t("suites.tasks", { count: suite.task_count })}</span>
 				)}
 				<span
 					className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap"

@@ -105,7 +105,7 @@ interface PickerProps {
 function Picker({ label, value, options, labels, onChange, disabled, testId, className }: PickerProps) {
 	const id = useId();
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
@@ -138,14 +138,14 @@ function SyntheticSwitch({
 	const { t } = useTranslation("bench");
 	const id = useId();
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col gap-1.5">
 			<span id={id} className="text-muted-foreground text-xs">
 				{t("trends.filters.synthetic")}
 			</span>
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
+				className="bg-muted inline-flex h-(--control-h) w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid="trends-synthetic"
 			>
 				{TREND_SYNTHETIC.map((option) => {

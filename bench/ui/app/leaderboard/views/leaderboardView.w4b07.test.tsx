@@ -30,7 +30,7 @@ vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 	useGetSuitesLightQuery: () => okQuery({ mode: "live", suites: [] }),
 }));
 
-vi.mock("@/components/migration/migrationReport", () => ({ LeaderboardParetoPanel: () => null }));
+vi.mock("./leaderboardPareto", () => ({ LeaderboardPareto: () => null }));
 
 describe("LeaderboardTab unknown benchmark", () => {
 	it("an unknown suite says no benchmark named bogus-zz@9", () => {
