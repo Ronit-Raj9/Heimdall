@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { errorQuery, mutation, okQuery, render } from "@/lib/testing/render";
 import type { GwCardLine, GwReportCard } from "@/lib/types/gateway";
 import { describe, expect, it, vi } from "vitest";
-import GatewayView, { GatewayCardLineRow, GatewayHeaderLine } from "./gatewayView";
+import GatewayView, { GatewayCardLineRow, GatewayHeaderLine, reportedVersion } from "./gatewayView";
 
 const state = vi.hoisted(() => ({ card: undefined as unknown }));
 
@@ -80,7 +80,9 @@ describe("Gateway report card", () => {
 		state.card = okQuery(card);
 		const html = render(<GatewayView />);
 		expect(html).toContain("Gateway report card");
-		expect(html).toContain("Bifrost v2.5.1 at bifrost:8080");
+		expect(html).toContain("Built-in gateway: bifrost:8080, version v2.5.1");
+		expect(html).toContain("A feature test runs the same agent on the same benchmark twice");
+		expect(html).toContain("Send production traces");
 		expect(html).toContain("Your Bifrost: connected to bifrost.example.com");
 		for (const l of lines) expect(html).toContain(`data-testid="gateway-line-${l.feature}"`);
 		expect(html).toContain("Watch for new models");
@@ -89,17 +91,34 @@ describe("Gateway report card", () => {
 	it("renders each state: measured, unknown with its reason, not measured, not enough data", () => {
 		const row = (l: GwCardLine) => render(<GatewayCardLineRow line={l} onStart={() => undefined} />);
 		const measured = row(lines[0]);
-		expect(measured).toContain("In use: On");
+		expect(measured).toContain(">On<");
+		expect(measured).not.toContain("In use");
 		expect(measured).toContain("Saved");
+		expect(measured).toContain("Checks how much the cache saves");
 		expect(measured).toContain("From: 160 runs of comparison e1, 2026-11-20");
-		expect(measured).toContain("Open the test");
-		expect(measured).toContain("Start a test");
+		expect(measured).toContain("See the test result");
+		expect(measured).toContain("Test it");
 		const unknown = row(lines[1]);
-		expect(unknown).toContain("In use: Unknown");
+		expect(unknown).toContain("Not known");
 		expect(unknown).toContain("Unknown: Heimdall cannot see your production routing");
-		expect(unknown).not.toContain("Start a test");
-		expect(row(lines[2])).toContain("Heimdall does not use Bifrost&#x27;s batch API yet");
+		expect(unknown).not.toContain("Test it");
+		expect(row(lines[2])).toContain("Coming later.");
+		expect(row(lines[2])).toContain("Not tested");
 		expect(row(lines[3])).toContain("Not enough data yet");
+	});
+
+	it("never prints vunknown and blocks tests that need your Bifrost until it is connected", () => {
+		expect(reportedVersion("vunknown")).toBe("");
+		expect(reportedVersion("unknown")).toBe("");
+		expect(reportedVersion("v2.5.1")).toBe("v2.5.1");
+		const html = render(<GatewayHeaderLine gateway={{ configured: true, reachable: true, host: "bifrost:8080", version: "vunknown", plugins: [] }} />);
+		expect(html).toContain("Built-in gateway: bifrost:8080 (version not reported)");
+		expect(html).not.toContain("vunknown");
+		const prompt: GwCardLine = { ...lines[0], feature: "prompt_version", start: "prompt_version", state: "not_measured", result: undefined };
+		const blocked = render(<GatewayCardLineRow line={prompt} onStart={() => undefined} connected={false} />);
+		expect(blocked).toContain("Connect your Bifrost first");
+		expect(blocked).toContain("Not tested");
+		expect(render(<GatewayCardLineRow line={lines[0]} onStart={() => undefined} connected={false} />)).not.toContain("Connect your Bifrost first");
 	});
 
 	it("says why the gateway could not be reached", () => {
@@ -114,7 +133,10 @@ describe("Gateway report card", () => {
 		const html = render(<GatewayView />);
 		expect(html).toContain("Connect your Bifrost");
 		expect(html).toContain("Bifrost address");
-		expect(html).toContain("Secret that holds the admin credential");
+		expect(html).toContain("Admin key (from your secrets)");
+		expect(html).toContain("https://bifrost.your-company.com");
+		expect(html).toContain("Add a secret");
+		expect(html).toContain("Connect your Bifrost to list its agents.");
 		expect(html).toContain("BIFROST_ADMIN");
 	});
 

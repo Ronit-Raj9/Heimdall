@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { errorQuery, okQuery, render } from "@/lib/testing/render";
 import type { GwEffect } from "@/lib/types/gateway";
 import { describe, expect, it, vi } from "vitest";
-import { GatewayEffectCard, GatewayEffectView } from "./gatewayEffectCard";
+import { GatewayEffectCard, GatewayEffectView, detailRows, effectOf } from "./gatewayEffectCard";
 
 const state = vi.hoisted(() => ({ effect: undefined as unknown }));
 
@@ -48,9 +48,10 @@ describe("GatewayEffectCard", () => {
 		expect(html).toContain("Saved");
 		expect(html).toContain("The cache saved 31% of cost");
 		expect(html).toContain("cache on at 0.80");
-		expect(html).toContain("setting as it is today");
+		expect(html).toContain("Today");
 		expect(html).toContain("60%");
 		expect(html).toContain("$0.0345");
+		expect(html).toContain("Raw data");
 		expect(html).toContain("wrong_hit_share");
 		expect(html).toContain("From: 160 runs of this comparison");
 		expect(html).toContain("Use this in Bifrost");
@@ -64,5 +65,27 @@ describe("GatewayEffectCard", () => {
 		);
 		expect(html).toContain("The setting was not applied");
 		expect(html).toContain("Unknown: the agent did not open the skill in any run");
+	});
+
+	it("labels known details, counts lists, keeps the rest under Raw data, and reads {effect: null}", () => {
+		const { rows, raw } = detailRows({ recommended: 0.9, thresholds: [1, 2], other: 3, filter: { a: 1 } });
+		expect(rows).toEqual([
+			{ key: "recommended", value: 0.9 },
+			{ key: "thresholds", value: [1, 2] },
+		]);
+		expect(raw).toBe(true);
+		expect(detailRows({ recommended: 0.9 }).raw).toBe(false);
+		const html = render(<GatewayEffectView effect={{ ...effect, details: { recommended: 0.9, thresholds: [1, 2] } }} />);
+		expect(html).toContain("Recommended threshold");
+		expect(html).toContain("2 entries");
+		expect(effectOf({ effect: null })).toBeNull();
+		expect(effectOf(effect)).toBe(effect);
+		state.effect = okQuery({ effect: null });
+		expect(render(<GatewayEffectCard expId="e1" />)).toBe("");
+	});
+
+	it("says what to do when the effect is unknown", () => {
+		const html = render(<GatewayEffectView effect={{ ...effect, state: "unknown", result: undefined, reason: "no rows" }} />);
+		expect(html).toContain("This test could not show an effect: no rows. Check that the setting is on in Bifrost, then run it again.");
 	});
 });

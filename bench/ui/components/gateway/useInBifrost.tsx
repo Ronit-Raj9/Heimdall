@@ -41,7 +41,7 @@ export function UseInBifrostBody({ setting, onCopy, copied }: { setting: GwSetti
 	);
 }
 
-/** "Use this in Bifrost": opens the setting to paste; disabled with the reason as its tooltip when there is none. */
+/** "Use this in Bifrost": opens the setting to paste; disabled with the reason shown next to it when there is none. */
 export function UseInBifrostButton({ setting, reason }: { setting: GwSetting | null | undefined; reason?: string }) {
 	const { t } = useTranslation("w4p6");
 	const [open, setOpen] = useState(false);
@@ -55,7 +55,7 @@ export function UseInBifrostButton({ setting, reason }: { setting: GwSetting | n
 				</Button>
 			</span>
 			{!usable && reason && (
-				<span className="sr-only" data-testid="use-in-bifrost-reason">
+				<span className="text-muted-foreground ml-2 text-xs" data-testid="use-in-bifrost-reason">
 					{reason}
 				</span>
 			)}

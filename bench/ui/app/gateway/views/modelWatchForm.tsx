@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { BIFROST_PROVIDERS, providerChoices } from "@/components/models/providerCatalog";
 import { Input } from "@/components/ui/input";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { errorMessage, useGetSchedulesQuery, useSaveSchedulesMutation } from "@/lib/store/apis/schedulesApi";
@@ -6,6 +7,7 @@ import type { Schedule, SchedulesFile } from "@/lib/types/schedules";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NewModelWatchFields } from "./modelWatchCard";
+import "./uf7cI18n";
 import "./w4intI18n";
 
 /** The form of a new model watch (D3 6.8), as typed. */
@@ -60,10 +62,7 @@ export function watchName(evaluation: string, taken: readonly string[]): string 
 
 /** The schedule a form describes: an evaluation schedule with its new model watch. Pure. */
 export function watchSchedule(f: WatchForm, taken: readonly string[]): WatchBuild {
-	const providers = f.providers
-		.split(/[\s,]+/)
-		.map((p) => p.trim().toLowerCase())
-		.filter((p, i, all) => p !== "" && all.indexOf(p) === i);
+	const providers = providerList(f.providers);
 	if (providers.length === 0) return { problem: "needProviders" };
 	if (providers.length > 5) return { problem: "tooManyProviders" };
 	if (!f.evaluation) return { problem: "needEvaluation" };
@@ -89,6 +88,29 @@ export function watchSchedule(f: WatchForm, taken: readonly string[]): WatchBuil
 /** The schedules file with the new watch added last; every other schedule and the alerts stay as they are. Pure. */
 export function withWatch(file: SchedulesFile, schedule: Schedule): SchedulesFile {
 	return { ...file, schedules: [...file.schedules, schedule] };
+}
+
+/** The providers typed so far, lower case, without repeats. Pure. */
+export function providerList(text: string): string[] {
+	return text
+		.split(/[\s,]+/)
+		.map((p) => p.trim().toLowerCase())
+		.filter((p, i, all) => p !== "" && all.indexOf(p) === i);
+}
+
+/** The option text of an evaluation: its name, the day it was made and its models, so equal names differ. Pure. */
+export function evaluationLabel(ev: Pick<Evaluation, "id" | "created_at" | "spec">): string {
+	const name = ev.spec.name || ev.id;
+	const d = ev.created_at ? new Date(ev.created_at) : null;
+	const date = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+	const models = [...new Set(ev.spec.arms.map((a) => a.model).filter((m) => m))].join(" vs ");
+	return [name, date, models].filter((p) => p).join(", ");
+}
+
+/** The option text of a setup: "A: gpt-6-luna", or the label alone when the arm names no model. Pure. */
+export function setupOptionLabel(ev: Pick<Evaluation, "spec"> | undefined, label: string): string {
+	const model = ev?.spec.arms.find((a) => a.label === label)?.model;
+	return model ? `${label}: ${model}` : label;
 }
 
 /** The arm labels of a saved evaluation: the setups "Your current model" can name. Pure. */
@@ -120,13 +142,50 @@ export function WatchFormFields({
 	evaluations: readonly Evaluation[];
 }) {
 	const { t } = useTranslation("w4int");
+	const { t: u } = useTranslation("uf7c");
+	const providers = providerList(form.providers);
 	const set = <K extends keyof WatchForm>(k: K, v: WatchForm[K]) => onChange({ ...form, [k]: v });
 	const picked = evaluations.find((e) => e.id === form.evaluation);
 	return (
 		<div className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="model-watch-form">
-			<Row label={t("watchForm.providers")} hint={t("watchForm.providersHint")}>
+			<Row label={t("watchForm.providers")} hint={u("watch.providersHint")}>
 				{(id) => (
-					<Input id={id} value={form.providers} onChange={(e) => set("providers", e.target.value)} data-testid="model-watch-providers" />
+					<div className="flex flex-col gap-2">
+						<select
+							id={id}
+							className={selectClass}
+							value=""
+							disabled={providers.length >= 5}
+							onChange={(e) => e.target.value && set("providers", [...providers, e.target.value].join(", "))}
+							data-testid="model-watch-providers"
+						>
+							<option value="">{t("watchForm.pick")}</option>
+							{providerChoices()
+								.filter((p) => !providers.includes(p.id))
+								.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+						</select>
+						{providers.length > 0 && (
+							<ul className="flex flex-wrap gap-1" data-testid="model-watch-provider-chips">
+								{providers.map((p) => (
+									<li key={p} className="bg-muted inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs">
+										{BIFROST_PROVIDERS[p]?.name ?? p}
+										<button
+											type="button"
+											className="text-muted-foreground hover:text-foreground"
+											aria-label={t("watchForm.cancel") + " " + (BIFROST_PROVIDERS[p]?.name ?? p)}
+											onClick={() => set("providers", providers.filter((x) => x !== p).join(", "))}
+										>
+											x
+										</button>
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
 				)}
 			</Row>
 			<Row label={t("watchForm.evaluation")}>
@@ -141,7 +200,7 @@ export function WatchFormFields({
 						<option value="">{t("watchForm.pick")}</option>
 						{evaluations.map((e) => (
 							<option key={e.id} value={e.id}>
-								{e.spec.name || e.id}
+								{evaluationLabel(e)}
 							</option>
 						))}
 					</select>
@@ -160,7 +219,7 @@ export function WatchFormFields({
 						<option value="">{t("watchForm.pick")}</option>
 						{setupLabels(picked).map((l) => (
 							<option key={l} value={l}>
-								{l}
+								{setupOptionLabel(picked, l)}
 							</option>
 						))}
 					</select>
@@ -242,7 +301,11 @@ export function NewModelWatchForm({ onDone }: { onDone(): void }) {
 	return (
 		<div className="flex flex-col gap-3 rounded-lg border p-3" data-testid="model-watch-new">
 			<WatchFormFields form={form} onChange={setForm} evaluations={usable} />
-			{built.problem && <p className="text-muted-foreground text-sm">{t(`watchForm.problems.${built.problem}`)}</p>}
+			{built.problem && (
+				<p className="text-destructive text-sm" data-testid="model-watch-problem">
+					{t(`watchForm.problems.${built.problem}`)}
+				</p>
+			)}
 			{error && (
 				<p className="text-destructive text-sm" role="alert" data-testid="model-watch-error">
 					{error}

@@ -67,7 +67,7 @@ describe("new model watch form", () => {
 		for (const label of [
 			"Providers to watch",
 			"Evaluation to run",
-			"Your current model (setup)",
+			"Which setup in that evaluation is your current model",
 			"Budget for each new model (USD)",
 			"At most per day",
 			"Only models whose name contains (optional)",
@@ -76,8 +76,8 @@ describe("new model watch form", () => {
 		]) {
 			expect(html).toContain(label);
 		}
-		expect(html).toContain('<option value="ev_core" selected="">Core check</option>');
-		expect(html).toContain('<option value="sonnet" selected="">sonnet</option>');
+		expect(html).toContain('<option value="ev_core" selected="">Core check, m</option>');
+		expect(html).toContain('<option value="sonnet" selected="">sonnet: m</option>');
 	});
 });
 
