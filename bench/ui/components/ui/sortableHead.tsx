@@ -37,7 +37,7 @@ export function SortableHead({ label, active, dir, onSort, align = "left", hint,
 				title={hint}
 				aria-label={active ? `${name}, ${t(dir === "asc" ? "leaderboard.table.sortedAsc" : "leaderboard.table.sortedDesc")}` : name}
 				className={cn(
-					"focus-visible:ring-ring/50 -mx-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+					"-mx-2 -my-1 inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-sm px-2 py-1 font-medium transition-colors focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 					active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
 					align === "right" && "flex-row-reverse",
 				)}

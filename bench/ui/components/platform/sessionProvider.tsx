@@ -6,6 +6,23 @@ import { useGetAuthConfigQuery, useGetMeQuery } from "@/lib/store/apis/platformA
 import { onUnauthorized, ORG_SWITCH_KEY } from "@/lib/store/apis/session";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 
+// True once this tab has been signed in: a later trip to /login is a session that ended (X-96).
+let wasSignedIn = false;
+
+/** Marks this tab as signed in before; used by loginSearch. Exported for tests. */
+export function markSignedIn(on = true): void {
+	wasSignedIn = on;
+}
+
+/**
+ * The search of the redirect to /login: where to come back to, and reason "expired" when the
+ * tab was signed in before, so the login page can say "Your session ended." Drafts are in
+ * sessionStorage and survive the trip; nothing here clears storage.
+ */
+export function loginSearch(returnTo: string): { return_to: string; reason?: "expired" } {
+	return wasSignedIn ? { return_to: returnTo, reason: "expired" } : { return_to: returnTo };
+}
+
 /**
  * Asks GET /auth/me once and shares the answer as the session. A hosted visitor who is not signed
  * in gets the sign-in options (GET /auth/config) and the login page: hosted installs require sign-in
@@ -33,6 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 	const signedIn = useRef(session.signedIn);
 	signedIn.current = session.signedIn;
+	if (session.signedIn) wasSignedIn = true;
 	useEffect(() => {
 		onUnauthorized(() => {
 			if (signedIn.current) dispatch(benchApi.util.invalidateTags(["AuthMe"]));

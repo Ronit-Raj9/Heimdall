@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, type ReactNode } from "react";
+import { useScrollEdges } from "@/lib/hooks/useScrollEdges";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "./gw20I18n";
 
@@ -55,18 +56,20 @@ export function unknownTab(tabs: readonly RouteTab[], requested: string | null |
 
 /**
  * The active tab bound to a search parameter (default "tab"). Choosing the default tab removes
- * the parameter, so a page's plain URL is its default tab. Switching replaces the history entry.
+ * the parameter, so a page's plain URL is its default tab. Choosing a tab adds a history entry, so
+ * Back steps through the tabs before it leaves the page (M1-10); pass history "replace" to opt out.
  */
-export function useRouteTab(tabs: readonly RouteTab[], opts: { defaultTab?: string; param?: string } = {}) {
+export function useRouteTab(tabs: readonly RouteTab[], opts: { defaultTab?: string; param?: string; history?: "push" | "replace" } = {}) {
 	const param = opts.param ?? "tab";
-	const [requested, setRequested] = useQueryState(param, parseAsString.withOptions({ history: "replace" }));
+	const history = opts.history ?? "push";
+	const [requested, setRequested] = useQueryState(param, parseAsString);
 	const active = resolveTab(tabs, requested, opts.defaultTab);
 	const fallback = resolveTab(tabs, null, opts.defaultTab);
-	const select = (id: string) => void setRequested(id === fallback ? null : id);
+	const select = (id: string) => void setRequested(id === fallback ? null : id, { history });
 	// An alias in the address is replaced by the tab's own id, so the address names the real tab.
 	const alias = aliasTarget(tabs, requested);
 	useEffect(() => {
-		if (alias) void setRequested(alias === fallback ? null : alias);
+		if (alias) void setRequested(alias === fallback ? null : alias, { history: "replace" });
 	}, [alias, fallback, setRequested]);
 	return [active, select, requested] as const;
 }
@@ -77,6 +80,8 @@ export interface RouteTabsProps {
 	defaultTab?: string;
 	/** Search parameter name; "tab" unless a page needs two strips. */
 	param?: string;
+	/** "push" (default): Back steps through the tabs. "replace": a tab change keeps one history entry. */
+	history?: "push" | "replace";
 	/** Accessible name of the tab strip, for example "Experiment views". */
 	label: string;
 	/** Renders the active tab's content. Only the active tab renders, so hidden work stays idle. */
@@ -88,11 +93,19 @@ export interface RouteTabsProps {
 /**
  * Page level tabs bound to the URL: each tab has its own address, back and reload keep it, and
  * tabs that do not apply are hidden. Arrow keys, Home and End move between tabs (Radix Tabs).
- * On a narrow screen the strip scrolls sideways.
+ * On a narrow screen the strip scrolls sideways, fades at the edge that hides tabs, and keeps the
+ * active tab in view.
  */
-export function RouteTabs({ tabs, defaultTab, param, label, children, className, testId }: RouteTabsProps) {
+export function RouteTabs({ tabs, defaultTab, param, history, label, children, className, testId }: RouteTabsProps) {
 	const { t } = useTranslation("gw20");
-	const [active, select, requested] = useRouteTab(tabs, { defaultTab, param });
+	const [active, select, requested] = useRouteTab(tabs, { defaultTab, param, history });
+	const list = useRef<HTMLDivElement>(null);
+	useScrollEdges(list);
+	// The active tab is scrolled into view on load and after every change (X-95).
+	useEffect(() => {
+		const trigger = list.current?.querySelector<HTMLElement>('[data-state="active"]');
+		trigger?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+	}, [active]);
 	if (active === null) return null;
 	// A link with a tab id this page does not have shows the default tab and says so; choosing a tab
 	// replaces the parameter, so the note goes away.
@@ -109,6 +122,7 @@ export function RouteTabs({ tabs, defaultTab, param, label, children, className,
 			data-active={active}
 		>
 			<TabsPrimitive.List
+				ref={list}
 				aria-label={label}
 				className="border-border -mx-1 flex min-w-0 items-end gap-1 overflow-x-auto border-b px-1 [scrollbar-width:thin]"
 			>
@@ -120,7 +134,7 @@ export function RouteTabs({ tabs, defaultTab, param, label, children, className,
 						className={cn(
 							"text-muted-foreground hover:text-foreground relative -mb-px inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium whitespace-nowrap transition-colors",
 							"data-[state=active]:border-primary data-[state=active]:text-foreground",
-							"focus-visible:ring-ring/60 rounded-t-sm focus-visible:ring-2 focus-visible:outline-none",
+							"rounded-t-sm focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 						)}
 					>
 						{tab.label}
@@ -135,7 +149,7 @@ export function RouteTabs({ tabs, defaultTab, param, label, children, className,
 					{t("routeTabs.unknown", { tab: unknown, label: typeof shownLabel === "string" ? shownLabel : active })}
 				</p>
 			)}
-			<TabsPrimitive.Content value={active} className="focus-visible:ring-ring/40 min-w-0 rounded-sm outline-none focus-visible:ring-2">
+			<TabsPrimitive.Content value={active} className="focus-visible:ring-(--focus) min-w-0 rounded-sm outline-none focus-visible:ring-2">
 				{children(active)}
 			</TabsPrimitive.Content>
 		</TabsPrimitive.Root>
