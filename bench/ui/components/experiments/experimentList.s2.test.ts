@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anyRunning, deleteMany } from "@/components/experiments/experimentList";
+import { anyRunning, deleteMany, isTestExperiment } from "@/components/experiments/experimentList";
 import type { ExperimentStatus } from "@/lib/types/bench";
 
 const exp = (state: string) => ({ exp_id: state, state }) as unknown as ExperimentStatus;
@@ -18,5 +18,10 @@ describe("experiment list (X-76, M4-79)", () => {
 		expect(res.deleted).toEqual(["a"]);
 		expect(res.error).toBeInstanceOf(Error);
 		expect(seen).toEqual(["a", "b"]);
+	});
+	it("marks test comparisons by name or id (M1-18)", () => {
+		expect(isTestExperiment({ exp_id: "exp-1", name: "zz-test-compare" })).toBe(true);
+		expect(isTestExperiment({ exp_id: "zz_test 9", name: "" })).toBe(true);
+		expect(isTestExperiment({ exp_id: "exp-1", name: "Prompt v2 against v1" })).toBe(false);
 	});
 });

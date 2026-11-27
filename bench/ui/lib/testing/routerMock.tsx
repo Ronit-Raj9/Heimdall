@@ -40,6 +40,7 @@ export const routerMock = {
 		<span data-testid="navigate" data-to={hrefOf(to, undefined, search)} />
 	),
 	useNavigate: () => navigateSpy,
+	useBlocker: () => undefined,
 	useRouterState: ({ select }: { select: (state: typeof routerState) => unknown }) => select(routerState),
 	useParams: () => ({}),
 	useSearch: () => routerState.location.search,

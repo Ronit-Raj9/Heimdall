@@ -91,7 +91,7 @@ export function SettingsSection({
 			<div className="flex flex-wrap items-end justify-between gap-3">
 				<div className="flex max-w-2xl flex-col gap-1">
 					<h2 className="text-foreground text-[15px] font-semibold tracking-tight">{title}</h2>
-					{description && <p className="text-muted-foreground text-[13px] leading-relaxed text-pretty">{description}</p>}
+					{description && <p className="text-muted-foreground max-w-prose text-[13px] leading-relaxed text-pretty">{description}</p>}
 				</div>
 				{actions}
 			</div>

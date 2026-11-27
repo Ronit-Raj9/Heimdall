@@ -9,11 +9,13 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListCount, Pager, pageSlice } from "@/components/ui/pager";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShowTestsChip } from "@/components/ui/toolbar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ValueCell } from "@/components/valueCell";
 import { formatDateTime, sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
+import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
 import type { ExperimentState, ExperimentStatus } from "@/lib/types/bench";
@@ -25,6 +27,11 @@ import { useTranslation } from "react-i18next";
 const ALL = "__all";
 
 const STATES: readonly ExperimentState[] = ["running", "analyzing", "created", "done", "failed", "cancelled"];
+
+/** True for a comparison made by a test (its name or id starts with the zz-test prefix). Pure (M1-18). */
+export function isTestExperiment(e: Pick<ExperimentStatus, "exp_id" | "name">): boolean {
+	return isTestObject(e.name) || isTestObject(e.exp_id);
+}
 
 /** The filters of the list, as they sit in the URL. */
 export interface ExperimentFilters {
@@ -83,7 +90,13 @@ export function ExperimentList() {
 	const all = useMemo(() => list.data?.experiments ?? [], [list.data]);
 	const isRunning = anyRunning(all);
 	if (isRunning !== running) setRunning(isRunning);
-	const shown = useMemo(() => filterExperiments(all, filters), [all, filters]);
+	const [showTests, setShowTests] = useShowTests();
+	// Test comparisons (zz-test names) stay hidden unless asked for (M1-18).
+	const { shown: real, hidden: hiddenTests } = useMemo(
+		() => withoutTests(all, isTestExperiment, showTests),
+		[all, showTests],
+	);
+	const shown = useMemo(() => filterExperiments(real, filters), [real, filters]);
 	const slice = pageSlice(shown, filters.page ?? 1);
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const active = Boolean(filters.q || filters.state || filters.suite);
@@ -201,6 +214,7 @@ export function ExperimentList() {
 							{ts("experiments.deleteSelected", { count: selected.size })}
 						</Button>
 					)}
+					<ShowTestsChip count={hiddenTests} on={showTests} onChange={setShowTests} testId="experiment-list-show-tests" />
 					<ListCount shown={shown.length} total={all.length} testId="experiment-list-toolbar-count" />
 				</span>
 			</div>

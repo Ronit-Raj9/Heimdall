@@ -36,8 +36,14 @@ describe("first divergence panel", () => {
 		expect(html).toContain("Model turns");
 		expect(html).toContain("$0.25");
 		expect(html).toContain("not known");
-		expect(html).toContain("Final result, checked by the task&#x27;s tests: base Passed, cand Failed.");
+		expect(html).toContain("Final result, checked by the task&#x27;s tests: base Solved, cand Not solved.");
 		expect(html).toContain("This is the first difference we saw, not a proven cause.");
+	});
+
+	it("uses the outcome badge word for a timeout, not Failed (M4-62)", () => {
+		const html = renderToStaticMarkup(<DivergenceView data={{ ...base, outcomes: ["pass", "timeout"] }} />);
+		expect(html).toContain("base Solved, cand Ran out of time.");
+		expect(html).not.toContain("Failed");
 	});
 
 	it("says when the runs did the same steps", () => {
