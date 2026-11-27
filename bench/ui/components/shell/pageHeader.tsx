@@ -96,8 +96,8 @@ export function PageHeader({ title, subtitle, actions, meta, more, moreLabel, ta
 							const last = index === trail.length - 1;
 							// The chevron sits inside the item after the first, so it is only ever between two items.
 							return (
-								<li key={index} className="flex min-w-0 items-center gap-1">
-									{index > 0 && <ChevronRight aria-hidden="true" className="size-3 shrink-0 opacity-60" />}
+								<li key={index} className={cn("flex min-w-0 items-center gap-1", !last && "max-sm:hidden")}>
+									{index > 0 && <ChevronRight aria-hidden="true" className="size-3 shrink-0 opacity-60 max-sm:hidden" />}
 									<span className="min-w-0 truncate">
 										{crumb.to && !last ? (
 											<Link
