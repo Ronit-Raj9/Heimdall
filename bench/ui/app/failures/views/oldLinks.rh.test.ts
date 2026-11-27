@@ -25,6 +25,11 @@ const OLD_LINKS: readonly [string, (s: RouteSearch) => { to: string; search: Rou
 	["/why-agents-fail", whyAgentsFailRedirect, null, "agents"],
 	["/why-agents-fail", whyAgentsFailRedirect, "patterns", "agents"],
 	["/why-agents-fail", whyAgentsFailRedirect, "groups", "groups"],
+	["/why-agents-fail", whyAgentsFailRedirect, "agents", "agents"],
+	["/why-agents-fail", whyAgentsFailRedirect, "findings", "findings"],
+	["/why-agents-fail", whyAgentsFailRedirect, "tracked", "findings"],
+	["/why-agents-fail", whyAgentsFailRedirect, "production", "production"],
+	["/inbox", inboxRedirect, "tracked", "findings"],
 	["/clusters", clustersRedirect, null, "groups"],
 	["/triage", triageRedirect, null, "patterns"],
 ];
@@ -39,7 +44,4 @@ describe("old Failures links open the tab that shows what the old tab showed (Q-
 		expect(resolveTab(tabs, String(out.search.tab), "production")).toBe(want);
 	});
 
-	// u3Redirects.ts belongs to lane R0; these turn into checks once its fallbacks land (notes/RH.md).
-	it.todo("/inbox?tab=tracked opens findings (INBOX_TAB_MAP has no tracked)");
-	it.todo("/why-agents-fail?tab=findings|production|tracked opens that tab, not agents");
 });
