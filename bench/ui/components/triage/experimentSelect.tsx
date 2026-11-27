@@ -99,7 +99,7 @@ export function ExperimentSelect({ picker, value, onChange, showHidden, onShowHi
 	const listed = !value || options.some((o) => o.id === value);
 	const current = value ? picker.all.find((o) => o.id === value) : undefined;
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className="flex w-full max-w-xl min-w-0 flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{t("triage.picker.label")}
 			</label>

@@ -42,7 +42,7 @@ export function InboxPullButton({ check }: { check?: PullCheck }) {
 					e.preventDefault();
 					revealAnchor("inbox-source-setup");
 				}}
-				className="text-primary text-xs font-medium underline underline-offset-2"
+				className="text-primary text-xs font-medium underline-offset-2 hover:underline"
 				data-testid="inbox-pull-setup-link"
 			>
 				{t("inbox.pull.needsSetup")}
