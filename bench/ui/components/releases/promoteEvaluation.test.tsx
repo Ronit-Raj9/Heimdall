@@ -12,11 +12,17 @@ vi.mock("@/lib/store/apis/evalReleaseApi", () => ({
 	useScheduleEvaluationMutation: () => mutation(),
 }));
 
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
+	useListReleasesQuery: () => ({ data: { releases: [] } }),
+}));
+
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useGetEvaluationQuery: () => ({ data: { result: { arms: [], cost_usd: 0.4, at: "" } } }),
 }));
 
+const { recordedLive } = await import("./promoteEvaluation");
 const { GateResultCard, PromoteEvaluation, RepeatEvaluation, onlyLiveVersion, parseRepeatLimit, previewTitle, repeatAsk } = await import("./promoteEvaluation");
 const { releaseTitle } = await import("./releaseEvidence");
 const { repeatCost } = await import("@/app/schedules/views/repeatCost");
@@ -233,5 +239,15 @@ describe("PromoteEvaluation says why there is no button (J7.promote)", () => {
 		expect(html).not.toContain('data-testid="evaluation-promote-open"');
 		expect(html).toContain("codex v4 is already the live version");
 		expect(html).not.toContain("Only members of the organization can promote.");
+	});
+});
+describe("recordedLive (one live rule)", () => {
+	const rel = (over: Record<string, unknown>) => ({ id: "r1", agent_id: "codex", version: 2, created_at: "2026-11-21T10:00:00Z", approver: "ana", ...over }) as never;
+	it("names the newer release record only when the server read a saved config", () => {
+		const live = { agent: "codex", version: 1, released_at: "2026-11-01T00:00:00Z", source: "saved_config" };
+		expect(recordedLive(live, "codex", [rel({})])).toEqual({ agent: "codex", version: 2 });
+		expect(recordedLive({ ...live, source: undefined }, "codex", [rel({})])).toBeNull();
+		expect(recordedLive({ ...live, released_at: "2026-11-25T00:00:00Z" }, "codex", [rel({})])).toBeNull();
+		expect(recordedLive(live, "codex", [rel({ agent_id: "other" })])).toBeNull();
 	});
 });

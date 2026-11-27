@@ -9,7 +9,11 @@ import {
 	useScheduleEvaluationMutation,
 	type EvaluationCadence,
 	type EvaluationReleasePreview,
+	type LiveVersion,
 } from "@/lib/store/apis/evalReleaseApi";
+import { liveReleases, type ReleaseAgent } from "@/components/govern/releaseAgent";
+import { useListReleasesQuery } from "@/lib/store/apis/benchApi";
+import type { ReleaseRecord } from "@/lib/types/bench";
 import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { browserZone } from "@/lib/utils/cron";
@@ -140,6 +144,24 @@ export function onlyLiveVersion(p: Pick<EvaluationReleasePreview, "problem" | "v
 }
 
 /**
+ * The release log's record to name as live instead of the server's answer (RI, one live rule): only
+ * when the server read the live version from a saved config (`source: "saved_config"`) and the log
+ * holds a newer release of the same agent, so this page and Releases name the same thing. Pure.
+ */
+export function recordedLive(
+	live: LiveVersion & { source?: string },
+	agent: string,
+	releases: readonly ReleaseRecord[],
+): ReleaseAgent | null {
+	if (live.source !== "saved_config") return null;
+	const name = live.agent || agent;
+	const hit = liveReleases(releases).find((x) => x.agent.agent === name);
+	if (!hit) return null;
+	if (live.released_at && (hit.release.created_at ?? "") <= live.released_at) return null;
+	return hit.agent;
+}
+
+/**
  * "Promote this version" on a finished evaluation's report card: what the release would record
  * (agent version, the live version it replaces, before and after numbers, the gate), what blocks it,
  * and the approve form. One release covers every finished benchmark of the evaluation.
@@ -156,8 +178,10 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 	const [note, setNote] = useState("");
 	const [override, setOverride] = useState(false);
 	const [reason, setReason] = useState("");
+	const releases = useListReleasesQuery();
 	const p = preview.data;
 	if (!p || preview.isError) return null;
+	const recorded = recordedLive(p.live, p.agent, releases.data?.releases ?? []);
 	const title = p.agent ? previewTitle(p, t as never) : t("promote.title");
 	const blocked = p.blocked.length > 0;
 	const canWrite = canUse(session, "member");
@@ -175,7 +199,9 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 							{title}
 						</h2>
 						<p className="text-muted-foreground text-xs">
-							{p.live.version
+							{recorded
+								? t("promote.liveNow", { name: versionName(recorded.agent, recorded.version) })
+								: p.live.version
 								? t("promote.liveNow", { name: versionName(p.agent, p.live.version) })
 								: t("promote.nothingLive", { agent: p.agent || "-" })}
 						</p>
