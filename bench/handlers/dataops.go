@@ -12,8 +12,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/auth"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -50,6 +53,18 @@ type RetentionInfo struct {
 	// member never gets the raw email, an org admin does (fix wave 3, L3).
 	// It is set on answers only, never stored.
 	UpdatedByName string `json:"updated_by_name,omitempty"`
+	// Preview is set only on GET ?preview_days=N (admin): what a retention
+	// of N days would delete at the next sweep. Never stored.
+	Preview *RetentionPreview `json:"preview,omitempty"`
+}
+
+// RetentionPreview counts the comparisons (and their runs) created more
+// than Days days ago: an upper bound, since the sweeper skips one still
+// running.
+type RetentionPreview struct {
+	Days        int `json:"days"`
+	Experiments int `json:"experiments"`
+	Runs        int `json:"runs"`
 }
 
 // retentionView is r as the caller may see it: the editor named, the email
@@ -218,7 +233,40 @@ func (h *dataOpsHandler) getRetention(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "retention", err)
 		return
 	}
+	if raw := strings.TrimSpace(string(ctx.QueryArgs().Peek("preview_days"))); raw != "" {
+		days, err := strconv.Atoi(raw)
+		if err != nil || days < RetentionMinDays || days > RetentionMaxDays {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest,
+				fmt.Sprintf("preview_days: %d to %d", RetentionMinDays, RetentionMaxDays))
+			return
+		}
+		if !isLocalCaller(ctx) && !auth.PrincipalFrom(ctx).Can(auth.RoleAdmin) {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "only an org owner or admin may preview a retention change")
+			return
+		}
+		if h.env.Services.Index == nil {
+			sendUnavailable(ctx, h.env.Mode, "the run index")
+			return
+		}
+		r.Preview = retentionPreview(h.env.Services.Index, days, time.Now())
+	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, retentionView(ctx, r))
+}
+
+// retentionPreview counts what a retention of days would delete at now, by
+// the sweeper's rule: a comparison whose plan was frozen before the cutoff.
+func retentionPreview(index ReadIndex, days int, now time.Time) *RetentionPreview {
+	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
+	p := &RetentionPreview{Days: days}
+	for _, id := range index.Experiments() {
+		m, ok := index.Manifest(id)
+		if !ok || m == nil || m.CreatedAt.IsZero() || !m.CreatedAt.Before(cutoff) {
+			continue
+		}
+		p.Experiments++
+		p.Runs += len(index.Runs(id))
+	}
+	return p
 }
 
 func (h *dataOpsHandler) putRetention(ctx *fasthttp.RequestCtx) {

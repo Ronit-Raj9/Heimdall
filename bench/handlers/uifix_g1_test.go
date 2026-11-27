@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/maximhq/bifrost/bench/evalstore"
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/sharelinks"
 	"github.com/valyala/fasthttp"
 	"strings"
@@ -139,5 +140,44 @@ func TestShareListIsPerOrganization(t *testing.T) {
 	_ = json.Unmarshal(shareCall(rb, "GET", APIPrefix+"/shares", nil).Body(), &b)
 	if len(a.Shares) != 1 || len(b.Shares) != 0 {
 		t.Fatalf("org a %d links, org b %d", len(a.Shares), len(b.Shares))
+	}
+}
+
+func TestRetentionPreview(t *testing.T) {
+	idx := testIndex()
+	now := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
+	p := retentionPreview(idx, RetentionMinDays, now)
+	if p.Days != RetentionMinDays || p.Experiments != 1 || p.Runs != len(idx.Runs(testExp)) {
+		t.Fatalf("preview %+v", p)
+	}
+	if p := retentionPreview(idx, RetentionMaxDays, time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)); p.Experiments != 0 {
+		t.Fatalf("nothing is that old: %+v", p)
+	}
+	h := &dataOpsHandler{env: OrgEnv{Cfg: &lib.Config{Root: t.TempDir()}, Mode: testMode, Services: Services{Index: idx}}}
+	call := func(ctx *fasthttp.RequestCtx, q string) *fasthttp.RequestCtx {
+		ctx.Request.SetRequestURI(APIPrefix + "/data/retention" + q)
+		h.getRetention(ctx)
+		return ctx
+	}
+	if c := call(asCaller(actorMember), "?preview_days=30"); c.Response.StatusCode() != 403 {
+		t.Fatalf("member preview %d", c.Response.StatusCode())
+	}
+	if c := call(asCaller(actorAdmin), "?preview_days=0"); c.Response.StatusCode() != 400 {
+		t.Fatalf("too short %d", c.Response.StatusCode())
+	}
+	c := call(asCaller(actorAdmin), "?preview_days=30")
+	if c.Response.StatusCode() != 200 || !strings.Contains(string(c.Response.Body()), `"preview":{"days":30`) {
+		t.Fatalf("admin preview %d %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	if c := call(asCaller(actorAdmin), ""); strings.Contains(string(c.Response.Body()), "preview") {
+		t.Fatalf("no preview without the parameter: %s", c.Response.Body())
+	}
+	// Another organization's server env has its own index: nothing of org a.
+	other := &dataOpsHandler{env: OrgEnv{Cfg: &lib.Config{Root: t.TempDir()}, Mode: testMode, Services: Services{Index: &fakeIndex{}}}}
+	ctx := asCaller(actorAdmin)
+	ctx.Request.SetRequestURI(APIPrefix + "/data/retention?preview_days=30")
+	other.getRetention(ctx)
+	if !strings.Contains(string(ctx.Response.Body()), `"experiments":0`) {
+		t.Fatalf("other org %s", ctx.Response.Body())
 	}
 }
