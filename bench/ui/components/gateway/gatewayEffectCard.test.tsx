@@ -7,19 +7,19 @@ import { GatewayEffectCard, GatewayEffectView, detailRows, effectOf } from "./ga
 
 const state = vi.hoisted(() => ({ effect: undefined as unknown }));
 
-vi.mock("@/lib/store/apis/gatewayApi", () => ({
+vi.mock("@/lib/store/apis/gatewayApi", async (orig) => ({
+	effectOf: ((await orig()) as { effectOf: unknown }).effectOf,
 	useGetBifrostSettingQuery: () => ({ data: undefined }),
 	useGetGatewayReportCardQuery: () => ({ data: undefined }),
+	useGetGatewayEffectOptionalQuery: () => state.effect,
 }));
-vi.mock("@/lib/store/apis/benchApi", () => ({
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...((await orig()) as object),
 	useGetExperimentQuery: () => ({ data: undefined }),
 }));
 vi.mock("@/app/gateway/views/featureTestDialog", () => ({
 	FeatureTestDialog: () => null,
 	suiteOption: (s: { id: string; version?: string }) => (s.version ? `${s.id}@${s.version}` : s.id),
-}));
-vi.mock("./gatewayEffectQuery", () => ({
-	useGetGatewayEffectOptionalQuery: () => state.effect,
 }));
 
 const effect: GwEffect = {
@@ -90,7 +90,7 @@ describe("GatewayEffectCard", () => {
 		expect(html).toContain("2 entries");
 		expect(effectOf({ effect: null })).toBeNull();
 		expect(effectOf(effect)).toBe(effect);
-		state.effect = okQuery({ effect: null });
+		state.effect = okQuery(null);
 		expect(render(<GatewayEffectCard expId="e1" />)).toBe("");
 	});
 

@@ -2,8 +2,7 @@ import { Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { FeatureTestDialog, suiteOption } from "@/app/gateway/views/featureTestDialog";
 import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
-import { useGetBifrostSettingQuery, useGetGatewayReportCardQuery } from "@/lib/store/apis/gatewayApi";
-import { useGetGatewayEffectOptionalQuery } from "./gatewayEffectQuery";
+import { useGetBifrostSettingQuery, useGetGatewayEffectOptionalQuery, useGetGatewayReportCardQuery } from "@/lib/store/apis/gatewayApi";
 import type { GwArmResult, GwBifrostSettingAnswer, GwEffect, GwResult } from "@/lib/types/gateway";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -182,17 +181,13 @@ export function GatewayEffectView({
 	);
 }
 
-/** The effect in an answer: the effect itself, or null for the server's {"effect": null} (the comparison used no gateway). Pure. */
-export function effectOf(data: unknown): GwEffect | null {
-	if (!data || typeof data !== "object") return null;
-	if ("effect" in data && !("state" in data)) return ((data as { effect: GwEffect | null }).effect ?? null) as GwEffect | null;
-	return data as GwEffect;
-}
+/** The effect in an answer, null for {"effect": null}: the shared reader beside the query. */
+export { effectOf } from "@/lib/store/apis/gatewayApi";
 
 /** Experiment page: the feature test's Effect. Renders nothing when the comparison is not a feature test (404 or {"effect": null}) or on any error. */
 export function GatewayEffectCard({ expId }: { expId: string }) {
 	const q = useGetGatewayEffectOptionalQuery(expId);
-	const effect = effectOf(q.data);
+	const effect = q.data ?? null;
 	const setting = useGetBifrostSettingQuery(expId, { skip: !effect });
 	const [again, setAgain] = useState(false);
 	const unknown = effect?.state === "unknown";
