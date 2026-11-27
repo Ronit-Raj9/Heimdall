@@ -1,5 +1,15 @@
 {
 	"details": "Details",
 	"clearFilters": "Clear",
-	"loading": "Loading"
+	"loading": "Loading",
+	"list": {
+		"count": "{{shown}} of {{total}}",
+		"hidden": "({{count}} hidden)"
+	},
+	"pager": {
+		"label": "Pages",
+		"page": "Page {{page}} of {{pageCount}}",
+		"prev": "Previous",
+		"next": "Next"
+	}
 }

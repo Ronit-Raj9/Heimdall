@@ -359,6 +359,8 @@ export const benchApi = createApi({
 			providesTags: ["BenchHealth"],
 		}),
 		getCatalog: builder.query<CatalogResponse, void>({
+			// The catalog barely changes; keep it an hour so tab switches do not refetch it (M4-6).
+			keepUnusedDataFor: 3600,
 			query: () => "/catalog",
 			transformResponse: (raw: unknown) => normalizeCatalog(raw),
 			providesTags: ["BenchCatalog"],
@@ -393,6 +395,8 @@ export const benchApi = createApi({
 		}),
 		// A string asks for the default grade source; an object may name one (original, a regrade id, reviewed).
 		getVerdict: builder.query<VerdictResponse, string | VerdictArgs>({
+			// Kept 10 minutes so switching comparison tabs does not refetch (M4-6).
+			keepUnusedDataFor: 600,
 			query: (arg) => {
 				const { expId, gradeSource } = verdictArgs(arg);
 				const url = `/experiments/${id(expId)}/verdict`;
@@ -419,6 +423,8 @@ export const benchApi = createApi({
 			providesTags: (_result, _error, { expId }) => [{ type: "BenchMatrix", id: expId }],
 		}),
 		getGrid: builder.query<GridResponse, string>({
+			// Kept 10 minutes so switching comparison tabs does not refetch (M4-6).
+			keepUnusedDataFor: 600,
 			query: (expId) => `/experiments/${id(expId)}/grid`,
 			providesTags: (_result, _error, expId) => [{ type: "BenchGrid", id: expId }],
 		}),
@@ -461,6 +467,8 @@ export const benchApi = createApi({
 		}),
 		// Failure clusters across experiments; one cluster and its runs. Empty params take the server default.
 		getClusters: builder.query<ClusterListResponse, ClusterParams | void>({
+			// Slow to compute on the server (M1-61): keep 5 minutes so a revisit is instant.
+			keepUnusedDataFor: 300,
 			query: (params) => clusterRequest("/clusters", params ?? {}),
 			providesTags: [{ type: "BenchClusters", id: "LIST" }],
 		}),

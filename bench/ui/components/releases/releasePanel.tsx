@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
 import { getBenchErrorMessage, useCreateReleaseMutation, useGetVerdictQuery, useListExperimentsQuery } from "@/lib/store";
+import { useSession } from "@/lib/session/sessionContext";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReleaseForm } from "./releaseForm";
@@ -31,6 +32,10 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 	const verdict = useGetVerdictQuery(expId ?? "", { skip: !expId });
 	const [createRelease, created] = useCreateReleaseMutation();
 	const data = verdict.data;
+	// The approver defaults to the signed-in person and survives switching the comparison (M7-81).
+	const session = useSession();
+	const [approver, setApprover] = useState<string | undefined>(undefined);
+	const defaultApprover = approver ?? session.user?.name ?? session.user?.email ?? "";
 
 	return (
 		<Card className="gap-4 py-4 shadow-none" data-testid="release-panel">
@@ -40,7 +45,7 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 			</CardHeader>
 			<CardContent className="px-4">
 				{list.isError && (
-					<p role="alert" className="text-chart-error-ink mb-3 text-sm" data-testid="release-experiments-error">
+					<p role="alert" className="text-danger-ink mb-3 text-sm" data-testid="release-experiments-error">
 						{t("releases.panel.experimentsError", { error: getBenchErrorMessage(list.error) })}
 					</p>
 				)}
@@ -76,7 +81,11 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 					submitting={created.isLoading}
 					submitError={created.isError ? getBenchErrorMessage(created.error) : undefined}
 					created={created.data}
-					onSubmit={(request) => void createRelease(request)}
+					initialValues={defaultApprover ? { approver: defaultApprover } : undefined}
+					onSubmit={(request) => {
+						setApprover(request.approver);
+						void createRelease(request);
+					}}
 				/>
 			</CardContent>
 		</Card>

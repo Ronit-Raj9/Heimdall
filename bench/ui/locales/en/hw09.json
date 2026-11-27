@@ -25,7 +25,7 @@
 		"setup": "Setup",
 		"solved": "Solved",
 		"pVsLeader": "p vs leader",
-		"pHint": "Holm-adjusted sign-flip p-value against the leader, over the tasks both ran.",
+		"pHint": "The chance that the gap to the leader is luck, over the tasks both ran. Lower means the gap is real.",
 		"group": "Group",
 		"top": "Top group",
 		"leader": "Leader",

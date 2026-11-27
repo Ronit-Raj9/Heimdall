@@ -1,3 +1,4 @@
+import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
 import "@/components/platform/fw23I18n";
 import { RoleBadge } from "@/components/platform/badges";
 import { CreateOrgDialog } from "@/components/platform/createOrgDialog";
@@ -35,6 +36,9 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 	const [creating, setCreating] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
+	// Focus moves into the menu on open; arrows, Home and End move between items (M1-39).
+	const menuRef = useRef<HTMLDivElement>(null);
+	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
 
 	useEffect(() => {
@@ -101,7 +105,7 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 				aria-expanded={open}
 				aria-controls={open ? menuId : undefined}
 				aria-label={t("header.switchOrg")}
-				className="hover:bg-accent focus-visible:ring-ring/60 flex h-8 max-w-64 min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 focus-visible:ring-2 focus-visible:outline-none"
+				className="hover:bg-accent focus-visible:ring-(--focus) flex h-8 max-w-64 min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 focus-visible:ring-2 focus-visible:outline-none"
 				data-testid="org-switcher"
 			>
 				{square}
@@ -115,6 +119,8 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 			{session.role && <RoleBadge role={session.role} className={cn("hidden lg:inline-flex")} />}
 			{open && (
 				<div
+					ref={menuRef}
+					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={tf("orgs.menu")}
