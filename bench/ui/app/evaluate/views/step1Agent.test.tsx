@@ -49,7 +49,7 @@ describe("Step1Agent", () => {
 		const version = html.indexOf('data-testid="evaluate-version"');
 		expect(bar).toBeGreaterThan(-1);
 		expect(version).toBeGreaterThan(bar);
-		expect(version).toBeLessThan(html.indexOf('data-testid="evaluate-agent-zz-test-loop"'));
+		expect(version).toBeLessThan(html.indexOf('data-testid="evaluate-agents-own-option-zz-test-loop"'));
 		expect(version).toBeLessThan(html.indexOf('data-testid="evaluate-mcp-server"'));
 		expect(html).toContain("zz-test-loop selected");
 		expect(html).toContain("Version of zz-test-loop");
@@ -64,8 +64,8 @@ describe("Step1Agent", () => {
 
 	it("hides test agents without an unasked note (N97, M3-49)", () => {
 		const html = render({});
-		expect(html).not.toContain('data-testid="evaluate-agent-storm"');
+		expect(html).not.toContain('data-testid="evaluate-agents-own-option-storm"');
 		expect(html).not.toContain("Test agents such as oracle and noop are not listed");
-		expect(html).toContain('role="radiogroup"');
+		expect(html).toContain('type="radio"');
 	});
 });

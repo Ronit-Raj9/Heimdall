@@ -50,13 +50,12 @@ export function ExampleRunLink({ example }: { example: FailureExample }) {
 /** One version's or arm's patterns: how often each showed up, and example runs. */
 export function PatternList({ group, testId }: { group: FailurePatternGroup; testId?: string }) {
 	const { t } = useTranslation("agentFirst");
-	const { t: tr } = useTranslation("reportCard");
 	const seen = seenPatterns(group);
 	if (seen.length === 0) {
 		// "No pattern" over a failed run would contradict the failures listed below it (M3-6).
 		return (
 			<p className="text-muted-foreground text-sm" data-testid={testId ? `${testId}-none` : undefined}>
-				{(group.failed ?? 0) > 0 ? tr("failures.noRepeated", { count: group.failed }) : t("failures.noPatterns", { count: group.runs })}
+				{(group.failed ?? 0) > 0 ? t("failures.noRepeated", { count: group.failed }) : t("failures.noPatterns", { count: group.runs })}
 			</p>
 		);
 	}

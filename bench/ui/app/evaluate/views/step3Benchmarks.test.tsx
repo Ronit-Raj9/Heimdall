@@ -15,6 +15,7 @@ import {
 	keepRunnable,
 	mergeArmCompatibility,
 	otherArmAgents,
+	ownNotReady,
 	packSelection,
 } from "./step3Benchmarks";
 import i18n from "@/lib/i18n";
@@ -72,6 +73,18 @@ const render = (selected: string[] = [], pack?: string) =>
 		<Step3BenchmarksView suites={suites} packs={packs} compatibility={compat} selected={selected} pack={pack} onChange={() => {}} />,
 	);
 const block = (html: string, testId: string) => html.match(new RegExp(`data-testid="${testId}"[\\s\\S]*?</label>`))?.[0] ?? "";
+
+describe("ownNotReady (M3-37)", () => {
+	it("lists the org's own benchmarks with no ready task, never library packs", () => {
+		const list = [
+			{ id: "mine-new", admitted_count: 0, task_count: 3 },
+			{ id: "mine-ready", admitted_count: 2, task_count: 3 },
+			{ id: "lib", admitted_count: 0, task_count: 5, builtin: true },
+			{ id: "pack", admitted_count: 0, task_count: 5, source: "library" as const },
+		];
+		expect(ownNotReady(list).map((s) => s.id)).toEqual(["mine-new"]);
+	});
+});
 
 describe("benchmark grouping", () => {
 	it("maps benchmarks to capability groups", () => {

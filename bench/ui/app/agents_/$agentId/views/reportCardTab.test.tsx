@@ -66,6 +66,10 @@ describe("agent report card tab names its evaluation (N206)", () => {
 		expect(html).toContain('data-testid="agent-report-card-evaluation"');
 		expect(html).toMatch(/<option value="ev_mid">codex first look/);
 		expect(html).toMatch(/<option value="ev_old">ev_old/);
+		// One "Showing: ... Change" line holds the picks (M2-34).
+		expect(html).toContain('data-testid="agent-report-card-picks-summary"');
+		expect(html).toMatch(/agent-report-card-picks-summary">codex: two models, [^<]+ \(5 runs\)</);
+		expect(html).toContain('data-testid="agent-report-card-picks-change"');
 	});
 	it("reads ?evaluation= into the request and the select, and writes a pick back", () => {
 		state.card = card({ evaluation_id: "ev_mid", evaluation_name: "codex first look" });

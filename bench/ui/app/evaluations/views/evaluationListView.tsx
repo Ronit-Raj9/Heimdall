@@ -18,7 +18,6 @@ import { useConfirm, type DestructiveConfirmOptions } from "@/components/platfor
 import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
-	EVALUATION_POLL_MS,
 	EVALUATION_SORTS,
 	EVALUATION_STATUS_FILTERS,
 	FAILURE_TEST_MODE,
@@ -50,7 +49,7 @@ export default function EvaluationListView() {
 	const filters = parseEvaluationFilters(search);
 	const anyActive = (list.data ?? []).some((e) => isActiveStatus(e.status));
 	// A second subscription with polling only while something is still running.
-	useListEvaluationsQuery(undefined, { pollingInterval: anyActive ? EVALUATION_POLL_MS : 0, skip: !anyActive });
+	useListEvaluationsQuery(undefined, { pollingInterval: anyActive ? 5000 : 0, skipPollingIfUnfocused: true, skip: !anyActive });
 	// The project's own test evaluations are hidden unless ?tests=1 (M1-18).
 	const [showTests, setShowTests] = useShowTests();
 	const { shown, hidden } = withoutTests(list.data ?? [], isTestEvaluation, showTests);

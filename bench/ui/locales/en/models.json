@@ -6,7 +6,7 @@
 	"editTitle": "Edit key",
 	"provider": "Provider",
 	"label": "Label",
-	"labelPlaceholder": "e.g. team OpenAI key",
+	"labelPlaceholder": "e.g. team {{provider}} key",
 	"value": "API key",
 	"valueKeep": "Leave empty to keep the stored key",
 	"valueKeepHint": "Leave empty to keep the current key",

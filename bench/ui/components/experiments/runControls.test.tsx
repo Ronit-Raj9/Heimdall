@@ -77,6 +77,13 @@ describe("RunControlsPanel", () => {
 		expect(html).toContain("outage");
 		expect(html).not.toContain("rerun-failures-button");
 	});
+	it("holds the page's Which grades select when given one (M4-14)", () => {
+		api.controls = controls();
+		const html = render(<RunControlsPanel expId="e_1" state="done" grades={<select data-testid="g" />} />, hostedSession("member"));
+		expect(html).toContain('data-testid="run-controls-grades"');
+		expect(html).toContain("Which grades");
+		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).not.toContain("run-controls-grades");
+	});
 	it("offers Rerun failures once finished, never on an exploratory rerun", () => {
 		api.controls = controls();
 		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).toContain("rerun-failures-button");
@@ -123,6 +130,8 @@ describe("EvaluationRunActions", () => {
 		const m = hostedSession("member");
 		expect(render(<EvaluationRunActions evaluation={ev("running")} />, m)).toContain('data-testid="evaluation-pause"');
 		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toContain('data-testid="evaluation-unpause"');
+		// Resume starts paid runs again, so it is the shared paid button (M4-41).
+		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toMatch(/data-testid="evaluation-unpause"[^>]*data-paid="true"|data-paid="true"[^>]*data-testid="evaluation-unpause"/);
 		expect(render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, m)).toContain(
 			'data-testid="evaluation-rerun-failures"',
 		);

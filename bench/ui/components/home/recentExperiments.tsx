@@ -8,7 +8,8 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { TrackBadge } from "./homeBits";
-import { humanExperimentName, type ExperimentListItem } from "./home.utils";
+import { humanExperimentName as experimentName } from "@/components/experiments/experiments.utils";
+import type { ExperimentListItem } from "./home.utils";
 import { isTestObject } from "@/lib/testObjects";
 
 /** The newest experiments that are not running: suite icon, name, verdict and when it started. */
@@ -44,6 +45,7 @@ export function RecentExperiments({
 
 function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite: string | undefined) => string | undefined }) {
 	const { t } = useTranslation("home");
+	const { t: tx } = useTranslation("experimentsUx");
 	const locale = getLocale();
 	// The list may already carry the suite and decision; otherwise the verdict route has both.
 	const needsVerdict = exp.state === "done" && Boolean(exp.analysis_id) && (exp.decision === undefined || exp.suite === undefined);
@@ -64,7 +66,8 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 					{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
 					<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
-						{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}
+						{/* The same name as the comparison page header: the saved title, never a title-cased id (M4-115). */}
+						{experimentName(exp, (k, o) => String(tx(k as never, (o ?? {}) as never)))}
 					</span>
 					<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1" data-testid={`home-recent-suite-${exp.exp_id}`}>
 						{suite ? suiteIdOf(suite) : "-"}

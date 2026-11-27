@@ -1,3 +1,4 @@
+import { KeyMissingNote } from "@/components/models/keyMissingNote";
 import {
 	familyOf,
 	groupProviders,
@@ -9,7 +10,6 @@ import {
 } from "@/components/models/providerCatalog";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelProviderInfo, ModelPurpose } from "@/lib/types/models";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/reportcard/reportCardI18n";
@@ -396,15 +396,15 @@ export function ModelPicker({
 					</span>
 				)}
 				{showAddKeyLink && !keyed.has(provider) && loaded && (
-					// Settings, Model keys, with the provider set and a way back to this page (M8-12).
-					<Link
-						to={"/settings" as never}
-						search={{ tab: "keys", add: provider, return: typeof window === "undefined" ? undefined : window.location.pathname + window.location.search } as never}
-						className="text-primary text-xs underline"
-						data-testid={`${tid}-add-key`}
-					>
-						{providerKeys.length === 0 ? t("picker.noKey") : t("picker.keyInvalidLong")}: {t("picker.addKey")}
-					</Link>
+					// The shared note: Settings, Model keys, with the provider set and a way back to this page (M8-12).
+					<span data-testid={`${tid}-add-key`}>
+						<KeyMissingNote
+							provider={provider}
+							providerName={providerName(provider, catalog)}
+							returnTo={typeof window === "undefined" ? undefined : window.location.pathname + window.location.search}
+							className="flex flex-wrap items-center gap-2 text-xs"
+						/>
+					</span>
 				)}
 			</div>
 			{query.trim() !== "" &&

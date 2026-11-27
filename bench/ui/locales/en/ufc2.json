@@ -1,0 +1,25 @@
+{
+	"resume": {
+		"confirm": "Resuming starts the runs that were waiting. They run on your model key and spend money.",
+		"done": "Resumed. New runs start now."
+	},
+	"picks": {
+		"runs_one": "{{count}} run",
+		"runs_other": "{{count}} runs"
+	},
+	"report": {
+		"moreSections": "More sections",
+		"moreSectionsCount_one": "{{count}} section",
+		"moreSectionsCount_other": "{{count}} sections"
+	},
+	"step3": {
+		"ownTitle": "Your benchmarks that are not ready",
+		"notReady_one": "0 of {{count}} task ready:",
+		"notReady_other": "0 of {{count}} tasks ready:",
+		"noneReady": "No task is ready yet:",
+		"runCheck": "run the readiness check"
+	},
+	"grades": {
+		"title": "Which grades"
+	}
+}

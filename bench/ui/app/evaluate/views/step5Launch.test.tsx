@@ -162,9 +162,10 @@ describe("Step5Launch", () => {
 		});
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain("this organization has no working openai key");
-		expect(tagOf(html, "step5-error-link")).toContain("/settings?tab=keys");
-		expect(tagOf(html, "step5-error-link")).toContain("return=");
-		expect(html).toMatch(/Add a (model key|key for )/);
+		// The shared KeyMissingNote (lane 8a) says it at this step, with a link back here (M8-12).
+		expect(html).toContain('data-testid="step5-error-link"');
+		expect(html).toContain('data-testid="key-missing-note"');
+		expect(html).toContain("Add a OpenAI key");
 	});
 });
 
