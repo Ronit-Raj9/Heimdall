@@ -20,7 +20,9 @@
 		"showOff": "Show turned off and expired ({{count}})",
 		"hideOff": "Hide turned off and expired",
 		"reportCard": "Report card",
-		"neverExpiresLower": "never expires"
+		"neverExpiresLower": "never expires",
+		"cancel": "Cancel",
+		"revokeFailed": "Could not turn the link off."
 	},
 	"shared": {
 		"actions": {

@@ -7,7 +7,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 const ROLE_CLASS: Record<Role, string> = {
-	owner: "border-primary/40 bg-primary/10 text-primary",
+	// Neutral, not the primary button colour (X-61); the weight tells it apart.
+	owner: "border-border bg-muted text-foreground font-semibold",
 	admin: "border-chart-cat-2/45 bg-chart-cat-2/10 text-foreground",
 	member: "border-border bg-secondary text-secondary-foreground",
 	viewer: "border-border text-muted-foreground",

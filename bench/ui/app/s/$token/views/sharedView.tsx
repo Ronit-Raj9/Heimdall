@@ -159,7 +159,7 @@ function EvaluationPart({
 	const { t } = useTranslation("share");
 	const actions =
 		exports.length > 0 ? (
-			<div className="flex flex-wrap gap-2" data-testid="shared-exports">
+			<div className="flex flex-wrap gap-2 print:hidden" data-testid="shared-exports">
 				{exports.includes("html") && (
 					<Button asChild variant="outline" size="sm">
 						<a href={sharedExportUrl(token, "html")} download>
@@ -234,7 +234,7 @@ function VerdictPart({ verdict }: { verdict: VerdictPayload | null }) {
 			<h2 className="text-2xl font-semibold tracking-tight">{action}</h2>
 			{/* The result card: each setup's score with how many runs it rests on (M8-68). */}
 			{arms.length > 0 && (
-				<div className="grid gap-3 sm:grid-cols-2" data-testid="shared-verdict-scores">
+				<div className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid" data-testid="shared-verdict-scores">
 					{arms.map((arm) => {
 						const r = verdict.naive[arm];
 						const score = naiveScore(r);

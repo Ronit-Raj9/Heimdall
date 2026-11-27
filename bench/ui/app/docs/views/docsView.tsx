@@ -2,6 +2,7 @@ import "@/components/share/uf8bI18n";
 import { hostedDocSource, Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
+import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { useSession } from "@/lib/session/sessionContext";
@@ -226,9 +227,9 @@ export default function DocsView() {
 						) : doc.data && source ? (
 							<>
 								{source.replaced > 0 && (
-									<p className="text-muted-foreground mb-4 rounded-md border px-3 py-2 text-xs" data-testid="docs-local-note">
+									<Alert tone="info" className="mb-4" testId="docs-local-note">
 										{t("docs.localAddressNote")}
-									</p>
+									</Alert>
 								)}
 								<Markdown source={source.text} onDocLink={open} docTitles={titles} testId="doc-body" />
 							</>
