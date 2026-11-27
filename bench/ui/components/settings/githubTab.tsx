@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import "./uf8aI18n";
 import { SettingsSection } from "./settingsBits";
 import "./w4m8I18n";
+import "./ufvp9I18n";
 
 /** The base branch choices: the picked base first (the repository's default branch may be missing from the loaded refs), then each branch once. */
 export function branchItems(base: string, branches: readonly { name: string }[]): string[] {
@@ -69,6 +70,10 @@ export function GithubTab() {
 	const [disconnect, disconnectState] = useDisconnectGithubMutation();
 	const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
 	const [picked, setPicked] = useState<GithubRepo | null>(null);
+	const { t: tp } = useTranslation("ufvp9");
+	// Same query as the repository list (shared cache): a rejected token means the link is broken,
+	// so the status line says "needs reconnect" instead of "Connected as".
+	const firstRepos = useListGithubReposQuery(1, { skip: !(status.data?.connected && isMember) });
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -155,6 +160,11 @@ export function GithubTab() {
 					<EmptyNote testId="github-not-configured">
 						{t("notConfigured")} {st.hint}
 					</EmptyNote>
+				) : st.connected && firstRepos.isError ? (
+					<p className="text-destructive flex items-center gap-2 text-sm" data-testid="github-needs-reconnect">
+						<Github className="size-4" aria-hidden="true" />
+						{tp("github.needsReconnect", { login: st.login })}
+					</p>
 				) : st.connected ? (
 					<p className="text-foreground flex items-center gap-2 text-sm" data-testid="github-connected">
 						<Github className="size-4" aria-hidden="true" />

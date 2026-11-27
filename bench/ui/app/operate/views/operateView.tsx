@@ -502,7 +502,7 @@ export default function OperateView() {
 	// Q-54: inside Settings the frame already pads the page; a second padding shifted the heading 16 px.
 	const embedded = useEmbedded();
 	return (
-		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
+		<section className={cn(pageWidthClass(embedded ? "wide" : "dash"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="operate-loading" />

@@ -1,0 +1,5 @@
+{
+	"github": {
+		"needsReconnect": "Needs reconnect: GitHub no longer accepts the stored access for {{login}}."
+	}
+}

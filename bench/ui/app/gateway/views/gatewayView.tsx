@@ -251,8 +251,8 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 			)}
 			{!admin && !source.connected && <p className="text-muted-foreground text-xs">{t("source.adminOnly")}</p>}
 			{showForm && (
-				<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-					<label className="flex w-full flex-col gap-1 sm:w-80">
+				<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+					<label className="flex w-full flex-col gap-1.5 text-sm leading-5 sm:w-80">
 						{t("source.address")}
 						<Input
 							value={url}
@@ -261,7 +261,8 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 							data-testid="gateway-source-url"
 						/>
 					</label>
-					<label className="flex w-full flex-col gap-1 sm:w-auto">
+					<div className="flex w-full flex-col gap-1.5 text-sm leading-5 sm:w-auto">
+						<label className="flex flex-col gap-1.5">
 						{t("source.secret")}
 						<Select value={secret || undefined} onValueChange={setSecret}>
 							<SelectTrigger className="w-full sm:w-56" data-testid="gateway-source-secret">
@@ -275,11 +276,12 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 								))}
 							</SelectContent>
 						</Select>
-						<Link to="/settings" search={{ tab: "secrets" } as never} className="text-primary text-xs hover:underline">
+						</label>
+						<Link to="/settings" search={{ tab: "secrets" } as never} className="text-primary w-fit text-xs hover:underline">
 							{u("page.addSecret")}
 						</Link>
-					</label>
-					<div className="flex gap-2">
+					</div>
+					<div className="flex gap-2 sm:pt-[26px]">
 						<Button type="button" size="sm" disabled={saving.isLoading || !url.trim() || !secret} onClick={() => void onSave()}>
 							{t("source.save")}
 						</Button>
