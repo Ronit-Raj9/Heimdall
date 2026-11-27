@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
 import { humanExperimentName, isCheckPracticeOrDebug, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -780,13 +781,16 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 	const [labellers, setLabellers] = useState<string[]>(queue.reviewers ?? []);
 	const disabled = !queue.can_manage;
 	const badPerItem = perItemProblem(reviewers);
+	// M6-73: a queue keeps a name; Save stays off while the name is blank.
+	const noName = name.trim() === "";
+	const confirm = useConfirm();
 	return (
 		<Section title={t("settings.title")} description={disabled ? t("settings.readOnly") : undefined} testId="annotation-settings">
 			<form
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
 					e.preventDefault();
-					if (badPerItem) return;
+					if (badPerItem || noName) return;
 					void update({
 						id: queue.id,
 						name: name.trim(),
@@ -798,7 +802,14 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 				}}
 			>
 				<Field label={t("create.name")}>
-					<Input value={name} onChange={(e) => setName(e.target.value)} disabled={disabled} data-testid="annotation-settings-name" />
+					<Input
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						disabled={disabled}
+						required
+						aria-invalid={noName || undefined}
+						data-testid="annotation-settings-name"
+					/>
 				</Field>
 				<Field label={t("create.reviewers")} hint={badPerItem ? t("create.reviewersRange") : t("create.reviewersHint")}>
 					<Input
@@ -851,18 +862,20 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 							type="button"
 							variant="destructive"
 							disabled={removed.isLoading}
-							onClick={() => {
-								if (!window.confirm(t("settings.deleteConfirm"))) return;
-								void remove(queue.id)
-									.unwrap()
-									.then(() => void navigate({ to: "/annotation" }))
-									.catch(() => {});
-							}}
+							onClick={() =>
+								void (async () => {
+									if (!(await confirm(t("settings.deleteConfirm"), { destructive: true, confirmLabel: t("settings.delete") }))) return;
+									await remove(queue.id)
+										.unwrap()
+										.then(() => void navigate({ to: "/annotation" }))
+										.catch(() => {});
+								})()
+							}
 							data-testid="annotation-settings-delete"
 						>
 							{t("settings.delete")}
 						</Button>
-						<Button type="submit" disabled={updated.isLoading || badPerItem} data-testid="annotation-settings-save">
+						<Button type="submit" disabled={updated.isLoading || badPerItem || noName} data-testid="annotation-settings-save">
 							{t("settings.save")}
 						</Button>
 					</div>

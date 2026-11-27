@@ -1,5 +1,6 @@
 import "@/lib/types/modelSwitchI18n";
 import "@/app/compare/views/w4m3I18n";
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { type ModelSwitchApplyResult, useApplyModelSwitchMutation } from "@/lib/store/apis/modelSwitchApi";
@@ -43,8 +44,10 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 	const secretNames = (secrets.data?.secrets ?? []).map((s) => s.name).sort();
 	const [apply, state] = useApplyModelSwitchMutation();
 	const [result, setResult] = useState<ModelSwitchApplyResult | null>(null);
+	const confirm = useConfirm();
 	const run = async (dry: boolean) => {
-		if (!dry && !window.confirm(t("export.apply.confirm", { count: ruleCount, url }))) return;
+		// X-72: the in-page confirm, not the browser's dialog.
+		if (!dry && !(await confirm(t("export.apply.confirm", { count: ruleCount, url })))) return;
 		const res = await apply({
 			id: evaluationId,
 			body: {

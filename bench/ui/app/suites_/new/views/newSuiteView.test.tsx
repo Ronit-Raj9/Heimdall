@@ -1,6 +1,7 @@
 import "@/lib/i18n";
 
 import { mutation, okQuery, render, tagOf } from "@/lib/testing/render";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it, vi } from "vitest";
 import NewSuiteView from "./newSuiteView";
 
@@ -34,7 +35,7 @@ vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 }));
 describe("NewSuiteView", () => {
 	it("starts from the team's own questions: no template list, no sample task", () => {
-		const html = render(<NewSuiteView />);
+		const html = render(<NuqsTestingAdapter><NewSuiteView /></NuqsTestingAdapter>);
 		expect(html).toContain('data-testid="suites-new-form"');
 		expect(html).toMatch(/checked="" value="questions"/);
 		expect(html).toContain('data-testid="suites-new-start-code"');
@@ -44,20 +45,20 @@ describe("NewSuiteView", () => {
 
 describe("NewSuiteView id check (N265)", () => {
 	it("disables Create for an id an organization benchmark has, with a link to it", () => {
-		const html = render(<NewSuiteView initialId="faq" />);
+		const html = render(<NuqsTestingAdapter><NewSuiteView initialId="faq" /></NuqsTestingAdapter>);
 		expect(html).toContain("A benchmark with this id already exists. Pick another id, or");
 		expect(html).toMatch(/<a [^>]*href="\/suites\/faq"[^>]*>open faq<\/a>\./);
 		expect(tagOf(html, "suites-new-create")).toContain('disabled=""');
 	});
 
 	it("disables Create for a built-in benchmark id", () => {
-		const html = render(<NewSuiteView initialId="coding-core" />);
+		const html = render(<NuqsTestingAdapter><NewSuiteView initialId="coding-core" /></NuqsTestingAdapter>);
 		expect(html).toContain("coding-core is the name of a built-in benchmark. Pick another id.");
 		expect(tagOf(html, "suites-new-create")).toContain('disabled=""');
 	});
 
 	it("keeps Create on for a free id", () => {
-		const html = render(<NewSuiteView initialId="my-new-one" />);
+		const html = render(<NuqsTestingAdapter><NewSuiteView initialId="my-new-one" /></NuqsTestingAdapter>);
 		expect(html).not.toContain('data-testid="suites-new-id-taken"');
 		expect(tagOf(html, "suites-new-create")).not.toContain('disabled=""');
 	});

@@ -47,7 +47,7 @@
 			"traces": "Production failures"
 		},
 		"issuesHosted": "From issues needs a connected GitHub repository, available on the hosted website.",
-		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create one from Benchmarks > New to add them.",
+		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create a question-and-answer benchmark with Add benchmark, Create your own, to add them.",
 		"traces": "Failures your agent had in production arrive in the inbox (from Langfuse, LangSmith, OpenTelemetry or the webhook). Open one and choose Turn into task to add it to this benchmark, then run the readiness checks here.",
 		"openInbox": "Open the inbox"
 	},
@@ -168,8 +168,8 @@
 		"all_one": "The task",
 		"all_other": "All {{count}} tasks",
 		"run": "Run readiness checks",
-		"confirm_one": "Run the readiness checks on 1 task? This builds the task's image and tries the right answer and the wrong ones.",
-		"confirm_other": "Run the readiness checks on all {{count}} tasks? This builds images and tries the right answer and the wrong ones for each task.",
+		"confirm_one": "Run the readiness checks on 1 task? This builds the task's image and tries the right answer and the wrong ones. It runs on a worker and usually takes a few minutes.",
+		"confirm_other": "Run the readiness checks on all {{count}} tasks? This builds images and tries the right answer and the wrong ones for each task. It runs on a worker and takes a few minutes per task.",
 		"confirmHosted_one": "Run the readiness checks on 1 task? It runs on a worker with scripted answers, no model calls.",
 		"confirmHosted_other": "Run the readiness checks on all {{count}} tasks? They run on a worker with scripted answers, no model calls.",
 		"confirmHostedJudged_one": "Run the readiness checks on 1 task? It runs on a worker with scripted answers; your judge model grades them, about {{calls}} calls on your own key.",

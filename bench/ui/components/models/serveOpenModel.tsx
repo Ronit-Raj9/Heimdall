@@ -1,3 +1,5 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/suites/uf6bI18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +18,11 @@ import {
 import { Server } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+
+/** A time limit the server can bound: 0.1 to 24 hours (M8-15; 0 used to mean no limit). */
+export function hoursProblem(limit: number): boolean {
+	return !Number.isFinite(limit) || limit < 0.1 || limit > 24;
+}
 
 const STATE_TONE: Record<string, "success" | "warning" | "outline"> = {
 	ready: "success",
@@ -47,6 +54,8 @@ export function ServeOpenModel() {
 	const [hours, setHours] = useState("2");
 	const [expId, setExpId] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const confirm = useConfirm();
+	const { t: tu } = useTranslation("uf6b");
 	if (!hosted) return null;
 
 	const model = models.find((m) => m.id === modelId) ?? models[0];
@@ -58,14 +67,19 @@ export function ServeOpenModel() {
 
 	const onSubmit = async (e: FormEvent) => {
 		e.preventDefault();
-		if (!model) return;
+		if (!model || hoursProblem(limit)) return;
 		setError(null);
+		// M8-15: starting a GPU bills the org's Modal account, so it asks first.
+		const ok = await confirm(tu("confirm.serveStart", { hours: limit, max: maxCost(choice, limit).toFixed(2) }), {
+			confirmLabel: t("serve.start"),
+		});
+		if (!ok) return;
 		try {
 			await start({
 				model: model.id,
 				engine,
 				gpu: gpuName,
-				max_hours: limit > 0 ? limit : undefined,
+				max_hours: limit,
 				experiment_id: expId.trim() || undefined,
 			}).unwrap();
 		} catch (err) {
@@ -126,14 +140,31 @@ export function ServeOpenModel() {
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="text-muted-foreground text-xs">{t("serve.hours")}</span>
-						<Input type="number" min="0.1" max="24" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} data-testid="serve-hours" />
+						<Input
+							type="number"
+							min="0.1"
+							max="24"
+							step="0.5"
+							required
+							value={hours}
+							onChange={(e) => setHours(e.target.value)}
+							aria-invalid={hoursProblem(limit) || undefined}
+							data-testid="serve-hours"
+						/>
+						{hoursProblem(limit) && (
+							<span className="text-destructive text-xs" data-testid="serve-hours-problem">
+								{tu("serve.hoursRange")}
+							</span>
+						)}
 					</label>
 					<label className="flex flex-col gap-1 text-sm sm:col-span-2">
 						<span className="text-muted-foreground text-xs">{t("serve.evaluation")}</span>
 						<Input value={expId} placeholder={t("serve.evaluationHint")} onChange={(e) => setExpId(e.target.value)} data-testid="serve-exp" />
 					</label>
 					<div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-						<Button type="submit" size="sm" disabled={started.isLoading || !choice || choice.count === 0} data-testid="serve-start">
+						<Button type="submit" size="sm" disabled={started.isLoading || !choice || choice.count === 0 || hoursProblem(limit)}
+							data-testid="serve-start"
+						>
 							{t("serve.start")}
 						</Button>
 						<span className="text-muted-foreground text-xs" data-testid="serve-cost">
@@ -154,7 +185,21 @@ export function ServeOpenModel() {
 			) : (
 				<ul className="bg-card flex flex-col divide-y rounded-xl border" data-testid="serve-list">
 					{deployments.slice(0, 20).map((d) => (
-						<DeploymentRow key={d.id} d={d} canStop={isAdmin && running.includes(d)} onStop={() => void stop(d.id)} />
+						<DeploymentRow
+							key={d.id}
+							d={d}
+							canStop={isAdmin && running.includes(d)}
+							onStop={() =>
+								void (async () => {
+									// X-70: Stop ends the server at once, so it asks first.
+									const ok = await confirm(tu("confirm.serveStop", { model: d.model_name || d.title }), {
+										destructive: true,
+										confirmLabel: t("serve.stop"),
+									});
+									if (ok) await stop(d.id);
+								})()
+							}
+						/>
 					))}
 				</ul>
 			)}

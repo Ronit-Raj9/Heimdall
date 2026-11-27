@@ -212,7 +212,7 @@ export function suiteDisplayCategory(id: string): string | undefined {
  * file names, tool-ish tokens (name@version, snake_case, paths). Cut at about 90 characters.
  */
 export function plainDescription(raw: string | undefined | null): string {
-	if (!raw) return "";
+	if (!raw || isImporterText(raw)) return "";
 	let text = raw.replace(/\s+/g, " ").trim();
 	const sentence = text.match(/^.*?[.!?](?=\s|$)/);
 	if (sentence) text = sentence[0];
@@ -235,6 +235,15 @@ export function plainDescription(raw: string | undefined | null): string {
 		text = `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}...`;
 	}
 	return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+/**
+ * Text the importer wrote about itself ("Imported by ... import harbor from", "through the harbor
+ * importer"), never shown as a description (M6-48).
+ */
+export function isImporterText(raw: string): boolean {
+	const text = raw.trim().toLowerCase();
+	return text.startsWith("imported by") || text.includes("importer");
 }
 
 /** One short human sentence for the benchmark: curated for known ids, cleaned up otherwise. */
@@ -292,7 +301,16 @@ export const LIBRARY_SUITE_IDS: readonly string[] = LIBRARY_ORDER;
 
 /** The small made-up practice suites: the Acme examples and the coding-core starter. */
 export function isPracticeSuite(id: string): boolean {
-	return id.startsWith("acme-") || id === "coding-core";
+	return id.startsWith("acme-") || id === "coding-core" || id.startsWith("zz-test-");
+}
+
+/**
+ * Whether at least one task can run today (X-112): the server's ready list when it knows it,
+ * otherwise the admitted count. A list row offers Run only then, and "Make it ready" otherwise.
+ */
+export function hasReadyTask(suite: Pick<SuiteSummary, "admitted_count" | "ready_known" | "ready_task_ids">): boolean {
+	if (suite.ready_known && Array.isArray(suite.ready_task_ids)) return suite.ready_task_ids.length > 0;
+	return (suite.admitted_count ?? 0) > 0;
 }
 
 /** A pack served from the server's read-only built-in library. */
@@ -310,20 +328,24 @@ export interface SuiteSections<T> {
 	builtin: T[];
 	/** What the organization added itself (catalog imports, uploads, its own). */
 	org: T[];
-	/** Acme and coding-core: small, made-up data, shown collapsed. */
+	/** Acme, coding-core and the zz-test fixtures: small, made-up data, shown collapsed. */
 	practice: T[];
 }
 
 type SectionFields = Pick<SuiteSummary, "id" | "builtin" | "source">;
 
-/** Splits suites into built-in, org-added and practice examples, each in display order. */
-export function suiteSections<T extends SectionFields>(suites: readonly T[]): SuiteSections<T> {
+/**
+ * Splits suites into built-in, org-added and practice examples, each in display order. With
+ * keepOrder each section keeps the order it was given (a sort the user picked).
+ */
+export function suiteSections<T extends SectionFields>(suites: readonly T[], keepOrder = false): SuiteSections<T> {
 	const out: SuiteSections<T> = { builtin: [], org: [], practice: [] };
 	for (const s of suites) {
 		if (isBuiltinSuite(s)) out.builtin.push(s);
 		else if (isPracticeSuite(s.id)) out.practice.push(s);
 		else out.org.push(s);
 	}
+	if (keepOrder) return out;
 	const byName = (a: T, b: T) => suiteDisplayName(a.id, a).localeCompare(suiteDisplayName(b.id, b)) || a.id.localeCompare(b.id);
 	out.builtin.sort((a, b) => libraryRank(a.id) - libraryRank(b.id) || byName(a, b));
 	out.org.sort(byName);

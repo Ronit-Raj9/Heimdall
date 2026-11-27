@@ -11,7 +11,10 @@ import i18n from "@/lib/i18n";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { AnnotationAssignment, AnnotationKind, AnnotationQueue, AnnotationQueueRequest } from "@/lib/types/annotation";
 import { Link } from "@tanstack/react-router";
-import { Plus, Tags } from "lucide-react";
+import { AddItems } from "@/app/annotation_/$queueId/views/queueView";
+import "@/components/suites/uf6bI18n";
+import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -68,15 +71,19 @@ export function LabellerPicker({
 	onChange,
 	disabled,
 	testId,
+	listOnly = false,
 }: {
 	value: string[];
 	onChange: (ids: string[]) => void;
 	disabled?: boolean;
 	testId: string;
+	/** Only the list of people, without its own Every member or Only these people choice (the create form's one "Who labels" group asks that, M6-72). */
+	listOnly?: boolean;
 }) {
 	const { t } = useTranslation("annotation");
 	const people = useGetAnnotationPeopleQuery();
-	const [only, setOnly] = useState(value.length > 0);
+	const [onlyState, setOnly] = useState(value.length > 0);
+	const only = listOnly || onlyState;
 	const [text, setText] = useState(value.join(", "));
 	if (people.data?.local) {
 		return (
@@ -99,8 +106,8 @@ export function LabellerPicker({
 	const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== id), id] : value.filter((v) => v !== id));
 	return (
 		<fieldset className="flex min-w-0 flex-col gap-2 text-sm" disabled={disabled} data-testid={testId}>
-			<legend className="text-muted-foreground mb-1">{t("create.labellers")}</legend>
-			<div className="flex flex-wrap gap-4">
+			{!listOnly && <legend className="text-muted-foreground mb-1">{t("create.labellers")}</legend>}
+			<div className={cn("flex flex-wrap gap-4", listOnly && "hidden")}>
 				<label className="flex items-center gap-2">
 					<input
 						type="radio"
@@ -174,7 +181,6 @@ export default function AnnotationView() {
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
-				icon={Tags}
 				actions={
 					writable && !creating ? (
 						<Button onClick={() => setCreating(true)} data-testid="annotation-new">
@@ -203,42 +209,89 @@ export default function AnnotationView() {
 	);
 }
 
+/** A count cell: a dash for zero, so the numbers that matter stand out (X-47). */
+export function countText(n: number): string {
+	return n > 0 ? String(n) : "-";
+}
+
+/**
+ * Every queue as a row the whole of which opens the queue (M6-69): For you first among the
+ * numbers, with Start labelling when something waits for you, and "Empty. Add items" on a queue
+ * with no items yet (M6-68). On a phone only the name, For you and Done show (M6-70).
+ */
 export function QueueTable({ queues }: { queues: AnnotationQueue[] }) {
 	const { t } = useTranslation("annotation");
+	const { t: tu } = useTranslation("uf6b");
+	const cell = "px-4 py-2.5";
 	return (
-		<div className="bg-card min-w-0 overflow-x-auto rounded-xl border" data-testid="annotation-queues">
+		<div className="min-w-0 overflow-x-auto border-y" data-testid="annotation-queues">
 			<table className="w-full text-sm">
-				<thead className="text-muted-foreground border-b text-left text-xs">
+				<thead className="text-foreground/70 border-b text-left text-xs font-medium">
 					<tr>
 						<th className="px-4 py-2 font-medium">{t("table.name")}</th>
-						<th className="px-4 py-2 font-medium">{t("table.benchmark")}</th>
-						<th className="px-4 py-2 font-medium">{t("table.settings")}</th>
-						<th className="px-4 py-2 text-right font-medium">{t("table.progress")}</th>
-						<th className="px-4 py-2 text-right font-medium">{t("table.disputed")}</th>
 						<th className="px-4 py-2 text-right font-medium">{t("table.mine")}</th>
+						<th className="px-4 py-2 text-right font-medium">{t("table.progress")}</th>
+						<th className="hidden px-4 py-2 text-right font-medium sm:table-cell">{t("table.disputed")}</th>
+						<th className="hidden px-4 py-2 font-medium md:table-cell">{t("table.benchmark")}</th>
+						<th className="hidden px-4 py-2 font-medium sm:table-cell">{t("table.settings")}</th>
 					</tr>
 				</thead>
 				<tbody>
 					{queues.map((q) => (
-						<tr key={q.id} className="border-b last:border-0" data-testid={`annotation-queue-${q.id}`}>
-							<td className="px-4 py-2.5">
-								<Link to="/annotation/$queueId" params={{ queueId: q.id }} className="text-foreground font-medium hover:underline">
+						<tr
+							key={q.id}
+							className="hover:bg-muted/40 focus-within:bg-muted/40 relative border-b transition-colors last:border-0"
+							data-testid={`annotation-queue-${q.id}`}
+						>
+							<td className={cell}>
+								<Link
+									to="/annotation/$queueId"
+									params={{ queueId: q.id }}
+									className="text-foreground font-medium whitespace-nowrap outline-none after:absolute after:inset-0 focus-visible:underline"
+								>
 									{q.name}
 								</Link>
 								{q.archived && <span className="text-muted-foreground ml-2 text-xs">{t("table.archived")}</span>}
+								{q.counts.total === 0 && q.can_manage && (
+									<Link
+										to="/annotation/$queueId"
+										params={{ queueId: q.id }}
+										search={{ tab: "items" } as never}
+										className="text-primary relative z-10 ml-2 text-xs whitespace-nowrap hover:underline"
+										data-testid={`annotation-queue-${q.id}-add`}
+									>
+										{tu("labelling.emptyAdd")}
+									</Link>
+								)}
 							</td>
-							<td className="text-muted-foreground px-4 py-2.5 font-mono text-xs">{q.benchmark || "-"}</td>
-							<td className="text-muted-foreground px-4 py-2.5 text-xs">
+							<td className={cn(cell, "text-right tabular-nums")}>
+								{q.can_label && q.mine > 0 ? (
+									<Link
+										to="/annotation/$queueId"
+										params={{ queueId: q.id }}
+										search={{ tab: "label" } as never}
+										className="text-primary relative z-10 font-medium whitespace-nowrap hover:underline"
+										data-testid={`annotation-queue-${q.id}-start`}
+									>
+										{tu("labelling.start", { count: q.mine })}
+									</Link>
+								) : (
+									"-"
+								)}
+							</td>
+							<td className={cn(cell, "text-right whitespace-nowrap tabular-nums")}>
+								{q.counts.done} / {q.counts.total}
+							</td>
+							<td className={cn(cell, "hidden text-right tabular-nums sm:table-cell")}>
+								{q.counts.disputed > 0 ? <StatusPill tone="warn">{q.counts.disputed}</StatusPill> : "-"}
+							</td>
+							<td className={cn(cell, "text-muted-foreground hidden font-mono text-xs whitespace-nowrap md:table-cell")}>
+								{q.benchmark || "-"}
+							</td>
+							<td className={cn(cell, "text-muted-foreground hidden text-xs sm:table-cell")}>
 								{t("table.perItem", { count: q.reviewers_per_item })}
 								{q.blind ? `, ${t("table.blind")}` : ""}
 							</td>
-							<td className="px-4 py-2.5 text-right tabular-nums">
-								{q.counts.done} / {q.counts.total}
-							</td>
-							<td className="px-4 py-2.5 text-right tabular-nums">
-								{q.counts.disputed > 0 ? <StatusPill tone="warn">{q.counts.disputed}</StatusPill> : 0}
-							</td>
-							<td className="px-4 py-2.5 text-right tabular-nums">{q.can_label ? q.mine : "-"}</td>
 						</tr>
 					))}
 				</tbody>
@@ -272,10 +325,48 @@ export function queueRequest(form: {
 	return body;
 }
 
+/** The create form's one "Who labels" choice (M6-72) as the queue's assignment and whether people are named. */
+export type WhoLabels = "any" | "only" | "assigned";
+export function whoLabels(who: WhoLabels): { assignment: AnnotationAssignment; named: boolean } {
+	if (who === "assigned") return { assignment: "fixed", named: true };
+	return { assignment: "open", named: who === "only" };
+}
+
+/**
+ * New queue in two steps (M6-68): the settings, then the items. After Create the same panel
+ * offers the finished runs to add, so a new queue does not sit empty.
+ */
 function CreateQueueForm({ onDone }: { onDone: () => void }) {
+	const { t: tu } = useTranslation("uf6b");
+	const [made, setMade] = useState<AnnotationQueue | null>(null);
+	if (made) {
+		return (
+			<div className="flex min-w-0 flex-col gap-3" data-testid="annotation-create-items">
+				<p className="text-sm" role="status">
+					{tu("labelling.created", { name: made.name })}
+				</p>
+				<AddItems queue={made} />
+				<div className="flex justify-end gap-2">
+					<Button asChild variant="outline">
+						<Link to="/annotation/$queueId" params={{ queueId: made.id }} data-testid="annotation-create-open">
+							{tu("labelling.openQueue")}
+						</Link>
+					</Button>
+					<Button onClick={onDone} data-testid="annotation-create-done">
+						{tu("labelling.done")}
+					</Button>
+				</div>
+			</div>
+		);
+	}
+	return <CreateQueueSettings onCancel={onDone} onCreated={setMade} />;
+}
+
+function CreateQueueSettings({ onCancel, onCreated }: { onCancel: () => void; onCreated: (q: AnnotationQueue) => void }) {
 	const { t } = useTranslation("annotation");
 	const suites = useGetSuitesLightQuery();
 	const [create, created] = useCreateAnnotationQueueMutation();
+	const [who, setWho] = useState<WhoLabels>("any");
 	const [form, setForm] = useState({
 		name: "",
 		benchmark: "",
@@ -288,7 +379,10 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 	});
 	const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
 	const benchmarks = (suites.data?.suites ?? []).map((s) => s.id);
-	const fixedWhy = fixedProblem(form.assignment, new Set(form.labellers).size, form.reviewers);
+	const choice = whoLabels(who);
+	const named = choice.named ? form.labellers : [];
+	const fixedWhy = fixedProblem(choice.assignment, new Set(named).size, form.reviewers);
+	const body = () => queueRequest({ ...form, assignment: choice.assignment, labellers: named });
 	return (
 		<Section title={t("create.title")} description={t("create.description")} testId="annotation-create">
 			<form
@@ -296,9 +390,9 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 				onSubmit={(e) => {
 					e.preventDefault();
 					if (!form.name.trim() || perItemProblem(form.reviewers) || fixedWhy) return;
-					void create(queueRequest(form))
+					void create(body())
 						.unwrap()
-						.then(onDone)
+						.then(onCreated)
 						.catch(() => {});
 				}}
 			>
@@ -348,18 +442,26 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 						data-testid="annotation-create-reviewers"
 					/>
 				</Field>
-				<Field label={t("create.assignment")}>
-					<select
-						className={selectClass}
-						value={form.assignment}
-						onChange={(e) => set("assignment", e.target.value as AnnotationAssignment)}
-						data-testid="annotation-create-assignment"
-					>
-						<option value="open">{t("create.assignmentOpen")}</option>
-						<option value="fixed">{t("create.assignmentFixed")}</option>
-					</select>
-				</Field>
-				<LabellerPicker value={form.labellers} onChange={(ids) => set("labellers", ids)} testId="annotation-create-labellers" />
+				<fieldset className="flex min-w-0 flex-col gap-2 text-sm md:col-span-2" data-testid="annotation-create-who">
+					<legend className="text-muted-foreground mb-1">{t("create.assignment")}</legend>
+					<div className="flex flex-wrap gap-x-5 gap-y-2">
+						{(["any", "only", "assigned"] as const).map((w) => (
+							<label key={w} className="flex items-center gap-2">
+								<input
+									type="radio"
+									name="annotation-create-who"
+									checked={who === w}
+									onChange={() => setWho(w)}
+									data-testid={`annotation-create-who-${w}`}
+								/>
+								{w === "any" ? t("create.assignmentOpen") : w === "only" ? t("create.labellersOnly") : t("create.assignmentFixed")}
+							</label>
+						))}
+					</div>
+					{choice.named && (
+						<LabellerPicker value={form.labellers} onChange={(ids) => set("labellers", ids)} testId="annotation-create-labellers" listOnly />
+					)}
+				</fieldset>
 				<label className="flex items-center gap-2 text-sm md:col-span-2">
 					<input
 						type="checkbox"
@@ -383,7 +485,7 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 							{getBenchErrorMessage(created.error)}
 						</p>
 					) : null}
-					<Button type="button" variant="ghost" onClick={onDone}>
+					<Button type="button" variant="ghost" onClick={onCancel}>
 						{t("create.cancel")}
 					</Button>
 					<Button

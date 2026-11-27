@@ -2,6 +2,7 @@ import { ImporterList } from "@/components/imports/importerCard";
 import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
+import { AddChooser } from "@/components/suites/addChooserView";
 import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
 import { useGetImportsQuery } from "@/lib/store";
 import { Link } from "@tanstack/react-router";
@@ -25,6 +26,7 @@ export default function AddSuiteView() {
 				subtitle={t("suites.addFlow.subtitle")}
 				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
 			/>
+			<AddChooser />
 			<Section title={t("imports.title")} description={t("imports.subtitle")} testId="imports-section">
 				{data?.mode === "synthetic" && (
 					<p

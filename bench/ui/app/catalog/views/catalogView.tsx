@@ -1,6 +1,9 @@
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { EmptyState } from "@/components/shell/emptyState";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/suites/uf6bI18n";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { firstReason, WhyDisabled } from "@/components/ui/whyDisabled";
@@ -27,6 +30,7 @@ import {
 	type CatalogFilters,
 	type Category,
 	cardDescription,
+	catalogEntries,
 	entryCategories,
 	filterEntries,
 	installedHref,
@@ -241,12 +245,16 @@ function SidePanel({ e, onClose, children, testId }: { e: CatalogEntry; onClose(
 
 function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; importForm: ImportForm }) {
 	const { t } = useTranslation("catalog");
+	const { t: tu } = useTranslation("uf6b");
 	const e = props.importFor;
 	const f = props.importForm;
 	const set = (p: Partial<ImportForm>) => props.onImportForm?.({ ...f, ...p });
 	const why = importProblem(f);
 	return (
 		<SidePanel e={e} onClose={() => props.onCancelImport?.()} testId="catalog-import-form">
+			<p className="text-sm text-pretty" data-testid="catalog-import-what">
+				{tu("catalog.importWhat", { count: Number(f.limit) || 0 })}
+			</p>
 			<DataOptions e={e} />
 			<div className="bg-muted inline-flex w-fit flex-wrap gap-1 rounded-lg p-1" role="tablist">
 				{MODES.filter((m) => m !== "url" || e.fetch_allowed).map((m) => (
@@ -364,6 +372,7 @@ function CardAction({
 	builtinSuite?: string;
 }) {
 	const { t } = useTranslation("catalog");
+	const { t: tu } = useTranslation("uf6b");
 	if (builtinSuite)
 		return (
 			<span className="flex items-center gap-2" data-testid={`catalog-builtin-${e.id}`}>
@@ -386,6 +395,8 @@ function CardAction({
 			</span>
 		);
 	if (!canWrite) return <span className="text-muted-foreground text-xs">{t("memberOnly")}</span>;
+	// M6-63: the button says what it does and that it costs nothing.
+	const hint = e.kind === "importer" ? tu("catalog.importHint") : tu("catalog.addHint");
 	return (
 		<Button
 			size="sm"
@@ -393,41 +404,49 @@ function CardAction({
 			disabled={busy}
 			onClick={onAdd}
 			data-testid={`catalog-add-${e.id}`}
-			title={e.hint}
+			title={hint}
+			className="h-7"
 		>
 			{busy ? t("adding") : e.kind === "importer" ? t("import") : t("add")}
 		</Button>
 	);
 }
 
-function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyProps; canWrite: boolean }) {
+/**
+ * One catalog entry as a table row (M6-65): the name opens the details (M6-66), the line under it
+ * says what the benchmark tests; category and source from sm up; the action at the right. On a
+ * phone the row is two lines, name then description, with the action beside it.
+ */
+function EntryRow({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyProps; canWrite: boolean }) {
 	const { t } = useTranslation("catalog");
+	const { t: tu } = useTranslation("uf6b");
 	const { title, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
+	const description = cardDescription(e);
 	return (
-		<div
-			className="border-border bg-card hover:border-foreground/20 flex flex-col gap-4 rounded-lg border p-4 transition-colors"
-			data-testid={`catalog-entry-${e.id}`}
-		>
-			<div className="min-w-0">
-				<div className="flex items-center gap-2">
+		<TableRow data-testid={`catalog-entry-${e.id}`}>
+			<TableCell className="max-w-0 py-2 whitespace-normal sm:w-auto">
+				<div className="flex min-w-0 items-center gap-2">
 					<CategoryIcon category={cat} />
-					<h3 className="truncate text-sm font-medium" title={title}>
+					<button
+						type="button"
+						className="hover:text-foreground min-h-9 min-w-0 truncate text-left text-sm font-medium underline-offset-4 hover:underline"
+						onClick={() => props.onDetails?.(e)}
+						aria-label={tu("catalog.detailsOf", { name: title })}
+						title={title}
+						data-testid={`catalog-details-${e.id}`}
+					>
 						{title}
-					</h3>
+					</button>
 					{example && <QuietTag>{t("pillExample")}</QuietTag>}
 				</div>
-				<p className="text-muted-foreground mt-1 line-clamp-2 text-sm">{cardDescription(e)}</p>
-			</div>
-			<div className="mt-auto flex items-center justify-between gap-2">
-				<button
-					type="button"
-					className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-					onClick={() => props.onDetails?.(e)}
-					data-testid={`catalog-details-${e.id}`}
-				>
-					{t("details")}
-				</button>
+				{description && <p className="text-muted-foreground line-clamp-1 text-xs text-pretty sm:line-clamp-2">{description}</p>}
+			</TableCell>
+			<TableCell className="text-muted-foreground hidden py-2 text-xs sm:table-cell">{t(`cat_${cat}`)}</TableCell>
+			<TableCell className="text-muted-foreground hidden py-2 text-xs md:table-cell">
+				{e.needs_data ? t("sourceNeedsData") : t("sourceReady")}
+			</TableCell>
+			<TableCell className="py-2 text-right">
 				<CardAction
 					e={e}
 					busy={props.busyId === e.id}
@@ -435,14 +454,15 @@ function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBody
 					onAdd={() => props.onAdd(e)}
 					builtinSuite={builtinSuiteOf(e, props.builtinSuites)}
 				/>
-			</div>
-		</div>
+			</TableCell>
+		</TableRow>
 	);
 }
 
 /** The catalog screen without data fetching (tested directly). */
 export function CatalogBody(props: CatalogBodyProps) {
 	const { t } = useTranslation("catalog");
+	const { t: tu } = useTranslation("uf6b");
 	const canWrite = canUse(useSession(), "member");
 	const { filters } = props;
 	// Built-in library entries first, the rest in their usual order (stable sort).
@@ -470,11 +490,11 @@ export function CatalogBody(props: CatalogBodyProps) {
 	const grouped = SECTIONS.map((id) => ({ id, items: shown.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
 	const details = props.detailsFor && !props.importFor ? props.detailsFor : null;
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 p-4 sm:p-6" data-testid="catalog-view">
+		<div className="flex w-full min-w-0 flex-col gap-8" data-testid="catalog-view">
 			<header className="flex flex-col gap-5">
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("title")}</h1>
-					<p className="text-muted-foreground mt-1 text-sm">{t("subtitle")}</p>
+					<p className="text-muted-foreground mt-1 text-sm text-pretty">{t("subtitle")}</p>
 				</div>
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="catalog-toolbar">
@@ -569,12 +589,26 @@ export function CatalogBody(props: CatalogBodyProps) {
 				/>
 			) : (
 				grouped.map((g) => (
-					<section key={g.id} className="flex flex-col gap-3" data-testid={`catalog-section-${g.id}`}>
+					<section key={g.id} className="flex min-w-0 flex-col gap-3" data-testid={`catalog-section-${g.id}`}>
 						<h2 className="text-muted-foreground text-sm font-medium">{t(SECTION_KEY[g.id as SectionId])}</h2>
-						<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-							{g.items.map((e) => (
-								<EntryCard key={e.id} e={e} props={props} canWrite={canWrite} />
-							))}
+						<div className="min-w-0 border-y">
+							<Table className="table-fixed">
+								<TableHeader className="sr-only sm:not-sr-only">
+									<TableRow>
+										<TableHead>{tu("catalog.colName")}</TableHead>
+										<TableHead className="hidden w-32 sm:table-cell">{t("category")}</TableHead>
+										<TableHead className="hidden w-32 md:table-cell">{t("sourceLabel")}</TableHead>
+										<TableHead className="w-28 text-right sm:w-44">
+											<span className="sr-only">{tu("catalog.colAction")}</span>
+										</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{g.items.map((e) => (
+										<EntryRow key={e.id} e={e} props={props} canWrite={canWrite} />
+									))}
+								</TableBody>
+							</Table>
 						</div>
 					</section>
 				))
@@ -609,6 +643,13 @@ export function CatalogBody(props: CatalogBodyProps) {
 	);
 }
 
+/** The question Add asks before it writes (M6-62): what is added, under which id, and that nothing runs. */
+export function addQuestion(e: CatalogEntry, tu: (k: string, o: Record<string, string>) => string): string {
+	const name = displayFor(e).title;
+	if (e.kind === "example") return tu("catalog.addAskExample", { name });
+	return tu("catalog.addAsk", { name, id: e.suite_id ?? e.id });
+}
+
 function errorMessage(err: unknown): string {
 	const transport = transportErrorText(err);
 	if (transport) return transport;
@@ -618,16 +659,16 @@ function errorMessage(err: unknown): string {
 
 function CatalogSkeleton() {
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-4 sm:p-6" data-testid="catalog-loading">
+		<div className="flex w-full min-w-0 flex-col gap-6" data-testid="catalog-loading">
 			<Skeleton className="h-9 w-64" />
 			<div className="flex gap-2">
 				{Array.from({ length: 6 }, (_, i) => (
 					<Skeleton key={i} className="h-8 w-24 rounded-full" />
 				))}
 			</div>
-			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-				{Array.from({ length: 6 }, (_, i) => (
-					<Skeleton key={i} className="h-36 rounded-xl" />
+			<div className="flex min-w-0 flex-col gap-2">
+				{Array.from({ length: 8 }, (_, i) => (
+					<Skeleton key={i} className="h-12 rounded-md" />
 				))}
 			</div>
 		</div>
@@ -643,6 +684,8 @@ export default function CatalogView() {
 		[suites.data],
 	);
 	const [addEntry] = useAddCatalogEntryMutation();
+	const confirm = useConfirm();
+	const { t: tu } = useTranslation("uf6b");
 	const [uploadDataset] = useUploadCatalogDatasetMutation();
 	const [localFilters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
 	// p12-2: the search term lives in the address (?q=), the other filters stay on the page.
@@ -660,7 +703,8 @@ export default function CatalogView() {
 	const [error, setError] = useState<string | null>(null);
 	const [jobId, setJobId] = useState<string | null>(null);
 	const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
-	const entries = useMemo(() => data?.entries ?? [], [data]);
+	// Internal entries left out and one entry per suite (N6-1, M6-64).
+	const entries = useMemo(() => catalogEntries(data?.entries ?? []), [data]);
 
 	if (isLoading) return <CatalogSkeleton />;
 	if (isError || !data)
@@ -707,7 +751,11 @@ export default function CatalogView() {
 					setImportForm(initialImportForm(e));
 					return;
 				}
-				void run(e);
+				// M6-62: Add writes to the project, so it asks first and says nothing runs or is charged.
+				void (async () => {
+					const ok = await confirm(addQuestion(e, (k, o) => String(tu(k as never, o as never))), { title: tu("catalog.addTitle"), confirmLabel: tu("catalog.addYes") });
+					if (ok) await run(e);
+				})();
 			}}
 			importFor={importFor}
 			importForm={importForm}

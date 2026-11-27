@@ -1,6 +1,7 @@
 import "@/lib/i18n";
 
 import { render } from "@/lib/testing/render";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { describe, expect, it, vi } from "vitest";
 import { SuitesList } from "./suitesView";
@@ -28,7 +29,7 @@ const suites = [suite("hd-swe-verified", { builtin: true, source: "library" }), 
 
 describe("My benchmarks list", () => {
 	it("has a search box, a category filter and a source filter", () => {
-		const html = render(<SuitesList suites={suites} />);
+		const html = render(<NuqsTestingAdapter><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(html).toContain('data-testid="suites-toolbar"');
 		expect(html).toContain('data-testid="suites-search"');
 		expect(html).toContain('data-testid="suites-filter-category"');
@@ -37,17 +38,37 @@ describe("My benchmarks list", () => {
 	});
 
 	it("shows a team benchmark by the id the team typed", () => {
-		const html = render(<SuitesList suites={suites} />);
+		const html = render(<NuqsTestingAdapter><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(html).toContain(">zz-test-own<");
 		expect(html).not.toContain("Zz Test Own");
 	});
 
 	it("narrows the list and says when nothing matches", () => {
-		const one = render(<SuitesList suites={suites} initialFilters={{ query: "zz-test", category: null, source: "all" }} />);
+		const one = render(<NuqsTestingAdapter searchParams={{ q: "zz-test" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(one).toContain("suites-row-zz-test-own");
 		expect(one).not.toContain("suites-row-hd-swe-verified");
-		const none = render(<SuitesList suites={suites} initialFilters={{ query: "no such thing", category: null, source: "all" }} />);
+		const none = render(<NuqsTestingAdapter searchParams={{ q: "no such thing" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(none).toContain('data-testid="suites-no-match"');
 		expect(none).toContain("No benchmarks match. Clear the search or filters.");
+	});
+
+	it("keeps the search in the URL, sorts, counts and offers the six ways to add", () => {
+		const html = render(
+			<NuqsTestingAdapter searchParams={{ sort: "name" }}>
+				<SuitesList suites={suites} />
+			</NuqsTestingAdapter>,
+		);
+		expect(html).toContain('data-testid="suites-sort"');
+		expect(html).toContain('data-testid="suites-count"');
+		expect(html).toContain("2 of 2");
+	});
+});
+
+describe("Add benchmark menu (M6-41)", () => {
+	it("lists the same six entries as the chooser, with Tasks from your API", async () => {
+		const { AddBenchmarkMenu } = await import("./suitesView");
+		const html = render(<AddBenchmarkMenu />);
+		for (const id of ["file", "catalog", "api", "create", "code", "failures"]) expect(html).toContain(`data-testid="suites-add-${id}"`);
+		expect(html).toContain("Tasks from your API");
 	});
 });

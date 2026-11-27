@@ -225,6 +225,42 @@ export function sectionOf(e: CatalogEntry): SectionId {
 
 export const SECTIONS: SectionId[] = ["featured", "try", "import"];
 
+/** Suites that only Heimdall itself uses (the improver task) or test fixtures: never offered in the catalog (N6-1). */
+const INTERNAL_SUITES = new Set(["heimdall-improver"]);
+
+/** The suite an entry adds, when it adds one. */
+export function entrySuite(e: CatalogEntry): string | undefined {
+  return e.suite_id ?? (e.id.startsWith("suite-") ? e.id.slice("suite-".length) : undefined);
+}
+
+/** An internal entry: a server flag when present, else the internal suite list and zz-test fixtures. */
+export function isInternalEntry(e: CatalogEntry): boolean {
+  if ((e as CatalogEntry & { internal?: boolean }).internal === true) return true;
+  const suite = entrySuite(e);
+  return !!suite && (INTERNAL_SUITES.has(suite) || suite.startsWith("zz-test-"));
+}
+
+/**
+ * The entries the catalog lists: internal ones left out, and one entry per suite (M6-64). The
+ * server lists headline benchmarks first, so when two entries add the same suite the first stays.
+ */
+export function catalogEntries(entries: readonly CatalogEntry[]): CatalogEntry[] {
+  const out: CatalogEntry[] = [];
+  const bySuite = new Map<string, number>();
+  for (const e of entries) {
+    if (isInternalEntry(e)) continue;
+    const suite = entrySuite(e);
+    if (!suite) {
+      out.push(e);
+      continue;
+    }
+    if (bySuite.has(suite)) continue;
+    bySuite.set(suite, out.length);
+    out.push(e);
+  }
+  return out;
+}
+
 /** Where an installed entry lives: its suite page, else the agents or suites list. */
 export function installedHref(e: CatalogEntry): string {
   const suite = e.suite_id ?? e.suites?.[0];

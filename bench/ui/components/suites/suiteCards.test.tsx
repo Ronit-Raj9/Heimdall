@@ -55,7 +55,7 @@ describe("SuiteCards", () => {
 		expect(core).toMatch(/data-testid="suites-row-coding-core-status" data-status="ready">.*Ready/);
 		expect(core).toContain("4 tasks");
 		expect(core).toContain('data-testid="suites-row-coding-core-run"');
-		expect(core).toContain("md:group-hover:opacity-100");
+		expect(core).toContain("md:inline-flex"); // M6-44: Run shows without hover from md up
 		const acme = card(html, "acme-payments");
 		expect(acme).toMatch(/data-status="needsAdmission">.*1 of 3 tasks ready/);
 		expect(acme).not.toContain("task init");
