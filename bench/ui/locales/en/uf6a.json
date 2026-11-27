@@ -8,6 +8,7 @@
 		"prev": "Previous",
 		"next": "Next",
 		"pageN": "Page {{page}} of {{pages}}",
+		"usedVersion": "The run used version {{rev}} of this benchmark.",
 		"columns": "Columns",
 		"moreColumns": "Show more columns",
 		"fewerColumns": "Show fewer columns",
@@ -65,7 +66,13 @@
 	},
 	"sections": {
 		"policy": "Tasks from a policy",
-		"review": "Draft tasks with a model"
+		"review": "Draft tasks with a model",
+		"cheat": "Cheat checks"
+	},
+	"cheat": {
+		"hint": "Makes up to 50 impossible twins of these tasks: copies no honest agent can pass. A run that passes one has cheated.",
+		"add": "Add cheat checks",
+		"confirm": "Make up to 50 impossible twins of this benchmark? They go into a new benchmark, and its readiness check runs next. No model is called."
 	},
 	"header": {
 		"tasks_one": "{{count}} task",
@@ -85,6 +92,7 @@
 		"privateSource": "Private source?"
 	},
 	"rows": {
+		"moreColumns": "More columns",
 		"drop": "Drop a file here or click to choose one",
 		"attachDrop": "Drop files here or click to choose",
 		"pasteLabel": "Or paste rows",

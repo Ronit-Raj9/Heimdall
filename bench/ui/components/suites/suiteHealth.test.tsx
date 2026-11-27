@@ -165,7 +165,7 @@ describe("TaskHealthBlock", () => {
 	it("shows a flaky verifier as serious, with evidence count, kinds and runs", () => {
 		const html = block("p02");
 		const verifier = html.match(/data-testid="suites-task-health-verifier"[\s\S]*?data-testid="suites-task-health-difficulty"/)?.[0] ?? "";
-		expect(verifier).toContain("border-chart-error/50");
+		expect(verifier).toContain("border-danger");
 		expect(verifier).toContain('role="alert"');
 		expect(verifier).toContain("Flaky verifier: 3 pieces of evidence from 9 checks.");
 		expect(verifier).toMatch(/suites-task-health-kind-regrade_disagrees" data-tone="bad">Regrade disagrees: 1/);
@@ -175,7 +175,7 @@ describe("TaskHealthBlock", () => {
 
 	it("highlights a difficulty mismatch with pass rate, interval, runs and configs", () => {
 		const difficulty = sub(block("p02"), "suites-task-health-difficulty");
-		expect(difficulty).toContain("border-chart-warning/50");
+		expect(difficulty).toContain("border-warning");
 		expect(difficulty).toMatch(/suites-task-health-declared".*?>hard</);
 		expect(difficulty).toMatch(/suites-task-health-observed".*?text-chart-warning-ink font-semibold">easy</);
 		expect(difficulty).toMatch(/suites-task-health-pass-rate".*?>92%</);

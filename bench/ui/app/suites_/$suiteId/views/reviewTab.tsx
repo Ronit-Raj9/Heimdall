@@ -58,7 +58,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -230,7 +230,7 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 	return (
 		<Section title={t("queue.title")} description={t("queue.description")} testId="suite-review-queue">
 			{q.isError ? (
-				<p role="alert" className="text-chart-error-ink text-sm">
+				<p role="alert" className="text-danger-ink text-sm">
 					{t("queue.loadError")}: {getBenchErrorMessage(q.error as never)}
 				</p>
 			) : !q.data || q.data.tasks.length === 0 ? (
@@ -269,9 +269,9 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 }
 
 const stateTone: Record<string, string> = {
-	pending: "border-chart-warning/50 bg-chart-warning/10",
-	accepted: "border-chart-success/40 bg-chart-success/10",
-	rejected: "border-chart-error/40 bg-chart-error/10",
+	pending: "border-warning bg-warning-soft",
+	accepted: "border-success bg-success-soft",
+	rejected: "border-danger bg-danger-soft",
 };
 
 function GeneratedRow({ suite, task, t }: { suite: string; task: GeneratedTask; t: T }) {
@@ -401,7 +401,7 @@ export function QualityBody({ report, t }: { report: QualityReport; t: T }) {
 					<h4 className="mb-1 font-medium">{t("quality.public")}</h4>
 					<ul className="flex flex-col gap-1">
 						{hits.map((h) => (
-							<li key={h.task} className={cn("text-xs", h.severity === "error" && "text-chart-error-ink")}>
+							<li key={h.task} className={cn("text-xs", h.severity === "error" && "text-danger-ink")}>
 								<span className="font-mono">{h.task}</span> {t("quality.overlap", { pct: pct(h.overlap), matches: h.matches.join(", ") })}
 								{h.severity === "error" && ` (${t("quality.heldOutError")})`}
 							</li>
@@ -550,7 +550,7 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 				<div className="flex flex-col gap-1 text-sm" data-testid="suite-review-split-result">
 					<span>{t("split.result", { held: state.result.held_out, public: state.result.public })}</span>
 					{(state.result.refused?.length ?? 0) > 0 && (
-						<span className="text-chart-warning-ink">{t("split.refused", { tasks: state.result.refused!.join(", ") })}</span>
+						<span className="text-warning-ink">{t("split.refused", { tasks: state.result.refused!.join(", ") })}</span>
 					)}
 					<span className="text-muted-foreground">{state.result.next}</span>
 				</div>

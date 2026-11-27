@@ -18,6 +18,7 @@
 		"open": "Open",
 		"summary": "{{clauses}} clauses, {{pending}} drafts pending review",
 		"delete": "Delete",
+		"deleteTitle": "Delete {{name}}?",
 		"deleteConfirm": "Delete {{name}} and its pending drafts? Accepted tasks stay in the benchmark.",
 		"viewerList": "Pick a policy to see its compliance report."
 	},

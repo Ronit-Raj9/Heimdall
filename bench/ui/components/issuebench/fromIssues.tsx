@@ -96,7 +96,7 @@ export function ReadinessBanner({ readiness, t }: { readiness: IssueReadiness | 
 	return (
 		<div
 			role="alert"
-			className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs"
+			className="border-danger bg-danger-soft text-danger-ink flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs"
 			data-testid="issuebench-readiness"
 		>
 			<span>{message}</span>

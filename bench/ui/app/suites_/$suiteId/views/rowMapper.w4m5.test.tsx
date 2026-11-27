@@ -14,3 +14,15 @@ describe("MappingStep help (p10-2)", () => {
 		expect(html).not.toContain("refreshes");
 	});
 });
+describe("MappingStep columns (M3-60)", () => {
+	it("shows Question and Expected answer, the rest under More columns", async () => {
+		const { splitMapFields } = await import("./rowMapper");
+		expect(splitMapFields(["question", "messages", "expected", "id"])).toEqual({ main: ["question", "expected"], more: ["messages", "id"] });
+		const html = renderToStaticMarkup(<MappingStep columns={[]} mapping={{}} onChange={() => {}} showGradeOn={false} t={t} />);
+		const more = html.indexOf('data-testid="suite-build-map-more"');
+		expect(more).toBeGreaterThan(html.indexOf('data-testid="suite-build-map-question"'));
+		expect(more).toBeGreaterThan(html.indexOf('data-testid="suite-build-map-expected"'));
+		expect(html.indexOf('data-testid="suite-build-map-messages"')).toBeGreaterThan(more);
+		expect(html).toContain("More columns");
+	});
+});

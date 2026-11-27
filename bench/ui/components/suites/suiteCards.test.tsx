@@ -52,7 +52,7 @@ describe("SuiteCards", () => {
 
 	it("shows readiness as a dot and words, the task count and a quiet Run, and hides engineering detail", () => {
 		const core = card(html, "coding-core");
-		expect(core).toMatch(/data-testid="suites-row-coding-core-status" data-status="ready">.*Ready/);
+		expect(core).toMatch(/data-testid="suites-row-coding-core-status"[^>]*data-status="ready"[^>]*>.*Ready/);
 		expect(core).toContain("4 tasks");
 		expect(core).toContain('data-testid="suites-row-coding-core-run"');
 		expect(core).toContain("md:inline-flex"); // M6-44: Run shows without hover from md up

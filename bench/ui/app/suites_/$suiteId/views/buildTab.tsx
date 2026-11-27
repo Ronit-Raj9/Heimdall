@@ -6,6 +6,7 @@ import { ReadinessResults, readinessReport } from "@/components/suites/admission
 import { ReadinessChecklist } from "@/components/suites/readinessChecklist";
 import "@/components/suites/uf6aI18n";
 import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
 import { Input } from "@/components/ui/input";
 import { searchTasks, taskPage } from "@/components/suites/taskPaging";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -249,7 +250,7 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 								aria-checked={on}
 								onClick={() => setSource(s)}
 								className={cn(
-									"focus-visible:ring-ring/50 inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+									"focus-visible:ring-(--focus) inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
 									on ? "bg-card text-foreground border shadow-xs" : "text-muted-foreground hover:text-foreground",
 								)}
 								data-testid={`suite-build-source-${s}`}
@@ -262,9 +263,9 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 				</div>
 				{!isAnswerSuite(suite) && (
 					<p className="text-muted-foreground text-xs" data-testid="suite-build-no-rows">
-						{/* X-89: a link to the builder, not "Benchmarks > New". */}
+						{/* X-89: a link to the builder (code start), not "Benchmarks > New". */}
 						{tf("add.codeSuite")}{" "}
-						<Link to="/suites/new" search={{ template: "qa" } as never} className="text-primary hover:underline" data-testid="suite-build-no-rows-create">
+						<Link to="/suites/new" search={{ start: "code" } as never} className="text-primary hover:underline" data-testid="suite-build-no-rows-create">
 							{tf("add.codeSuiteLink")}
 						</Link>
 					</p>
@@ -352,22 +353,13 @@ function PrivateSection({ suite, writable, t }: { suite: SuiteSummary; writable:
 									<SplitRow key={task.id} suiteId={suite.id} task={task} writable={writable} t={t} />
 								))}
 							</ul>
-							{/* Phase B swaps these for the shared Pager (components/ui/pager.tsx, lane S2). */}
-							<div className="flex flex-wrap items-center justify-between gap-2" data-testid="suite-build-private-pager">
-								<span className="text-muted-foreground text-xs tabular-nums">
-									{tf("tasks.pageOf", { first: paged.first, last: paged.last, total: paged.total })}
-								</span>
-								{paged.pages > 1 && (
-									<span className="flex gap-2">
-										<Button size="sm" variant="outline" disabled={paged.page <= 1} onClick={() => setPage(paged.page - 1)}>
-											{tf("tasks.prev")}
-										</Button>
-										<Button size="sm" variant="outline" disabled={paged.page >= paged.pages} onClick={() => setPage(paged.page + 1)}>
-											{tf("tasks.next")}
-										</Button>
-									</span>
-								)}
-							</div>
+							<Pager
+								page={paged.page}
+								pageCount={paged.pages}
+								onPage={setPage}
+								rangeText={tf("tasks.pageOf", { first: paged.first, last: paged.last, total: paged.total })}
+								testId="suite-build-private-pager"
+							/>
 						</>
 					)}
 				</div>
@@ -492,7 +484,7 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 					</label>
 				)}
 				{job && !report && job.error && (
-					<p role="alert" className="text-chart-error-ink text-sm" data-testid="suite-build-readiness-error">
+					<p role="alert" className="text-danger-ink text-sm" data-testid="suite-build-readiness-error">
 						{job.error}
 					</p>
 				)}

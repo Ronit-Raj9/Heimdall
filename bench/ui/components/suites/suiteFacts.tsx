@@ -128,10 +128,10 @@ export function SuiteDriftNotice({ suite }: { suite: SuiteSummary }) {
 		return (
 			<div
 				role="alert"
-				className="border-chart-error/50 bg-chart-error/10 flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
+				className="border-danger bg-danger-soft flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
 				data-testid="suites-lock-error"
 			>
-				<CircleX className="text-chart-error-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+				<CircleX className="text-danger-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 				<span className="min-w-0 break-words">{t("suites.drift.lockError", { error: suite.lock_error })}</span>
 			</div>
 		);
@@ -139,11 +139,11 @@ export function SuiteDriftNotice({ suite }: { suite: SuiteSummary }) {
 	if (suite.drift.length === 0) return null;
 	return (
 		<div
-			className="border-chart-warning/50 bg-chart-warning/10 flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2"
+			className="border-warning bg-warning-soft flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2"
 			data-testid="suites-drift"
 		>
 			<div className="flex items-start gap-2">
-				<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<p className="text-foreground text-sm font-medium">{t("suites.drift.title")}</p>
 					<p className="text-muted-foreground text-xs">{t("suites.drift.description")}</p>
@@ -180,11 +180,11 @@ export function BrokenSuite({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div
 			role="alert"
-			className="border-chart-error/50 bg-chart-error/5 flex min-w-0 flex-col gap-2 rounded-sm border px-4 py-3"
+			className="border-danger bg-danger-soft flex min-w-0 flex-col gap-2 rounded-sm border px-4 py-3"
 			data-testid="suites-broken"
 		>
 			<p className="text-foreground flex items-center gap-2 text-sm font-medium">
-				<CircleX className="text-chart-error-ink size-4 shrink-0" aria-hidden="true" />
+				<CircleX className="text-danger-ink size-4 shrink-0" aria-hidden="true" />
 				{t("suites.broken.title")}
 			</p>
 			<pre className="text-foreground min-w-0 overflow-x-auto font-mono text-xs break-all whitespace-pre-wrap">{suite.error}</pre>

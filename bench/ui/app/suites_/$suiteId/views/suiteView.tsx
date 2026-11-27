@@ -14,6 +14,7 @@ import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { healthState } from "@/components/suites/suiteHealth.utils";
 import { leaderboardSuite } from "@/components/suites/suites.utils";
 import { Button } from "@/components/ui/button";
+import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { getBenchErrorMessage, useGetSuiteHealthQuery, useListRunsQuery } from "@/lib/store";
 import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/app/failure-tests/views/gw07I18n";
@@ -273,10 +274,10 @@ function SuiteBody({
 			{askedVersion && askedVersion !== suite.version && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
+					className="border-warning bg-warning-soft text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
 					data-testid="suite-version-mismatch"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{t("suites.detail.versionMismatch", {
 						requested: askedVersion,
 						current: suite.version || "?",
@@ -286,10 +287,10 @@ function SuiteBody({
 			{mode === "synthetic" && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
+					className="border-warning bg-warning-soft text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
 					data-testid="suites-synthetic-banner"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{t("suites.synthetic")}
 				</p>
 			)}
@@ -352,6 +353,24 @@ function SuiteBody({
 										</h2>
 										<ReviewTab suite={suite} />
 									</section>
+									{/* M3-14: the create action for cheat checks lives here, not on the report card. */}
+									{!builtin && !suite.id.endsWith("-twins") && suite.task_count > 0 && (
+										<section id="suite-section-cheat" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="suite-section-cheat-title" data-testid="suite-cheat-checks">
+											<h2 id="suite-section-cheat-title" className="text-foreground text-base font-semibold tracking-tight">
+												{tf("sections.cheat")}
+											</h2>
+											<p className="text-muted-foreground max-w-prose text-sm">{tf("cheat.hint")}</p>
+											<div>
+												<JobRunButton
+													kind="twins.make"
+													params={{ suite: suite.id, max: 50 }}
+													label={tf("cheat.add")}
+													confirm={tf("cheat.confirm")}
+													variant="outline"
+												/>
+											</div>
+										</section>
+									)}
 								</div>
 							) : active === "files" ? (
 								<div className="flex min-w-0 flex-col gap-8" data-testid="suite-files">

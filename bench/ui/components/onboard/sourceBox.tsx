@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import type { OnboardInput } from "@/lib/types/onboard";
 import { cn } from "@/lib/utils";
 import { Upload } from "lucide-react";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
 import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/suites/uf6aI18n";
@@ -30,8 +31,11 @@ export function sourceHintShown(box: { link: string; rows: string; file: File | 
 export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit(c: SourceChoice): void; onClear?(): void }) {
 	const { t } = useTranslation("onboard");
 	const { t: tf } = useTranslation("uf6a");
-	const [link, setLink] = useState("");
-	const [rows, setRows] = useState("");
+	// X-83: a typed link or pasted rows survive a reload (sessionStorage); the file and the secret do not.
+	const [draft, updateDraft, clearDraft] = useFormDraft("onboardSource", { link: "", rows: "" });
+	const { link, rows } = draft;
+	const setLink = (v: string) => updateDraft({ link: v });
+	const setRows = (v: string) => updateDraft({ rows: v });
 	const [file, setFile] = useState<File | null>(null);
 	const [connection, setConnection] = useState("");
 	const [error, setError] = useState("");
@@ -89,7 +93,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 				</label>
 			</details>
 			{error && (
-				<p role="alert" className="text-chart-error-ink text-xs">
+				<p role="alert" className="text-danger-ink text-xs">
 					{error}
 				</p>
 			)}
@@ -108,8 +112,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					<Button
 						variant="outline"
 						onClick={() => {
-							setLink("");
-							setRows("");
+							clearDraft();
 							setFile(null);
 							setConnection("");
 							setError("");
@@ -196,7 +199,7 @@ export function FileDrop({
 					else if (all[0]) onFile(all[0]);
 				}}
 				className={cn(
-					"text-muted-foreground focus-visible:ring-ring/50 flex min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center text-sm outline-none focus-visible:ring-[3px]",
+					"text-muted-foreground focus-visible:ring-(--focus) flex min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center text-sm outline-none focus-visible:ring-2",
 					over && "border-primary bg-accent",
 					file && "text-foreground",
 					disabled && "cursor-not-allowed opacity-50",

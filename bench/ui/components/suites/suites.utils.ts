@@ -52,9 +52,9 @@ export const EXTRA_CONTROLS: readonly AdmissionControl[] = ["stale_notes", "othe
 
 /** Tone classes from the chart tokens, so badges follow light and dark mode. */
 export const TONE_CLASS = {
-	good: "border-chart-success/50 bg-chart-success/10 text-chart-success-ink",
-	warn: "border-chart-warning/50 bg-chart-warning/10 text-chart-warning-ink",
-	bad: "border-chart-error/50 bg-chart-error/10 text-chart-error-ink",
+	good: "border-success bg-success-soft text-success-ink",
+	warn: "border-warning bg-warning-soft text-warning-ink",
+	bad: "border-danger bg-danger-soft text-danger-ink",
 	neutral: "border-border bg-muted text-muted-foreground",
 } as const;
 

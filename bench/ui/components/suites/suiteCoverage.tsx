@@ -69,10 +69,10 @@ export function LicenseSummary({ tasks }: { tasks: readonly SuiteTask[] }) {
 			{missing.length > 0 && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
+					className="border-warning bg-warning-soft text-foreground flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
 					data-testid="suites-license-missing"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 					<span className="min-w-0 break-words">
 						{t("suites.licenses.missingWarning", { count: missing.length, tasks: missing.join(", ") })}
 					</span>

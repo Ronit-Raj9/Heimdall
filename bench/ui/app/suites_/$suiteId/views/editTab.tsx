@@ -132,7 +132,7 @@ export function LintResult({ report }: { report: SuiteLintReport }) {
 	return (
 		<div className="flex flex-col gap-1 text-sm" data-testid="suite-edit-lint-result">
 			{report.errors === 0 ? (
-				<p className="text-chart-success-ink" data-testid="suite-edit-lint-ok">
+				<p className="text-success-ink" data-testid="suite-edit-lint-ok">
 					{t("edit.lintOk", { tasks: report.tasks })}{" "}
 					{report.warnings > 0 && t("edit.lintSummary", { errors: 0, warnings: report.warnings })}
 				</p>

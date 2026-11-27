@@ -257,7 +257,7 @@ function FlagCounts({ counts }: { counts: Record<string, number> }) {
 	const rows = flagCounts(counts);
 	if (rows.length === 0) {
 		return (
-			<p className="text-chart-success-ink text-xs" data-testid="suites-health-no-flags">
+			<p className="text-success-ink text-xs" data-testid="suites-health-no-flags">
 				{t("suiteHealth.noFlags")}
 			</p>
 		);

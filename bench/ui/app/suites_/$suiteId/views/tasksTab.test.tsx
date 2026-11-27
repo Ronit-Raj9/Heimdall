@@ -36,6 +36,15 @@ describe("SuiteTasksTab opened from a link", () => {
 		expect(html).not.toContain('data-testid="suites-task-missing"');
 	});
 
+	it("names the version the run used when the link sends ?rev= (M1-12)", () => {
+		query.q = { task: "t2", rev: "0.9.0" };
+		const html = renderToStaticMarkup(<SuiteTasksTab suite={suite} health={health} />);
+		expect(html).toContain('data-testid="suites-task-used-version"');
+		expect(html).toContain("The run used version 0.9.0 of this benchmark.");
+		query.q = { task: "t2" };
+		expect(renderToStaticMarkup(<SuiteTasksTab suite={suite} health={health} />)).not.toContain("suites-task-used-version");
+	});
+
 	it("names a task the benchmark does not have", () => {
 		query.q = { task: "gone-task" };
 		const html = renderToStaticMarkup(<SuiteTasksTab suite={suite} health={health} />);
@@ -70,6 +79,8 @@ describe("SuiteTasksTab paging (M6-1)", () => {
 		const html = renderToStaticMarkup(<SuiteTasksTab suite={big} health={health} />);
 		expect(html).toContain("1 to 50 of 3641 tasks");
 		expect(html).toContain('data-testid="suites-tasks-next"');
+		// The shared Pager (S2) with the page's own range text.
+		expect(html).toContain("Page 1 of 73");
 		expect(html).not.toContain("<h2");
 	});
 	it("page 2 reads 51 to 100", () => {

@@ -27,6 +27,7 @@ import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } f
 import { Columns3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
 import { useTranslation } from "react-i18next";
 import "./gw13I18n";
 
@@ -58,6 +59,8 @@ export const TASK_QUERY = {
 	/** M6-1: search text (task id or title) and the 1-based page of 50 rows. */
 	q: parseAsString,
 	page: parseAsInteger,
+	/** M1-12: the version a run used, sent by run and compare links with ?task=. */
+	rev: parseAsString,
 };
 
 /** Tasks tab: the filterable task table, the task in ?task= open beside it. */
@@ -128,13 +131,18 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 					className="min-w-0 scroll-mt-4 2xl:sticky 2xl:top-4 2xl:order-last 2xl:self-start"
 					data-testid="suites-task-detail-wrap"
 				>
+					{q.rev && (
+						<p className="text-muted-foreground mb-2 text-xs" data-testid="suites-task-used-version">
+							{tf("tasks.usedVersion", { rev: q.rev })}
+						</p>
+					)}
 					<TaskDetailPanel
 						suiteId={suite.id}
 						suiteVersion={suite.version}
 						taskId={openTask}
 						suiteOutput={suite.output}
 						suiteArtifacts={suite.artifacts}
-						onClose={() => void setQ({ task: null })}
+						onClose={() => void setQ({ task: null, rev: null })}
 						health={health}
 						quarantine={suite.tasks.find((task) => task.id === openTask)?.quarantine ?? null}
 					/>
@@ -204,7 +212,7 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 						{/* M2-112a: keyboard users can jump past the table to the pager. */}
 						<a
 							href="#suites-task-pager"
-							className="focus-visible:ring-ring/50 sr-only rounded-sm text-sm focus:not-sr-only focus-visible:ring-[3px] focus-visible:outline-none"
+							className="focus-visible:ring-(--focus) sr-only rounded-sm text-sm focus:not-sr-only focus-visible:ring-2 focus-visible:outline-none"
 							data-testid="suites-tasks-skip"
 						>
 							{tf("tasks.skipTable")}
@@ -220,68 +228,22 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 							moreColumns={moreColumns}
 							categories={categories}
 						/>
-						{/* Phase B swaps this local control for the shared Pager (components/ui/pager.tsx, lane S2). */}
-						<TaskPager
-							page={paged.page}
-							pages={paged.pages}
-							onPage={(page) => void setQ({ page: page === 1 ? null : page })}
-							label={tf("tasks.pager")}
-							text={
-								paged.total < suite.tasks.length
-									? tf("tasks.pageOfFiltered", { first: paged.first, last: paged.last, total: paged.total, all: suite.tasks.length })
-									: tf("tasks.pageOf", { first: paged.first, last: paged.last, total: paged.total })
-							}
-							prev={tf("tasks.prev")}
-							next={tf("tasks.next")}
-						/>
+						<div id="suites-task-pager">
+							<Pager
+								page={paged.page}
+								pageCount={paged.pages}
+								onPage={(page) => void setQ({ page: page === 1 ? null : page })}
+								rangeText={
+									paged.total < suite.tasks.length
+										? tf("tasks.pageOfFiltered", { first: paged.first, last: paged.last, total: paged.total, all: suite.tasks.length })
+										: tf("tasks.pageOf", { first: paged.first, last: paged.last, total: paged.total })
+								}
+								testId="suites-tasks"
+							/>
+						</div>
 					</>
 				)}
 			</section>
 		</div>
-	);
-}
-
-/**
- * M6-1: a minimal pager under the task table (count, Previous, Next). Local to this tab in phase A;
- * phase B replaces it with the shared Pager of lane S2.
- */
-function TaskPager({
-	page,
-	pages,
-	onPage,
-	label,
-	text,
-	prev,
-	next,
-}: {
-	page: number;
-	pages: number;
-	onPage: (page: number) => void;
-	label: string;
-	text: string;
-	prev: string;
-	next: string;
-}) {
-	return (
-		<nav
-			id="suites-task-pager"
-			aria-label={label}
-			className="flex flex-wrap items-center justify-between gap-2"
-			data-testid="suites-tasks-pager"
-		>
-			<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite" data-testid="suites-tasks-showing">
-				{text}
-			</p>
-			{pages > 1 && (
-				<div className="flex items-center gap-2">
-					<Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)} data-testid="suites-tasks-prev">
-						{prev}
-					</Button>
-					<Button size="sm" variant="outline" disabled={page >= pages} onClick={() => onPage(page + 1)} data-testid="suites-tasks-next">
-						{next}
-					</Button>
-				</div>
-			)}
-		</nav>
 	);
 }

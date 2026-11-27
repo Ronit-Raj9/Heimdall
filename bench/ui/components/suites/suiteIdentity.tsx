@@ -1,4 +1,5 @@
 import type { SuiteSummary } from "@/lib/types/bench";
+import { StatusPill, type StatusTone } from "@/components/ui/statusPill";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import "./gw12I18n";
@@ -28,32 +29,27 @@ export function suitePillState(suite: Pick<SuiteSummary, "error" | "task_count" 
 	return state === "notReady" && suite.lock_state === "locked" ? "frozenNotChecked" : state;
 }
 
-const DOT_TONE: Record<SuitePillState, string> = {
-	ready: "bg-chart-success",
-	// M6-45: partly ready is normal (a built-in benchmark admits a subset by design): neutral, not amber.
-	needsAdmission: "bg-muted-foreground/60",
-	notReady: "bg-muted-foreground/60",
-	frozenNotChecked: "bg-muted-foreground/60",
-	needsLock: "bg-chart-warning",
-	noTasks: "bg-muted-foreground/60",
-	error: "bg-chart-error",
+/** M6-45: the shared pill tones. Partly ready is normal (a built-in benchmark admits a subset by design): neutral, not amber. */
+export const PILL_TONE: Record<SuitePillState, StatusTone> = {
+	ready: "ok",
+	needsAdmission: "neutral",
+	notReady: "neutral",
+	frozenNotChecked: "neutral",
+	needsLock: "warn",
+	noTasks: "neutral",
+	error: "bad",
 };
 
-/** The suite's readiness: a small colored dot and a few words ("Ready", "2 of 3 tasks ready"). */
+/** The suite's readiness: the shared StatusPill with a few words ("Ready", "2 of 3 tasks ready"). */
 export function SuiteStatusPill({ suite, testId, className }: { suite: SuiteSummary; testId?: string; className?: string }) {
 	const { t } = useTranslation("suitesUx");
 	const { t: tg } = useTranslation("gw12");
 	const state = suitePillState(suite);
 	return (
-		<span
-			className={cn("text-muted-foreground inline-flex w-fit items-center gap-1.5 text-xs whitespace-nowrap", className)}
-			data-testid={testId}
-			data-status={state}
-		>
-			<span className={cn("size-1.5 shrink-0 rounded-full", DOT_TONE[state])} aria-hidden="true" />
+		<StatusPill tone={PILL_TONE[state]} className={cn("w-fit whitespace-nowrap", className)} testId={testId} data-status={state}>
 			{state === "frozenNotChecked"
 				? tg("status.frozenNotChecked")
 				: t(`status.${state}`, { ready: suite.admitted_count, total: suite.task_count })}
-		</span>
+		</StatusPill>
 	);
 }

@@ -42,7 +42,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 export function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -179,6 +179,14 @@ export function columnLabel(c: RowColumn, t: T): string {
 	return `${c.path} (${kind})${ex}`;
 }
 
+/** M3-60: the fields shown at once (Question, Expected answer); the rest sit under "More columns". */
+export const PRIMARY_MAP_FIELDS: readonly string[] = ["question", "expected"];
+
+/** Splits the offered fields into the shown ones and the "More columns" ones, keeping their order. */
+export function splitMapFields<F extends string>(fields: readonly F[]): { main: F[]; more: F[] } {
+	return { main: fields.filter((f) => PRIMARY_MAP_FIELDS.includes(f)), more: fields.filter((f) => !PRIMARY_MAP_FIELDS.includes(f)) };
+}
+
 /** Mapping step: one column per task field, metadata columns, and the remember checkbox. */
 export function MappingStep({
 	columns,
@@ -217,33 +225,40 @@ export function MappingStep({
 		const next = meta.has(path) ? [...meta].filter((p) => p !== path) : [...meta, path];
 		onChange({ ...mapping, metadata: next });
 	};
+	const { t: tf } = useTranslation("uf6a");
+	const split = splitMapFields(fields);
+	const fieldSelect = (f: (typeof MAP_FIELDS)[number]) => (
+		<Field key={f} label={t(`rows.map.field.${f}`)}>
+			<select
+				className={selectClass}
+				value={mapping[f] ?? ""}
+				disabled={disabled}
+				onChange={(e) => onChange({ ...mapping, [f]: e.target.value })}
+				data-testid={`suite-build-map-${f}`}
+			>
+				<option value="">{t("rows.map.auto")}</option>
+				<option value="-">{t("rows.map.skip")}</option>
+				{columns.map((c) => (
+					<option key={c.path} value={c.path}>
+						{columnLabel(c, t)}
+					</option>
+				))}
+			</select>
+		</Field>
+	);
 	return (
 		<div className="flex min-w-0 flex-col gap-3 rounded-md border px-3 py-3" data-testid="suite-build-mapping">
 			<div>
 				<p className="text-sm font-medium">{t("rows.map.title")}</p>
 				<p className="text-muted-foreground text-xs">{help ?? t("rows.map.help")}</p>
 			</div>
-			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{fields.map((f) => (
-					<Field key={f} label={t(`rows.map.field.${f}`)}>
-						<select
-							className={selectClass}
-							value={mapping[f] ?? ""}
-							disabled={disabled}
-							onChange={(e) => onChange({ ...mapping, [f]: e.target.value })}
-							data-testid={`suite-build-map-${f}`}
-						>
-							<option value="">{t("rows.map.auto")}</option>
-							<option value="-">{t("rows.map.skip")}</option>
-							{columns.map((c) => (
-								<option key={c.path} value={c.path}>
-									{columnLabel(c, t)}
-								</option>
-							))}
-						</select>
-					</Field>
-				))}
-			</div>
+			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{split.main.map(fieldSelect)}</div>
+			{split.more.length > 0 && (
+				<details className="min-w-0" open={split.more.some((f) => !!mapping[f])} data-testid="suite-build-map-more">
+					<summary className="text-muted-foreground min-h-11 cursor-pointer py-2 text-sm">{tf("rows.moreColumns")}</summary>
+					<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{split.more.map(fieldSelect)}</div>
+				</details>
+			)}
 			{showMetadata && columns.length > 0 && (
 				<fieldset className="flex min-w-0 flex-col gap-1" data-testid="suite-build-map-metadata">
 					<legend className="text-muted-foreground text-sm">{t("rows.map.metadata")}</legend>
@@ -353,7 +368,7 @@ export function AttachmentsInput({
 				</ul>
 			)}
 			{problem && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid="suite-build-attachments-error">
+				<p role="alert" className="text-danger-ink text-xs" data-testid="suite-build-attachments-error">
 					{problem}
 				</p>
 			)}
@@ -389,9 +404,9 @@ export function ImportProgress({ status, t }: { status: RowImportStatus; t: T })
 			>
 				<div className="bg-primary h-full transition-[width]" style={{ width: `${pct}%` }} />
 			</div>
-			{status.error && <p className="text-chart-error-ink text-xs">{status.error}</p>}
+			{status.error && <p className="text-danger-ink text-xs">{status.error}</p>}
 			{status.problem_count > 0 && (
-				<p className="text-chart-warning-ink text-xs">{t("rows.progress.problems", { count: status.problem_count })}</p>
+				<p className="text-warning-ink text-xs">{t("rows.progress.problems", { count: status.problem_count })}</p>
 			)}
 			{status.problems.length > 0 && <ProblemList problems={status.problems} t={t} />}
 			{status.next && <p className="text-muted-foreground text-xs">{status.next}</p>}
@@ -471,7 +486,7 @@ export function RowPreview({ result, t }: { result: RowImportResult; t: T }) {
 
 export function ProblemList({ problems, t }: { problems: RowImportResult["problems"]; t: T }) {
 	return (
-		<ul className="text-chart-warning-ink flex flex-col gap-0.5 text-xs" data-testid="suite-build-problems">
+		<ul className="text-warning-ink flex flex-col gap-0.5 text-xs" data-testid="suite-build-problems">
 			{problems.map((p, i) => (
 				<li key={`${p.line}-${i}`}>{t("rows.problem", { line: p.line, message: p.message })}</li>
 			))}
@@ -625,7 +640,7 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 			{tickets && exact && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 rounded-md border px-3 py-2 text-xs"
+					className="border-warning bg-warning-soft rounded-md border px-3 py-2 text-xs"
 					data-testid="suite-build-tickets-exact"
 				>
 					{t("rows.ticketsNeedJudge")}
@@ -683,7 +698,7 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 				/>
 			</label>
 			{mode === "too_big" && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid="suite-build-too-big">
+				<p role="alert" className="text-danger-ink text-xs" data-testid="suite-build-too-big">
 					{t("rows.tooBig")}
 				</p>
 			)}

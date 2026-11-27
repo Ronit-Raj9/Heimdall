@@ -87,7 +87,7 @@ export function SuiteTaskTable({
 									aria-label={t("suites.tasks.open", {
 										task: `${task.id}: ${task.title}`,
 									})}
-									className="focus-visible:ring-ring/50 group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-[3px] focus-visible:outline-none"
+									className="focus-visible:ring-(--focus) group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
 									data-testid={`suites-task-open-${task.id}`}
 								>
 									<span className="text-foreground text-sm font-medium break-words group-hover:underline">{task.title || task.id}</span>
@@ -150,7 +150,7 @@ export function SuiteTaskTable({
 									{license ? (
 										<span className="font-mono">{license}</span>
 									) : (
-										<span className="text-chart-warning-ink">{t("suites.tasks.noLicense")}</span>
+										<span className="text-warning-ink">{t("suites.tasks.noLicense")}</span>
 									)}
 								</TableCell>
 							)}
@@ -248,7 +248,7 @@ function SortableHead({ sortKey, label, sort, onSort, align, className }: Sortab
 				onClick={() => onSort(sortKey)}
 				aria-label={active ? `${name}, ${t(sort.dir === "asc" ? "suites.tasks.sortedAsc" : "suites.tasks.sortedDesc")}` : name}
 				className={cn(
-					"focus-visible:ring-ring/50 -mx-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+					"focus-visible:ring-(--focus) -mx-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
 					active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
 					align === "right" && "flex-row-reverse",
 				)}

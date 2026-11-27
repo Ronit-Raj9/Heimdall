@@ -141,7 +141,7 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 				<span className="font-mono text-sm">{task.id}</span>
 				{task.redacted && <span className="text-muted-foreground text-xs">{t("health.redacted")}</span>}
 				{task.quarantine ? (
-					<span className="text-chart-warning-ink text-xs">{t("health.quarantined", { reason: task.quarantine.reason })}</span>
+					<span className="text-warning-ink text-xs">{t("health.quarantined", { reason: task.quarantine.reason })}</span>
 				) : (
 					<>
 						<AdmissionBadge task={task} testId={`suite-ops-admission-${task.id}`} />

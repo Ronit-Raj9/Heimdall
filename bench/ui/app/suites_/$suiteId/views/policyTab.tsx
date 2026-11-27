@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { isPicked, LabeledModelPicker, splitModelRef, usePickedKeyState } from "@/components/models/labeledModelPicker";
 import { ConfirmButton } from "@/components/platform/badges";
 import type { PickedModel } from "@/components/models/groupedModelPicker";
-import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
+import { useConfirm, type ConfirmFn, type DestructiveConfirmOptions } from "@/components/platform/confirmDialog";
+import { notify } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { FileDrop } from "@/components/onboard/sourceBox";
 import { Link } from "@tanstack/react-router";
@@ -84,7 +85,7 @@ function fileBase64(f: File): Promise<string> {
 function ErrorLine({ error }: { error: unknown }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs break-words">
+		<p role="alert" className="text-danger-ink text-xs break-words">
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -321,7 +322,7 @@ function GenerateSection({
 				</p>
 			)}
 			{(j?.status === "failed" || j?.status === "cancelled") && (
-				<p role="alert" className="text-chart-error-ink text-xs">
+				<p role="alert" className="text-danger-ink text-xs">
 					{t("generate.failed", { error: j.error ?? j.status })}
 				</p>
 			)}
@@ -440,7 +441,7 @@ function DraftsSection({ suite, view, taskCount }: { suite: string; view: Policy
 											<strong>{d.title}</strong>
 											<p className="break-words">{d.opening}</p>
 											{d.warnings?.map((w) => (
-												<p key={w} className="text-chart-error-ink text-xs">
+												<p key={w} className="text-danger-ink text-xs">
 													{w}
 												</p>
 											))}
@@ -596,9 +597,12 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 	// M6-75: the in-page confirm, not window.confirm.
 	const confirm = useConfirm();
 	const onDelete = async (id: string, name: string) => {
-		if (!(await confirm(t("docs.deleteConfirm", { name })))) return;
+		const opts: DestructiveConfirmOptions = { destructive: true, title: t("docs.deleteTitle", { name }), confirmLabel: t("docs.delete") };
+		if (!(await confirm(t("docs.deleteConfirm", { name }), opts))) return;
 		void remove({ suite: suite.id, doc: id }).then((r) => {
-			if (!("error" in r) && id === doc) setDoc("");
+			if ("error" in r) return;
+			if (id === doc) setDoc("");
+			notify({ text: t("deleted", { ns: "toast", name }) });
 		});
 	};
 	return (

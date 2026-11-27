@@ -50,7 +50,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -543,7 +543,7 @@ export function ImportPreview({ result, t }: { result: PlatformImportResult; t: 
 				</p>
 			)}
 			{(result.benchmark?.problems?.length ?? 0) > 0 && (
-				<p className="text-chart-error-ink text-xs">{t("import.problems", { count: result.benchmark!.problems!.length })}</p>
+				<p className="text-danger-ink text-xs">{t("import.problems", { count: result.benchmark!.problems!.length })}</p>
 			)}
 			{(result.preview ?? []).length > 0 && (
 				<ul className="flex max-h-64 flex-col gap-1 overflow-auto rounded-md border p-2 text-xs">
