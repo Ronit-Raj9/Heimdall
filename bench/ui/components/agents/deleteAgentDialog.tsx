@@ -54,7 +54,8 @@ export function DeleteAgentDialog({ agentId, onDeleted, onClose }: DeleteAgentDi
 					</p>
 				)}
 				<div className="flex justify-end gap-2">
-					<Button type="button" variant="outline" onClick={onClose} disabled={isLoading} dataTestId="delete-agent-keep">
+					{/* Destructive: the dialog opens with focus on Keep, so Enter on a fresh dialog deletes nothing. */}
+					<Button type="button" variant="outline" onClick={onClose} disabled={isLoading} autoFocus data-initial-focus="" dataTestId="delete-agent-keep">
 						{t("deleteAgent.keep")}
 					</Button>
 					<Button type="button" variant="destructive" onClick={() => void confirm()} disabled={isLoading} dataTestId="delete-agent-confirm">
