@@ -543,7 +543,9 @@ class AgentConfig(_AgentConfigRequired, total=False):
     build: Optional[ImageSpec]
     capabilities: List[str]
     files: Dict[str, str]
+    files_raw: Dict[str, str]
     image_digest: str
+    instructions: str
     limits: Optional[AgentLimits]
     mcp: Optional[AgentMCP]
     memory: Optional[AgentMemory]
@@ -576,6 +578,7 @@ class AgentConfigDoc(_AgentConfigDocRequired, total=False):
 class _AgentConfigFieldsRequired(TypedDict):
     adapter: str
     cpus: float
+    description: str
     id: str
     mem_gb: float
     model: str
@@ -588,7 +591,6 @@ class AgentConfigFields(_AgentConfigFieldsRequired, total=False):
     a2a_card_url: str
     argv: List[str]
     behavior: Optional[AgentBehaviorFields]
-    description: str
     env: Dict[str, str]
     files: List[str]
     image: str
@@ -871,7 +873,7 @@ class AgentReport(TypedDict):
     agent: str
     by_kind: Dict[str, Rate]
     clauses: List[ClauseResult]
-    findings: List[Finding]
+    findings: List[Finding_policybench]
     total: Rate
 
 
@@ -1115,6 +1117,7 @@ class AgentVersionList(_AgentVersionListRequired, total=False):
     builtin: bool
     live: int
     live_source: str
+    no_file: bool
 
 
 class AgenticCoverage(TypedDict):
@@ -1472,11 +1475,15 @@ class AppTasksWriteRequest(TypedDict, total=False):
     judge: Optional[JudgeConfig]
 
 
-class AppTasksWriteResult(TypedDict):
+class _AppTasksWriteResultRequired(TypedDict):
     created: bool
     next: str
     suite: str
     tasks: List[Written]
+
+
+class AppTasksWriteResult(_AppTasksWriteResultRequired, total=False):
+    readiness_job: str
 
 
 class _ApplyResultRequired(TypedDict):
@@ -1663,6 +1670,19 @@ class ArmRef_migration(TypedDict):
     label: str
     model: str
     provider: str
+
+
+class _ArmResultRequired(TypedDict):
+    arm: str
+    label: str
+    runs: int
+    tasks: int
+
+
+class ArmResult(_ArmResultRequired, total=False):
+    cost_per_run: Optional[float]
+    latency_ms: Optional[float]
+    solve_rate: Optional[float]
 
 
 class ArmSetup(TypedDict):
@@ -1866,6 +1886,28 @@ class Behaviour(TypedDict):
     retries_per_run: Change
 
 
+class BehaviourArmCounts(TypedDict):
+    fired: int
+    fired_failed: int
+    fired_passed: int
+    runs: int
+    unknown: int
+
+
+class BehaviourChecks(TypedDict):
+    builtin: List[Rule_steprules]
+    classes: Classes
+    rules: List[Rule_steprules]
+
+
+class _BehaviourChecksRequestRequired(TypedDict):
+    rules: List[Rule_steprules]
+
+
+class BehaviourChecksRequest(_BehaviourChecksRequestRequired, total=False):
+    classes: Optional[Classes]
+
+
 BenchCatalogAdd = TypedDict('BenchCatalogAdd', {'force': "bool", 'from': "str", 'ids': "List[str]", 'limit': "int", 'set': "Dict[str, str]", 'suite': "str", 'url': "str"}, total=False)
 
 
@@ -2006,6 +2048,7 @@ class BifrostFeature(_BifrostFeatureRequired, total=False):
 
 class BifrostFeatures(TypedDict, total=False):
     mcp: Optional[BifrostMCP]
+    prompt: Optional[BifrostPrompt]
     prompt_cache: str
     semantic_cache: Optional[BifrostSemanticCache]
 
@@ -2014,8 +2057,25 @@ class BifrostGovernance(TypedDict):
     routing_rules: List[RoutingRule]
 
 
-class BifrostMCP(TypedDict):
+class _BifrostMCPRequired(TypedDict):
     code_mode: bool
+
+
+class BifrostMCP(_BifrostMCPRequired, total=False):
+    forbidden: List[str]
+    tools: List[str]
+
+
+class _BifrostPromptRequired(TypedDict):
+    messages: List[Dict[str, Any]]
+    name: str
+    sha256: str
+    version: int
+
+
+class BifrostPrompt(_BifrostPromptRequired, total=False):
+    model_params: Dict[str, Any]
+    source_id: str
 
 
 class _BifrostProviderSpecRequired(TypedDict):
@@ -2072,6 +2132,22 @@ class _BifrostSemanticCacheRequired(TypedDict):
 class BifrostSemanticCache(_BifrostSemanticCacheRequired, total=False):
     threshold: float
     ttl: str
+
+
+class _BifrostSettingRequired(TypedDict):
+    body: str
+    kind: str
+    title: str
+    where: str
+
+
+class BifrostSetting(_BifrostSettingRequired, total=False):
+    note: str
+
+
+class BifrostSettingAnswer(TypedDict):
+    reason: str
+    setting: Optional[BifrostSetting]
 
 
 class _BifrostUseRequired(TypedDict):
@@ -2165,6 +2241,10 @@ class BudgetSpec(_BudgetSpecRequired, total=False):
     reserve_usd: float
 
 
+class BudgetSpec_improve(TypedDict):
+    total_usd: float
+
+
 class _BudgetsRequired(TypedDict):
     cpus: float
     mem_gb: float
@@ -2198,6 +2278,16 @@ class BuildResult(_BuildResultRequired, total=False):
     detail: str
     env: Optional[EnvSpec]
     log_path: str
+
+
+class _BundleSourceRequired(TypedDict):
+    kind: str
+
+
+class BundleSource(_BundleSourceRequired, total=False):
+    prompt_id: str
+    publish: str
+    skills: List[str]
 
 
 class _CIWorkflowPreviewRequired(TypedDict):
@@ -2456,6 +2546,21 @@ class Candidate(_CandidateRequired, total=False):
     step_seq: int
 
 
+class _CandidateViewRequired(TypedDict):
+    cost_usd: float
+    dev_diff: float
+    dev_tasks: int
+    id: str
+    kind: str
+    slot: int
+
+
+class CandidateView(_CandidateViewRequired, total=False):
+    dropped: str
+    edits: List[EditView]
+    source: str
+
+
 class _Candidate_connectRequired(TypedDict):
     confidence: float
     evidence: List[str]
@@ -2698,6 +2803,31 @@ class Channel(TypedDict):
     label: str
 
 
+class _CheatArmRequired(TypedDict):
+    high: float
+    low: float
+    passed: int
+    rate: float
+    runs: int
+
+
+class CheatArm(_CheatArmRequired, total=False):
+    pass_runs: List[str]
+
+
+class _CheatCheckRequired(TypedDict):
+    state: str
+
+
+class CheatCheck(_CheatCheckRequired, total=False):
+    evaluation: str
+    per_arm: Dict[str, CheatArm]
+
+
+class CheatCheckRequest(TypedDict):
+    yes: bool
+
+
 class _ClaimRequired(TypedDict):
     made: bool
     source: str
@@ -2708,6 +2838,13 @@ class Claim(_ClaimRequired, total=False):
     text: str
 
 
+class ClaimSpec(TypedDict):
+    alpha: float
+    extension: bool
+    extension_alpha: float
+    target_gain: float
+
+
 class ClassCounts(TypedDict):
     flipped_to_fail: int
     flipped_to_pass: int
@@ -2716,6 +2853,15 @@ class ClassCounts(TypedDict):
     unchanged_fail: int
     unchanged_pass: int
     unstable_in_both: int
+
+
+class Classes(TypedDict):
+    claim_words: List[str]
+    edit_tools: List[str]
+    read_commands: List[str]
+    read_tools: List[str]
+    shell_tools: List[str]
+    test_commands: List[str]
 
 
 class _ClauseRequired(TypedDict):
@@ -2866,6 +3012,17 @@ class CommitSpec(TypedDict):
     max_pairs: int
     min_pairs: int
     trials: int
+
+
+class CommitView(TypedDict):
+    level: float
+    mean: float
+    missing: int
+    n: int
+    n_nonzero: int
+    p: float
+    skipped: bool
+    why: str
 
 
 class _CompareViewRequired(TypedDict):
@@ -3328,6 +3485,24 @@ class ContaminationHit(TypedDict):
     task: str
 
 
+class ContinueOffer(TypedDict, total=False):
+    can_confirm: float
+    extra_trials: int
+    new_tasks: int
+    runs: int
+    text: str
+    usd: List[float]
+
+
+class _ContinueRequestRequired(TypedDict):
+    extra_trials: int
+    new_tasks: bool
+
+
+class ContinueRequest(_ContinueRequestRequired, total=False):
+    extra_budget_usd: float
+
+
 class _ControlBandRequired(TypedDict):
     best_of_k: float
     high: float
@@ -3346,6 +3521,13 @@ class ControlInfo(TypedDict):
     kind: str
     origin: str
     path: str
+
+
+class ControlLine(TypedDict, total=False):
+    ci80: List[float]
+    diff: float
+    note: str
+    score: float
 
 
 class ConversationSpec(TypedDict, total=False):
@@ -3775,9 +3957,20 @@ class _Detail_improveRequired(TypedDict):
 
 
 class Detail_improve(_Detail_improveRequired, total=False):
+    can_continue: bool
+    can_resume: bool
     control_band: Optional[ControlBand]
     error: str
+    estimate: Optional[Estimate]
+    extension: Optional[FinalView]
+    final: Optional[FinalView]
+    keep: List[KeepView]
+    limit_usd: float
+    revision: int
     sealed_gain: Optional[float]
+    spent_usd: float
+    study: str
+    teacher: str
     verdict: str
     verdict_detail: Optional[Verdict_improve]
 
@@ -3838,6 +4031,20 @@ class DifficultyHealth(TypedDict):
     pass_rate: Optional[float]
     runs: int
     spread: Optional[float]
+
+
+class _DivergenceRequired(TypedDict):
+    after: List[SideAfter]
+    found: bool
+    note: str
+
+
+class Divergence(_DivergenceRequired, total=False):
+    category: str
+    seq_a: int
+    seq_b: int
+    text_a: str
+    text_b: str
 
 
 class _DocRequired(TypedDict):
@@ -3923,6 +4130,21 @@ class Draft(_DraftRequired, total=False):
     template: str
     tools: List[ToolSeen]
     tools_declared: List[str]
+
+
+class _DraftRequestRequired(TypedDict):
+    base: str
+    budget_usd: float
+    feature: str
+    suite: str
+
+
+class DraftRequest(_DraftRequestRequired, total=False):
+    model: str
+    options: Dict[str, str]
+    provider: str
+    tasks: List[str]
+    trials: int
 
 
 class _DraftSetRequired(TypedDict):
@@ -4029,12 +4251,48 @@ class EValueTest(TypedDict):
     worse: bool
 
 
+class _EditRequired(TypedDict):
+    op: str
+    reason: str
+
+
+class Edit(_EditRequired, total=False):
+    evidence: List[str]
+    file: str
+    id: str
+    path: str
+    predicts_fixed: List[str]
+    section: str
+    text: str
+
+
+class _EditViewRequired(TypedDict):
+    op: str
+    reason: str
+    result: str
+
+
+class EditView(_EditViewRequired, total=False):
+    id: str
+    why: str
+
+
 class _EditableRequired(TypedDict):
     files: List[str]
 
 
 class Editable(_EditableRequired, total=False):
     dirs: List[str]
+    instructions: bool
+
+
+class _EditsFileRequired(TypedDict):
+    edits: List[Edit]
+    rationale: str
+
+
+class EditsFile(_EditsFileRequired, total=False):
+    no_edits: str
 
 
 class _EffectRequired(TypedDict):
@@ -4057,6 +4315,30 @@ class Effect(_EffectRequired, total=False):
     p_draws: int
     p_value: Optional[float]
     upper_bound: Optional[Effect]
+
+
+class _Effect_gwfeatureRequired(TypedDict):
+    arms: List[ArmResult]
+    computed_at: str
+    control: str
+    exp_id: str
+    feature: str
+    fingerprint: str
+    headline: str
+    source: Source
+    state: str
+    tasks: int
+
+
+class Effect_gwfeature(_Effect_gwfeatureRequired, total=False):
+    cost_delta: Optional[Interval]
+    details: Any
+    latency_delta: Optional[Interval]
+    reason: str
+    result: str
+    setting: Optional[BifrostSetting]
+    solve_delta: Optional[Interval]
+    variant: str
 
 
 class _EmailSettingsRequired(TypedDict):
@@ -4231,6 +4513,22 @@ class Entry_reference(_Entry_referenceRequired, total=False):
     version: int
 
 
+class _Entry_validityRequired(TypedDict):
+    after: Side
+    at: str
+    before: Side
+    exp_id: str
+    flipped: bool
+    id: str
+    regrade_id: str
+
+
+class Entry_validity(_Entry_validityRequired, total=False):
+    gates: Dict[str, str]
+    note: str
+    seen_by: List[str]
+
+
 class _EnvSpecRequired(TypedDict):
     base_image: str
     commands: List[str]
@@ -4295,7 +4593,63 @@ class ErrorRule(TypedDict, total=False):
     retry: Optional[bool]
 
 
-class Estimate(TypedDict):
+class _EstimateRequired(TypedDict):
+    assumed: List[str]
+    detectable: EstimateDetectable
+    minutes: EstimateMinutes
+    ok: bool
+    pool: int
+    refusals: List[EstimateNote]
+    runs: EstimateRuns
+    splits: SplitCounts
+    usd: EstimateUSD
+    warnings: List[EstimateNote]
+
+
+class Estimate(_EstimateRequired, total=False):
+    loops: int
+
+
+class EstimateDetectable(TypedDict):
+    gate_points: float
+    held_out_points: float
+
+
+class EstimateMinutes(TypedDict):
+    high: float
+    low: float
+
+
+class EstimateNote(TypedDict):
+    code: str
+    message: str
+
+
+class EstimateRuns(TypedDict):
+    baseline: int
+    final: int
+    gate: int
+    held_out_curve: int
+    improver: int
+    practice: int
+    total: int
+
+
+class _EstimateUSDRequired(TypedDict):
+    expected: float
+    high: float
+    limit: float
+    low: float
+    per_run: float
+    per_run_source: str
+
+
+class EstimateUSD(_EstimateUSDRequired, total=False):
+    limit_text: str
+    loop_limit: float
+
+
+class Estimate_onboard(TypedDict):
     assist_usd: float
     judge_calls: int
     readiness_runs: int
@@ -4458,6 +4812,7 @@ class _EvaluationRequired(TypedDict):
 
 
 class Evaluation(_EvaluationRequired, total=False):
+    cheat_check_of: str
     created_by: str
     failed_runs: int
     gate_result: Optional[EvaluationGateResult]
@@ -4729,6 +5084,9 @@ class Event(_EventRequired, total=False):
     usd: Optional[Value]
 
 
+Event_findings = TypedDict('Event_findings', {'at': "str", 'by': "str", 'experiment': "str", 'from': "str", 'reason': "str", 'run_id': "str", 'to': "str"}, total=False)
+
+
 class EventsPoll(TypedDict):
     events: List[LiveEvent]
     exp_id: str
@@ -4801,6 +5159,7 @@ class Experiment(_ExperimentRequired, total=False):
     extra_gates: List[str]
     fairness: str
     framing_pairs: List[FramingPair]
+    gateway_test: Optional[GatewayTest]
     matrix: Optional[MatrixSpec]
     metrics: List[str]
     paid_judge: bool
@@ -4816,6 +5175,21 @@ class Experiment(_ExperimentRequired, total=False):
     stream: Optional[StreamSpec]
     tier: str
     trials: Optional[TrialsPolicy]
+
+
+class _ExperimentBehaviourRequired(TypedDict):
+    exp_id: str
+    rules: List[ExperimentBehaviourRule]
+
+
+class ExperimentBehaviour(_ExperimentBehaviourRequired, total=False):
+    partial: bool
+
+
+class ExperimentBehaviourRule(TypedDict):
+    per_arm: Dict[str, BehaviourArmCounts]
+    rule: Rule_steprules
+    runs: Dict[str, List[str]]
 
 
 class ExperimentCreated(TypedDict):
@@ -4871,6 +5245,44 @@ class ExperimentStatus(_ExperimentStatusRequired, total=False):
     started_at: Optional[str]
     suite: str
     suite_version: str
+
+
+class ExperimentValidity(TypedDict):
+    entries: List[Entry_validity]
+    stale: Optional[Stale]
+
+
+class Explain(TypedDict):
+    decision: str
+    files: List[ExplainFile]
+    gates: List[GateResult_improve]
+    improver: str
+    model: str
+    parent_ref: str
+    rationale: str
+    ref: str
+    round: int
+    source: str
+    why: str
+
+
+class _ExplainEditRequired(TypedDict):
+    evidence_count: int
+    op: str
+    predicts_fixed: int
+    reason: str
+    result: str
+
+
+class ExplainEdit(_ExplainEditRequired, total=False):
+    id: str
+
+
+class ExplainFile(TypedDict):
+    edits: List[ExplainEdit]
+    lines: List[DiffLine]
+    path: str
+    status: str
 
 
 class Explanation(TypedDict):
@@ -5141,11 +5553,63 @@ class Filters(TypedDict):
     synthetic: str
 
 
-class Finding(TypedDict):
-    clause: str
-    examples: List[Example]
-    kind: str
-    text: str
+class FinalView(TypedDict):
+    ci80: List[float]
+    ci95: List[float]
+    gain: float
+    n: int
+    n_nonzero: int
+    p_upper: float
+    trials: int
+
+
+class _FindingRequired(TypedDict):
+    created_at: str
+    history: List[Event_findings]
+    id: str
+    key: str
+    origin: str
+    runs: List[str]
+    source: str
+    state: str
+    tasks: List[TaskRef]
+    title: str
+    updated_at: str
+
+
+class Finding(_FindingRequired, total=False):
+    fix: Optional[FixProof]
+    hypothesis: str
+    quotes: List[Quote_findings]
+    reruns: List[str]
+
+
+class FindingAddRequest(TypedDict):
+    ref: str
+    source: str
+
+
+class FindingReasonRequest(TypedDict):
+    reason: str
+
+
+class _FindingRerunRequestRequired(TypedDict):
+    arm: str
+    exp_id: str
+    yes: bool
+
+
+class FindingRerunRequest(_FindingRerunRequestRequired, total=False):
+    trials: int
+
+
+class _FindingRerunResultRequired(TypedDict):
+    finding: Optional[Finding]
+    rerun: Optional[RerunFailuresResult]
+
+
+class FindingRerunResult(_FindingRerunResultRequired, total=False):
+    note: str
 
 
 class _Finding_datasetRequired(TypedDict):
@@ -5156,6 +5620,18 @@ class _Finding_datasetRequired(TypedDict):
 
 class Finding_dataset(_Finding_datasetRequired, total=False):
     id: str
+
+
+class Finding_policybench(TypedDict):
+    clause: str
+    examples: List[Example]
+    kind: str
+    text: str
+
+
+class FindingsList(TypedDict):
+    counts: Dict[str, int]
+    findings: List[Finding]
 
 
 class _FingerprintDriftRequired(TypedDict):
@@ -5195,6 +5671,18 @@ class _FixRequired(TypedDict):
 
 class Fix(_FixRequired, total=False):
     value: str
+
+
+class FixProof(TypedDict):
+    agent: str
+    at: str
+    experiment: str
+    fixed_hash: str
+    fixed_passed: int
+    fixed_runs: int
+    old_hash: str
+    old_passed: int
+    old_runs: int
 
 
 class FlippedTask(TypedDict):
@@ -5390,6 +5878,29 @@ class GateSummary(_GateSummaryRequired, total=False):
     detail: str
 
 
+class GatewayAgent(TypedDict):
+    card_url: str
+    enabled: bool
+    name: str
+
+
+class _GatewayCardLineRequired(TypedDict):
+    enabled: str
+    enabled_source: str
+    feature: str
+    headline: str
+    name: str
+    state: str
+
+
+class GatewayCardLine(_GatewayCardLineRequired, total=False):
+    exp_id: str
+    measured_at: Optional[str]
+    result: str
+    source: Optional[Source]
+    start: str
+
+
 class _GatewayHygieneRequired(TypedDict):
     mcp_clients: int
     mcp_disable_auto_tool_inject: bool
@@ -5403,6 +5914,18 @@ class GatewayHygiene(_GatewayHygieneRequired, total=False):
     multi_target: List[str]
     semantic_cache_default_key: bool
     violations: List[str]
+
+
+class _GatewayInfoRequired(TypedDict):
+    configured: bool
+    plugins: List[str]
+    reachable: bool
+
+
+class GatewayInfo(_GatewayInfoRequired, total=False):
+    error: str
+    host: str
+    version: str
 
 
 class _GatewayManifestRequired(TypedDict):
@@ -5433,6 +5956,66 @@ class GatewayPolicy(_GatewayPolicyRequired, total=False):
     fallbacks: List[str]
     models: List[str]
     routing: Optional[RoutingPolicy]
+
+
+class GatewayPrompt(TypedDict):
+    id: str
+    name: str
+
+
+class GatewayPromptVersion(TypedDict):
+    commit_message: str
+    created_at: str
+    messages: int
+    model: str
+    version: int
+
+
+class GatewayReportCard(TypedDict):
+    checked_at: str
+    gateway: GatewayInfo
+    lines: List[GatewayCardLine]
+    source: GatewaySourceInfo
+
+
+class GatewaySkill(TypedDict):
+    id: str
+    latest_version: str
+    name: str
+
+
+class GatewaySkillImport(TypedDict):
+    extra_path: str
+    folder: str
+    scan: SkillScanResult
+
+
+class GatewaySkillImportRequest(TypedDict):
+    skill_id: str
+    version: str
+
+
+class GatewaySkillVersion(TypedDict):
+    created_at: str
+    size: int
+    version: str
+
+
+class GatewaySourceInfo(TypedDict):
+    connected: bool
+    error: str
+    host: str
+    mode: str
+
+
+class _GatewayTestRequired(TypedDict):
+    control: str
+    feature: str
+    variants: List[str]
+
+
+class GatewayTest(_GatewayTestRequired, total=False):
+    options: Dict[str, str]
 
 
 class GatewayUsageAccepted(TypedDict):
@@ -5605,19 +6188,12 @@ class GridRow(TypedDict):
     task: str
 
 
-class _GroupRequired(TypedDict):
-    best: str
-    default: str
-    key: str
-    models: Dict[str, GroupModel]
-    tasks: int
-    value: str
-
-
-class Group(_GroupRequired, total=False):
-    note: str
-    small: bool
-    vs_default: Optional[Comparison_modelswitch]
+class Group(TypedDict):
+    items: List[str]
+    kind: str
+    runs: int
+    tasks: List[str]
+    title: str
 
 
 class GroupModel(TypedDict):
@@ -5626,6 +6202,21 @@ class GroupModel(TypedDict):
     quality: Value
     runs: int
     tasks: int
+
+
+class _Group_modelswitchRequired(TypedDict):
+    best: str
+    default: str
+    key: str
+    models: Dict[str, GroupModel]
+    tasks: int
+    value: str
+
+
+class Group_modelswitch(_Group_modelswitchRequired, total=False):
+    note: str
+    small: bool
+    vs_default: Optional[Comparison_modelswitch]
 
 
 class GroupingView(TypedDict):
@@ -5743,6 +6334,12 @@ class Hello(_HelloRequired, total=False):
     instructions: str
 
 
+class Hit(TypedDict):
+    seqs: List[int]
+    summary: str
+    witnessed: bool
+
+
 class _HoldRequired(TypedDict):
     call: int
     deadline: str
@@ -5845,17 +6442,27 @@ class _ImproveResultRequired(TypedDict):
 
 
 class ImproveResult(_ImproveResultRequired, total=False):
+    edits: Optional[EditsFile]
     exp_id: str
     flags: List[str]
+    reasons: Dict[str, str]
     run_id: str
+    summary: str
 
 
 class _ImproverSpecRequired(TypedDict):
     budget_usd: float
+    candidates: int
+    keep: int
     wall_s: int
 
 
 class ImproverSpec(_ImproverSpecRequired, total=False):
+    agent: str
+    merge: bool
+    model: str
+    provider: str
+    restart_rounds: List[int]
     task: str
 
 
@@ -6250,9 +6857,18 @@ class IntegrityRow(TypedDict):
     vetoes_incumbent: int
 
 
+class _IntervalRequired(TypedDict):
+    point: float
+
+
+class Interval(_IntervalRequired, total=False):
+    high: Optional[float]
+    low: Optional[float]
+
+
 class _InventoryRequired(TypedDict):
     can_draft: bool
-    estimate: Estimate
+    estimate: Estimate_onboard
     kind: str
     license: str
     next: str
@@ -6269,6 +6885,23 @@ class Inventory(_InventoryRequired, total=False):
     importers: List[str]
     needs: List[str]
     warnings: List[str]
+
+
+class InvestigationList(TypedDict):
+    investigations: List[InvestigationSummary]
+
+
+class _InvestigationSummaryRequired(TypedDict):
+    created_at: str
+    exp_id: str
+    id: str
+    items: int
+    runs: int
+    spent_usd: float
+
+
+class InvestigationSummary(_InvestigationSummaryRequired, total=False):
+    stopped: str
 
 
 class InvitationInfo(TypedDict):
@@ -6340,21 +6973,34 @@ class IssueRunStart(_IssueRunStartRequired, total=False):
     provider: str
 
 
-class _ItemRequired(TypedDict):
-    candidate: Candidate_issuebench
-    status: str
-    version: str
+class IssueSyncList(TypedDict):
+    repos: List[Repo]
 
 
-class Item(_ItemRequired, total=False):
-    cost_usd: float
-    fix: str
-    instruction: str
-    job_id: str
-    options: BuildOptions
-    reason: str
-    stage: str
-    validation: Optional[Validation]
+class IssueSyncRequest(TypedDict, total=False):
+    benchmark: str
+    hour_utc: Optional[int]
+    max_issues: Optional[int]
+    model: Optional[ModelChoice]
+    paused: Optional[bool]
+    per_issue_usd: Optional[float]
+    repo: str
+    weekday: Optional[int]
+    weekly_usd: Optional[float]
+
+
+class IssueSyncRunRequest(TypedDict):
+    yes: bool
+
+
+class Item(TypedDict):
+    hypothesis: str
+    id: str
+    kind: str
+    origin: str
+    quotes: List[Quote_investigator]
+    run_id: str
+    title: str
 
 
 class _Item_annotateRequired(TypedDict):
@@ -6376,11 +7022,28 @@ class Item_annotate(_Item_annotateRequired, total=False):
     judge_label: str
     judge_reason: str
     judge_votes: List[str]
-    labels: List[Label]
+    labels: List[Label_annotate]
     question: str
     ref: str
     resolution: Optional[Resolution]
     run_id: str
+
+
+class _Item_pipelineRequired(TypedDict):
+    candidate: Candidate_issuebench
+    status: str
+    version: str
+
+
+class Item_pipeline(_Item_pipelineRequired, total=False):
+    cost_usd: float
+    fix: str
+    instruction: str
+    job_id: str
+    options: BuildOptions
+    reason: str
+    stage: str
+    validation: Optional[Validation]
 
 
 class _JobRequired(TypedDict):
@@ -6551,6 +7214,7 @@ class _JudgeRecordRequired(TypedDict):
 class JudgeRecord(_JudgeRecordRequired, total=False):
     aggregate: str
     audit: Optional[JudgeAudit]
+    cached_votes: int
     calibration: str
     criteria: List[JudgeCriterion]
     pass_at: float
@@ -6582,6 +7246,15 @@ class JudgeView(TypedDict):
     sample_rate: float
 
 
+class _KeepViewRequired(TypedDict):
+    dev_diff: float
+    ref: str
+
+
+class KeepView(_KeepViewRequired, total=False):
+    led: List[str]
+
+
 class _LLMChecksRequired(TypedDict):
     clear: bool
     leak: bool
@@ -6592,13 +7265,21 @@ class LLMChecks(_LLMChecksRequired, total=False):
     wrong_patches: List[str]
 
 
-class _LabelRequired(TypedDict):
+class Label(TypedDict):
+    at: str
+    category: str
+    source: str
+    sure: bool
+    why: str
+
+
+class _Label_annotateRequired(TypedDict):
     at: str
     label: str
     user_id: str
 
 
-class Label(_LabelRequired, total=False):
+class Label_annotate(_Label_annotateRequired, total=False):
     email: str
     note: str
 
@@ -6738,6 +7419,20 @@ class LeaseCredentials(_LeaseCredentialsRequired, total=False):
     prompt_logging: Optional[PromptLogPolicy]
     registries: List[RegistryAuth]
     secrets: Dict[str, str]
+
+
+class _LedgerRowRequired(TypedDict):
+    at: str
+    attempts: int
+    cost_usd: float
+    model: str
+    prompt_sha: str
+    purpose: str
+
+
+class LedgerRow(_LedgerRowRequired, total=False):
+    error: str
+    served: str
 
 
 class _LineRequired(TypedDict):
@@ -7176,7 +7871,9 @@ class _MeRequired(TypedDict):
 class Me(_MeRequired, total=False):
     csrf: str
     current_org: str
+    default_org: str
     email_verified: Optional[bool]
+    org_reset: bool
     role: str
     server_admin: bool
     token_id: str
@@ -7319,6 +8016,7 @@ class _ModelRequired(TypedDict):
     provider: str
     quality: Value
     runs: int
+    served_as_asked: Value
     tasks: int
     wall_p50_s: Value
 
@@ -7326,6 +8024,8 @@ class _ModelRequired(TypedDict):
 class Model(_ModelRequired, total=False):
     excluded: Dict[str, int]
     open: bool
+    served_models: Dict[str, int]
+    served_unknown: int
 
 
 class ModelChoice(TypedDict, total=False):
@@ -7501,6 +8201,10 @@ class ModelSwitchApplyRequest(_ModelSwitchApplyRequestRequired, total=False):
     prefix: str
     scope: str
     scope_id: str
+
+
+class ModelWatchRetry(TypedDict):
+    model: str
 
 
 class _ModelsCatalogResponseRequired(TypedDict):
@@ -7848,6 +8552,17 @@ class MoreEvidence(_MoreEvidenceRequired, total=False):
     over: bool
 
 
+class _NewModelWatchRequired(TypedDict):
+    current: str
+    providers: List[str]
+    usd_per_model: float
+
+
+class NewModelWatch(_NewModelWatchRequired, total=False):
+    match: str
+    max_per_day: int
+
+
 class _NewShareRequired(TypedDict):
     kind: str
     target: str
@@ -7960,6 +8675,7 @@ class OnboardJobResult(TypedDict):
 
 
 class OnboardReadyRequest(TypedDict, total=False):
+    judge_consent: bool
     task: str
 
 
@@ -8120,6 +8836,19 @@ class Pair(_PairRequired, total=False):
     suite_version: str
 
 
+class _PairDivergenceRequired(TypedDict):
+    arms: List[str]
+    available: bool
+    outcomes: List[str]
+    pair_id: str
+    runs: List[str]
+
+
+class PairDivergence(_PairDivergenceRequired, total=False):
+    divergence: Optional[Divergence]
+    reason: str
+
+
 class PairKappa(TypedDict):
     a: str
     agree: int
@@ -8230,8 +8959,12 @@ class PersistenceRow(_PersistenceRowRequired, total=False):
     resumed_without_redo: Optional[Rate_reportcard]
 
 
-class PhaseSpec(TypedDict):
+class _PhaseSpecRequired(TypedDict):
     trials: int
+
+
+class PhaseSpec(_PhaseSpecRequired, total=False):
+    curve: bool
 
 
 class Pinned(TypedDict):
@@ -8821,6 +9554,24 @@ class Proof(_ProofRequired, total=False):
     skipped: List[str]
 
 
+class Proposal(TypedDict):
+    cost_usd: float
+    created_at: str
+    dropped_unverified: int
+    guide: InboxGuide
+    item: str
+    kind: str
+    model: str
+    origin: str
+    reasons: List[ProposalReason]
+
+
+class ProposalReason(TypedDict):
+    field: str
+    quotes: List[Quote]
+    text: str
+
+
 class _ProviderCredentialRequired(TypedDict):
     key_id: str
     provider: str
@@ -9072,6 +9823,24 @@ class QuickRunResponse(_QuickRunResponseRequired, total=False):
     status: Optional[ExperimentStatus]
 
 
+class Quote(TypedDict):
+    run_id: str
+    seq: int
+    text: str
+
+
+class Quote_findings(TypedDict):
+    run_id: str
+    seq: int
+    text: str
+
+
+class Quote_investigator(TypedDict):
+    run_id: str
+    seq: int
+    text: str
+
+
 class RaiseBudgetRequest(TypedDict):
     budget_usd: float
 
@@ -9209,7 +9978,7 @@ class _Record_scheduleRequired(TypedDict):
 class Record_schedule(_Record_scheduleRequired, total=False):
     alerts: List[str]
     reason: str
-    result: Optional[Result]
+    result: Optional[Result_schedule]
 
 
 class _RecordingFileRequired(TypedDict):
@@ -9666,8 +10435,12 @@ class _RemotePollRequired(TypedDict):
 
 
 class RemotePoll(_RemotePollRequired, total=False):
+    complete_path: str
+    done_states: List[str]
+    fail_states: List[str]
     interval_s: int
     reply_id_path: str
+    status_path: str
 
 
 RemoteReport = TypedDict('RemoteReport', {'artifacts': "List[str]", 'async': "bool", 'build': "str", 'cost_usd': "Optional[float]", 'events': "int", 'events_dropped': "int", 'input_tokens': "Optional[int]", 'model': "str", 'notes': "List[str]", 'output_tokens': "Optional[int]", 'total_tokens': "Optional[int]", 'version': "str"}, total=False)
@@ -9700,11 +10473,25 @@ class Replay(_ReplayRequired, total=False):
     run_id: str
 
 
+class ReplayList(TypedDict):
+    replays: List[ReportRow]
+
+
 class ReplayPlan(TypedDict, total=False):
     edit_message: str
     edit_response: str
     on_divergence: str
     until_call: int
+
+
+class _ReplicationPlanRequired(TypedDict):
+    loops: int
+    repartition: bool
+    seeds: List[int]
+
+
+class ReplicationPlan(_ReplicationPlanRequired, total=False):
+    transfer: Optional[TransferSpec]
 
 
 class _ReplyRequired(TypedDict):
@@ -9716,6 +10503,29 @@ class Reply(_ReplyRequired, total=False):
     stop: bool
 
 
+class _RepoRequired(TypedDict):
+    benchmark: str
+    created_at: str
+    created_by: str
+    hour_utc: int
+    id: str
+    max_issues: int
+    merged_after: str
+    model: ModelChoice
+    paused: bool
+    per_issue_usd: float
+    private: bool
+    repo: str
+    runs: List[RunRef_issuesync]
+    seen_prs: List[int]
+    weekday: int
+    weekly_usd: float
+
+
+class Repo(_RepoRequired, total=False):
+    paused_reason: str
+
+
 class Report(TypedDict):
     clusters: List[Cluster]
     excluded: List[Exclusion]
@@ -9725,6 +10535,16 @@ class Report(TypedDict):
     generated_at: str
     hidden: int
     runs: int
+
+
+class ReportRow(TypedDict):
+    candidate: str
+    counts: Dict[str, int]
+    created_at: str
+    id: str
+    mode: str
+    sessions: int
+    spent_usd: float
 
 
 class Report_agentdiff(TypedDict):
@@ -9754,6 +10574,27 @@ class Report_failover(_Report_failoverRequired, total=False):
     per_run: bool
 
 
+class _Report_investigatorRequired(TypedDict):
+    budget_usd: float
+    calls: List[LedgerRow]
+    created_at: str
+    dropped_unverified: int
+    exp_id: str
+    groups: List[Group]
+    id: str
+    items: List[Item]
+    model: str
+    note: str
+    question: str
+    runs: List[str]
+    skipped: List[str]
+    spent_usd: float
+
+
+class Report_investigator(_Report_investigatorRequired, total=False):
+    stopped: str
+
+
 class _Report_mcptestRequired(TypedDict):
     calls: List[ToolCallResult]
     checked_at: str
@@ -9780,7 +10621,7 @@ Report_migration = TypedDict('Report_migration', {'alpha': "float", 'condition':
 class _Report_modelswitchRequired(TypedDict):
     agent: str
     alpha: float
-    benchmarks: List[Group]
+    benchmarks: List[Group_modelswitch]
     best: str
     comparisons: List[Comparison_modelswitch]
     current: str
@@ -9791,7 +10632,7 @@ class _Report_modelswitchRequired(TypedDict):
     notes: List[str]
     pareto: Pareto
     recommendation: Recommendation_modelswitch
-    segments: List[Group]
+    segments: List[Group_modelswitch]
     status: str
 
 
@@ -9834,6 +10675,7 @@ class _Report_reportcardRequired(TypedDict):
 class Report_reportcard(_Report_reportcardRequired, total=False):
     alignment: Optional[Alignment]
     bifrost: List[BifrostRow]
+    cheat_check: Optional[CheatCheck]
     done_runs: int
     failover: Optional[Report_failover]
     learning: List[LearningRow]
@@ -9984,19 +10826,14 @@ class Response(_ResponseRequired, total=False):
 
 
 class _ResultRequired(TypedDict):
-    cost_usd: float
-    run_errors: int
-    runs: int
+    rule_id: str
+    rule_version: int
+    status: str
 
 
 class Result(_ResultRequired, total=False):
-    action: str
-    analysis_id: str
-    decision: str
-    evaluation_id: str
-    exp_id: str
-    policy: str
-    summary: str
+    hits: List[Hit]
+    reason: str
 
 
 class _Result_agentplatformRequired(TypedDict):
@@ -10012,6 +10849,22 @@ class _Result_agentplatformRequired(TypedDict):
 
 class Result_agentplatform(_Result_agentplatformRequired, total=False):
     preset: str
+
+
+class _Result_scheduleRequired(TypedDict):
+    cost_usd: float
+    run_errors: int
+    runs: int
+
+
+class Result_schedule(_Result_scheduleRequired, total=False):
+    action: str
+    analysis_id: str
+    decision: str
+    evaluation_id: str
+    exp_id: str
+    policy: str
+    summary: str
 
 
 class _RetentionInfoRequired(TypedDict):
@@ -10030,6 +10883,10 @@ class RetentionInfo(_RetentionInfoRequired, total=False):
 
 class RetentionRequest(TypedDict):
     run_days: int
+
+
+class RetriesSpec(TypedDict):
+    max_attempts: int
 
 
 class _RetryRecordRequired(TypedDict):
@@ -10164,10 +11021,14 @@ class _RoundViewRequired(TypedDict):
 class RoundView(_RoundViewRequired, total=False):
     audit: Optional[CompareView]
     candidate: str
+    candidates: List[CandidateView]
+    commit: Optional[CommitView]
     finished_at: Optional[str]
     improver: Optional[ImproveResult]
     screen: Optional[CompareView]
     sealed: Optional[ScoreView]
+    stages: List[StageResult]
+    winner: str
 
 
 class _RouteRequired(TypedDict):
@@ -10429,6 +11290,23 @@ class Rule_livemon(TypedDict, total=False):
     window: int
 
 
+class _Rule_steprulesRequired(TypedDict):
+    a: Selector
+    id: str
+    kind: str
+    title: str
+    version: int
+
+
+class Rule_steprules(_Rule_steprulesRequired, total=False):
+    b: Optional[Selector]
+    classes: Optional[Classes]
+    description: str
+    n: int
+    reset: Optional[Selector]
+    window: int
+
+
 class _RunRequired(TypedDict):
     agent: RunAgentInfo
     attempt: int
@@ -10506,6 +11384,13 @@ class _RunAgentsRequired(TypedDict):
 class RunAgents(_RunAgentsRequired, total=False):
     blame: Optional[Blame]
     tree: Optional[AgentTree]
+    truncated: bool
+
+
+class RunBehaviour(TypedDict):
+    available: bool
+    results: List[Result]
+    run_id: str
     truncated: bool
 
 
@@ -10646,6 +11531,7 @@ class RunDetail(_RunDetailRequired, total=False):
     canonical: Optional[CanonicalRun]
     debug_allowed: Optional[RunDebugAllowed]
     evidence_contract: Optional[RunEvidenceContract]
+    output: str
     seal_error: str
     services: List[ServiceResult]
     sessions: List[SessionResult]
@@ -10840,6 +11726,19 @@ class RunRef_agentdiff(TypedDict):
     run_id: str
 
 
+class _RunRef_issuesyncRequired(TypedDict):
+    at: str
+    skipped: int
+    spent_usd: float
+    started: int
+    status: str
+
+
+class RunRef_issuesync(_RunRef_issuesyncRequired, total=False):
+    reason: str
+    run_id: str
+
+
 class _RunRef_livemonRequired(TypedDict):
     at: str
     outcome: str
@@ -10864,6 +11763,23 @@ class RunRemote(TypedDict):
     available: bool
     remote: Optional[RemoteEvidence]
     run_id: str
+
+
+class _RunReportRequired(TypedDict):
+    candidate: str
+    counts: Dict[str, int]
+    created_at: str
+    id: str
+    mode: str
+    note: str
+    recorded: List[str]
+    sessions: List[SessionResult_shadowreplay]
+    spent_usd: float
+
+
+class RunReport(_RunReportRequired, total=False):
+    stats: Optional[Stats]
+    stopped: str
 
 
 class _RunReviewsRequired(TypedDict):
@@ -10936,6 +11852,13 @@ class RunServices(TypedDict):
     services: List[RunService]
 
 
+class RunStep(TypedDict):
+    children: List[StepRecord]
+    step: StepRecord
+    witness_of: Optional[StepRecord]
+    witnesses: List[StepRecord]
+
+
 class _RunStepsRequired(TypedDict):
     available: bool
     observers: List[ObserverStatus]
@@ -10946,6 +11869,14 @@ class _RunStepsRequired(TypedDict):
 class RunSteps(_RunStepsRequired, total=False):
     agent_events: Optional[AgentEventStatus]
     skipped_lines: int
+    truncated: bool
+
+
+class RunStepsPage(TypedDict):
+    next_after_seq: Optional[int]
+    run_id: str
+    steps: List[StepRecord]
+    total: int
     truncated: bool
 
 
@@ -11146,6 +12077,7 @@ class Schedule(_ScheduleRequired, total=False):
     fail_on: List[str]
     job: str
     max_usd_per_day: float
+    new_models: Optional[NewModelWatch]
     paused: bool
     policy: str
     timezone: str
@@ -11172,6 +12104,7 @@ class ScheduleRow(_ScheduleRowRequired, total=False):
     job: str
     last: Optional[Record_schedule]
     max_usd_per_day: float
+    new_models: Optional[NewModelWatch]
     next: str
     paused: bool
     policy: str
@@ -11351,6 +12284,9 @@ class Seen(TypedDict):
     value: str
 
 
+Selector = TypedDict('Selector', {'class': "str", 'command': "str", 'is_error': "Optional[bool]", 'kinds': "List[str]", 'op': "str", 'path': "str", 'tool': "str", 'witnessed': "bool"}, total=False)
+
+
 class _SentRequired(TypedDict):
     headers: List[List[str]]
     method: str
@@ -11482,6 +12418,22 @@ class SessionResult(TypedDict):
     timed_out: bool
 
 
+class _SessionResult_shadowreplayRequired(TypedDict):
+    cost_usd: float
+    final: str
+    recording: str
+    session_id: str
+    steps: List[StepResult]
+
+
+class SessionResult_shadowreplay(_SessionResult_shadowreplayRequired, total=False):
+    diverged_at: Optional[int]
+    inbox_item: str
+    recorded_cost_usd: Optional[float]
+    tool_agreement: Optional[float]
+    write_set_equal: Optional[bool]
+
+
 class _SessionSpecRequired(TypedDict):
     id: str
     instruction: str
@@ -11507,6 +12459,14 @@ class _SetSummaryRequired(TypedDict):
 
 class SetSummary(_SetSummaryRequired, total=False):
     readiness: str
+
+
+class Settings(TypedDict):
+    enabled: bool
+    enabled_at: Optional[str]
+    enabled_by: str
+    max_sessions_per_run: int
+    max_usd_per_run: float
 
 
 class _SetupsVerdictRequired(TypedDict):
@@ -11581,6 +12541,29 @@ class _ShimSpecRequired(TypedDict):
 
 class ShimSpec(_ShimSpecRequired, total=False):
     output: str
+
+
+class _SideRequired(TypedDict):
+    decision: str
+    source: str
+
+
+class Side(_SideRequired, total=False):
+    action: str
+    invalid_reasons: List[str]
+
+
+class _SideAfterRequired(TypedDict):
+    edits: int
+    errors: int
+    retries: int
+    steps: int
+    test_runs: int
+    turns: int
+
+
+class SideAfter(_SideAfterRequired, total=False):
+    cost_usd: Optional[float]
 
 
 class SignTest(TypedDict):
@@ -11764,6 +12747,19 @@ class SlotProgress(TypedDict):
     total: int
 
 
+class _SourceRequired(TypedDict):
+    kind: str
+    raw_rows: int
+    rows: int
+    runs: int
+    text: str
+
+
+class Source(_SourceRequired, total=False):
+    exp_id: str
+    gateway: str
+
+
 class _SourceViewRequired(TypedDict):
     last_scored: int
     read_only: bool
@@ -11781,6 +12777,8 @@ class SourceView(_SourceViewRequired, total=False):
 
 class _SpecRequired(TypedDict):
     agent: str
+    budget: BudgetSpec_improve
+    claim: ClaimSpec
     commit: CommitSpec
     controls: List[str]
     editable: Editable
@@ -11788,15 +12786,20 @@ class _SpecRequired(TypedDict):
     improver: ImproverSpec
     kind: str
     name: str
+    replicate: ReplicationPlan
+    retries: RetriesSpec
     rounds: int
     screen: PhaseSpec
     sealed: PhaseSpec
     seed: int
     splits: SplitSpec
     suite: str
+    surfaces: Surfaces
 
 
 class Spec(_SpecRequired, total=False):
+    bundle_source: Optional[BundleSource]
+    preset: str
     tasks: List[str]
 
 
@@ -11810,6 +12813,13 @@ class SplitChoice(_SplitChoiceRequired, total=False):
     changed: bool
     public: str
     stratum: str
+
+
+class SplitCounts(TypedDict):
+    gate: int
+    held_out: int
+    impossible: int
+    practice: int
 
 
 class SplitPlan(TypedDict):
@@ -11844,6 +12854,22 @@ class SplitsView(TypedDict):
     hash: str
     honeypots: int
     sealed: int
+
+
+class _StageResultRequired(TypedDict):
+    level: int
+    tasks: int
+
+
+class StageResult(_StageResultRequired, total=False):
+    exp_id: str
+    survivors: List[str]
+
+
+class Stale(TypedDict):
+    checked: str
+    exp_id: str
+    gates: Dict[str, List[str]]
 
 
 class _StartRequestRequired(TypedDict):
@@ -11904,7 +12930,7 @@ class _State_pipelineRequired(TypedDict):
     created: str
     funnel: Funnel
     id: str
-    items: List[Item]
+    items: List[Item_pipeline]
     repo: str
     status: str
     updated: str
@@ -11913,9 +12939,24 @@ class _State_pipelineRequired(TypedDict):
 class State_pipeline(_State_pipelineRequired, total=False):
     benchmark: str
     builder_model: ModelChoice
+    cap_usd: float
     detail: str
     envs: Dict[str, BuildResult]
     log: List[LogLine]
+
+
+class Stats(TypedDict):
+    compared: int
+    equivalent_high: float
+    equivalent_low: float
+    left_out: int
+    median_cost_usd: float
+    median_latency_ms: float
+    median_recorded_cost_usd: float
+    median_recorded_latency_ms: float
+    paired: int
+    paired_latency: int
+    shares: Dict[str, float]
 
 
 class _StatusRequired(TypedDict):
@@ -11987,6 +13028,22 @@ class StepRecord(_StepRecordRequired, total=False):
     witnessed_by: List[int]
 
 
+class _StepResultRequired(TypedDict):
+    cost_usd: float
+    index: int
+    latency_ms: int
+    recorded: str
+    state: str
+
+
+class StepResult(_StepResultRequired, total=False):
+    basis: str
+    judge_note: str
+    new: str
+    recorded_cost_usd: Optional[float]
+    recorded_latency_ms: Optional[float]
+
+
 class Strategy(TypedDict):
     description: str
     id: str
@@ -12003,6 +13060,49 @@ class StreamSpec(_StreamSpecRequired, total=False):
     order: str
     replay: int
     threshold: float
+
+
+class StudyList(TypedDict):
+    studies: List[StudyView]
+
+
+class _StudyVerdictRequired(TypedDict):
+    better: int
+    ci95: List[float]
+    gain: float
+    headline: str
+    loop_gains: List[float]
+    loops: int
+    n: int
+    n_nonzero: int
+    p_upper: float
+    state: str
+
+
+class StudyVerdict(_StudyVerdictRequired, total=False):
+    loop_ci80: Optional[List[float]]
+
+
+class _StudyViewRequired(TypedDict):
+    agent: str
+    cost_usd: float
+    created_at: str
+    created_by: str
+    held_out: int
+    id: str
+    loops: List[str]
+    loops_max: int
+    name: str
+    reason: str
+    running: bool
+    status: str
+    suite: str
+    updated_at: str
+
+
+class StudyView(_StudyViewRequired, total=False):
+    final: Optional[StudyVerdict]
+    limit: str
 
 
 class Suggest(TypedDict, total=False):
@@ -12110,8 +13210,12 @@ class SuiteLintReport(_SuiteLintReportRequired, total=False):
     lock_drift: List[SuiteDrift]
 
 
-class SuiteList(TypedDict):
+class _SuiteListRequired(TypedDict):
     suites: List[SuiteSummary]
+
+
+class SuiteList(_SuiteListRequired, total=False):
+    reserved_ids: List[str]
 
 
 class _SuiteMockRequestRequired(TypedDict):
@@ -12321,6 +13425,7 @@ class _Summary_improveRequired(TypedDict):
 
 class Summary_improve(_Summary_improveRequired, total=False):
     sealed_gain: Optional[float]
+    teacher: str
     verdict: str
 
 
@@ -12378,6 +13483,10 @@ class SupportSummary(_SupportSummaryRequired, total=False):
     simulator_mode: str
 
 
+class Surfaces(TypedDict, total=False):
+    tool_descriptions: bool
+
+
 class SwitchOrgRequest(TypedDict):
     org: str
 
@@ -12402,6 +13511,19 @@ class _TargetRequired(TypedDict):
 
 class Target(_TargetRequired, total=False):
     provider: str
+
+
+class _TaskCategoriesViewRequired(TypedDict):
+    labels: Dict[str, Label]
+    suite: str
+
+
+class TaskCategoriesView(_TaskCategoriesViewRequired, total=False):
+    labelled: int
+
+
+class TaskCategoryRequest(TypedDict):
+    category: str
 
 
 class TaskDiff(TypedDict):
@@ -12511,6 +13633,11 @@ class _TaskQuarantineRequired(TypedDict):
 class TaskQuarantine(_TaskQuarantineRequired, total=False):
     evidence: List[str]
     task_version: str
+
+
+class TaskRef(TypedDict):
+    suite: str
+    task: str
 
 
 class _TaskReviewDecisionRequired(TypedDict):
@@ -12875,6 +14002,15 @@ class TracesForgotten(TypedDict):
     forgotten: bool
 
 
+class _TransferSpecRequired(TypedDict):
+    trials: int
+
+
+class TransferSpec(_TransferSpecRequired, total=False):
+    model: str
+    suite: str
+
+
 class Triage(TypedDict):
     exp_id: str
     groups: List[TriageGroup]
@@ -13011,6 +14147,12 @@ class Validation(_ValidationRequired, total=False):
     stop: str
 
 
+class ValidityList(TypedDict):
+    entries: List[Entry_validity]
+    stale: List[Stale]
+    unseen: int
+
+
 class _ValueRequired(TypedDict):
     state: str
     v: Optional[float]
@@ -13102,24 +14244,7 @@ class VerdictSpec(_VerdictSpecRequired, total=False):
     allow_uncalibrated_judge: bool
 
 
-class _Verdict_improveRequired(TypedDict):
-    commits: int
-    dev_gain: float
-    generalization_gap: float
-    greedy_extra: int
-    headline: str
-    notes: List[str]
-    overrides: int
-    rejects: int
-    sealed_gain: float
-    state: str
-    total_usd: float
-    tripwires: int
-
-
-class Verdict_improve(_Verdict_improveRequired, total=False):
-    gain_per_usd: Optional[float]
-    p: Optional[float]
+Verdict_improve = TypedDict('Verdict_improve', {'ci80': "List[float]", 'ci95': "List[float]", 'commits': "int", 'continue': "Optional[ContinueOffer]", 'dev_gain': "float", 'gain': "float", 'gain_per_usd': "Optional[float]", 'generalization_gap': "float", 'greedy_extra': "int", 'headline': "str", 'level': "float", 'mde': "float", 'n': "int", 'n_nonzero': "int", 'notes': "List[str]", 'null': "Optional[ControlLine]", 'overrides': "int", 'p': "Optional[float]", 'p_lower': "float", 'p_upper': "float", 'rejects': "int", 'retries': "Optional[ControlLine]", 'sealed_gain': "float", 'sentences': "List[str]", 'state': "str", 'teacher': "str", 'total_usd': "float", 'tripwires': "int"}, total=False)
 
 
 class Verdict_migration(TypedDict):
@@ -13248,7 +14373,9 @@ class _Version_improveRequired(TypedDict):
 
 class Version_improve(_Version_improveRequired, total=False):
     bundle: Dict[str, str]
+    bundle_obj: str
     doc: str
+    playbook_obj: str
 
 
 class _ViewRequired(TypedDict):
@@ -13526,6 +14653,30 @@ class VoiceTrack(TypedDict):
     sha256: str
     track: str
     url: str
+
+
+class _WatchItemRequired(TypedDict):
+    claimed_at: str
+    first_seen: str
+    model: str
+    provider: str
+    state: str
+
+
+class WatchItem(_WatchItemRequired, total=False):
+    evaluation_id: str
+    reason: str
+
+
+class _WatchStateRequired(TypedDict):
+    baseline: Dict[str, List[str]]
+    checked_at: str
+    schedule: str
+    seen: Dict[str, WatchItem]
+
+
+class WatchState(_WatchStateRequired, total=False):
+    last_error: str
 
 
 Waterfall = TypedDict('Waterfall', {'basis': "str", 'from': "Value", 'known': "float", 'parts': "List[Part]", 'reason': "str", 'to': "Value", 'total': "Value"}, total=False)
@@ -13816,6 +14967,61 @@ class Written(_WrittenRequired, total=False):
     reviewed_by: str
 
 
+class gatewayAgentImportDoc(TypedDict):
+    agent_id: str
+    yaml: str
+
+
+class _gatewayAgentImportRequestRequired(TypedDict):
+    model: str
+    provider: str
+
+
+class gatewayAgentImportRequest(_gatewayAgentImportRequestRequired, total=False):
+    id: str
+
+
+class gatewayAgentsDoc(TypedDict):
+    agents: List[GatewayAgent]
+
+
+class gatewayDraftDoc(TypedDict):
+    experiment: Experiment
+    notes: List[str]
+
+
+class gatewayEffectsDoc(TypedDict):
+    effects: List[Effect_gwfeature]
+
+
+class gatewayFeaturesDoc(TypedDict):
+    features: List[Any]
+
+
+class gatewayPromptVersionsDoc(TypedDict):
+    versions: List[GatewayPromptVersion]
+
+
+class gatewayPromptsDoc(TypedDict):
+    prompts: List[GatewayPrompt]
+
+
+class gatewaySkillVersionsDoc(TypedDict):
+    versions: List[GatewaySkillVersion]
+
+
+class gatewaySkillsDoc(TypedDict):
+    skills: List[GatewaySkill]
+
+
+class _gatewaySourceRequestDocRequired(TypedDict):
+    gateway_url: str
+
+
+class gatewaySourceRequestDoc(_gatewaySourceRequestDocRequired, total=False):
+    credential_secret: str
+
+
 class _liveFramePostRequired(TypedDict):
     at: str
     data: str
@@ -13973,6 +15179,10 @@ class AwarenessReportResponse(AwarenessReport):
     mode: Mode
 
 
+class BehaviourChecksResponse(BehaviourChecks):
+    mode: Mode
+
+
 class BenchCatalogAddedResponse(BenchCatalogAdded):
     mode: Mode
 
@@ -13986,6 +15196,10 @@ class BenchCatalogListResponse(BenchCatalogList):
 
 
 class BifrostProvidersResponseResponse(BifrostProvidersResponse):
+    mode: Mode
+
+
+class BifrostSettingAnswerResponse(BifrostSettingAnswer):
     mode: Mode
 
 
@@ -14060,6 +15274,10 @@ class ConnectionViewResponse(ConnectionView):
 
 
 class ConnectionsListResponse(ConnectionsList):
+    mode: Mode
+
+
+class ContinueOfferResponse(ContinueOffer):
     mode: Mode
 
 
@@ -14150,6 +15368,10 @@ class DraftSetResponse(DraftSet):
     mode: Mode
 
 
+class Effect_gwfeatureResponse(Effect_gwfeature):
+    mode: Mode
+
+
 class EmailSettingsResponse(EmailSettings):
     mode: Mode
 
@@ -14171,6 +15393,10 @@ class EndpointTestResultResponse(EndpointTestResult):
 
 
 class Entry_projectfsResponse(Entry_projectfs):
+    mode: Mode
+
+
+class EstimateResponse(Estimate):
     mode: Mode
 
 
@@ -14209,6 +15435,10 @@ class EventsPollResponse(EventsPoll):
     mode: Mode
 
 
+class ExperimentBehaviourResponse(ExperimentBehaviour):
+    mode: Mode
+
+
 class ExperimentCreatedResponse(ExperimentCreated):
     mode: Mode
 
@@ -14222,6 +15452,14 @@ class ExperimentPlanResponse(ExperimentPlan):
 
 
 class ExperimentStatusResponse(ExperimentStatus):
+    mode: Mode
+
+
+class ExperimentValidityResponse(ExperimentValidity):
+    mode: Mode
+
+
+class ExplainResponse(Explain):
     mode: Mode
 
 
@@ -14241,8 +15479,31 @@ class FaultCatalogResponse(FaultCatalog):
     mode: Mode
 
 
+class FindingResponse(Finding):
+    mode: Mode
+
+
+class FindingRerunResultResponse(FindingRerunResult):
+    mode: Mode
+
+
+class FindingsListResponse(FindingsList):
+    mode: Mode
+
+
 class ForecastResponse(Forecast):
     mode: Mode
+
+
+class GatewayReportCardResponse(GatewayReportCard):
+    mode: Mode
+
+
+class GatewaySkillImportResponse(GatewaySkillImport):
+    mode: Mode
+
+
+GatewaySourceInfoResponse = GatewaySourceInfo
 
 
 class GatewayUsageAcceptedResponse(GatewayUsageAccepted):
@@ -14321,6 +15582,10 @@ class InventoryResponse(Inventory):
     mode: Mode
 
 
+class InvestigationListResponse(InvestigationList):
+    mode: Mode
+
+
 class InvitationInfoResponse(InvitationInfo):
     mode: Mode
 
@@ -14330,6 +15595,10 @@ class IssueReadinessResponse(IssueReadiness):
 
 
 class IssueRunListResponse(IssueRunList):
+    mode: Mode
+
+
+class IssueSyncListResponse(IssueSyncList):
     mode: Mode
 
 
@@ -14501,6 +15770,10 @@ class PairResponse(Pair):
     mode: Mode
 
 
+class PairDivergenceResponse(PairDivergence):
+    mode: Mode
+
+
 class ParetoResponse(Pareto):
     mode: Mode
 
@@ -14566,6 +15839,10 @@ class PromptLoggingResponse(PromptLogging):
 
 
 class PromptLogsDeletedResponse(PromptLogsDeleted):
+    mode: Mode
+
+
+class ProposalResponse(Proposal):
     mode: Mode
 
 
@@ -14645,11 +15922,23 @@ class ReleaseRecordResponse(ReleaseRecord):
     mode: Mode
 
 
+class ReplayListResponse(ReplayList):
+    mode: Mode
+
+
+class RepoResponse(Repo):
+    mode: Mode
+
+
 class ReportResponse(Report):
     mode: Mode
 
 
 class Report_agentdiffResponse(Report_agentdiff):
+    mode: Mode
+
+
+class Report_investigatorResponse(Report_investigator):
     mode: Mode
 
 
@@ -14736,6 +16025,10 @@ class RunAgentsResponse(RunAgents):
     mode: Mode
 
 
+class RunBehaviourResponse(RunBehaviour):
+    mode: Mode
+
+
 class RunBifrostResponse(RunBifrost):
     mode: Mode
 
@@ -14784,8 +16077,15 @@ class RunRecordingsResponse(RunRecordings):
     mode: Mode
 
 
+class RunRef_issuesyncResponse(RunRef_issuesync):
+    mode: Mode
+
+
 class RunRemoteResponse(RunRemote):
     mode: Mode
+
+
+RunReportResponse = RunReport
 
 
 class RunReviewsResponse(RunReviews):
@@ -14800,7 +16100,15 @@ class RunServicesResponse(RunServices):
     mode: Mode
 
 
+class RunStepResponse(RunStep):
+    mode: Mode
+
+
 class RunStepsResponse(RunSteps):
+    mode: Mode
+
+
+class RunStepsPageResponse(RunStepsPage):
     mode: Mode
 
 
@@ -14862,6 +16170,10 @@ class SessionListResponse(SessionList):
     mode: Mode
 
 
+class SettingsResponse(Settings):
+    mode: Mode
+
+
 class ShareListResponse(ShareList):
     mode: Mode
 
@@ -14887,6 +16199,14 @@ class StatusResponse(Status):
 
 
 class Status_livescoreResponse(Status_livescore):
+    mode: Mode
+
+
+class StudyListResponse(StudyList):
+    mode: Mode
+
+
+class StudyViewResponse(StudyView):
     mode: Mode
 
 
@@ -14918,6 +16238,10 @@ class SuiteMockResultResponse(SuiteMockResult):
     mode: Mode
 
 
+class SuiteSummaryResponse(SuiteSummary):
+    mode: Mode
+
+
 class SuiteTaskDetailResponse(SuiteTaskDetail):
     mode: Mode
 
@@ -14935,6 +16259,10 @@ class Summary_improveResponse(Summary_improve):
 
 
 class SupportSummaryResponse(SupportSummary):
+    mode: Mode
+
+
+class TaskCategoriesViewResponse(TaskCategoriesView):
     mode: Mode
 
 
@@ -14986,6 +16314,10 @@ class UsageReportResponse(UsageReport):
     mode: Mode
 
 
+class ValidityListResponse(ValidityList):
+    mode: Mode
+
+
 class VerdictResponse(Verdict):
     mode: Mode
 
@@ -15003,6 +16335,10 @@ class ViewResponse(View):
 
 
 class VoiceCallResponse(VoiceCall):
+    mode: Mode
+
+
+class WatchStateResponse(WatchState):
     mode: Mode
 
 
@@ -15063,6 +16399,42 @@ class WorkerUploadStateResponse(WorkerUploadState):
 
 
 class WorkersListResponse(WorkersList):
+    mode: Mode
+
+
+class gatewayAgentImportDocResponse(gatewayAgentImportDoc):
+    mode: Mode
+
+
+class gatewayAgentsDocResponse(gatewayAgentsDoc):
+    mode: Mode
+
+
+class gatewayDraftDocResponse(gatewayDraftDoc):
+    mode: Mode
+
+
+class gatewayEffectsDocResponse(gatewayEffectsDoc):
+    mode: Mode
+
+
+class gatewayFeaturesDocResponse(gatewayFeaturesDoc):
+    mode: Mode
+
+
+class gatewayPromptVersionsDocResponse(gatewayPromptVersionsDoc):
+    mode: Mode
+
+
+class gatewayPromptsDocResponse(gatewayPromptsDoc):
+    mode: Mode
+
+
+class gatewaySkillVersionsDocResponse(gatewaySkillVersionsDoc):
+    mode: Mode
+
+
+class gatewaySkillsDocResponse(gatewaySkillsDoc):
     mode: Mode
 
 
@@ -15207,6 +16579,7 @@ __all__ = [
     'ArmPoint',
     'ArmRef',
     'ArmRef_migration',
+    'ArmResult',
     'ArmSetup',
     'ArmSpec',
     'ArmStats',
@@ -15227,6 +16600,9 @@ __all__ = [
     'BargeIn',
     'Baseline',
     'Behaviour',
+    'BehaviourArmCounts',
+    'BehaviourChecks',
+    'BehaviourChecksRequest',
     'BenchCatalogAdd',
     'BenchCatalogAdded',
     'BenchCatalogDataset',
@@ -15242,10 +16618,13 @@ __all__ = [
     'BifrostFeatures',
     'BifrostGovernance',
     'BifrostMCP',
+    'BifrostPrompt',
     'BifrostProviderSpec',
     'BifrostProvidersResponse',
     'BifrostRow',
     'BifrostSemanticCache',
+    'BifrostSetting',
+    'BifrostSettingAnswer',
     'BifrostUse',
     'Blame',
     'Breakpoints',
@@ -15255,9 +16634,11 @@ __all__ = [
     'BudgetParityResult',
     'BudgetSnapshot',
     'BudgetSpec',
+    'BudgetSpec_improve',
     'Budgets',
     'BuildOptions',
     'BuildResult',
+    'BundleSource',
     'CIWorkflowPreview',
     'CacheABReport',
     'CacheArmStats',
@@ -15277,6 +16658,7 @@ __all__ = [
     'CanaryInitRequest',
     'CanaryInitResponse',
     'Candidate',
+    'CandidateView',
     'Candidate_connect',
     'Candidate_issuebench',
     'CanonicalArmIdentity',
@@ -15299,8 +16681,13 @@ __all__ = [
     'Change',
     'Changes',
     'Channel',
+    'CheatArm',
+    'CheatCheck',
+    'CheatCheckRequest',
     'Claim',
+    'ClaimSpec',
     'ClassCounts',
+    'Classes',
     'Clause',
     'ClauseResult',
     'Cluster',
@@ -15314,6 +16701,7 @@ __all__ = [
     'CodeScanReport',
     'CodeScanSkip',
     'CommitSpec',
+    'CommitView',
     'CompareView',
     'Comparison',
     'Comparison_livescore',
@@ -15357,8 +16745,11 @@ __all__ = [
     'ConnectionView',
     'ConnectionsList',
     'ContaminationHit',
+    'ContinueOffer',
+    'ContinueRequest',
     'ControlBand',
     'ControlInfo',
+    'ControlLine',
     'ConversationSpec',
     'CostView',
     'Counts',
@@ -15404,6 +16795,7 @@ __all__ = [
     'DiffLine',
     'DiffReject',
     'DifficultyHealth',
+    'Divergence',
     'Doc',
     'DocBody',
     'DocList',
@@ -15411,6 +16803,7 @@ __all__ = [
     'Doctor',
     'DoctorCheck',
     'Draft',
+    'DraftRequest',
     'DraftSet',
     'DraftTask',
     'DraftTask_mcptest',
@@ -15419,8 +16812,12 @@ __all__ = [
     'Dropped',
     'DuplicatePair',
     'EValueTest',
+    'Edit',
+    'EditView',
     'Editable',
+    'EditsFile',
     'Effect',
+    'Effect_gwfeature',
     'EmailSettings',
     'EmailSettingsInput',
     'EmailTestResult',
@@ -15435,6 +16832,7 @@ __all__ = [
     'Entry_benchcatalog',
     'Entry_projectfs',
     'Entry_reference',
+    'Entry_validity',
     'EnvSpec',
     'EnvironmentChoice',
     'Equivalence',
@@ -15445,6 +16843,12 @@ __all__ = [
     'ErrorPolicySpec',
     'ErrorRule',
     'Estimate',
+    'EstimateDetectable',
+    'EstimateMinutes',
+    'EstimateNote',
+    'EstimateRuns',
+    'EstimateUSD',
+    'Estimate_onboard',
     'EvalBenchmarkEstimate',
     'EvalBudget',
     'EvalCostRange',
@@ -15478,6 +16882,7 @@ __all__ = [
     'EvaluationSkippedTask',
     'EvaluationSpec',
     'Event',
+    'Event_findings',
     'EventsPoll',
     'Evidence',
     'EvidenceStatus',
@@ -15485,10 +16890,16 @@ __all__ = [
     'Exclusion',
     'Exclusion_agentdiff',
     'Experiment',
+    'ExperimentBehaviour',
+    'ExperimentBehaviourRule',
     'ExperimentCreated',
     'ExperimentList',
     'ExperimentPlan',
     'ExperimentStatus',
+    'ExperimentValidity',
+    'Explain',
+    'ExplainEdit',
+    'ExplainFile',
     'Explanation',
     'Export',
     'ExtendsRef',
@@ -15514,12 +16925,20 @@ __all__ = [
     'FileEvaluate',
     'Filter',
     'Filters',
+    'FinalView',
     'Finding',
+    'FindingAddRequest',
+    'FindingReasonRequest',
+    'FindingRerunRequest',
+    'FindingRerunResult',
     'Finding_dataset',
+    'Finding_policybench',
+    'FindingsList',
     'FingerprintDrift',
     'FirstDivergence',
     'FirstLookPick',
     'Fix',
+    'FixProof',
     'FlippedTask',
     'Forecast',
     'ForecastRange',
@@ -15538,9 +16957,21 @@ __all__ = [
     'GateResult_onboard',
     'GateSliceRule',
     'GateSummary',
+    'GatewayAgent',
+    'GatewayCardLine',
     'GatewayHygiene',
+    'GatewayInfo',
     'GatewayManifest',
     'GatewayPolicy',
+    'GatewayPrompt',
+    'GatewayPromptVersion',
+    'GatewayReportCard',
+    'GatewaySkill',
+    'GatewaySkillImport',
+    'GatewaySkillImportRequest',
+    'GatewaySkillVersion',
+    'GatewaySourceInfo',
+    'GatewayTest',
     'GatewayUsageAccepted',
     'GatewayUsageBatch',
     'GatewayUsageRecord',
@@ -15557,6 +16988,7 @@ __all__ = [
     'GridRow',
     'Group',
     'GroupModel',
+    'Group_modelswitch',
     'GroupingView',
     'GuardResult',
     'GuardSpec',
@@ -15569,6 +17001,7 @@ __all__ = [
     'HeldOutSplitRequest',
     'HeldOutSplitResult',
     'Hello',
+    'Hit',
     'Hold',
     'HoldRelease',
     'HoldStatus',
@@ -15617,7 +17050,10 @@ __all__ = [
     'IntegrationExport',
     'IntegrationExportList',
     'IntegrityRow',
+    'Interval',
     'Inventory',
+    'InvestigationList',
+    'InvestigationSummary',
     'InvitationInfo',
     'Issue',
     'IssueReadiness',
@@ -15625,8 +17061,12 @@ __all__ = [
     'IssueRunCreate',
     'IssueRunList',
     'IssueRunStart',
+    'IssueSyncList',
+    'IssueSyncRequest',
+    'IssueSyncRunRequest',
     'Item',
     'Item_annotate',
+    'Item_pipeline',
     'Job',
     'JobComplete',
     'JobCreate',
@@ -15644,8 +17084,10 @@ __all__ = [
     'JudgeRecord',
     'JudgeState',
     'JudgeView',
+    'KeepView',
     'LLMChecks',
     'Label',
+    'Label_annotate',
     'Latency',
     'LatencyPareto',
     'LatencyPoint',
@@ -15656,6 +17098,7 @@ __all__ = [
     'LeaderboardGradeSource',
     'LearningRow',
     'LeaseCredentials',
+    'LedgerRow',
     'Line',
     'Lineage',
     'LineageView',
@@ -15722,6 +17165,7 @@ __all__ = [
     'ModelRefView',
     'ModelSummary',
     'ModelSwitchApplyRequest',
+    'ModelWatchRetry',
     'ModelsCatalogResponse',
     'MonitorBadgeRequest',
     'MonitorCertExperiment',
@@ -15747,6 +17191,7 @@ __all__ = [
     'MonitorStats',
     'MonitorTranscriptLimits',
     'MoreEvidence',
+    'NewModelWatch',
     'NewShare',
     'NoTest',
     'Node',
@@ -15779,6 +17224,7 @@ __all__ = [
     'Page',
     'Page_statuspage',
     'Pair',
+    'PairDivergence',
     'PairKappa',
     'PairRun',
     'Pair_migration',
@@ -15852,6 +17298,8 @@ __all__ = [
     'PromptLogging',
     'PromptLogsDeleted',
     'Proof',
+    'Proposal',
+    'ProposalReason',
     'ProviderCredential',
     'ProviderField',
     'ProviderTest',
@@ -15879,6 +17327,9 @@ __all__ = [
     'QuickRunModel',
     'QuickRunRequest',
     'QuickRunResponse',
+    'Quote',
+    'Quote_findings',
+    'Quote_investigator',
     'RaiseBudgetRequest',
     'Rate',
     'Rate_reportcard',
@@ -15936,11 +17387,16 @@ __all__ = [
     'RemoteReport',
     'RemoteStep',
     'Replay',
+    'ReplayList',
     'ReplayPlan',
+    'ReplicationPlan',
     'Reply',
+    'Repo',
     'Report',
+    'ReportRow',
     'Report_agentdiff',
     'Report_failover',
+    'Report_investigator',
     'Report_mcptest',
     'Report_migration',
     'Report_modelswitch',
@@ -15959,8 +17415,10 @@ __all__ = [
     'Response',
     'Result',
     'Result_agentplatform',
+    'Result_schedule',
     'RetentionInfo',
     'RetentionRequest',
+    'RetriesSpec',
     'RetryRecord',
     'Review',
     'ReviewItem',
@@ -15995,11 +17453,13 @@ __all__ = [
     'Rule',
     'RuleWhy',
     'Rule_livemon',
+    'Rule_steprules',
     'Run',
     'RunA2A',
     'RunAccepted',
     'RunAgentInfo',
     'RunAgents',
+    'RunBehaviour',
     'RunBifrost',
     'RunCall',
     'RunCallDetail',
@@ -16024,16 +17484,20 @@ __all__ = [
     'RunRecordings',
     'RunRef',
     'RunRef_agentdiff',
+    'RunRef_issuesync',
     'RunRef_livemon',
     'RunRef_migration',
     'RunRemote',
+    'RunReport',
     'RunReviews',
     'RunRouting',
     'RunRoutingRow',
     'RunSample',
     'RunService',
     'RunServices',
+    'RunStep',
     'RunSteps',
+    'RunStepsPage',
     'RunTiming',
     'RunnerImages',
     'RunnerSpec',
@@ -16074,6 +17538,7 @@ __all__ = [
     'SecretSlot',
     'SecretSpec',
     'Seen',
+    'Selector',
     'Sent',
     'SeriesBucket',
     'Served',
@@ -16084,14 +17549,18 @@ __all__ = [
     'SessionList',
     'SessionRecord',
     'SessionResult',
+    'SessionResult_shadowreplay',
     'SessionSpec',
     'SetSummary',
+    'Settings',
     'SetupsVerdict',
     'ShareList',
     'ShareView',
     'SharedItem',
     'SharedMeta',
     'ShimSpec',
+    'Side',
+    'SideAfter',
     'SignTest',
     'SignalDef',
     'SignalMean',
@@ -16107,23 +17576,32 @@ __all__ = [
     'Slot',
     'SlotHold',
     'SlotProgress',
+    'Source',
     'SourceView',
     'Spec',
     'SplitChoice',
+    'SplitCounts',
     'SplitPlan',
     'SplitPlan_taskgates',
     'SplitSpec',
     'SplitsView',
+    'StageResult',
+    'Stale',
     'StartRequest',
     'State',
     'StateExport',
     'StateFile',
     'State_pipeline',
+    'Stats',
     'Status',
     'Status_livescore',
     'StepRecord',
+    'StepResult',
     'Strategy',
     'StreamSpec',
+    'StudyList',
+    'StudyVerdict',
+    'StudyView',
     'Suggest',
     'SuiteAdmissionCheck',
     'SuiteDrift',
@@ -16153,9 +17631,12 @@ __all__ = [
     'Supersede',
     'SupportArm',
     'SupportSummary',
+    'Surfaces',
     'SwitchOrgRequest',
     'TakeoverRequest',
     'Target',
+    'TaskCategoriesView',
+    'TaskCategoryRequest',
     'TaskDiff',
     'TaskDraft',
     'TaskEdit',
@@ -16166,6 +17647,7 @@ __all__ = [
     'TaskOutcome',
     'TaskProvenance',
     'TaskQuarantine',
+    'TaskRef',
     'TaskReviewDecision',
     'TaskReviewRequest',
     'TaskReviewResult',
@@ -16197,6 +17679,7 @@ __all__ = [
     'TraceInferResult',
     'TraceSetup',
     'TracesForgotten',
+    'TransferSpec',
     'Triage',
     'TriageGroup',
     'TrialsPolicy',
@@ -16211,6 +17694,7 @@ __all__ = [
     'User',
     'Utterance',
     'Validation',
+    'ValidityList',
     'Value',
     'VarianceCard',
     'Verdict',
@@ -16249,6 +17733,8 @@ __all__ = [
     'VoiceRTCSIP',
     'VoiceRow',
     'VoiceTrack',
+    'WatchItem',
+    'WatchState',
     'Waterfall',
     'WebhookCreated',
     'WebhookDeliveries',
@@ -16282,6 +17768,17 @@ __all__ = [
     'WorkerUploadState',
     'WorkersList',
     'Written',
+    'gatewayAgentImportDoc',
+    'gatewayAgentImportRequest',
+    'gatewayAgentsDoc',
+    'gatewayDraftDoc',
+    'gatewayEffectsDoc',
+    'gatewayFeaturesDoc',
+    'gatewayPromptVersionsDoc',
+    'gatewayPromptsDoc',
+    'gatewaySkillVersionsDoc',
+    'gatewaySkillsDoc',
+    'gatewaySourceRequestDoc',
     'liveFramePost',
     'registryInputDoc',
     'AdaptiveViewResponse',
@@ -16317,10 +17814,12 @@ __all__ = [
     'ApplyResultResponse',
     'AuthInfoResponse',
     'AwarenessReportResponse',
+    'BehaviourChecksResponse',
     'BenchCatalogAddedResponse',
     'BenchCatalogDatasetResponse',
     'BenchCatalogListResponse',
     'BifrostProvidersResponseResponse',
+    'BifrostSettingAnswerResponse',
     'BifrostUseResponse',
     'CIWorkflowPreviewResponse',
     'CalibrationItemResponse',
@@ -16340,6 +17839,7 @@ __all__ = [
     'ConnectVerifyStatusResponse',
     'ConnectionViewResponse',
     'ConnectionsListResponse',
+    'ContinueOfferResponse',
     'CreateSuiteResponseResponse',
     'CreateTaskResponseResponse',
     'DataPolicyListResponse',
@@ -16362,12 +17862,14 @@ __all__ = [
     'DocListResponse',
     'DoctorResponse',
     'DraftSetResponse',
+    'Effect_gwfeatureResponse',
     'EmailSettingsResponse',
     'EmailTestResultResponse',
     'EndpointPresetListResponse',
     'EndpointPreviewResponse',
     'EndpointTestResultResponse',
     'Entry_projectfsResponse',
+    'EstimateResponse',
     'EvalEstimateResponse',
     'EvaluationResponse',
     'EvaluationBifrostUseResponse',
@@ -16377,15 +17879,24 @@ __all__ = [
     'EvaluationRerunResultResponse',
     'EvaluationScheduleResponseResponse',
     'EventsPollResponse',
+    'ExperimentBehaviourResponse',
     'ExperimentCreatedResponse',
     'ExperimentListResponse',
     'ExperimentPlanResponse',
     'ExperimentStatusResponse',
+    'ExperimentValidityResponse',
+    'ExplainResponse',
     'ExplanationResponse',
     'ExportResponse',
     'FailurePatternsResponse',
     'FaultCatalogResponse',
+    'FindingResponse',
+    'FindingRerunResultResponse',
+    'FindingsListResponse',
     'ForecastResponse',
+    'GatewayReportCardResponse',
+    'GatewaySkillImportResponse',
+    'GatewaySourceInfoResponse',
     'GatewayUsageAcceptedResponse',
     'GatewayUsageRunResponse',
     'GeneratedTaskListResponse',
@@ -16405,9 +17916,11 @@ __all__ = [
     'InboxWebhookInfoResponse',
     'IntegrationExportListResponse',
     'InventoryResponse',
+    'InvestigationListResponse',
     'InvitationInfoResponse',
     'IssueReadinessResponse',
     'IssueRunListResponse',
+    'IssueSyncListResponse',
     'JobResponse',
     'JobListResponse',
     'LeaderboardResponse',
@@ -16450,6 +17963,7 @@ __all__ = [
     'PageResponse',
     'Page_statuspageResponse',
     'PairResponse',
+    'PairDivergenceResponse',
     'ParetoResponse',
     'PlatformImportListResponse',
     'PlatformImportResultResponse',
@@ -16467,6 +17981,7 @@ __all__ = [
     'ProjectManifestResponse',
     'PromptLoggingResponse',
     'PromptLogsDeletedResponse',
+    'ProposalResponse',
     'PullAgentsResponseResponse',
     'PullReadinessResponse',
     'PullRepoCreatedResponse',
@@ -16486,8 +18001,11 @@ __all__ = [
     'RegistryViewResponse',
     'ReleaseListResponse',
     'ReleaseRecordResponse',
+    'ReplayListResponse',
+    'RepoResponse',
     'ReportResponse',
     'Report_agentdiffResponse',
+    'Report_investigatorResponse',
     'Report_mcptestResponse',
     'Report_migrationResponse',
     'Report_modelswitchResponse',
@@ -16509,6 +18027,7 @@ __all__ = [
     'RunA2AResponse',
     'RunAcceptedResponse',
     'RunAgentsResponse',
+    'RunBehaviourResponse',
     'RunBifrostResponse',
     'RunCallDetailResponse',
     'RunCallsResponse',
@@ -16521,11 +18040,15 @@ __all__ = [
     'RunMaximResponse',
     'RunReceiptsResponse',
     'RunRecordingsResponse',
+    'RunRef_issuesyncResponse',
     'RunRemoteResponse',
+    'RunReportResponse',
     'RunReviewsResponse',
     'RunRoutingResponse',
     'RunServicesResponse',
+    'RunStepResponse',
     'RunStepsResponse',
+    'RunStepsPageResponse',
     'RunnerTokenCreatedResponse',
     'RunnerTokenViewResponse',
     'RunnerTokensListResponse',
@@ -16541,6 +18064,7 @@ __all__ = [
     'SecretDeletedResponse',
     'SecretListResponse',
     'SessionListResponse',
+    'SettingsResponse',
     'ShareListResponse',
     'ShareViewResponse',
     'SharedItemResponse',
@@ -16548,6 +18072,8 @@ __all__ = [
     'State_pipelineResponse',
     'StatusResponse',
     'Status_livescoreResponse',
+    'StudyListResponse',
+    'StudyViewResponse',
     'SuiteFileResponse',
     'SuiteFileListResponse',
     'SuiteGraderResultResponse',
@@ -16555,11 +18081,13 @@ __all__ = [
     'SuiteLintReportResponse',
     'SuiteListResponse',
     'SuiteMockResultResponse',
+    'SuiteSummaryResponse',
     'SuiteTaskDetailResponse',
     'SuiteTemplateListResponse',
     'SuiteUploadResultResponse',
     'Summary_improveResponse',
     'SupportSummaryResponse',
+    'TaskCategoriesViewResponse',
     'TaskReviewResultResponse',
     'TaskSplitResultResponse',
     'TestAlertResponseResponse',
@@ -16572,11 +18100,13 @@ __all__ = [
     'UploadFilesReportResponse',
     'UploadRunsReportResponse',
     'UsageReportResponse',
+    'ValidityListResponse',
     'VerdictResponse',
     'VerdictPayloadResponse',
     'VersionListResponse',
     'ViewResponse',
     'VoiceCallResponse',
+    'WatchStateResponse',
     'WebhookCreatedResponse',
     'WebhookDeliveriesResponse',
     'WebhookDeliveryRetriedResponse',
@@ -16592,4 +18122,13 @@ __all__ = [
     'WorkerTargetViewResponse',
     'WorkerUploadStateResponse',
     'WorkersListResponse',
+    'gatewayAgentImportDocResponse',
+    'gatewayAgentsDocResponse',
+    'gatewayDraftDocResponse',
+    'gatewayEffectsDocResponse',
+    'gatewayFeaturesDocResponse',
+    'gatewayPromptVersionsDocResponse',
+    'gatewayPromptsDocResponse',
+    'gatewaySkillVersionsDocResponse',
+    'gatewaySkillsDocResponse',
 ]

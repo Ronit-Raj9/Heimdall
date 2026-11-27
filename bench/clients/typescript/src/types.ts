@@ -472,6 +472,7 @@ export interface Slot {
 export type Stage =
 	| "planned"
 	| "leased"
+	| "image"
 	| "prepare"
 	| "arm"
 	| "run"
@@ -901,6 +902,7 @@ export interface Experiment {
 	realism?: string;
 	safety?: string;
 	codescan?: Record<string, unknown>;
+	gateway_test?: { feature: string; control: string; variants: string[]; options?: Record<string, string> };
 	environment?: Record<string, unknown>;
 	/** The evaluation that created this experiment, when one did. */
 	evaluation_id?: string;
@@ -1399,6 +1401,8 @@ export interface RunDetail {
 	answer?: Answer;
 	/** Service state exported after the agent exited. */
 	state?: StateFile[];
+	/** The run's output kind (diff, answer, state, artifact); absent on older servers. */
+	output?: OutputKind;
 	/** Services that ran beside the agent. */
 	services?: ServiceResult[];
 	/** Files an artifact task's agent produced, copied into the sealed run folder. */
@@ -1787,6 +1791,7 @@ export interface RunListParams {
 	task?: string;
 	condition?: string;
 	outcome?: string;
+	failed?: boolean;
 	track?: string;
 	/** Agent config id; matched on the server across every page. */
 	agent?: string;
@@ -2638,6 +2643,7 @@ export interface SuiteTier {
 /** GET /suites: every pack under the benchmarks root, sorted by id. */
 export interface SuiteList {
 	suites: SuiteSummary[];
+	reserved_ids?: string[];
 }
 
 /** One visible file of a task's repo/ folder. */
@@ -3864,6 +3870,8 @@ export interface AuthMe {
 	orgs: MeOrg[];
 	/** Id of the organization requests act in. */
 	current_org?: string;
+	default_org?: string;
+	org_reset?: boolean;
 	/** The caller's role in current_org. */
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
@@ -4107,7 +4115,7 @@ export interface RunnerTokenCreated {
 /** One audit_log row (handlers/orgs.go AuditRow). */
 export interface AuditEntry {
 	id: string;
-	actor_type: "user" | "token" | "runner" | "system";
+	actor_type: "user" | "token" | "runner" | "system" | "anonymous";
 	actor_id?: string;
 	action: string;
 	target_type?: string;
