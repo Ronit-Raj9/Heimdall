@@ -1924,8 +1924,40 @@ class BenchCatalogAdded(_BenchCatalogAddedRequired, total=False):
 BenchCatalogDataset = TypedDict('BenchCatalogDataset', {'entry': "str", 'from': "str", 'size': "int", 'zip': "bool"}, total=False)
 
 
+class _BenchCatalogEntryRequired(TypedDict):
+    available: bool
+    id: str
+    installed: bool
+    kind: str
+    needs_data: bool
+    summary: str
+    title: str
+
+
+class BenchCatalogEntry(_BenchCatalogEntryRequired, total=False):
+    agents: List[str]
+    benchmarks: List[str]
+    data_note: str
+    dataset_path: str
+    extra: Dict[str, str]
+    fetch_allowed: bool
+    fetch_url: str
+    grading: str
+    hint: str
+    importer: str
+    internal: bool
+    license: str
+    needs: List[str]
+    source: str
+    suite_id: str
+    suites: List[str]
+    tags: List[str]
+    track: str
+    upload_expects: str
+
+
 class BenchCatalogList(TypedDict):
-    entries: List[Entry_benchcatalog]
+    entries: List[BenchCatalogEntry]
     source_available: bool
     starter_agents: List[str]
 
@@ -3402,6 +3434,7 @@ class _ConnectFirstLookResponseRequired(TypedDict):
 class ConnectFirstLookResponse(_ConnectFirstLookResponseRequired, total=False):
     bare_model: Optional[EvaluationSpec]
     bare_model_reason: str
+    estimate_usd: Optional[EvalCostRange]
     reference: Any
 
 
@@ -4439,37 +4472,6 @@ class Entry(_EntryRequired, total=False):
     target: str
 
 
-class _Entry_benchcatalogRequired(TypedDict):
-    available: bool
-    id: str
-    installed: bool
-    kind: str
-    needs_data: bool
-    summary: str
-    title: str
-
-
-class Entry_benchcatalog(_Entry_benchcatalogRequired, total=False):
-    agents: List[str]
-    benchmarks: List[str]
-    data_note: str
-    dataset_path: str
-    extra: Dict[str, str]
-    fetch_allowed: bool
-    fetch_url: str
-    grading: str
-    hint: str
-    importer: str
-    license: str
-    needs: List[str]
-    source: str
-    suite_id: str
-    suites: List[str]
-    tags: List[str]
-    track: str
-    upload_expects: str
-
-
 class _Entry_projectfsRequired(TypedDict):
     dir: bool
     mod_time: str
@@ -4670,6 +4672,7 @@ class _EvalBenchmarkEstimateRequired(TypedDict):
 class EvalBenchmarkEstimate(_EvalBenchmarkEstimateRequired, total=False):
     basis: str
     concurrency: int
+    estimate_basis: str
     from_library: bool
     skipped: str
 
@@ -4882,6 +4885,7 @@ class _EvaluationChildRequired(TypedDict):
 class EvaluationChild(_EvaluationChildRequired, total=False):
     budget_stopped: bool
     budget_usd: float
+    cause: str
     fault_of: Dict[str, str]
     faults_skipped: List[FaultSkip]
     lock_hash: str
@@ -4958,6 +4962,7 @@ class EvaluationReleasePreview(_EvaluationReleasePreviewRequired, total=False):
     baseline: Optional[GateBaseline]
     gate: Optional[EvaluationGateResult]
     problem: str
+    problem_code: str
     summary: Optional[ReleaseSummary]
 
 
@@ -5578,6 +5583,8 @@ class _FindingRequired(TypedDict):
 
 
 class Finding(_FindingRequired, total=False):
+    arm: str
+    experiment: str
     fix: Optional[FixProof]
     hypothesis: str
     quotes: List[Quote_findings]
@@ -10876,9 +10883,16 @@ class _RetentionInfoRequired(TypedDict):
 
 class RetentionInfo(_RetentionInfoRequired, total=False):
     last_sweep_at: Optional[str]
+    preview: Optional[RetentionPreview]
     updated_at: Optional[str]
     updated_by: str
     updated_by_name: str
+
+
+class RetentionPreview(TypedDict):
+    days: int
+    experiments: int
+    runs: int
 
 
 class RetentionRequest(TypedDict):
@@ -11531,12 +11545,15 @@ class RunDetail(_RunDetailRequired, total=False):
     canonical: Optional[CanonicalRun]
     debug_allowed: Optional[RunDebugAllowed]
     evidence_contract: Optional[RunEvidenceContract]
+    failure: Optional[RunFailureGroup]
     output: str
     seal_error: str
     services: List[ServiceResult]
     sessions: List[SessionResult]
     state: List[StateFile]
+    suite_title: str
     superseded: bool
+    task_title: str
     tool_calls: List[ToolCall]
 
 
@@ -11563,6 +11580,17 @@ class RunEvidenceContract(_RunEvidenceContractRequired, total=False):
     optional_missing: List[str]
     required: List[str]
     sources: List[str]
+
+
+class _RunFailureGroupRequired(TypedDict):
+    count: int
+    exp_id: str
+    signature: str
+    title: str
+
+
+class RunFailureGroup(_RunFailureGroupRequired, total=False):
+    text: str
 
 
 class RunGatewayInfo(TypedDict, total=False):
@@ -11632,6 +11660,7 @@ class RunListRow(_RunListRowRequired, total=False):
     cost_usd: Optional[Value]
     error: str
     excluded: str
+    exp_name: str
     fault: str
     grading: str
     model: str
@@ -11640,6 +11669,8 @@ class RunListRow(_RunListRowRequired, total=False):
     sealed_at: Optional[str]
     started: Optional[str]
     steps: Optional[float]
+    suite_title: str
+    task_title: str
     tokens: Optional[float]
     tool_calls: Optional[float]
     track: str
@@ -12497,6 +12528,7 @@ class _ShareViewRequired(TypedDict):
 
 class ShareView(_ShareViewRequired, total=False):
     created_by: str
+    created_by_name: str
     expires_at: Optional[str]
     label: str
     path: str
@@ -13348,6 +13380,19 @@ class SuiteTaskDetail(TypedDict):
     verifier_result: str
 
 
+class _SuiteTaskPageRequired(TypedDict):
+    limit: int
+    offset: int
+    suite: str
+    tasks: List[SuiteTask]
+    total: int
+    version: str
+
+
+class SuiteTaskPage(_SuiteTaskPageRequired, total=False):
+    partial: bool
+
+
 class _SuiteTemplateRequired(TypedDict):
     id: str
     scenario: bool
@@ -13700,6 +13745,7 @@ class _TemplateParamRequired(TypedDict):
 
 class TemplateParam(_TemplateParamRequired, total=False):
     default: str
+    details: str
     group: str
     help: str
     kind: str
@@ -13975,6 +14021,7 @@ class TraceConnectInfo(_TraceConnectInfoRequired, total=False):
     request: Optional[FromTemplate]
     spans_dropped: int
     summary: str
+    token_env: str
 
 
 class _TraceInferResultRequired(TypedDict):
@@ -16246,6 +16293,10 @@ class SuiteTaskDetailResponse(SuiteTaskDetail):
     mode: Mode
 
 
+class SuiteTaskPageResponse(SuiteTaskPage):
+    mode: Mode
+
+
 class SuiteTemplateListResponse(SuiteTemplateList):
     mode: Mode
 
@@ -16606,6 +16657,7 @@ __all__ = [
     'BenchCatalogAdd',
     'BenchCatalogAdded',
     'BenchCatalogDataset',
+    'BenchCatalogEntry',
     'BenchCatalogList',
     'Benchmark',
     'BenchmarkCompatibility',
@@ -16829,7 +16881,6 @@ __all__ = [
     'EndpointTestStep',
     'EngineInfo',
     'Entry',
-    'Entry_benchcatalog',
     'Entry_projectfs',
     'Entry_reference',
     'Entry_validity',
@@ -17417,6 +17468,7 @@ __all__ = [
     'Result_agentplatform',
     'Result_schedule',
     'RetentionInfo',
+    'RetentionPreview',
     'RetentionRequest',
     'RetriesSpec',
     'RetryRecord',
@@ -17472,6 +17524,7 @@ __all__ = [
     'RunDiff',
     'RunEvents',
     'RunEvidenceContract',
+    'RunFailureGroup',
     'RunGatewayInfo',
     'RunInputIdentity',
     'RunList',
@@ -17621,6 +17674,7 @@ __all__ = [
     'SuiteSummary',
     'SuiteTask',
     'SuiteTaskDetail',
+    'SuiteTaskPage',
     'SuiteTemplate',
     'SuiteTemplateList',
     'SuiteTier',
@@ -18083,6 +18137,7 @@ __all__ = [
     'SuiteMockResultResponse',
     'SuiteSummaryResponse',
     'SuiteTaskDetailResponse',
+    'SuiteTaskPageResponse',
     'SuiteTemplateListResponse',
     'SuiteUploadResultResponse',
     'Summary_improveResponse',
