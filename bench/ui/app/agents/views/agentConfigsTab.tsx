@@ -1,3 +1,4 @@
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { ShowTestsChip } from "@/components/ui/toolbar";
@@ -502,18 +503,23 @@ function RowMenu({ agent, name, testId }: { agent: AgentSummary; name: string; t
 	const { t: tf } = useTranslation("uf2a");
 	if (agent.error || !agent.id || isBaselineAgent(agent)) return null;
 	return (
-		<details className="relative" data-testid={`${testId}-menu`}>
-			<summary
-				className="hover:bg-accent text-muted-foreground flex size-8 cursor-pointer list-none items-center justify-center rounded-md"
-				aria-label={tf("agents.more", { name })}
-				title={tf("agents.more", { name })}
-			>
-				<MoreHorizontal className="size-4" aria-hidden="true" />
-			</summary>
-			<div className="bg-popover absolute right-0 z-20 mt-1 min-w-36 rounded-md border p-1 shadow-md">
-				<AgentRowDelete agent={agent} name={name} testId={testId} />
-			</div>
-		</details>
+		<DropdownMenu
+			label={tf("agents.more", { name })}
+			testId={`${testId}-menu`}
+			items={[]}
+			content={<AgentRowDelete agent={agent} name={name} testId={testId} />}
+			contentClassName="min-w-36"
+			trigger={(props) => (
+				<button
+					{...props}
+					className="hover:bg-accent text-muted-foreground flex size-8 cursor-pointer items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none"
+					aria-label={tf("agents.more", { name })}
+					title={tf("agents.more", { name })}
+				>
+					<MoreHorizontal className="size-4" aria-hidden="true" />
+				</button>
+			)}
+		/>
 	);
 }
 

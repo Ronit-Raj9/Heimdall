@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { isBaselineAgent, isTestAgent } from "@/app/agents/views/agentDisplay";
 import type { AgentSummary } from "@/lib/types/bench";
 import "@/lib/types/agentFirstI18n";
@@ -29,10 +30,10 @@ export function AgentPicker({
 	const { t } = useTranslation("agentFirst");
 	const { yours, baselines } = pickableAgents(agents);
 	return (
-		<label className="flex flex-col gap-1 text-xs font-medium">
+		<label className="flex flex-col gap-1.5 text-xs font-medium">
 			{label ?? t("picker.agent")}
-			<select
-				className="border-input bg-background h-9 min-w-56 rounded-md border px-2 text-sm"
+			<NativeSelect
+				className="min-w-56"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				data-testid={testId}
@@ -56,7 +57,7 @@ export function AgentPicker({
 						))}
 					</optgroup>
 				)}
-			</select>
+			</NativeSelect>
 		</label>
 	);
 }

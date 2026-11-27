@@ -8,7 +8,7 @@ const css = readFileSync(join(__dirname, "globals.css"), "utf8");
 describe("global link underline rule", () => {
 	const rules = [...css.matchAll(/([^{}]+)\{[^{}]*text-decoration-line:\s*underline/g)].map((m) => m[1].replace(/\/\*[\s\S]*?\*\//g, "").trim());
 	it("has exactly one underline rule, scoped to prose", () => {
-		expect(rules).toEqual([":where(p, dd, .prose li) a:where(:not([data-slot]))"]);
+		expect(rules).toEqual([":where(p, .prose li) a:where(:not([data-slot], td *, th *))"]);
 	});
 	it("never underlines every link or every list item link", () => {
 		for (const r of rules) {

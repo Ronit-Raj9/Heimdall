@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { createPortal } from "react-dom";
 import {
 	useCallback,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useRef,
 	useState,
 	type KeyboardEvent as ReactKeyboardEvent,
@@ -58,7 +60,8 @@ export function useMenuKeyboard(
 		const id = requestAnimationFrame(() => {
 			const items = menuItems(menuRef.current);
 			const checked = items.find((el) => el.getAttribute("aria-checked") === "true");
-			(checked ?? items[0])?.focus();
+			const first = checked ?? items[0] ?? menuRef.current?.querySelector<HTMLElement>("button:not([disabled]), a[href], input, select");
+			first?.focus();
 		});
 		return () => cancelAnimationFrame(id);
 	}, [open, menuRef]);
@@ -112,6 +115,11 @@ export interface DropdownMenuProps {
 	/** Renders the trigger button; receive the props to spread on it (ref, aria, onClick). */
 	trigger: (props: DropdownTriggerProps) => ReactNode;
 	items: readonly DropdownMenuItem[];
+	/**
+	 * Free content instead of items, for a row menu whose action keeps its own state (a delete with
+	 * its error line). Shown in the same layer and place; Escape and an outside click close it.
+	 */
+	content?: ReactNode;
 	align?: "start" | "end";
 	className?: string;
 	/** Classes for the list itself, for example "w-72" for items with a second line (X-42). */
@@ -133,15 +141,36 @@ export const dropdownContentClass =
 export const dropdownItemClass =
 	"hover:bg-muted focus-visible:bg-muted flex min-h-(--control-h) w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--focus) disabled:cursor-not-allowed disabled:opacity-60";
 
-export function DropdownMenu({ label, trigger, items, align = "end", className, contentClassName, testId }: DropdownMenuProps) {
+export function DropdownMenu({ label, trigger, items, content, align = "end", className, contentClassName, testId }: DropdownMenuProps) {
 	const [open, setOpen] = useState(false);
 	const root = useRef<HTMLDivElement>(null);
 	const button = useRef<HTMLButtonElement>(null);
-	const menu = useRef<HTMLUListElement>(null);
+	const menu = useRef<HTMLElement>(null);
 	const menuId = useId();
 	const close = useCallback(() => setOpen(false), []);
 	const onKeyDown = useMenuKeyboard(open, menu, close, button);
 	const pathname = useSafePathname();
+
+	const [pos, setPos] = useState<MenuPosition | null>(null);
+	const place = useCallback(() => {
+		const b = button.current;
+		const m = menu.current;
+		if (!b || !m) return;
+		setPos(menuPosition(b.getBoundingClientRect(), m.getBoundingClientRect(), window.innerWidth, window.innerHeight, align));
+	}, [align]);
+	useLayoutEffect(() => {
+		if (!open) {
+			setPos(null);
+			return;
+		}
+		place();
+		window.addEventListener("resize", place);
+		window.addEventListener("scroll", place, true);
+		return () => {
+			window.removeEventListener("resize", place);
+			window.removeEventListener("scroll", place, true);
+		};
+	}, [open, place]);
 
 	// Back or any navigation closes the menu.
 	useEffect(() => setOpen(false), [pathname]);
@@ -149,11 +178,15 @@ export function DropdownMenu({ label, trigger, items, align = "end", className, 
 	useEffect(() => {
 		if (!open) return;
 		const onDown = (e: MouseEvent) => {
-			if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
+			const t = e.target as Node;
+			if (root.current?.contains(t) || menu.current?.contains(t)) return;
+			// A confirm dialog opened from the menu is part of it: a click there keeps the menu.
+			if (content !== undefined && (t as Element).closest?.('[role="dialog"], [role="alertdialog"]')) return;
+			setOpen(false);
 		};
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
-	}, [open]);
+	}, [open, content]);
 
 	return (
 		<div ref={root} className={cn("relative", className)} data-testid={testId}>
@@ -165,14 +198,35 @@ export function DropdownMenu({ label, trigger, items, align = "end", className, 
 				"aria-controls": open ? menuId : undefined,
 				onClick: () => setOpen((v) => !v),
 			})}
-			{open && (
+			{open &&
+				content !== undefined &&
+				portal(
+					<div
+						ref={menu as RefObject<HTMLDivElement>}
+						id={menuId}
+						role="dialog"
+						aria-label={label}
+						onKeyDown={onKeyDown}
+						className={cn(dropdownContentClass, "fixed mt-0", contentClassName)}
+						style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: "hidden" }}
+						data-placement={pos?.placement}
+						data-testid={testId ? `${testId}-list` : undefined}
+					>
+						{content}
+					</div>,
+				)}
+			{open &&
+				content === undefined &&
+				portal(
 				<ul
-					ref={menu}
+					ref={menu as RefObject<HTMLUListElement>}
 					id={menuId}
 					role="menu"
 					aria-label={label}
 					onKeyDown={onKeyDown}
-					className={cn(dropdownContentClass, align === "end" ? "right-0" : "left-0", contentClassName)}
+					className={cn(dropdownContentClass, "fixed mt-0 max-h-[min(24rem,calc(100dvh-1rem))] overflow-y-auto", contentClassName)}
+					style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: "hidden" }}
+					data-placement={pos?.placement}
 					data-testid={testId ? `${testId}-list` : undefined}
 				>
 					{items.map((item, index) => {
@@ -223,10 +277,46 @@ export function DropdownMenu({ label, trigger, items, align = "end", className, 
 							</li>
 						);
 					})}
-				</ul>
-			)}
+				</ul>,
+				)}
 		</div>
 	);
+}
+
+/** Renders into document.body so no row, table box or stacking context can cover or clip the menu. */
+function portal(node: ReactNode): ReactNode {
+	if (typeof document === "undefined") return node;
+	return createPortal(node, document.body);
+}
+
+export interface MenuPosition {
+	top: number;
+	left: number;
+	placement: "below" | "above";
+}
+
+/**
+ * Where a menu goes: below its button (4 px gap), right edges aligned for align "end", left edges
+ * for "start"; flipped above when it does not fit below and fits better above; always kept 8 px
+ * inside the window. Pure.
+ */
+export function menuPosition(
+	trigger: { top: number; bottom: number; left: number; right: number },
+	menu: { width: number; height: number },
+	vw: number,
+	vh: number,
+	align: "start" | "end" = "end",
+): MenuPosition {
+	const gap = 4;
+	const edge = 8;
+	let left = align === "end" ? trigger.right - menu.width : trigger.left;
+	left = Math.max(edge, Math.min(left, vw - edge - menu.width));
+	const below = vh - trigger.bottom - gap - edge;
+	const above = trigger.top - gap - edge;
+	const placement = menu.height > below && above > below ? "above" : "below";
+	let top = placement === "below" ? trigger.bottom + gap : trigger.top - gap - menu.height;
+	top = Math.max(edge, Math.min(top, vh - edge - menu.height));
+	return { top: Math.round(top), left: Math.round(left), placement };
 }
 
 function useSafePathname(): string | null {

@@ -468,6 +468,18 @@ export function ExperimentBoard() {
 						onChange={(v) => setFilter({ result: v })}
 						testId="experiment-filter-result"
 					/>
+					<ShowTestsChip
+						count={hiddenTests}
+						on={showTests}
+						onChange={(on) => setFilter({ tests: on ? "1" : null })}
+						testId="experiment-show-tests"
+					/>
+					<ShowArchivedChip
+						count={archivedCount}
+						on={showArchived}
+						onChange={(on) => setFilter({ archived: on ? "1" : null })}
+						testId="experiment-show-archived"
+					/>
 					{systemCount > 0 && (
 						<label className="text-muted-foreground ml-auto inline-flex min-h-6 items-center gap-2 text-sm" title={t("system.toggleHint")}>
 							{/* M4-75: a switch, not a 14 px checkbox. */}
@@ -484,19 +496,6 @@ export function ExperimentBoard() {
 						</label>
 					)}
 				</div>
-				<ShowTestsChip
-					count={hiddenTests}
-					on={showTests}
-					onChange={(on) => setFilter({ tests: on ? "1" : null })}
-					testId="experiment-show-tests"
-				/>
-				<ShowArchivedChip
-					count={archivedCount}
-					on={showArchived}
-					onChange={(on) => setFilter({ archived: on ? "1" : null })}
-					className="self-start"
-					testId="experiment-show-archived"
-				/>
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 

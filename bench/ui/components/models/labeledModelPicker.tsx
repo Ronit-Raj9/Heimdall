@@ -44,9 +44,9 @@ export interface LabeledModelPickerProps extends GroupedModelPickerProps {
 /** The shared GroupedModelPicker under a visible label, and an optional hint line under it. */
 export function LabeledModelPicker({ label, hint, testId, ...rest }: LabeledModelPickerProps) {
 	return (
-		<div className="flex flex-col gap-1 text-sm" data-testid={testId ? `${testId}-field` : undefined}>
+		<div className="flex flex-col gap-1.5 text-sm" data-testid={testId ? `${testId}-field` : undefined}>
 			{/* The visible label; the box itself carries the same text as its accessible name. */}
-			<span className="text-muted-foreground" aria-hidden="true">
+			<span className="text-foreground font-medium" aria-hidden="true">
 				{label}
 			</span>
 			<GroupedModelPicker testId={testId} label={label} {...rest} />

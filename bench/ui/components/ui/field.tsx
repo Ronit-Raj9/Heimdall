@@ -61,3 +61,21 @@ export function Field({ label, required, optional, hint, error, children, classN
 		</div>
 	);
 }
+
+/**
+ * A row of fields that share one top and one bottom (round 3): labels at the same distance above
+ * same-height controls, hints below do not push the controls. Wraps on narrow screens. Put Field,
+ * Combobox, LabeledModelPicker or FieldRow.Item children in it.
+ */
+export function FieldRow({ children, className, testId }: { children: ReactNode; className?: string; testId?: string }) {
+	return (
+		<div data-slot="field-row" data-testid={testId} className={cn("flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3", className)}>
+			{children}
+		</div>
+	);
+}
+
+/** The label style of every form field: use it for a hand-built label so it matches Field. */
+export const fieldLabelClass = "text-foreground text-sm font-medium";
+/** The stack of a hand-built field: label, 6 px, control, hint. */
+export const fieldStackClass = "flex min-w-0 flex-col gap-1.5";

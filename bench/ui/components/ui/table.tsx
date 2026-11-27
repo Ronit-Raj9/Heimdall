@@ -157,7 +157,13 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	);
 }
 
-function TableHead({ className, priority, scope = "col", ...props }: React.ComponentProps<"th"> & { priority?: ColumnPriority }) {
+function TableHead({
+	className,
+	priority,
+	numeric,
+	scope = "col",
+	...props
+}: React.ComponentProps<"th"> & { priority?: ColumnPriority; /** Right aligned, for a column of numbers or money. */ numeric?: boolean }) {
 	return (
 		<th
 			data-slot="table-head"
@@ -166,6 +172,7 @@ function TableHead({ className, priority, scope = "col", ...props }: React.Compo
 			className={cn(
 				priorityProps(priority).className,
 				"text-muted-foreground sticky top-0 z-[2] h-(--row-h) bg-(--table-head-bg) px-4 text-left align-middle text-xs font-medium tracking-[0.01em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				numeric && "text-right",
 				className,
 			)}
 			{...props}
@@ -177,8 +184,15 @@ function TableCell({
 	className,
 	priority,
 	label,
+	numeric,
 	...props
-}: React.ComponentProps<"td"> & { priority?: ColumnPriority; /** The column name a stacked table shows before the value. */ label?: string }) {
+}: React.ComponentProps<"td"> & {
+	priority?: ColumnPriority;
+	/** The column name a stacked table shows before the value. */
+	label?: string;
+	/** Right aligned with tabular numerals, for numbers and money. */
+	numeric?: boolean;
+}) {
 	return (
 		<td
 			data-slot="table-cell"
@@ -187,6 +201,7 @@ function TableCell({
 			className={cn(
 				priorityProps(priority).className,
 				"px-4 py-1 align-middle whitespace-nowrap tabular-nums [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				numeric && "text-right",
 				className,
 			)}
 			{...props}
@@ -198,4 +213,42 @@ function TableCaption({ className, ...props }: React.ComponentProps<"caption">) 
 	return <caption data-slot="table-caption" className={cn("text-muted-foreground mt-4 text-sm", className)} {...props} />;
 }
 
-export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow };
+/**
+ * A name cell with a small second line (round 3): tight leading so the row is about 48 px, not 53.
+ * The second line is helper text (benchmark, id); it truncates instead of wrapping.
+ */
+function TableTwoLine({ primary, secondary, className }: { primary: React.ReactNode; secondary?: React.ReactNode; className?: string }) {
+	return (
+		<div data-slot="table-two-line" className={cn("flex min-w-0 flex-col justify-center", className)}>
+			<span className="truncate text-sm leading-5">{primary}</span>
+			{secondary !== undefined && secondary !== null && secondary !== "" && (
+				<span className="text-muted-foreground truncate text-xs leading-4">{secondary}</span>
+			)}
+		</div>
+	);
+}
+
+/** The standard last column for the row menu: 56 px wide, right aligned, no header text. */
+function TableMenuHead({ className, label, ...props }: React.ComponentProps<"th"> & { /** Screen reader name, for example "Actions". */ label?: string }) {
+	return (
+		<th data-slot="table-head" scope="col" className={cn("sticky top-0 z-[2] h-(--row-h) w-14 bg-(--table-head-bg) pr-3 pl-0", className)} {...props}>
+			{label && <span className="sr-only">{label}</span>}
+		</th>
+	);
+}
+function TableMenuCell({ className, ...props }: React.ComponentProps<"td">) {
+	return <td data-slot="table-cell" data-menu-cell="" className={cn("w-14 py-1 pr-3 pl-0 text-right align-middle whitespace-nowrap", className)} {...props} />;
+}
+
+/**
+ * Whether a column has a value in at least one row, so a page hides a column that is empty in every
+ * row (rule 5). Empty means undefined, null, "" or an empty array; 0 and false are values. Pure.
+ */
+export function columnHasData<T>(rows: readonly T[], pick: (row: T) => unknown): boolean {
+	return rows.some((row) => {
+		const v = pick(row);
+		return !(v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0));
+	});
+}
+
+export { Table, TableMenuCell, TableMenuHead, TableTwoLine, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow };

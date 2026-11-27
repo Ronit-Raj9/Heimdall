@@ -137,7 +137,7 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 					type="button"
 					onClick={toggle}
 					className={cn(
-						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
+						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
 						"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 						form === "rail" && "justify-center px-0",
 						form === "auto" && "justify-center px-0 xl:justify-start xl:px-2.5",
@@ -173,7 +173,7 @@ function Brand({ form }: { form: NavForm }) {
 		<Link
 			to="/"
 			className={cn(
-				"focus-visible:ring-(--focus) flex h-10 items-center gap-2.5 rounded-lg px-1.5 focus-visible:ring-2 focus-visible:outline-none",
+				"focus-visible:ring-(--focus) flex h-10 shrink-0 items-center gap-2.5 rounded-lg px-1.5 focus-visible:ring-2 focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-1.5",
 			)}
@@ -197,7 +197,7 @@ function SidebarOrg({ form }: { form: NavForm }) {
 	return (
 		<div
 			className={cn(
-				"border-sidebar-border bg-card/60 min-w-0 rounded-lg border px-1 py-0.5 empty:hidden",
+				"border-sidebar-border bg-card/60 min-w-0 shrink-0 rounded-lg border px-1 py-0.5 empty:hidden",
 				form === "rail" && "md:hidden",
 				form === "auto" && "md:hidden xl:block",
 			)}
@@ -234,8 +234,16 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 	const closedItemsClass = form === "full" ? "hidden" : form === "auto" ? "xl:hidden" : "";
 
 	return (
-		<nav aria-label={t("nav.label")} className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-1 [scrollbar-width:thin]" data-testid={`${idPrefix}-groups`}>
-			{groups.map((group) => {
+		<nav aria-label={t("nav.label")} className="-mx-1 flex min-h-0 flex-1 flex-col px-1" data-testid={`${idPrefix}-groups`}>
+			{/* The groups scroll; the bottom group stays below them, so it never lies over a link (round 3). */}
+			<div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-1 pb-2 [scrollbar-width:thin] md:[@media(max-height:960px)]:gap-2.5" data-testid={`${idPrefix}-scroll`}>
+				{groups.filter((group) => group.id !== "bottom").map((group) => renderGroup(group))}
+			</div>
+			{groups.filter((group) => group.id === "bottom").map((group) => renderGroup(group))}
+		</nav>
+	);
+
+	function renderGroup(group: (typeof groups)[number]) {
 				const label = group.labelKey ? t(group.labelKey) : null;
 				const closed = label !== null && closedGroups.includes(group.id);
 				const listId = `${idPrefix}-group-${group.id}`;
@@ -244,7 +252,7 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 				return (
 					<div
 						key={group.id}
-						className={cn("flex flex-col gap-0.5", group.id === "bottom" && "mt-auto pt-2")}
+						className={cn("flex flex-col gap-0.5", group.id === "bottom" && "border-sidebar-border shrink-0 border-t pt-2")}
 						data-testid={`nav-group-${group.id}`}
 						data-closed={closed || undefined}
 					>
@@ -283,9 +291,7 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 						</ul>
 					</div>
 				);
-			})}
-		</nav>
-	);
+	}
 }
 
 function NavLink({
@@ -315,7 +321,7 @@ function NavLink({
 			aria-current={active ? "page" : undefined}
 			onClick={onNavigate}
 			className={cn(
-				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
+				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap md:[@media(max-height:960px)]:h-7 transition-colors duration-150",
 				"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-2.5",

@@ -2,7 +2,9 @@ import { optionsState, type OptionsQuery } from "@/lib/hooks/useOptionsState";
 import { isTestObject } from "@/lib/testObjects";
 import { cn } from "@/lib/utils";
 import { ChevronDown, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createPortal } from "react-dom";
+import { menuPosition, type MenuPosition } from "./dropdownMenu";
 import { useTranslation } from "react-i18next";
 import "./ufc0I18n";
 
@@ -143,11 +145,43 @@ export function Combobox({
 	useEffect(() => {
 		if (!open) return;
 		const onDown = (e: MouseEvent) => {
-			if (root.current && !root.current.contains(e.target as Node)) close();
+			const t = e.target as Node;
+			if (root.current?.contains(t) || pop.current?.contains(t)) return;
+			close();
 		};
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
 	});
+
+	// The list renders in document.body (round 3) so no table, card or dialog box clips or covers it;
+	// it sits under the box at the box's width and flips up near the bottom of the window.
+	const box = useRef<HTMLDivElement>(null);
+	const pop = useRef<HTMLDivElement>(null);
+	const [pos, setPos] = useState<(MenuPosition & { width: number }) | null>(null);
+	const place = useCallback(() => {
+		const b = box.current;
+		const p = pop.current;
+		if (!b || !p) return;
+		const r = b.getBoundingClientRect();
+		const width = Math.min(Math.max(r.width, 224), window.innerWidth - 16);
+		const next = { ...menuPosition(r, { width, height: p.getBoundingClientRect().height }, window.innerWidth, window.innerHeight, "start"), width };
+		setPos((prev) =>
+			prev && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.placement === next.placement ? prev : next,
+		);
+	}, []);
+	useLayoutEffect(() => {
+		if (!open) {
+			setPos(null);
+			return;
+		}
+		place();
+		window.addEventListener("resize", place);
+		window.addEventListener("scroll", place, true);
+		return () => {
+			window.removeEventListener("resize", place);
+			window.removeEventListener("scroll", place, true);
+		};
+	}, [open, text, place, flat.length]);
 
 	const close = () => {
 		setOpen(false);
@@ -202,11 +236,18 @@ export function Combobox({
 
 	const activeId = open && flat[active] ? `${id}-opt-${active}` : undefined;
 	return (
-		<div ref={root} className={cn("relative flex min-w-0 flex-col gap-1", className)} data-testid={testId}>
+		<div ref={root} className={cn("relative flex min-w-0 flex-col gap-1.5", className)} data-testid={testId}>
 			<label htmlFor={`${id}-input`} className={cn("text-sm font-medium", hideLabel && "sr-only")}>
 				{label}
 			</label>
-			<div className="relative">
+			{/* The bordered box holds the text and its buttons side by side, so nothing is drawn over the text. */}
+			<div
+				ref={box}
+				className={cn(
+					"border-input bg-card focus-within:border-primary flex h-(--control-h) w-full min-w-0 items-center rounded-md border shadow-xs focus-within:ring-2 focus-within:ring-(--focus)/40",
+					disabled && "cursor-not-allowed opacity-50",
+				)}
+			>
 				<input
 					ref={input}
 					id={`${id}-input`}
@@ -228,10 +269,10 @@ export function Combobox({
 					onFocus={openList}
 					onClick={() => !open && openList()}
 					onKeyDown={onKeyDown}
-					className="border-input bg-card focus-visible:border-primary h-(--control-h) w-full min-w-0 rounded-md border pr-14 pl-3 text-base outline-none placeholder:text-neutral-500 focus-visible:ring-2 focus-visible:ring-(--focus)/40 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+					className="-my-px h-[calc(100%+2px)] w-full min-w-0 flex-1 rounded-md bg-transparent pl-3 text-base outline-none placeholder:text-neutral-500 disabled:cursor-not-allowed md:text-sm"
 					data-testid={`${testId}-input`}
 				/>
-				<span className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+				<span className="flex shrink-0 items-center gap-0.5 pr-1">
 					{clearable && value && !disabled && (
 						<button
 							type="button"
@@ -258,8 +299,14 @@ export function Combobox({
 					</button>
 				</span>
 			</div>
-			{open && (
-				<div className="bg-card text-card-foreground absolute top-full right-0 left-0 z-50 mt-1 rounded-lg border p-1 shadow-(--shadow-pop)">
+			{open &&
+				createPortal(
+				<div
+					ref={pop}
+					className="bg-card text-card-foreground fixed z-50 rounded-lg border p-1 shadow-(--shadow-pop)"
+					style={pos ? { top: pos.top, left: pos.left, width: pos.width } : { top: 0, left: 0, visibility: "hidden" }}
+					data-placement={pos?.placement}
+				>
 					<ul id={listId} role="listbox" aria-label={label} className="max-h-72 overflow-y-auto" data-testid={`${testId}-list`}>
 						{state === "loading" && <li className="text-muted-foreground px-2.5 py-2 text-sm">{t("combobox.loading")}</li>}
 						{state === "error" && (
@@ -320,8 +367,9 @@ export function Combobox({
 							{t("combobox.hiddenTests", { count: hidden })}
 						</p>
 					)}
-				</div>
-			)}
+				</div>,
+				document.body,
+				)}
 		</div>
 	);
 }

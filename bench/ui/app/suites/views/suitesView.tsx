@@ -150,7 +150,6 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 						placeholder={t("filter.search")}
 						label={t("filter.search")}
 						testId="suites-search"
-						className="[&_input]:h-9"
 					/>
 					<FilterSelect
 						label={t("filter.category")}
@@ -159,7 +158,6 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 						value={filters.category}
 						onChange={(v) => set({ category: (v as SuiteCategory | null) ?? null })}
 						testId="suites-filter-category"
-						className="h-9"
 					/>
 					<SegmentedControl
 						label={t("filter.source")}
@@ -167,7 +165,6 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 						value={filters.source}
 						onChange={(v) => set({ source: v })}
 						testId="suites-source"
-						className="h-9"
 					/>
 					<FilterSelect
 						label={tu("list.sort")}
@@ -176,7 +173,6 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 						value={sort === "default" ? null : sort}
 						onChange={(v) => void setUrl({ sort: v ?? null })}
 						testId="suites-sort"
-						className="h-9"
 					/>
 					<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="suites-show-tests" />
 					<span className="ml-auto" aria-live="polite">

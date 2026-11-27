@@ -121,7 +121,7 @@ export function EntityLink({ kind, id, suite, children, short, className, testId
 			aria-label={children === undefined && shown !== id ? label : undefined}
 			className={cn(
 				mono && "font-mono text-[0.92em]",
-				"text-foreground decoration-primary/40 hover:text-primary rounded-sm underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid",
+				"text-foreground decoration-primary/50 hover:text-primary rounded-sm underline-offset-[3px] transition-colors hover:underline",
 				"focus-visible:ring-(--focus) focus-visible:ring-2 focus-visible:outline-none",
 				className,
 			)}

@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { pageWidthClass } from "@/components/shell/pageWidth";
 import { cn } from "@/lib/utils";
 import "@/app/evaluations_/$evalId/views/fw08I18n";
@@ -94,7 +95,6 @@ export default function EvaluationListView() {
 
 export { isTestEvaluation };
 
-const selectClass = "border-input bg-card dark:bg-input/20 h-8 rounded-md border px-2 text-xs shadow-xs outline-none";
 
 /** Search, status, mode and sort above the table. */
 function EvaluationToolbar({
@@ -134,8 +134,8 @@ function EvaluationToolbar({
 			</label>
 			<label className="flex items-center gap-1.5 text-xs">
 				<span className="text-muted-foreground">{tf("list.status")}</span>
-				<select
-					className={selectClass}
+				<NativeSelect
+					className="[field-sizing:content]"
 					value={filters.status}
 					onChange={(e) => onChange({ ...filters, status: e.target.value as EvaluationFilters["status"] })}
 					data-testid="evaluations-status-filter"
@@ -145,12 +145,12 @@ function EvaluationToolbar({
 							{s === "all" ? tf("list.statusAll") : t(`status.${s}`)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 			</label>
 			<label className="flex items-center gap-1.5 text-xs">
 				<span className="text-muted-foreground">{tf("list.mode")}</span>
-				<select
-					className={selectClass}
+				<NativeSelect
+					className="[field-sizing:content]"
 					value={filters.mode}
 					onChange={(e) => onChange({ ...filters, mode: e.target.value })}
 					data-testid="evaluations-mode-filter"
@@ -164,12 +164,12 @@ function EvaluationToolbar({
 							</option>
 						);
 					})}
-				</select>
+				</NativeSelect>
 			</label>
 			<label className="flex items-center gap-1.5 text-xs">
 				<span className="text-muted-foreground">{tf("list.sort")}</span>
-				<select
-					className={selectClass}
+				<NativeSelect
+					className="[field-sizing:content]"
 					value={filters.sort}
 					onChange={(e) => onChange({ ...filters, sort: e.target.value as EvaluationFilters["sort"] })}
 					data-testid="evaluations-sort"
@@ -179,7 +179,7 @@ function EvaluationToolbar({
 							{s === "result" ? t("list.sortResult") : tf(`list.sorts.${s}`)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 			</label>
 			{filtered && (
 				<Button

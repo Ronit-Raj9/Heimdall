@@ -4,6 +4,28 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * The one dropdown look (round 3), shared by the native select and the Radix trigger: card
+ * background, input border, control height, text-sm, a muted 16 px chevron at the right.
+ * Use NativeSelect for a plain list; it renders the select and the chevron.
+ */
+export const nativeSelectClass =
+	"border-input bg-card text-foreground hover:border-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-(--focus)/40 aria-invalid:border-destructive h-(--control-h) min-w-0 cursor-pointer appearance-none rounded-md border pr-8 pl-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50";
+export const nativeSelectChevronClass = "text-muted-foreground pointer-events-none absolute right-2.5 size-4 opacity-70";
+
+/** A native select with the shared dropdown look. `wrapperClassName` sizes the box (for example "w-full"). */
+const NativeSelect = React.forwardRef<HTMLSelectElement, React.ComponentProps<"select"> & { wrapperClassName?: string }>(
+	({ className, wrapperClassName, children, ...props }, ref) => (
+		<span data-slot="native-select" className={cn("relative inline-flex items-center", wrapperClassName)}>
+			<select ref={ref} className={cn(nativeSelectClass, "w-full", className)} {...props}>
+				{children}
+			</select>
+			<ChevronDownIcon className={nativeSelectChevronClass} aria-hidden="true" />
+		</span>
+	),
+);
+NativeSelect.displayName = "NativeSelect";
+
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
 	return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
@@ -36,7 +58,7 @@ function SelectTrigger({
 		>
 			{children}
 			<SelectPrimitive.Icon asChild>
-				<ChevronDownIcon className="size-4 opacity-50" />
+				<ChevronDownIcon className="text-muted-foreground size-4 opacity-70" />
 			</SelectPrimitive.Icon>
 		</SelectPrimitive.Trigger>
 	);
@@ -146,6 +168,7 @@ function SelectScrollDownButton({ className, ...props }: React.ComponentProps<ty
 }
 
 export {
+	NativeSelect,
 	Select,
 	SelectContent,
 	SelectGroup,

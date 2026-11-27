@@ -14,6 +14,8 @@ import { ESTIMATE_DEBOUNCE_MS, FAULTS, estimateText, groupFaults } from "@/app/e
 import { useDebounced } from "@/app/evaluate/views/useDebounced";
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { AgentPicker } from "@/components/agents/agentPicker";
+import { NativeSelect } from "@/components/ui/select";
+import { StickyFooter } from "@/components/ui/stickyFooter";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultChange } from "@/components/reportcard/reportCard.utils";
 import "@/app/evaluations/views/gw08I18n";
@@ -474,13 +476,13 @@ export default function FailureTestsView() {
 			<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
 				{/* No nested card inside the section (BD-13): the fields sit on the page. */}
 				<div className="flex min-w-0 flex-col gap-6">
-					<div className="flex min-w-0 flex-wrap items-end gap-4">
+					<div className="flex min-w-0 flex-wrap items-start gap-4">
 						<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
 						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
-						<label className="flex flex-col gap-1 text-xs font-medium">
+						<label className="flex flex-col gap-1.5 text-xs font-medium">
 							{t("ft.version")}
-							<select
-								className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+							<NativeSelect
+								className="min-w-40"
 								value={form.version}
 								onChange={(e) => setForm((f) => ({ ...f, version: Number(e.target.value) }))}
 								disabled={!form.agent}
@@ -493,9 +495,9 @@ export default function FailureTestsView() {
 										{v.note ? ` - ${v.note}` : ""}
 									</option>
 								))}
-							</select>
+							</NativeSelect>
 						</label>
-						<div className="flex w-full min-w-0 flex-col gap-1 text-xs font-medium sm:w-auto sm:min-w-64">
+						<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:w-auto sm:min-w-64">
 							{t("ft.model")}
 							<GroupedModelPicker
 								value={chosen.model || chosen.provider ? { provider: chosen.provider, model: chosen.model } : null}
@@ -650,7 +652,7 @@ export default function FailureTestsView() {
 						)}
 					</fieldset>
 
-					<div className="flex min-w-0 flex-wrap items-end gap-4">
+					<div className="flex min-w-0 flex-wrap items-start gap-4">
 						<NumberChoice
 							label={t("ft.tasks")}
 							value={form.tasks}
@@ -666,11 +668,11 @@ export default function FailureTestsView() {
 							testId="ft-trials"
 						/>
 						{planned > 0 && (
-							<span className="text-sm font-medium tabular-nums sm:pb-1.5" data-testid="ft-runs-planned" aria-live="polite">
+							<span className="flex h-(--control-h) items-center self-end text-sm font-medium tabular-nums sm:mt-[1.375rem] sm:self-start" data-testid="ft-runs-planned" aria-live="polite">
 								{tu("ft.runsPlanned", { count: planned })}
 							</span>
 						)}
-						<label className="flex max-w-56 min-w-0 flex-col gap-1 text-xs font-medium">
+						<label className="flex max-w-56 min-w-0 flex-col gap-1.5 text-xs font-medium">
 							{t("ft.budget")}
 							<span className="relative inline-flex w-32 items-center">
 								<span aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-2 text-sm">
@@ -681,7 +683,7 @@ export default function FailureTestsView() {
 									inputMode="decimal"
 									min={0}
 									step={0.01}
-									className="border-input bg-background h-9 w-full rounded-md border pr-2 pl-5 text-sm"
+									className="border-input bg-card h-(--control-h) w-full rounded-md border pr-2 pl-5 text-sm shadow-xs"
 									value={form.budgetText ?? ""}
 									onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
 									aria-invalid={problem === "budget" || undefined}
@@ -701,9 +703,10 @@ export default function FailureTestsView() {
 						</p>
 					)}
 					{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
-					<div
-						className="bg-background fixed inset-x-0 bottom-0 z-20 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-3 shadow-sm sm:sticky sm:z-10 sm:rounded-lg sm:border"
-						data-testid="ft-launch-bar"
+					<StickyFooter
+						phone="fixed"
+						className="bg-background min-w-0 justify-start gap-x-4 gap-y-2 shadow-sm sm:rounded-lg sm:border"
+						testId="ft-launch-bar"
 					>
 						<FailureTestEstimate
 							problem={problem}
@@ -727,7 +730,7 @@ capUsd={cost.capUsd}
 								testId="ft-launch"
 							/>
 						)}
-					</div>
+					</StickyFooter>
 				</div>
 			</Section>
 			)}
@@ -761,7 +764,7 @@ function NumberChoice({
 	testId: string;
 }) {
 	return (
-		<div className="flex flex-col gap-1 text-xs font-medium">
+		<div className="flex flex-col gap-1.5 text-xs font-medium">
 			{label}
 			<div role="radiogroup" aria-label={label} className="bg-muted inline-flex rounded-lg p-0.5" data-testid={testId}>
 				{options.map((n) => (

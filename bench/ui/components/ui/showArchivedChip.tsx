@@ -1,5 +1,6 @@
 import "./ufd5I18n";
 import { cn } from "@/lib/utils";
+import { filterChipClass, filterChipOff, filterChipOn } from "./toolbar";
 import { Archive } from "lucide-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -62,11 +63,7 @@ export function ShowArchivedChip({
 			type="button"
 			aria-pressed={on}
 			onClick={() => onChange(!on)}
-			className={cn(
-				"inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
-				on ? "border-primary/40 bg-primary-soft text-primary" : "bg-card text-muted-foreground hover:text-foreground hover:bg-muted",
-				className,
-			)}
+			className={cn(filterChipClass, on ? filterChipOn : filterChipOff, className)}
 			data-testid={testId ?? "show-archived-chip"}
 		>
 			<Archive className="size-3.5" aria-hidden="true" />

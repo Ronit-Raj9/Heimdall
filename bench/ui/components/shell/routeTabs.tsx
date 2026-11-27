@@ -134,7 +134,7 @@ export function RouteTabs({ tabs, defaultTab, param, history, label, children, c
 			ref={list}
 			aria-label={label}
 			className={cn(
-				"-mx-1 flex min-w-0 items-end gap-1 overflow-x-auto px-1 [scrollbar-width:thin]",
+				"bench-no-scrollbar -mx-1 flex min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1",
 				trailing ? "-mb-px flex-1" : "border-border border-b",
 			)}
 		>
