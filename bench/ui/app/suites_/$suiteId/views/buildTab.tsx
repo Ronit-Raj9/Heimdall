@@ -263,9 +263,9 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 				</div>
 				{!isAnswerSuite(suite) && (
 					<p className="text-muted-foreground text-xs" data-testid="suite-build-no-rows">
-						{/* X-89: a link to the builder (code start), not "Benchmarks > New". */}
+						{/* X-89, Q-192: a link to the builder's question and answer template, where rows can be added. */}
 						{tf("add.codeSuite")}{" "}
-						<Link to="/suites/new" search={{ start: "code" } as never} className="text-primary hover:underline" data-testid="suite-build-no-rows-create">
+						<Link to="/suites/new" search={{ template: "qa" } as never} className="text-primary hover:underline" data-testid="suite-build-no-rows-create">
 							{tf("add.codeSuiteLink")}
 						</Link>
 					</p>
