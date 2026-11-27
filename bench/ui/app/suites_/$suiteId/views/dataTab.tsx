@@ -69,8 +69,13 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-data-tab">
 			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
 			<PolicySection suite={suite.id} writable={writable} t={t} />
-			{writable && <ImportSection suite={suite.id} t={t} />}
 			<VersionsSection suite={suite.id} t={t} />
+			{/* M6-32: importing from another platform is a separate job; it sits after the tab's own data, with an anchor. */}
+			{writable && (
+				<div id="import" className="scroll-mt-20">
+					<ImportSection suite={suite.id} t={t} />
+				</div>
+			)}
 			<Section title={t("api.title")} description={t("api.description")} testId="suite-data-api">
 				<CopyCodeBlock code={apiSnippet(suite.id)} label={t("api.title")} kind="code" testId="suite-data-api-code" />
 			</Section>

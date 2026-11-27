@@ -49,6 +49,9 @@ describe("benchmark data tab", () => {
 		const html = render(<DataTab suite={{ id: "support-faq", tasks: [] } as unknown as SuiteSummary} />);
 		for (const id of ["suite-data-policy", "suite-data-import", "suite-data-versions-empty", "suite-data-api-code"])
 			expect(html).toContain(`data-testid="${id}"`);
+		// M6-32: the import sits after the versions, under an #import anchor.
+		expect(html.indexOf('data-testid="suite-data-versions')).toBeLessThan(html.indexOf('data-testid="suite-data-import"'));
+		expect(html).toContain('id="import"');
 		expect(text(html)).not.toMatch(/sealed|suite |probe|canary|lease/i);
 	});
 

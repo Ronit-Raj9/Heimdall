@@ -2746,7 +2746,7 @@
 				"init": "Start a benchmark from a template: python-pytest, node-test, go-test or generic-reward.",
 				"image": "Put your toolchain in the benchmark's base image. The verifier runs in it with no network.",
 				"verifier": "Say how the verifier reports: junit (default), reward with a threshold, or exit_code.",
-				"lock": "Lock the benchmark, then admit every task. Only admitted tasks can be planned."
+				"lock": "Freeze the benchmark, then admit every task. Only admitted tasks can be planned."
 			},
 			"agent": {
 				"init": "Describe your agent in one YAML file: command, python or http-service (LangGraph, FastAPI, an Agents SDK app).",
@@ -3149,7 +3149,7 @@
 		"fetch": "How to fetch",
 		"needs": "What a run needs",
 		"needsNone": "Nothing beyond the default stack.",
-		"command": "Import, lock and admit",
+		"command": "Import, freeze and admit",
 		"commandLabel": "Import command for {{name}}"
 	},
 	"workers": {
