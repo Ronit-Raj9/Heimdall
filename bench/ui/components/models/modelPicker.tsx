@@ -130,7 +130,8 @@ function firstChoice(c: ModelChoices, key?: ModelKey): string {
 	return key?.models[0] ?? c.suggested[0] ?? c.reported[0] ?? "";
 }
 
-const selectClass = "border-input bg-background h-8 rounded-md border px-2 text-sm disabled:opacity-50";
+// Q-149: on a phone each control takes the full row and may shrink, so a model row never overflows 390 px.
+const selectClass = "border-input bg-background h-8 w-full min-w-0 rounded-md border px-2 text-sm disabled:opacity-50 sm:w-auto";
 const OTHER = "__other__";
 const SEP = "::";
 
@@ -280,7 +281,7 @@ export function ModelPicker({
 					id={`${id}-search`}
 					type="search"
 					autoComplete="off"
-					className={`${selectClass} min-w-40`}
+					className={`${selectClass} sm:min-w-40`}
 					value={query}
 					disabled={disabled}
 					placeholder={t("picker.searchPlaceholder")}
@@ -320,7 +321,7 @@ export function ModelPicker({
 				</label>
 				<select
 					id={`${id}-model`}
-					className={`${selectClass} max-w-72 min-w-48`}
+					className={`${selectClass} sm:max-w-72 sm:min-w-48`}
 					value={other ? OTHER : model}
 					disabled={disabled}
 					onChange={(e) => setModel(e.target.value)}
@@ -363,7 +364,7 @@ export function ModelPicker({
 						</label>
 						<input
 							id={`${id}-model-other`}
-							className={`${selectClass} min-w-48`}
+							className={`${selectClass} sm:min-w-48`}
 							value={model}
 							disabled={disabled}
 							placeholder={t("picker.custom")}

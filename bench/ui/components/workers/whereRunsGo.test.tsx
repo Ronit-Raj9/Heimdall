@@ -4,7 +4,7 @@ import type { WorkerTargetView } from "@/lib/store/apis/workerTargetApi";
 import { describe, expect, it, vi } from "vitest";
 import { createConfirmStore } from "@/components/platform/confirmDialog";
 import i18n from "@/lib/i18n";
-import { changeTarget, confirmTarget, EvaluationWorkerPicker, WhereRunsGo } from "./whereRunsGo";
+import { changeTarget, choiceLabel, confirmTarget, evalWorkerOptions, EvaluationWorkerPicker, WhereRunsGo } from "./whereRunsGo";
 
 const q = vi.hoisted(() => ({ target: {} as Record<string, unknown> }));
 
@@ -45,10 +45,16 @@ describe("WhereRunsGo", () => {
 		q.target = okQuery(view);
 		const html = render(<WhereRunsGo />);
 		expect(html).toContain('data-testid="where-runs-go-select"');
+		// Q-239: the styled select shows the current choice and fits a phone (no fixed min width below sm).
 		expect(html).toContain("Modal (a fresh sandbox per run)");
-		expect(html).toContain("gpu (Fly Machines)");
-		expect(html).toContain("Shared worker");
-		expect(html).toMatch(/<option value="platform:modal" selected="">/);
+		expect(html).toContain('data-value="platform:modal"');
+		expect(html).toMatch(/class="[^"]*w-full min-w-0 sm:w-auto sm:min-w-64[^"]*"/);
+		expect(view.choices.map((c) => choiceLabel(c, "a fresh sandbox per run"))).toEqual([
+			"Shared worker",
+			"Modal (a fresh sandbox per run)",
+			"E2B (a fresh sandbox per run)",
+			"gpu (Fly Machines)",
+		]);
 		expect(html).not.toMatch(/arm|runner|lease/i);
 	});
 
@@ -83,11 +89,14 @@ describe("EvaluationWorkerPicker", () => {
 		q.target = okQuery(view);
 		const html = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />);
 		expect(html).toContain("Modal (a fresh sandbox per run), where runs go");
-		expect(html).toContain('<option value="worker:gpu">gpu (Fly Machines), ready</option>');
-		expect(html).toMatch(
-			/<option value="platform:e2b" disabled="">E2B \(a fresh sandbox per run\) \(set it as where runs go on the Workers page\)<\/option>/,
-		);
-		expect(html).toMatch(/<option value="shared" disabled=""/);
+		const t = i18n.getFixedT("en", "byoworker") as unknown as (k: string, o?: Record<string, unknown>) => string;
+		const opts = evalWorkerOptions(view, t);
+		expect(opts.find((o) => o.value === "worker:gpu")).toMatchObject({ label: "gpu (Fly Machines), ready", disabled: false });
+		expect(opts.find((o) => o.value === "platform:e2b")).toMatchObject({
+			label: "E2B (a fresh sandbox per run) (set it as where runs go on the Workers page)",
+			disabled: true,
+		});
+		expect(opts.find((o) => o.value === "shared")?.disabled).toBe(true);
 	});
 });
 describe("where runs go asks first (N217)", () => {

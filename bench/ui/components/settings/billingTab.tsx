@@ -286,7 +286,10 @@ function MeterCard({ meter, enabled }: { meter: MeterView; enabled: boolean }) {
 				<span className="text-muted-foreground text-xs">{t("meters.noLimit")}</span>
 			)}
 			{meter.reached && (
-				<span className="text-chart-error-ink text-xs font-medium" data-testid={`billing-meter-${meter.id}-reached`}>
+				<span
+					className={cn("text-xs font-medium", enabled ? "text-chart-error-ink" : "text-muted-foreground")}
+					data-testid={`billing-meter-${meter.id}-reached`}
+				>
 					{enabled ? t("meters.reached") : t("meters.reachedOff")}
 				</span>
 			)}

@@ -5,7 +5,7 @@ import { LOCAL_SESSION, type SessionInfo } from "@/lib/session/sessionContext";
 import type { OpenModelCatalog, OpenModelDeployment } from "@/lib/store/apis/openModelsApi";
 import { activeDeployments, defaultGPU, maxCost } from "@/lib/store/apis/openModelsApi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ServeOpenModel } from "./serveOpenModel";
+import { openEvaluations, ServeOpenModel, serveEmptyKey } from "./serveOpenModel";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/openModelsApi", async (orig) => {
@@ -19,6 +19,12 @@ vi.mock("@/lib/store/apis/openModelsApi", async (orig) => {
 		useStopOpenModelMutation: () => mutation(),
 	};
 });
+
+const platforms = vi.hoisted(() => ({ modal: false }));
+vi.mock("@/lib/store/apis/workerPlatformsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/workerPlatformsApi")>()),
+	useListWorkerPlatformsQuery: () => ({ data: { platforms: [{ name: "modal", title: "Modal", token_hint: "", connected: platforms.modal, default: false }], default: "" } }),
+}));
 
 // M8-15: the evaluation is picked from the experiments list.
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
@@ -97,8 +103,12 @@ describe("ServeOpenModel", () => {
 		expect(html).toContain("For evaluation exp-1");
 		// Start is the shared paid button; the evaluation is a select of unfinished ones.
 		expect(html).toContain('data-testid="serve-start"');
-		expect(html).toContain(">Support run<");
-		expect(html).not.toContain(">Old<");
+		expect(html).toContain('data-testid="serve-exp"');
+		expect(openEvaluations([{ state: "running", name: "Support run" }, { state: "done", name: "Old" }]).map((x) => x.name)).toEqual(["Support run"]);
+		// Q-22, Q-239: styled selects that fill their cell and may shrink, so the form fits 390 px.
+		expect(html).not.toContain("bg-background h-9 rounded-md border px-2");
+		expect(html).toMatch(/<button[^>]*class="[^"]*w-full min-w-0[^"]*"[^>]*data-testid="serve-gpu"/);
+		expect(html).toContain("min-w-0 grid-cols-1");
 	});
 	it("shows a viewer the deployments only", () => {
 		const html = render(<ServeOpenModel />, hosted("viewer"));
@@ -109,6 +119,15 @@ describe("ServeOpenModel", () => {
 	it("says how to start when nothing runs", () => {
 		api.q.list = okQuery({ deployments: [] });
 		expect(render(<ServeOpenModel />, hosted("viewer"))).toContain("Connect Modal under Workers first");
+	});
+	it("does not ask to connect Modal once Modal is connected (Q-53)", () => {
+		api.q.list = okQuery({ deployments: [] });
+		platforms.modal = true;
+		const html = render(<ServeOpenModel />, hosted("viewer"));
+		platforms.modal = false;
+		expect(html).toContain("Start one with the form above");
+		expect(html).not.toContain("Connect Modal");
+		expect(serveEmptyKey(false)).toBe("serve.empty");
 	});
 	it("renders when the list fails", () => {
 		api.q.list = errorQuery(503);

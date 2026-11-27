@@ -20,6 +20,7 @@ import "@/lib/types/shareI18n";
 import "@/components/settings/w4m8I18n";
 import "./uf8bI18n";
 import "./ufd4I18n";
+import "@/components/settings/ufrkI18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { cn } from "@/lib/utils";
 import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2 } from "lucide-react";
@@ -73,6 +74,12 @@ export function canonicalQuery(q?: string): string {
 /** The "what they will see" lines under the intro, in order (M8-69). Exported for tests. */
 export function shareAudienceLines(kind: ShareKind, hidePrompts: boolean): string[] {
 	return [`share.visible.${kind}`, hidePrompts ? "share.hiddenPrompts" : "share.hidden", "share.live", "share.pageUrl"];
+}
+
+/** True when an active link of this view already carries the label being typed (Q-283). Exported for tests. */
+export function labelTaken(shares: Share[], label: string): boolean {
+	const l = label.trim().toLowerCase();
+	return l !== "" && shares.some((s) => s.state === "active" && (s.label ?? "").trim().toLowerCase() === l);
 }
 
 /** Active links first; turned off and expired ones only when asked for (M8-30). Exported for tests. */
@@ -195,6 +202,7 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 	const session = useSession();
 	const confirm = useConfirm();
 	const { t: td } = useTranslation("ufd4");
+	const { t: tr } = useTranslation("ufrk");
 	const canCreate = canUse(session, "member");
 	const isAdmin = canUse(session, "admin");
 	const [days, setDays] = useState<number>(DEFAULT_EXPIRY_DAYS);
@@ -324,7 +332,13 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 									placeholder={t("labelPlaceholder")}
 									onChange={(e) => setLabel(e.target.value)}
 									data-testid="share-label"
+									aria-describedby={labelTaken(mine, label) ? "share-label-taken" : undefined}
 								/>
+								{labelTaken(mine, label) && (
+									<span id="share-label-taken" className="text-warning-ink text-xs" data-testid="share-label-taken">
+										{tr("share.labelExists")}
+									</span>
+								)}
 							</label>
 							<div className="flex items-center gap-3">
 								<Button type="button" onClick={submit} isLoading={createState.isLoading} dataTestId="share-create-submit">

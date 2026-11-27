@@ -5,7 +5,7 @@ import { useSession } from "@/lib/session/sessionContext";
 import { useGetAdminOverviewQuery, useSetKillSwitchMutation } from "@/lib/store/apis/adminApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { Activity, Building2, OctagonX, PlayCircle, ShieldAlert, Users } from "lucide-react";
-import { PageHeader } from "@/components/shell";
+import { PageHeader, useEmbedded } from "@/components/shell";
 import { StatCard } from "@/app/operate/views/uxBits";
 import { Button } from "@/components/ui/button";
 import "@/components/settings/uf8aI18n";
@@ -38,6 +38,7 @@ export default function AdminView({
 }: { /** Search parameter of the panel tab; "section" inside Settings, whose own tab is ?tab=. */ param?: string } = {}) {
 	const { t } = useTranslation("admin");
 	const session = useSession();
+	const embedded = useEmbedded();
 	const [tabParam, setTab] = useQueryState(param, parseAsString);
 	const tab = adminTab(tabParam);
 	useEffect(() => {
@@ -65,10 +66,15 @@ export default function AdminView({
 		);
 	}
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="admin-view">
+		<div className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="admin-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<Tabs value={tab} onValueChange={(value) => void setTab(adminTab(value) === "overview" ? null : value)} className="gap-6">
-				<TabsList ref={strip} className="max-w-full justify-start overflow-x-auto">
+				{/* Q-232: on a phone the strip fades at its right edge, so the tabs past it are hinted. */}
+				<TabsList
+					ref={strip}
+					className="max-w-full justify-start overflow-x-auto max-sm:[mask-image:linear-gradient(to_right,black_80%,transparent)] max-sm:pr-8"
+					data-testid="admin-tabs"
+				>
 					{ADMIN_TABS.map((key) => (
 						<TabsTrigger key={key} value={key} data-testid={`admin-tab-${key}`}>
 							{t(`tabs.${key}`)}

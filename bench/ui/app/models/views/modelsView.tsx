@@ -1,5 +1,7 @@
 import "@/components/settings/uf8aI18n";
 import "@/components/gateway/ufc7I18n";
+import "@/components/settings/ufrkI18n";
+import { useListEvaluationsLightQuery } from "@/lib/store/apis/evaluationsApi";
 import { notify } from "@/lib/notify";
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
 import { CredentialKinds } from "@/components/settings/credentialKinds";
@@ -71,7 +73,9 @@ export function addParam(search: unknown, known?: readonly string[]): ProviderId
  * wizard), or null. Only same-site paths count: a full URL or "//host" is ignored.
  */
 export function returnParam(search: unknown): string | null {
-	const ret = (search as { return?: unknown } | undefined)?.return;
+	// Q-309: the wizard may send ?returnTo=; older links use ?return=.
+	const sp = search as { return?: unknown; returnTo?: unknown } | undefined;
+	const ret = sp?.return ?? sp?.returnTo;
 	if (typeof ret !== "string" || !ret.startsWith("/") || ret.startsWith("//") || ret.startsWith("/\\")) return null;
 	return ret;
 }
@@ -186,6 +190,21 @@ export function spendPercent(spent: number, budget: number): number {
 	return Math.max(0, Math.min(100, (spent / budget) * 100));
 }
 
+/** The provider choices of the key form, grouped as the catalog groups them; a stored key's unknown provider stays listed. Pure, exported for tests. */
+export function providerItems(
+	formProviders: Pick<ModelProviderInfo, "id" | "name" | "custom_base_url">[],
+	current: ProviderId,
+	all: ModelProviderInfo[],
+	groupName: (g: ProviderGroup) => string,
+): { value: string; label: string; group?: string }[] {
+	const out: { value: string; label: string; group?: string }[] = [];
+	if (!formProviders.some((p) => p.id === current)) out.push({ value: current, label: providerName(current, all) });
+	for (const g of groupProviders(formProviders)) {
+		for (const p of g.providers) out.push({ value: p.id, label: p.name || providerName(p.id, all), group: groupName(g.group) });
+	}
+	return out;
+}
+
 /** Model keys: your keys first (add, edit, test, delete), the default model, then every provider behind "Browse providers". */
 export default function ModelsView() {
 	const { t } = useTranslation("models");
@@ -208,6 +227,12 @@ export default function ModelsView() {
 	);
 	const returnTo = returnParam(search);
 	const [saved, setSaved] = useState(false);
+	// Q-286: the panel was closed without saving; a person sent here from the wizard still gets the link back.
+	const [closed, setClosed] = useState(false);
+	const { t: tr } = useTranslation("ufrk");
+	// Q-309: with no evaluation yet, offer the way back to the set-up steps on Home.
+	const evals = useListEvaluationsLightQuery({ limit: 1, status: "" }, { skip: Boolean(returnTo) });
+	const noEvaluationYet = !returnTo && evals.isSuccess && (evals.data?.length ?? 0) === 0;
 	// The provider filter lives in the URL (?filter=), so a shared link keeps it.
 	const filter = filterParam(search);
 	const setFilter = (v: string) =>
@@ -257,15 +282,27 @@ export default function ModelsView() {
 			</header>
 			<CredentialKinds current="keys" />
 
-			{returnTo && saved && (
+			{returnTo && (saved || closed) && !form && (
 				<div
 					role="status"
-					className="border-chart-success/40 bg-chart-success/10 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-3"
+					className={cn(
+						"flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-3",
+						saved ? "border-chart-success/40 bg-chart-success/10" : "bg-card",
+					)}
 					data-testid="models-return"
 				>
-					<span className="text-sm font-medium">{tl("models.returnSaved")}</span>
+					<span className="text-sm font-medium">{saved ? tl("models.returnSaved") : tr("models.returnCancelled")}</span>
 					<Button asChild size="sm">
 						<a href={returnTo}>{tl("models.returnAction")}</a>
+					</Button>
+				</div>
+			)}
+
+			{noEvaluationYet && keys.length > 0 && !form && (
+				<div className="bg-card flex flex-wrap items-center justify-between gap-3 rounded-xl border px-5 py-3" data-testid="models-setup">
+					<span className="text-sm">{tr("models.setupLine")}</span>
+					<Button asChild size="sm" variant="outline">
+						<Link to="/">{tr("models.setupAction")}</Link>
 					</Button>
 				</div>
 			)}
@@ -277,7 +314,7 @@ export default function ModelsView() {
 			) : !models.data.keys_ready ? (
 				<EmptyState
 					icon={KeyRound}
-					message={isAdmin ? tl("models.unavailableAdmin") : tl("models.unavailableViewer")}
+					message={`${isAdmin ? tl("models.unavailableAdmin") : tl("models.unavailableViewer")} ${tr("models.freeCheck")}`}
 					action={
 						isAdmin
 							? { label: t("unavailableAction"), to: "/docs", search: { doc: "hosting" } }
@@ -407,14 +444,23 @@ export default function ModelsView() {
 						</div>
 					</DetailsDisclosure>
 					{form && (
-						<SidePanel title={form.key ? t("editTitle") : tc("models.add")} onClose={() => setForm(null)}>
+						<SidePanel
+							title={form.key ? t("editTitle") : tc("models.add")}
+							onClose={() => {
+								setForm(null);
+								setClosed(true);
+							}}
+						>
 							<KeyForm
 								key={`${form.provider}-${form.key?.id ?? "new"}`}
 								providers={providers}
 								initial={form}
 								canTest={canTest}
 								onSaved={() => setSaved(true)}
-								onDone={() => setForm(null)}
+								onDone={() => {
+									setForm(null);
+									setClosed(true);
+								}}
 							/>
 						</SidePanel>
 					)}
@@ -851,6 +897,7 @@ function KeyForm({
 	const { t } = useTranslation("models");
 	const { t: tl } = useTranslation("uf8a");
 	const { t: tc } = useTranslation("ufc7");
+	const { t: tr } = useTranslation("ufrk");
 	const id = useId();
 	const editing = initial.key;
 	const [provider, setProvider] = useState<ProviderId>(initial.provider);
@@ -863,7 +910,7 @@ function KeyForm({
 	const [priceOutput, setPriceOutput] = useState(editing?.price?.output_per_mtok ? String(editing.price.output_per_mtok) : "");
 	const [priceCache, setPriceCache] = useState(editing?.price?.cache_per_mtok ? String(editing.price.cache_per_mtok) : "");
 	const [touched, setTouched] = useState(false);
-	// After Save the panel stays open on the stored key and offers the (paid) test.
+	// After Save the panel stays open on the stored key and offers the test (free for most providers).
 	const [stored, setStored] = useState<ModelKey | null>(null);
 	const [create, createState] = useCreateModelKeyMutation();
 	const [update, updateState] = useUpdateModelKeyMutation();
@@ -1000,29 +1047,28 @@ function KeyForm({
 	);
 	return (
 		<form className="flex flex-col gap-5" autoComplete="off" onSubmit={(e) => void onSubmit(e)} noValidate data-testid="model-key-form">
+			<div className="bg-muted/40 flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-xs" data-testid="model-key-where">
+				<p>{tr("models.whereKeyGoes")}</p>
+				{canTest && <p>{tr("models.testAfterSave")}</p>}
+				<Link
+					to="/docs"
+					search={{ doc: "web-keys-secrets" } as never}
+					className="text-foreground w-fit underline underline-offset-4"
+					data-testid="model-key-where-doc"
+				>
+					{tr("models.whereDoc")}
+				</Link>
+			</div>
 			<div className={field}>
-				<label className={lbl} htmlFor={`${id}-provider`}>
-					{t("provider")} *
-				</label>
-				<select
-					id={`${id}-provider`}
-					className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+				<Combobox
+					label={`${t("provider")} *`}
+					items={providerItems(formProviders, provider, providers, (g) => t(`groups.${g}`))}
 					value={provider}
 					disabled={Boolean(editing)}
-					onChange={(e) => setProvider(e.target.value)}
-					data-testid="model-key-provider"
-				>
-					{!formProviders.some((p) => p.id === provider) && <option value={provider}>{providerName(provider, providers)}</option>}
-					{groupProviders(formProviders).map((g) => (
-						<optgroup key={g.group} label={t(`groups.${g.group}`)}>
-							{g.providers.map((p) => (
-								<option key={p.id} value={p.id}>
-									{p.name || providerName(p.id, providers)}
-								</option>
-							))}
-						</optgroup>
-					))}
-				</select>
+					onChange={(v) => v && setProvider(v)}
+					showTests
+					testId="model-key-provider"
+				/>
 				{info?.key_hint && (
 					<p className="text-muted-foreground text-xs" data-testid="model-key-hint">
 						{hintParts(info.key_hint).map((part, i) =>

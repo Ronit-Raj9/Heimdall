@@ -12,7 +12,10 @@ describe("activity log (lane 8a)", () => {
 	it("reads entries as sentences, raw id as fallback", () => {
 		expect(auditSentence(t, row("runs.diff.read", "r_1"), "Ada")).toBe("Ada opened runs diff r_1");
 		expect(auditSentence(t, row("member.role", "usr_grace"), "Ada")).toBe("Ada changed the role of usr_grace");
-		expect(auditSentence(t, row("odd.thing"), "Ada")).toBe("Ada: odd.thing");
+		// Q-52: an unknown action reads as words (the id stays a tooltip); a cost check has its own verb and counts as a read.
+		expect(auditSentence(t, row("odd.thing"), "Ada")).toBe("Ada: odd thing");
+		expect(auditSentence(t, row("evaluations.estimate"), "Ada")).toBe("Ada checked the cost of evaluations");
+		expect(isReadAction("evaluations.estimate")).toBe(true);
 	});
 	it("hides reads unless asked and filters by group", () => {
 		const rows = [row("runs.diff.read"), row("member.role"), row("experiment.create")];

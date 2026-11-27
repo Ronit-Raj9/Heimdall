@@ -16,11 +16,18 @@ import ModelsView, {
 	needsBaseUrl,
 	parseModels,
 	addModel,
+	providerItems,
+	returnParam,
 } from "./modelsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/models/serveOpenModel", () => ({ ServeOpenModel: () => null })); // Z05: its own test (serveOpenModel.test.tsx)
+const evals = vi.hoisted(() => ({ list: [{ id: "ev_1" }] as unknown[] }));
+vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useListEvaluationsLightQuery: () => ({ isSuccess: true, data: evals.list }),
+}));
 vi.mock("@/lib/store/apis/modelsApi", async () => {
 	const { mutation } = await import("@/lib/testing/render");
 	return {
@@ -146,7 +153,7 @@ describe("ModelsView", () => {
 		api.q = { models: okQuery({ ...CATALOG, keys: [], default: undefined }) };
 		const html = render(<ModelsView />);
 		expect(html).toContain('data-testid="models-empty"');
-		expect(html).toContain("Add a model key");
+		expect(html).toContain("Add API key");
 	});
 
 	it("says what to configure when the key store is off", () => {
@@ -325,5 +332,48 @@ describe("addModel", () => {
 		expect(addModel("", "gpt-5")).toBe("gpt-5");
 		expect(addModel("a, b", "c")).toBe("a, b, c");
 		expect(addModel("a, b", "a")).toBe("a, b");
+	});
+});
+
+describe("Model keys, round 2 lane RK", () => {
+	it("says in the add panel where the key goes and that Test follows the save (Q-287, Q-230)", () => {
+		routerState.location.search = { add: "openai" };
+		try {
+			const html = render(<ModelsView />);
+			expect(html).toContain('data-testid="model-key-where"');
+			expect(html).toContain("A worker receives it only for the length of a run and keeps it in memory");
+			expect(html).toContain("only ever gets a per-run key");
+			expect(html).toContain("Test comes right after you save: it is free for most providers");
+			expect(html).toContain('data-testid="model-key-where-doc"');
+			// Q-239: the provider is the shared combobox, not a native select.
+			expect(html).toContain('data-testid="model-key-provider"');
+			expect(html).not.toContain("<optgroup");
+		} finally {
+			routerState.location.search = {};
+		}
+	});
+	it("groups the provider choices and keeps an unknown stored provider (Q-239)", () => {
+		const items = providerItems(CATALOG.providers, "mystery", CATALOG.providers, (g) => g);
+		expect(items[0]).toMatchObject({ value: "mystery" });
+		expect(items.find((i) => i.value === "openai")?.group).toBe("frontier");
+	});
+	it("reads ?returnTo= as well as ?return= (Q-286, Q-309)", () => {
+		expect(returnParam({ returnTo: "/evaluate?step=4" })).toBe("/evaluate?step=4");
+		expect(returnParam({ returnTo: "https://evil.example" })).toBeNull();
+	});
+	it("offers the way back to set-up when there is no evaluation yet (Q-309)", () => {
+		expect(render(<ModelsView />)).not.toContain('data-testid="models-setup"');
+		evals.list = [];
+		try {
+			const html = render(<ModelsView />);
+			expect(html).toContain('data-testid="models-setup"');
+			expect(html).toContain("Back to set-up");
+		} finally {
+			evals.list = [{ id: "ev_1" }];
+		}
+	});
+	it("names the free agent check when keys cannot be saved (Q-238)", () => {
+		api.q = { models: okQuery({ ...CATALOG, keys_ready: false }) };
+		expect(render(<ModelsView />)).toContain("with Check agent on its page");
 	});
 });

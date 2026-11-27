@@ -28,6 +28,8 @@ beforeEach(() => {
 describe("JobsView", () => {
 	it("lists jobs with filters, cancel on running jobs and retry on ended ones", () => {
 		const html = render(<JobsView />, hostedSession("member"));
+		// Q-27: the table keeps a minimum width so the sticky Actions cell never covers Started.
+		expect(html).toContain("w-full min-w-[960px] text-sm");
 		expect(html).toContain('data-testid="jobs-filter-kind"');
 		expect(html).toContain('data-testid="jobs-filter-status"');
 		expect(html).toContain(`data-testid="jobs-row-${RUNNING_JOB.id}"`);

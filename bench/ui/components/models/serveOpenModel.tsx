@@ -7,6 +7,8 @@ import "@/components/suites/uf6bI18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useListWorkerPlatformsQuery } from "@/lib/store/apis/workerPlatformsApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import {
 	activeDeployments,
@@ -25,6 +27,19 @@ import { useTranslation } from "react-i18next";
 /** A time limit the server can bound: 0.1 to 24 hours (M8-15; 0 used to mean no limit). */
 export function hoursProblem(limit: number): boolean {
 	return !Number.isFinite(limit) || limit < 0.1 || limit > 24;
+}
+
+/** Radix Select has no empty value: this stands for "not tied to an evaluation". */
+const NO_EVALUATION = "__none__";
+
+/** Q-53: the empty list says "connect Modal first" only while Modal is not connected. */
+export function serveEmptyKey(modalConnected: boolean): "serve.empty" | "serve.emptyReady" {
+	return modalConnected ? "serve.emptyReady" : "serve.empty";
+}
+
+/** M8-15: only an unfinished evaluation can stop a server, so only those are offered. */
+export function openEvaluations<T extends { state?: string }>(list: readonly T[]): T[] {
+	return list.filter((x) => x.state !== "done" && x.state !== "failed" && x.state !== "cancelled");
 }
 
 const STATE_TONE: Record<string, "success" | "warning" | "outline"> = {
@@ -62,6 +77,8 @@ export function ServeOpenModel() {
 	const experiments = useListExperimentsQuery(undefined, { skip: !hosted || !isAdmin });
 	const confirm = useConfirm();
 	const { t: tu } = useTranslation("uf6b");
+	const platforms = useListWorkerPlatformsQuery(undefined, { skip: !hosted });
+	const modalConnected = (platforms.data?.platforms ?? []).some((p) => p.name === "modal" && p.connected);
 	if (!hosted) return null;
 
 	const model = models.find((m) => m.id === modelId) ?? models[0];
@@ -102,7 +119,9 @@ export function ServeOpenModel() {
 			setStopError(err);
 		}
 	};
-	const openExperiments = (experiments.data?.experiments ?? []).filter((x) => x.state !== "done" && x.state !== "failed" && x.state !== "cancelled");
+	const gpuLabel = (g: NonNullable<typeof choice>) =>
+		`${g.count > 1 ? `${g.count} x ` : ""}${g.title} · $${g.usd_per_hour_total.toFixed(2)}/h${g.recommended ? ` · ${t("serve.recommended")}` : ""}`;
+	const openExperiments = openEvaluations(experiments.data?.experiments ?? []);
 
 	return (
 		<section className="flex flex-col gap-3" data-testid="serve-open-model">
@@ -114,48 +133,66 @@ export function ServeOpenModel() {
 				<p className="text-muted-foreground text-sm">{t("serve.subtitle")}</p>
 			</div>
 			{isAdmin && models.length > 0 && (
-				<form className="bg-card grid gap-3 rounded-xl border px-5 py-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => e.preventDefault()} data-testid="serve-form">
-					<label className="flex flex-col gap-1 text-sm">
-						<span className="text-muted-foreground text-xs">{t("serve.model")}</span>
-						<select
-							className="bg-background h-9 rounded-md border px-2"
+				<form className="bg-card grid min-w-0 grid-cols-1 gap-3 rounded-xl border px-4 py-4 sm:grid-cols-2 sm:px-5" onSubmit={(e: FormEvent) => e.preventDefault()} data-testid="serve-form">
+					<div className="flex min-w-0 flex-col gap-1 text-sm">
+						<span className="text-muted-foreground text-xs" id="serve-model-label">
+							{t("serve.model")}
+						</span>
+						<Select
 							value={model?.id ?? ""}
-							onChange={(e) => {
-								setModelId(e.target.value);
+							onValueChange={(v) => {
+								setModelId(v);
 								setGPU("");
 							}}
-							data-testid="serve-model"
 						>
-							{models.map((m) => (
-								<option key={m.id} value={m.id}>
-									{m.title} ({m.licence}
-									{m.gated ? `, ${t("serve.gated")}` : ""})
-								</option>
-							))}
-						</select>
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						<span className="text-muted-foreground text-xs">{t("serve.engine")}</span>
-						<select className="bg-background h-9 rounded-md border px-2" value={engine} onChange={(e) => setEngine(e.target.value)} data-testid="serve-engine">
-							{engines.map((en) => (
-								<option key={en.id} value={en.id}>
-									{en.title} {en.version}
-								</option>
-							))}
-						</select>
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						<span className="text-muted-foreground text-xs">{t("serve.gpu")}</span>
-						<select className="bg-background h-9 rounded-md border px-2" value={gpuName} onChange={(e) => setGPU(e.target.value)} data-testid="serve-gpu">
-							{(model?.gpus ?? []).map((g) => (
-								<option key={g.name} value={g.name} disabled={g.count === 0} title={g.unsupported}>
-									{g.count > 1 ? `${g.count} x ` : ""}
-									{g.title} · ${g.usd_per_hour_total.toFixed(2)}/h{g.recommended ? ` · ${t("serve.recommended")}` : ""}
-								</option>
-							))}
-						</select>
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
+							<SelectTrigger className="w-full min-w-0" aria-labelledby="serve-model-label" data-testid="serve-model">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{models.map((m) => (
+									<SelectItem key={m.id} value={m.id}>
+										{m.title} ({m.licence}
+										{m.gated ? `, ${t("serve.gated")}` : ""})
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="flex min-w-0 flex-col gap-1 text-sm">
+						<span className="text-muted-foreground text-xs" id="serve-engine-label">
+							{t("serve.engine")}
+						</span>
+						<Select value={engine} onValueChange={setEngine}>
+							<SelectTrigger className="w-full min-w-0" aria-labelledby="serve-engine-label" data-testid="serve-engine">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{engines.map((en) => (
+									<SelectItem key={en.id} value={en.id}>
+										{en.title} {en.version}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="flex min-w-0 flex-col gap-1 text-sm">
+						<span className="text-muted-foreground text-xs" id="serve-gpu-label">
+							{t("serve.gpu")}
+						</span>
+						<Select value={gpuName} onValueChange={setGPU}>
+							<SelectTrigger className="w-full min-w-0" aria-labelledby="serve-gpu-label" data-testid="serve-gpu">
+								<SelectValue>{choice ? gpuLabel(choice) : null}</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								{(model?.gpus ?? []).map((g) => (
+									<SelectItem key={g.name} value={g.name} disabled={g.count === 0} disabledReason={g.unsupported} title={g.unsupported}>
+										{gpuLabel(g)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<label className="flex min-w-0 flex-col gap-1 text-sm">
 						<span className="text-muted-foreground text-xs">{t("serve.hours")}</span>
 						<Input
 							type="number"
@@ -174,23 +211,25 @@ export function ServeOpenModel() {
 							</span>
 						)}
 					</label>
-					<label className="flex flex-col gap-1 text-sm sm:col-span-2">
-						<span className="text-muted-foreground text-xs">{t("serve.evaluation")}</span>
-						<select
-							className="bg-background h-9 min-w-0 rounded-md border px-2"
-							value={expId}
-							onChange={(e) => setExpId(e.target.value)}
-							data-testid="serve-exp"
-						>
-							<option value="">{tu("serve.noEvaluation")}</option>
-							{openExperiments.map((x) => (
-								<option key={x.exp_id} value={x.exp_id}>
-									{x.name || x.exp_id}
-								</option>
-							))}
-						</select>
+					<div className="flex min-w-0 flex-col gap-1 text-sm sm:col-span-2">
+						<span className="text-muted-foreground text-xs" id="serve-exp-label">
+							{t("serve.evaluation")}
+						</span>
+						<Select value={expId || NO_EVALUATION} onValueChange={(v) => setExpId(v === NO_EVALUATION ? "" : v)}>
+							<SelectTrigger className="w-full min-w-0" aria-labelledby="serve-exp-label" data-testid="serve-exp">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={NO_EVALUATION}>{tu("serve.noEvaluation")}</SelectItem>
+								{openExperiments.map((x) => (
+									<SelectItem key={x.exp_id} value={x.exp_id}>
+										{x.name || x.exp_id}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 						<span className="text-muted-foreground text-xs">{t("serve.evaluationHint")}</span>
-					</label>
+					</div>
 					<div className="flex flex-wrap items-center gap-3 sm:col-span-2">
 						<PaidButton
 							size="sm"
@@ -204,7 +243,7 @@ export function ServeOpenModel() {
 							onConfirm={startServing}
 							testId="serve-start"
 						/>
-						<span className="text-muted-foreground text-xs" data-testid="serve-cost">
+						<span className="text-muted-foreground min-w-0 text-xs break-words" data-testid="serve-cost">
 							{t("serve.cost", { max: maxCost(choice, limit).toFixed(2) })}
 						</span>
 						<InlineError error={error} onRetry={() => void startServing()} testId="serve-error" className="sm:col-span-2" />
@@ -214,7 +253,7 @@ export function ServeOpenModel() {
 			<InlineError error={stopError} testId="serve-stop-error" />
 			{deployments.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="serve-empty">
-					{t("serve.empty")}
+					{t(serveEmptyKey(modalConnected))}
 				</p>
 			) : (
 				<ul className="bg-card flex flex-col divide-y rounded-xl border" data-testid="serve-list">
@@ -249,7 +288,7 @@ function DeploymentRow({ d, canStop, onStop }: { d: OpenModelDeployment; canStop
 				</div>
 				{d.state === "ready" && (
 					<span className="text-muted-foreground text-xs">
-						{t("serve.useAs")} <code className="font-mono text-[11px]">{d.model_name}</code>
+						{t("serve.useAs")} <code className="font-mono text-[11px] break-all">{d.model_name}</code>
 					</span>
 				)}
 				{d.experiment_id && <span className="text-muted-foreground text-xs">{t("serve.forEvaluation", { id: d.experiment_id })}</span>}

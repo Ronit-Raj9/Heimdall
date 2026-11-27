@@ -18,7 +18,7 @@ import {
 	useListSecretsQuery,
 	useRotateSecretMutation,
 } from "@/lib/store/apis/secretsApi";
-import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem, type OrgSecret } from "@/lib/types/secrets";
+import { MAX_SECRET_BYTES, secretNameProblem, type OrgSecret } from "@/lib/types/secrets";
 import { LockKeyhole } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -33,6 +33,11 @@ function byteLength(v: string): number {
 }
 
 /** Whether an agent can name this secret: older secrets may predate the name rule. */
+/** Q-242: what was typed, only upper-cased; a space or a dash stays so the inline format error can name it. Pure, exported for tests. */
+export function typedSecretName(value: string): string {
+	return value.toUpperCase();
+}
+
 export function secretNameUsable(name: string): boolean {
 	return /^[A-Z0-9_]+$/.test(name);
 }
@@ -346,7 +351,7 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 						placeholder={t("namePlaceholder")}
 						value={name}
 						onChange={(event) => {
-							setName(normalizeSecretName(event.target.value));
+							setName(typedSecretName(event.target.value));
 							setSaved(null);
 						}}
 						aria-invalid={Boolean(nameError) || undefined}

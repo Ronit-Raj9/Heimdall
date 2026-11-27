@@ -3,7 +3,8 @@ import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog"
 import "@/components/settings/w4m8I18n";
 import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { notify } from "@/lib/notify";
-import { PageHeader } from "@/components/shell";
+import { PageHeader, useEmbedded } from "@/components/shell";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -497,8 +498,10 @@ export default function OperateView() {
 	const status = query.data;
 	const backupsQuery = useGetOperateBackupsQuery(undefined, { skip: !status?.hosted });
 	const experiments = useListExperimentsQuery();
+	// Q-54: inside Settings the frame already pads the page; a second padding shifted the heading 16 px.
+	const embedded = useEmbedded();
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="operate-screen">
+		<section className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="operate-loading" />

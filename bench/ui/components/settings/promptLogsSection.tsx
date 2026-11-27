@@ -107,7 +107,7 @@ function PromptLogsForm({ policy }: { policy: PromptLogging }) {
 				</p>
 			)}
 			{policy.gateway_logs ? (
-				<div className="border-chart-error/40 flex flex-wrap items-center gap-4 rounded-lg border px-4 py-4" data-testid="prompt-logs-delete">
+				<div className="flex flex-wrap items-center gap-4 rounded-lg border px-4 py-4" data-testid="prompt-logs-delete">
 					<div className="flex min-w-60 flex-1 flex-col gap-1">
 						<span className="text-foreground text-sm font-medium">{t("settings.promptLogs.deleteTitle")}</span>
 						<span className="text-muted-foreground text-xs">{t("settings.promptLogs.deleteBody")}</span>

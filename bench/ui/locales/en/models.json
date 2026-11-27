@@ -131,6 +131,7 @@
 		"recommended": "cheapest fit",
 		"gated": "needs your Hugging Face token as the secret HF_TOKEN",
 		"empty": "No open model served yet. Connect Modal under Workers first.",
+		"emptyReady": "No open model served yet. Start one with the form above.",
 		"useAs": "Use it in an agent as",
 		"forEvaluation": "For evaluation {{id}}",
 		"maxCost": "at most ${{max}}",

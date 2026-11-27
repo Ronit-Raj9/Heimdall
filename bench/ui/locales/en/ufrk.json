@@ -1,0 +1,33 @@
+{
+	"share": {
+		"labelExists": "A link with this label already exists. Add a word or a date so the two can be told apart."
+	},
+	"members": {
+		"invited": "Invitation made for {{email}}. Copy the link below.",
+		"roleChanged": "{{email}} is now {{role}}.",
+		"removed": "{{email}} was removed.",
+		"inviteRevoked": "Invitation for {{email}} turned off."
+	},
+	"models": {
+		"whereKeyGoes": "Your key is stored encrypted. A worker receives it only for the length of a run and keeps it in memory; your agent's own container only ever gets a per-run key, never this one.",
+		"testAfterSave": "Test comes right after you save: it is free for most providers (for Sarvam it makes one tiny call).",
+		"whereDoc": "How keys are kept",
+		"returnCancelled": "No key was added. You can add one later.",
+		"setupLine": "Key added. The next set-up step is on Home.",
+		"setupAction": "Back to set-up",
+		"freeCheck": "You can still check that an agent runs, for free, with Check agent on its page."
+	},
+	"audit": {
+		"estimate": "{{actor}} checked the cost of {{what}} {{target}}",
+		"estimateNoTarget": "{{actor}} checked the cost of {{what}}",
+		"other": "{{actor}}: {{label}} {{target}}"
+	},
+	"jobs": {
+		"retryFree": "Retry (free)",
+		"retryFreeTitle": "A replay answers from the recording and calls no model, so it costs nothing."
+	},
+	"password": {
+		"setTitle": "Set a password",
+		"setDescription": "You sign in with GitHub, so this account has no password yet. Set one to also sign in with your email and a password."
+	}
+}

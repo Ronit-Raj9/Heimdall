@@ -1,6 +1,7 @@
 import i18n from "@/lib/i18n";
 
 import { normalizeSecretName, secretNameProblem } from "@/lib/types/secrets";
+import { typedSecretName } from "./secretsTab";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SecretsTable } from "./secretsTab";
@@ -32,6 +33,9 @@ describe("SecretsTable", () => {
 describe("secret names", () => {
 	it("normalizes and checks like the server", () => {
 		expect(normalizeSecretName("tavily api-key!")).toBe("TAVILY_API_KEY");
+		// Q-242: the field no longer rewrites the name; a bad character stays and fails the format check.
+		expect(typedSecretName("tavily api-key")).toBe("TAVILY API-KEY");
+		expect(secretNameProblem(typedSecretName("tavily api-key"))).toBe("format");
 		expect(secretNameProblem("")).toBe("required");
 		expect(secretNameProblem("1A")).toBe("format");
 		expect(secretNameProblem("HEIMDALL_MASTER_KEY")).toBe("reserved");

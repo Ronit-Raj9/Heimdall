@@ -21,7 +21,10 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useUpdateMemberMutation: () => mutation(),
 	useRemoveMemberMutation: () => mutation(),
 	useRevokeInvitationMutation: () => [
-		(arg: unknown) => sent.revoke.push(arg),
+		(arg: unknown) => {
+			sent.revoke.push(arg);
+			return { unwrap: () => Promise.resolve({}) };
+		},
 		{ isLoading: false, error: undefined, originalArgs: undefined },
 	],
 }));
@@ -49,5 +52,12 @@ describe("MembersTab invitations", () => {
 		expect(sent.revoke).toEqual([]);
 		revoke?.onConfirm();
 		expect(sent.revoke).toEqual([{ orgId: "org_acme", invitationId: "inv_1" }]);
+	});
+});
+
+describe("MembersTab on phones (Q-26)", () => {
+	it("lets a member row grow so email, role and date all show at 390", () => {
+		const html = render(<MembersTab org={ORG} />, hostedSession("owner"));
+		expect(html).toMatch(/data-testid="member-row-[^"]+"[^>]*class="[^"]*max-sm:h-auto|class="[^"]*max-sm:h-auto[^"]*"[^>]*data-testid="member-row-/);
 	});
 });

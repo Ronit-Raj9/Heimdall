@@ -56,7 +56,7 @@ deliver only to public https URLs.
 
 ## Live scoring
 
-**Production > Live traffic**: score real traffic from the Bifrost gateway,
+**Production > Live scoring**: score real traffic from the Bifrost gateway,
 read-only.
 
 1. **Set up live scoring**: gateway URL (empty uses the server's gateway)

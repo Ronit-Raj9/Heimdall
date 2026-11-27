@@ -10,7 +10,7 @@ import {
 	useRemovePlatformRegistryMutation,
 	useSavePlatformRegistryMutation,
 } from "@/lib/store/apis/workerPlatformsApi";
-import { CheckCircle2, Package } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useContext, useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ReactReduxContext } from "react-redux";
@@ -65,11 +65,8 @@ export function PlatformRegistryForm({
 		setToken("");
 	};
 	return (
-		<section className="flex flex-col gap-2 border-t pt-3" data-testid={`platform-${p.name}-registry`}>
-			<p className="flex items-center gap-1.5 text-[13px] font-medium">
-				<Package className="size-3.5" aria-hidden="true" />
-				{t("registry.title")}
-			</p>
+		<section className="flex flex-col gap-2" data-testid={`platform-${p.name}-registry`}>
+			{/* Q-247: the disclosure around this block already carries the "Image registry" title. */}
 			{!saved && (
 				<p className="text-chart-warning-ink text-xs" data-testid={`platform-${p.name}-registry-needed`}>
 					{t("registry.needed")}
@@ -161,7 +158,7 @@ export function PlatformRegistryForm({
 						</Button>
 					</div>
 					{hint && (
-						<p id={`${formId}-hint`} className="text-muted-foreground text-right text-xs" data-testid={`platform-${p.name}-registry-hint`}>
+						<p id={`${formId}-hint`} className="text-muted-foreground text-right text-sm" data-testid={`platform-${p.name}-registry-hint`}>
 							{t(`registry.${hint}`)}
 						</p>
 					)}
