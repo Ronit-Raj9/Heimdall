@@ -1,7 +1,7 @@
 import { okQuery, render } from "@/lib/testing/render";
 import type { WorkerTargetView } from "@/lib/store/apis/workerTargetApi";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationWorkerPicker } from "./whereRunsGo";
+import { evalWorkerOptions, EvaluationWorkerPicker } from "./whereRunsGo";
 
 const q = vi.hoisted(() => ({ target: {} as Record<string, unknown> }));
 
@@ -25,8 +25,10 @@ describe("EvaluationWorkerPicker on a per-evaluation platform", () => {
 	it("enables the platform option and says what it takes when it is picked", () => {
 		q.target = okQuery(view);
 		const html = render(<EvaluationWorkerPicker value="platform:modal" onChange={() => {}} />);
-		expect(html).toMatch(/<option value="platform:modal" selected="">Modal/);
-		expect(html).not.toMatch(/<option value="platform:modal"[^>]*disabled/);
+		expect(html).toContain('data-value="platform:modal"');
+		expect(html).toContain("Modal (a fresh sandbox per run)");
+		const t = ((k: string) => k) as (k: string, o?: Record<string, unknown>) => string;
+		expect(evalWorkerOptions(view, t).find((o) => o.value === "platform:modal")?.disabled).toBe(false);
 		expect(html).toContain(line);
 	});
 

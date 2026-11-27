@@ -10,6 +10,7 @@ import {
 import type { TFunction } from "i18next";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "./hw05I18n";
 import "./w4510I18n";
 
@@ -111,8 +112,10 @@ export function WhereRunsGo() {
 			setError(getBenchErrorMessage(e));
 		}
 	};
+	const currentChoice = data?.choices.find((c) => c.target === data.target);
+	const currentLabel = currentChoice ? choiceLabel(currentChoice, t("target.sandbox")) : null;
 	return (
-		<section className="bg-card flex min-w-0 flex-col gap-2 rounded-xl border px-5 py-4" data-testid="where-runs-go">
+		<section className="bg-card flex min-w-0 flex-col gap-2 rounded-xl border px-4 py-4 sm:px-5" data-testid="where-runs-go">
 			<div className="flex min-w-0 flex-wrap items-center gap-3">
 				<label htmlFor={fieldId} className="text-foreground text-sm font-semibold">
 					{t("target.label")}
@@ -122,20 +125,24 @@ export function WhereRunsGo() {
 						{t("target.loadError")}: {getBenchErrorMessage(query.error)}
 					</span>
 				) : (
-					<select
-						id={fieldId}
-						className="border-input bg-background h-8 min-w-64 rounded-md border px-2 text-sm"
-						value={data?.target ?? ""}
-						disabled={!data || state.isLoading}
-						onChange={(e) => void choose(e.target.value)}
-						data-testid="where-runs-go-select"
-					>
-						{(data?.choices ?? []).map((c) => (
-							<option key={c.target} value={c.target}>
-								{choiceLabel(c, t("target.sandbox"))}
-							</option>
-						))}
-					</select>
+					<Select value={data?.target ?? ""} disabled={!data || state.isLoading} onValueChange={(v) => void choose(v)}>
+						<SelectTrigger
+							id={fieldId}
+							size="sm"
+							className="w-full min-w-0 sm:w-auto sm:min-w-64"
+							data-testid="where-runs-go-select"
+							data-value={data?.target ?? ""}
+						>
+							<SelectValue>{currentLabel}</SelectValue>
+						</SelectTrigger>
+						<SelectContent>
+							{(data?.choices ?? []).map((c) => (
+								<SelectItem key={c.target} value={c.target}>
+									{choiceLabel(c, t("target.sandbox"))}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				)}
 			</div>
 			<p className="text-muted-foreground max-w-3xl text-xs text-pretty">{t("target.hint")}</p>
@@ -146,6 +153,39 @@ export function WhereRunsGo() {
 			)}
 		</section>
 	);
+}
+
+/** Radix Select has no empty value: this stands for "where runs go" (the evaluation follows the org setting). */
+export const CURRENT_TARGET = "__current__";
+
+export interface EvalWorkerOption {
+	value: string;
+	label: string;
+	disabled: boolean;
+	title?: string;
+}
+
+/** The evaluation worker choices: first "where runs go" (the current target), then the others; a choice that cannot take one evaluation is disabled. */
+export function evalWorkerOptions(data: WorkerTargetView, t: (key: string, opts?: Record<string, unknown>) => string): EvalWorkerOption[] {
+	const sandbox = t("target.sandbox");
+	const current = data.choices.find((c) => c.current);
+	const first: EvalWorkerOption = {
+		value: CURRENT_TARGET,
+		label: current ? `${choiceLabel(current, sandbox)}, ${t("target.whereRunsGo")}` : t("target.whereRunsGo"),
+		disabled: false,
+	};
+	const rest = data.choices
+		.filter((c) => !c.current)
+		.map((c) => ({
+			value: c.target,
+			label:
+				choiceLabel(c, sandbox) +
+				(c.kind === "worker" && c.status ? `, ${t(`status.${c.status}`, { defaultValue: c.status }).toLowerCase()}` : "") +
+				(c.per_evaluation ? "" : ` (${t("target.notForOne")})`),
+			disabled: !c.per_evaluation,
+			title: c.note,
+		}));
+	return [first, ...rest];
 }
 
 /** Settings, Workers tab: where an admin adds a worker. */
@@ -188,31 +228,30 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 	// N208: a platform picked for this evaluation (or where runs go) takes the evaluation only.
 	const picked = value ? data.choices.find((c) => c.target === value) : current;
 	const onPlatform = picked?.kind === "platform" && picked.per_evaluation ? picked : undefined;
+	const options = evalWorkerOptions(data, (k, o) => (t as unknown as (key: string, opts?: Record<string, unknown>) => string)(k, o));
 	return (
 		<section className="flex flex-col gap-1.5" data-testid="eval-worker">
 			<label htmlFor={fieldId} className="text-sm font-medium">
 				{t("target.evalLabel")}
 			</label>
-			<select
-				id={fieldId}
-				className="border-input bg-background h-8 w-72 rounded-md border px-2 text-sm"
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				data-testid="eval-worker-select"
-			>
-				<option value="">
-					{current ? `${choiceLabel(current, t("target.sandbox"))}, ${t("target.whereRunsGo")}` : t("target.whereRunsGo")}
-				</option>
-				{data.choices
-					.filter((c) => !c.current)
-					.map((c) => (
-						<option key={c.target} value={c.target} disabled={!c.per_evaluation} title={c.note}>
-							{choiceLabel(c, t("target.sandbox"))}
-							{c.kind === "worker" && c.status ? `, ${t(`status.${c.status}`, { defaultValue: c.status }).toLowerCase()}` : ""}
-							{c.per_evaluation ? "" : ` (${t("target.notForOne")})`}
-						</option>
+			<Select value={value || CURRENT_TARGET} onValueChange={(v) => onChange(v === CURRENT_TARGET ? "" : v)}>
+				<SelectTrigger
+					id={fieldId}
+					size="sm"
+					className="w-full min-w-0 sm:w-72"
+					data-testid="eval-worker-select"
+					data-value={value}
+				>
+					<SelectValue>{options.find((o) => o.value === (value || CURRENT_TARGET))?.label ?? null}</SelectValue>
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((o) => (
+						<SelectItem key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+							{o.label}
+						</SelectItem>
 					))}
-			</select>
+				</SelectContent>
+			</Select>
 			{onPlatform ? (
 				<p className="text-muted-foreground text-xs" data-testid="eval-worker-platform-line">
 					{t4510("perEvaluationLine", { platform: onPlatform.title })}

@@ -13,7 +13,9 @@ const form = (p: WorkerPlatform, extra: Partial<Parameters<typeof PlatformRegist
 describe("PlatformRegistryForm", () => {
 	it("asks for a registry when none is saved, with the token as a password field", () => {
 		const html = form(modal);
-		expect(html).toContain("Modal needs an image registry it can pull from. Add one on the Modal card.");
+		expect(html).toContain("Modal needs an image registry it can pull from. Add one below.");
+		// Q-247: one title only (the disclosure's); the block repeats no "Image registry" heading.
+		expect(html).not.toContain(">Image registry<");
 		expect(html).toContain('data-testid="platform-modal-registry-form"');
 		expect(html).toContain('placeholder="ghcr.io/team/heimdall"');
 		expect(html).toMatch(/type="password"[^>]*data-testid="platform-modal-registry-token"/);

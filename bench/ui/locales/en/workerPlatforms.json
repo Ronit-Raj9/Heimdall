@@ -37,7 +37,7 @@
   "off": "Worker platforms need the hosted server with a keystore master key.",
   "registry": {
     "title": "Image registry",
-    "needed": "Modal needs an image registry it can pull from. Add one on the Modal card.",
+    "needed": "Modal needs an image registry it can pull from. Add one below.",
     "help": "Heimdall pushes each image your runs use to this registry and Modal pulls it from there with the same login. Use a private registry you own and a token that can push and pull.",
     "path": "Registry path",
     "pathPlaceholder": "ghcr.io/team/heimdall",

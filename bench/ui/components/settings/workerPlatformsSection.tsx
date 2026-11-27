@@ -194,7 +194,7 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 						<p
 							id={`${formId}-connect-hint`}
 							role={pressed ? "alert" : undefined}
-							className={cn("text-right text-xs", pressed ? "text-chart-error-ink" : "text-muted-foreground")}
+							className={cn("text-right text-sm", pressed ? "text-chart-error-ink" : "text-muted-foreground")}
 							data-testid={`platform-${p.name}-connect-hint`}
 						>
 							{t(hint)}
