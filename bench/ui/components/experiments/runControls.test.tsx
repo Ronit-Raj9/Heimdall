@@ -84,6 +84,13 @@ describe("RunControlsPanel", () => {
 		expect(html).toContain("Which grades");
 		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).not.toContain("run-controls-grades");
 	});
+	it("keeps the grades select when the server has no run controls (M4-14)", () => {
+		api.controls = undefined;
+		const html = render(<RunControlsPanel expId="e_1" state="done" grades={<select data-testid="g" />} />, hostedSession("member"));
+		expect(html).toContain('data-testid="run-controls-grades"');
+		expect(html).toContain('data-testid="g"');
+		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).toBe("");
+	});
 	it("offers Rerun failures once finished, never on an exploratory rerun", () => {
 		api.controls = controls();
 		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).toContain("rerun-failures-button");

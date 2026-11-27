@@ -24,6 +24,7 @@ import { runLocations, type RunLocation } from "@/components/triage/triage.utils
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useGetClusterQuery, useGetClustersQuery, useGetGridQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import {
 	CLUSTER_SYNTHETIC,
 	type ClusterListResponse,
@@ -94,6 +95,12 @@ export default function ClustersTab() {
 	};
 	const matching = useMemo(() => filterClusters(data?.clusters ?? [], q ?? ""), [data?.clusters, q]);
 	const slice = pageSlice(matching, page);
+	// The benchmark filter is a select of the org's benchmarks ("id@version"), M7-38.
+	const suitesLight = useGetSuitesLightQuery();
+	const suiteOptions = useMemo(
+		() => (suitesLight.data?.suites ?? []).map((s) => (s.version ? `${s.id}@${s.version}` : s.id)),
+		[suitesLight.data?.suites],
+	);
 	const agentOptions = useMemo(() => [...new Set((data?.clusters ?? []).flatMap((c) => c.agents ?? []))].sort(), [data?.clusters]);
 
 	return (
@@ -110,6 +117,7 @@ export default function ClustersTab() {
 				min={min ?? data?.filters?.min ?? 1}
 				synthetic={synthetic ?? syntheticOf(data?.filters?.synthetic)}
 				agentOptions={agentOptions}
+				suiteOptions={suiteOptions}
 				experimentOptions={experimentChoices.options}
 				onText={onText}
 				onMin={(next) => void setMin(next)}

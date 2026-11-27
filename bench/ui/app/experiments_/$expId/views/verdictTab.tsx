@@ -30,7 +30,7 @@ import { NoiseFloorLine } from "@/components/integrity/varianceCard";
 import { cheaperArm } from "@/components/verdict/armCost";
 import "@/components/verdict/uf4aI18n";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
-import { EXPERIMENT_POLL_MS, useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { EXPERIMENT_POLL_MS, useGetExperimentQuery, useGetVerdictQuery as useVerdictForPicker } from "@/lib/store/apis/benchApi"; // the grade picker reads benchApi directly
 import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
@@ -308,7 +308,6 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 						</div>
 					</details>
 				</div>
-				<GradeSourcePicker value={grade} judged={judged} onChange={(next) => void setGrade(next)} />
 			</div>
 			{grade && grade !== latest?.id && (
 				<p
@@ -556,21 +555,36 @@ function guardMeta(guards: { status: string }[]): string | undefined {
 	return [...counts].map(([status, n]) => `${n} ${status}`).join(", ");
 }
 
+/**
+ * The "Which grades" select of the experiment page (M4-14): it sits in the Run controls, not in the
+ * verdict's top row. Reads the same grade choice and verdict as the Result tab (one cached request).
+ */
+export function ExperimentGradePicker({ expId }: { expId: string }) {
+	const { grade, setGrade } = useGradeChoice(expId);
+	const status = useGetExperimentQuery(expId);
+	const debug = Boolean(status.data && status.data.exp_id === expId && isDebugExperiment(status.data));
+	const verdict = useVerdictForPicker(gradeQuery(expId, grade), { skip: debug || !status.data });
+	const judged = Boolean(verdict.data?.judge_calibration);
+	return <GradeSourcePicker value={grade} judged={judged} onChange={(next) => void setGrade(next)} hideLabel />;
+}
+
 /** Which grades the verdict reads: the sealed ones, human reviews, or the regrade named in the URL. */
 function GradeSourcePicker({
 	value,
 	judged,
 	onChange,
+	hideLabel,
 }: {
 	value: string | null;
 	judged: boolean;
 	onChange: (next: string | null) => void;
+	hideLabel?: boolean;
 }) {
 	const { t } = useTranslation("bench");
 	const current = value ?? SEALED;
 	return (
 		<label className="flex items-center gap-2 text-xs">
-			<span className="text-muted-foreground">{t("verdict.source.pickLabel")}</span>
+			<span className={hideLabel ? "sr-only" : "text-muted-foreground"}>{t("verdict.source.pickLabel")}</span>
 			<Select value={current} onValueChange={(next) => onChange(next === SEALED ? null : next)}>
 				<SelectTrigger size="sm" className="w-44 text-xs" data-testid="verdict-grade-source-picker">
 					<SelectValue />

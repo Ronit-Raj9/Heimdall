@@ -36,6 +36,9 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 // Real error formatting; only the requests are faked.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: { suites: [{ id: "acme", version: "1.0.0" }] } }),
+}));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetClustersQuery: (args: unknown) => {
@@ -88,6 +91,8 @@ describe("ClustersTab", () => {
 		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(state.listArgs[0]).toEqual({ agent: "codex-default", exp: "e_1,e_2", min: 2, synthetic: "include" });
 		expect(html).toContain('data-testid="clusters-table"');
+		// The benchmark filter lists the org's benchmarks (M7-38).
+		expect(html).toContain("acme@1.0.0");
 		expect(html).toContain("12 failures in 30 checked runs");
 		expect(html).not.toContain('data-testid="mode-badge-synthetic"');
 		expect(html).not.toContain('data-testid="cluster-panel"');

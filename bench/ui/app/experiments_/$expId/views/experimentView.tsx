@@ -71,7 +71,7 @@ import { MatrixTab } from "./matrixTab";
 import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
 import { ScorecardsTab } from "./scorecardsTab";
-import { VerdictTab } from "./verdictTab";
+import { ExperimentGradePicker, VerdictTab } from "./verdictTab";
 import { GatewayEffectSlot } from "./gatewayEffectSlot";
 import "./fw11I18n";
 import "./hw12I18n";
@@ -403,7 +403,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 			{live && <LiveProgress status={st} />}
 
-			{!notStarted && <RunControlsPanel expId={expId} state={st.state} />}
+			{!notStarted && <RunControlsPanel expId={expId} state={st.state} grades={<ExperimentGradePicker expId={expId} />} />}
 
 			<div className="min-w-0">
 				<RouteTabs

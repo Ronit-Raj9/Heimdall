@@ -440,7 +440,14 @@ export function RunControlsPanel({ expId, state, grades }: { expId: string; stat
 	const { t: tc } = useTranslation("ufc2");
 	const controls = useGetRunControlsQuery(expId);
 	const c = controls.data;
-	if (!c) return null;
+	// A server without run controls still gets the grades select (M4-14).
+	if (!c)
+		return grades ? (
+			<div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-controls-grades">
+				<span className="font-medium">{tc("grades.title")}</span>
+				{grades}
+			</div>
+		) : null;
 	const live = state === "running";
 	const finished = state === "done" || state === "failed" || state === "cancelled";
 	const cancelled = Object.entries(c.state.cancelled_slots ?? {});
