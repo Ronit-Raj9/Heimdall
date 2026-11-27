@@ -628,6 +628,9 @@ func newRecord(m *schemas.Manifest, ev *evidence, r schemas.ReleaseRequest, now 
 	if ev.policy != nil {
 		rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = ev.policy.RuleSetName(), ev.policy.PolicyHash, ev.policy.Decision
 	}
+	// The numbers the release card shows, as the evaluation releases carry
+	// them (M7-76). Records written before this have no summary.
+	rec.Summary = comparisonSummary(m, a, arm)
 	return rec, nil
 }
 
