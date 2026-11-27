@@ -358,28 +358,31 @@ export const METRIC_PRIORITY: Record<(typeof METRIC_HEADS)[number], "metric" | "
 };
 
 function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
+	const { t: tr } = useTranslation("reportCard");
 	const num = "text-right tabular-nums";
+	// Stacked on phones, each value says which column it is (C2-8).
+	const l = (h: (typeof METRIC_HEADS)[number]) => tr(`columns.metric.${h}`);
 	return (
 		<>
-			<TableCell priority="metric">
+			<TableCell label={l("Score")} priority="metric">
 				<ScoreCell metrics={metrics} />
 			</TableCell>
-			<TableCell priority="secondary" className={num}>
+			<TableCell label={l("Runs")} priority="secondary" className={num}>
 				{metrics ? compactNumber(metrics.runs) : "-"}
 			</TableCell>
-			<TableCell priority="metric" className={num}>
+			<TableCell label={l("Cost")} priority="metric" className={num}>
 				<CostValue metrics={metrics} />
 			</TableCell>
-			<TableCell priority="secondary" className={num}>
+			<TableCell label={l("Tokens")} priority="secondary" className={num}>
 				{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}
 			</TableCell>
-			<TableCell priority="secondary" className={num}>
+			<TableCell label={l("Steps")} priority="secondary" className={num}>
 				{metrics ? compactNumber(metrics.steps) : "-"}
 			</TableCell>
-			<TableCell priority="secondary" className={num}>
+			<TableCell label={l("Tool calls")} priority="secondary" className={num}>
 				{metrics ? compactNumber(metrics.tool_calls) : "-"}
 			</TableCell>
-			<TableCell priority="secondary" className={num}>
+			<TableCell label={l("Time")} priority="secondary" className={num}>
 				{metrics ? duration(metrics.wall_s) : "-"}
 			</TableCell>
 		</>
@@ -408,7 +411,7 @@ function CapabilityTable({ report }: { report: Report }) {
 	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
-		<Table data-testid="report-capabilities" aria-label={tr("columns.capabilityTable")}>
+		<Table stack data-testid="report-capabilities" aria-label={tr("columns.capabilityTable")}>
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">{tr("columns.capability")}</TableHead>

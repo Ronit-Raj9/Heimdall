@@ -13,7 +13,16 @@ interface TableProps extends React.ComponentProps<"table"> {
 	stickyColumns?: number;
 	/** A long table scrolls inside itself (at most 70% of the viewport) and keeps its header row in view. */
 	scrollY?: boolean;
+	/**
+	 * Below sm each row stacks into key and value lines (C2-8, M2-37, M3-8): the header row is kept
+	 * for screen readers only and a cell shows its `label` before its value. Off by default.
+	 */
+	stack?: boolean;
 }
+
+/** The classes of a stacked table below sm (see TableProps.stack). Pure, exported for tests. */
+export const STACK_CLASSES =
+	"max-sm:[&_thead]:sr-only max-sm:[&_tbody_tr]:flex max-sm:[&_tbody_tr]:h-auto max-sm:[&_tbody_tr]:flex-col max-sm:[&_tbody_tr]:gap-1 max-sm:[&_tbody_tr]:py-2 max-sm:[&_tbody_td]:flex max-sm:[&_tbody_td]:justify-between max-sm:[&_tbody_td]:gap-4 max-sm:[&_tbody_td]:px-4 max-sm:[&_tbody_td]:whitespace-normal max-sm:[&_tbody_th]:px-4 max-sm:[&_tbody_th]:text-left max-sm:[&_td[data-label]]:before:text-muted-foreground max-sm:[&_td[data-label]]:before:content-[attr(data-label)]";
 
 /** Marks the first `count` columns of every row as sticky and sets their left offsets. */
 function pinLeadingColumns(table: HTMLTableElement, count: number) {
@@ -50,7 +59,7 @@ function pinLeadingColumns(table: HTMLTableElement, count: number) {
 	}
 }
 
-function Table({ className, containerClassName, stickyColumns = 0, scrollY = false, ...props }: TableProps) {
+function Table({ className, containerClassName, stickyColumns = 0, scrollY = false, stack = false, ...props }: TableProps) {
 	const containerRef = React.useRef<HTMLDivElement>(null);
 	// Fade the edge that hides columns (X-95); pinned leading columns never fade.
 	useScrollEdges(containerRef, { start: stickyColumns <= 0 });
@@ -108,7 +117,13 @@ function Table({ className, containerClassName, stickyColumns = 0, scrollY = fal
 			)}
 			tabIndex={isScrollable ? 0 : undefined}
 		>
-			<table ref={tableRef} data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />
+			<table
+				ref={tableRef}
+				data-slot="table"
+				data-stack={stack ? "" : undefined}
+				className={cn("w-full caption-bottom text-sm", stack && STACK_CLASSES, className)}
+				{...props}
+			/>
 		</div>
 	);
 }
@@ -158,10 +173,16 @@ function TableHead({ className, priority, scope = "col", ...props }: React.Compo
 	);
 }
 
-function TableCell({ className, priority, ...props }: React.ComponentProps<"td"> & { priority?: ColumnPriority }) {
+function TableCell({
+	className,
+	priority,
+	label,
+	...props
+}: React.ComponentProps<"td"> & { priority?: ColumnPriority; /** The column name a stacked table shows before the value. */ label?: string }) {
 	return (
 		<td
 			data-slot="table-cell"
+			data-label={label}
 			data-priority={priorityProps(priority)["data-priority"]}
 			className={cn(
 				priorityProps(priority).className,
