@@ -12,7 +12,7 @@
 		"passed": "Works",
 		"failed": "Problem: last check failed",
 		"running": "Checking...",
-		"never": "Not checked yet",
+		"never": "Setup not checked",
 		"broken": "Problem: settings file has an error"
 	},
 	"actions": {
@@ -59,7 +59,7 @@
 		"title": "Is this agent ready?",
 		"subtitle": "Run each step to confirm this agent works before you test it on a benchmark.",
 		"lastRun": "Last run {{when}}",
-		"options": "Options",
+		"options": "Advanced options",
 		"step": {
 			"check": "Quick test run",
 			"build": "Prepare the container",
@@ -87,5 +87,10 @@
 		"limitsHint": "How much time, CPU and memory the agent gets for each task.",
 		"environment": "Environment",
 		"environmentHint": "The command that starts the agent, and settings passed to it."
+	},
+	"tabs": {
+		"configs": "All agents",
+		"diff": "Compare setups",
+		"frameworks": "Frameworks"
 	}
 }

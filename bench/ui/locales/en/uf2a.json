@@ -1,0 +1,46 @@
+{
+	"workers": {
+		"sizeMin": "Use 1 or more, or leave it empty for the default."
+	},
+	"home": {
+		"tryBuiltin": "Try a built-in agent:",
+		"scheduled": "Scheduled checks",
+		"builtin": "Built-in",
+		"noneEvaluated_one": "Your agent has no report card yet. Evaluate it to see its scores here.",
+		"noneEvaluated_other": "None of your {{count}} agents has a report card yet. Evaluate one to see its scores here."
+	},
+	"agents": {
+		"empty": "No agents yet. Connect an agent or start from a template.",
+		"fromTemplate": "Start from a template",
+		"connect": "Connect an agent",
+		"jobsError": "Could not load recent runs. Last run and check may be old.",
+		"sortBy": "Sort by",
+		"typeLabel": "Agent type",
+		"typeAll": "All types",
+		"type": {
+			"command": "Command line",
+			"remote_http": "Web service",
+			"a2a": "Agent to agent",
+			"pull": "In your code",
+			"scripted": "Practice",
+			"other": "Custom"
+		},
+		"columns": {
+			"name": "Agent",
+			"runsAs": "Runs as",
+			"model": "Model",
+			"runs": "Runs",
+			"lastRun": "Last run",
+			"check": "Setup",
+			"actions": "Actions"
+		},
+		"more": "More actions for {{name}}"
+	},
+	"onboard": {
+		"builder": {
+			"openapi": "Build tasks from your OpenAPI file and policy",
+			"github": "Make tasks from this repository's commits"
+		},
+		"judgeNeeded": "Pick the judge model first: rubric grading needs one."
+	}
+}

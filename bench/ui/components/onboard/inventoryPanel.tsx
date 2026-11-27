@@ -1,6 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import { LabeledModelPicker, isPicked } from "@/components/models/labeledModelPicker";
+import "@/components/home/uf2aI18n";
+import { Link } from "@tanstack/react-router";
 import { MAP_FIELDS, MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
 import { suggestSuiteId, suiteIdBlocks, suiteIdCheck, type SuiteIdCheck } from "@/components/onboard/onboard.utils";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
@@ -47,6 +51,19 @@ export function estimateLine(
 	if (grader === "judge") return w4m5Text("estimate.judge", { tasks, runs });
 	const line = tx("found.estimate", { tasks, runs });
 	return judge > 0 ? `${line} ${tx("found.estimateJudge", { judge })}` : line;
+}
+
+/** Where a source that cannot become tasks here is built instead (M2-112, M6-50): OpenAPI and GitHub. */
+export function builderLink(kind: string): string | null {
+	if (kind === "openapi") return "/suites/from-api";
+	if (kind === "github") return "/suites/new";
+	return null;
+}
+
+/** A whole number inside [min, max] (M2-112b). */
+export function clampInt(v: number, min: number, max: number): number {
+	if (!Number.isFinite(v)) return min;
+	return Math.min(max, Math.max(min, Math.round(v)));
 }
 
 /** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
@@ -138,6 +155,9 @@ export function InventoryPanel({
 	const idLine = suiteIdLine(idCheck, plan.suite, tx);
 	const idLineId = useId();
 	const estimate = estimateLine(tx, inv, plan.grader);
+	const { t: tf } = useTranslation("uf2a");
+	// M6-54: rubric grading needs a judge model before drafting can start.
+	const judgeMissing = rows && plan.grader === "judge" && !isPicked(plan.judge ?? null);
 	// An empty box on first show gets a free id made from the source name.
 	useEffect(() => {
 		if (plan.suite) return;
@@ -221,6 +241,15 @@ export function InventoryPanel({
 					data-testid="onboard-cannot-draft"
 				>
 					<span className="font-medium">{t("source.cannotDraft")}.</span> {inv.next}
+					{builderLink(inv.kind) && (
+						<Link
+							to={builderLink(inv.kind) as never}
+							className="text-primary mt-2 block font-medium underline-offset-4 hover:underline"
+							data-testid="onboard-builder-link"
+						>
+							{tf(`onboard.builder.${inv.kind as "openapi"}`)}
+						</Link>
+					)}
 				</p>
 			) : (
 				<div className="flex flex-col gap-3 rounded-lg border p-3" data-testid="onboard-plan">
@@ -229,7 +258,9 @@ export function InventoryPanel({
 							<span className="font-medium">{t("plan.suite")}</span>
 							<Input
 								value={plan.suite}
-								onChange={(e) => set({ suite: e.target.value.toLowerCase() })}
+								// M2-112c: what is typed stays as typed; the check line names a rule it breaks.
+								onChange={(e) => set({ suite: e.target.value })}
+								placeholder="my-benchmark"
 								aria-invalid={idLine.error || undefined}
 								aria-describedby={idLineId}
 								data-testid="onboard-plan-suite"
@@ -259,24 +290,13 @@ export function InventoryPanel({
 						)}
 						{rows && plan.grader === "judge" && (
 							<>
-								<label className="flex flex-col gap-1 text-xs">
-									<span className="font-medium">{t("plan.judgeProvider")}</span>
-									<Input
-										value={plan.judge?.provider ?? ""}
-										onChange={(e) => set({ judge: { provider: e.target.value, model: plan.judge?.model ?? "" } })}
-										placeholder="openai"
-										data-testid="onboard-plan-judge-provider"
-									/>
-								</label>
-								<label className="flex flex-col gap-1 text-xs">
-									<span className="font-medium">{t("plan.judgeModel")}</span>
-									<Input
-										value={plan.judge?.model ?? ""}
-										onChange={(e) => set({ judge: { provider: plan.judge?.provider ?? "", model: e.target.value } })}
-										placeholder="gpt-4.1-mini"
-										data-testid="onboard-plan-judge-model"
-									/>
-								</label>
+								<LabeledModelPicker
+									label={`${t("plan.judgeProvider")} / ${t("plan.judgeModel")}`}
+									value={plan.judge?.provider || plan.judge?.model ? { provider: plan.judge?.provider ?? "", model: plan.judge?.model ?? "" } : null}
+									onChange={(v) => set({ judge: { provider: v.provider, model: v.model } })}
+									hint={judgeMissing ? tf("onboard.judgeNeeded") : undefined}
+									testId="onboard-plan-judge"
+								/>
 							</>
 						)}
 						{(inv.importers?.length ?? 0) > 0 && (
@@ -304,7 +324,7 @@ export function InventoryPanel({
 								min={1}
 								max={500}
 								value={plan.limit ?? ""}
-								onChange={(e) => set({ limit: e.target.value ? Number(e.target.value) : undefined })}
+								onChange={(e) => set({ limit: e.target.value ? clampInt(Number(e.target.value), 1, 500) : undefined })}
 								className="w-28"
 								data-testid="onboard-plan-limit"
 							/>
@@ -316,7 +336,7 @@ export function InventoryPanel({
 								min={0}
 								max={100}
 								value={plan.held_out?.pct ?? 0}
-								onChange={(e) => set({ held_out: { pct: Number(e.target.value) || 0, seed: plan.held_out?.seed || 1 } })}
+								onChange={(e) => set({ held_out: { pct: clampInt(Number(e.target.value) || 0, 0, 100), seed: plan.held_out?.seed || 1 } })}
 								className="w-24"
 								data-testid="onboard-plan-heldout"
 							/>
@@ -349,13 +369,14 @@ export function InventoryPanel({
 						<Button
 							onClick={onDraft}
 							isLoading={busy}
-							disabled={busy || suiteIdBlocks(idCheck)}
+							disabled={busy || suiteIdBlocks(idCheck) || judgeMissing}
 							aria-describedby={suiteIdBlocks(idCheck) ? idLineId : undefined}
 							dataTestId="onboard-draft"
 						>
 							{t("plan.draft")}
 						</Button>
 						<span className="text-muted-foreground text-xs">{t("plan.draftHint")}</span>
+						<WhyDisabled reason={judgeMissing ? tf("onboard.judgeNeeded") : null} testId="onboard-draft-why" />
 					</div>
 				</div>
 			)}

@@ -19,7 +19,7 @@ export function isUnreviewed(task: SuiteTask): boolean {
 
 /** Per suite, the mined tasks and the unreviewed ones, suites with mined tasks first, then by id. */
 export function minedRows(suites: readonly SuiteSummary[]): MinedSuiteRow[] {
-	const rows = suites.map((s) => {
+	const rows = suites.filter((s) => !isTestSuite(s.id)).map((s) => {
 		const mined = s.tasks.filter((t) => t.provenance?.created_by === MINED_BY);
 		return {
 			suite: s.id,
@@ -42,10 +42,18 @@ export function reviewCommand(suite: string, task: string): string {
 	return `heimdall task review ${suite}/${task}`;
 }
 
+/** Suites made by tests (`zz-test-` prefix), kept out of the mined list like test agents (M2-19). */
+export function isTestSuite(id: string): boolean {
+	return id.startsWith("zz-test-");
+}
+
+/** Step 0 on /quickstart: build the command line tool from this repository (M2-17). */
+export const INSTALL_STEP = { key: "install", command: "cd bench && make heimdall" } as const;
+
 /** The four commands of the first workflow, in order, with their i18n keys. */
 export const QUICKSTART_STEPS = [
 	{ key: "init", command: "heimdall init" },
-	{ key: "mine", command: "heimdall tasks mine -limit 10" },
+	{ key: "mine", command: "heimdall tasks mine --limit 10" },
 	{ key: "compare", command: "heimdall compare --baseline main --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage" },
 	{ key: "ci", command: "heimdall ci install github" },
 ] as const;

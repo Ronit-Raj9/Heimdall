@@ -30,7 +30,7 @@
 	},
 	"quickstart": {
 		"title": "Get started",
-		"subtitle": "Four commands take you from your code to a clear answer: is the new agent better or worse?",
+		"subtitle": "Build the command line tool, then four commands take you from your code to a clear answer: is the new agent better or worse?",
 		"step": "Step {{n}}",
 		"copy": "Copy command",
 		"copied": "Copied",
@@ -38,16 +38,23 @@
 			"init": "Looks at your project (tests, agents, Docker) and writes a .heimdall/ settings folder.",
 			"mine": "Turns past commits into tasks your agent must solve.",
 			"compare": "Runs the old and new agent side by side and says which is better.",
-			"ci": "Adds a GitHub check that comments on every pull request."
+			"ci": "Adds a GitHub check that comments on every pull request.",
+			"install": "Builds the Heimdall command line tool from this repository, once per machine."
 		},
-		"costFree": "Free",
-		"costForecast": "Shows the cost first",
+		"costForecast": "Estimates the cost before it runs",
 		"minedTitle": "Tasks made from your commits",
 		"minedSubtitle": "Check the written instructions before you trust the results.",
 		"needsReview_one": "{{count}} needs review",
 		"needsReview_other": "{{count}} need review",
 		"allReviewed": "All reviewed",
 		"minedCount": "{{mined}} of {{tasks}} made from commits",
-		"showCommands": "Review commands"
+		"showCommands": "Review commands",
+		"installTitle": "Install the Heimdall command line tool",
+		"web": {
+			"title": "Prefer the website? Evaluate an agent in 5 steps",
+			"body": "Pick an agent and benchmarks in the browser. Heimdall shows the cost before anything runs.",
+			"evaluate": "Evaluate an agent",
+			"keys": "Add a model key"
+		}
 	}
 }

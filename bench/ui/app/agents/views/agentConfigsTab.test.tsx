@@ -11,6 +11,7 @@ import { FrameworksTab } from "./frameworksTab";
 vi.mock("./agentRowDelete", () => ({ AgentRowDelete: () => null })); // row Delete has its own test (agentRowDelete.iwid.test.tsx)
 vi.mock("./agentJobs", () => ({
 	useAgentJobs: () => [{ id: "j1", kind: "agent.check", status: "succeeded", params: { agent: "agents/codex.yaml" } }],
+	useAgentJobsError: () => false,
 }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...(rest as object)}>{children}</a>,
@@ -82,7 +83,7 @@ const more = [
 
 /** The data-testid of every agent card in render order. */
 const cardIds = (html: string) =>
-	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last)$/.test(id));
+	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last|menu|delete|delete-error)$/.test(id));
 
 describe("AgentConfigsTab", () => {
 	it("shows agents as cards with a friendly adapter, model chip, check status and Evaluate", () => {
@@ -145,6 +146,18 @@ describe("AgentConfigsTab", () => {
 		expect(none).toContain("No agents match.");
 		expect(none).toContain("Clear the search.");
 		expect(filterAgents(more, "codex").map((a) => a.id)).toEqual(["codex", "live-l10-codex-task"]);
+	});
+
+	it("filters by type chips, hides Setup not checked on agents with runs, and keeps Delete in the row menu (M2-21..M2-26)", () => {
+		const html = render(more);
+		expect(html).toContain('data-testid="agents-types"');
+		expect(html).toContain('data-testid="agents-type-remote_http"');
+		expect(cardIds(render(more, { type: "remote_http" }))).toEqual(["support-bot"]);
+		expect(html).toContain("Sort by");
+		expect(html).not.toContain('data-testid="agents-row-claude-code-status"');
+		expect(html).toContain('data-testid="agents-row-my-plain-loop-menu"');
+		expect(html).not.toContain('data-testid="agents-row-codex-menu"');
+		expect(isTestAgent({ id: "zz-test-p1", scripted_kind: "", adapter: "command" })).toBe(true);
 	});
 
 	it("sorts by name, last run or runs", () => {

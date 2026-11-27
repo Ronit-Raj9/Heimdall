@@ -1,24 +1,26 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
 import {
 	evaluationStats,
-	firstRunSeen,
+	hasFinishedEvaluation,
 	homeStats,
-	markFirstRunSeen,
-	monthStart,
+	homeUsageRange,
+	monthStartUTC,
 	newestEvaluations,
 	recentComparisons,
 	runningNow,
+	setupSteps,
 	type ExperimentListItem,
 	type RunningNow,
 } from "@/components/home/home.utils";
 import { RecentEvaluations } from "@/components/home/recentEvaluations";
-import { YourAgents } from "@/components/home/yourAgents";
+import { YourAgents, agentsWithResults, ownAgents } from "@/components/home/yourAgents";
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
 import { LoadError } from "@/components/runs/screenStates";
 import { EmptyState, suiteIdOf } from "@/components/shell";
-import { Button } from "@/components/ui/button";
+import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
+import { useGetUsageQuery } from "@/lib/store/apis/usageApi";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -29,9 +31,9 @@ import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
-import { Link, Navigate } from "@tanstack/react-router";
-import { ArrowRight, Award, Bot, Boxes, CircleCheck, FlaskConical, Play, Wallet } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, Award, Bot, Boxes, Check, CircleCheck, FlaskConical, Wallet } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** How often the list itself refreshes, so a new or finished experiment shows up. */
@@ -49,18 +51,26 @@ function greetingKey(now: Date): "morning" | "afternoon" | "evening" {
 /**
  * Home: a greeting with the one thing to do (evaluate your agent), four agent KPIs, the
  * experiments running now with live progress, the newest evaluations, the newest finished
- * comparisons and the suites. A fresh org gets one onboarding card that
- * leads to /evaluate, the one start path.
+ * comparisons and the suites. Until an evaluation has finished, a set-up card lists the four steps
+ * to the first report card (M2-10); there is no first-run redirect any more.
  */
 export default function HomeView() {
 	const { t } = useTranslation("home");
 	const { t: ta } = useTranslation("agentFirst");
 	const locale = getLocale();
+	// M2-14: lists poll only while something runs; a finished run is picked up by the next visit
+	// or by RunningNowList's onFinished refetch.
+	const [live, setLive] = useState(true);
+	const poll = { pollingInterval: live ? LIST_POLL_MS : 0, skipPollingIfUnfocused: true };
 	const agents = useGetAgentsQuery();
-	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
+	const list = useListExperimentsQuery(undefined, poll);
 	const suites = useGetSuitesLightQuery();
-	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
-	const evals = useListEvaluationsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
+	const runs = useListRunsQuery({ limit: RUNS_PAGE }, poll);
+	const evals = useListEvaluationsQuery(undefined, poll);
+	const [usageRange] = useState(() => homeUsageRange());
+	// M8-19: "Spent" is the Usage total of this calendar month (UTC), the same number Usage shows.
+	const usage = useGetUsageQuery(usageRange);
+	const models = useGetModelsQuery();
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const evaluations = evals.data ?? [];
 	const evStats = evaluationStats(evaluations);
@@ -68,6 +78,8 @@ export default function HomeView() {
 	// Running now: active evaluations (what the Evaluations tile counts) plus running comparisons of no
 	// evaluation; checks and practice runs stay out of both lists.
 	const running = runningNow(evaluations, experiments);
+	const anyLive = running.total > 0;
+	if (list.isSuccess && evals.isSuccess && anyLive !== live) setLive(anyLive);
 	const recent = recentComparisons(experiments);
 	const empty = list.isSuccess && experiments.length === 0;
 	const session = useSession();
@@ -81,11 +93,22 @@ export default function HomeView() {
 	);
 	const trackOf = (suite: string | undefined) => (suite ? tracks.get(suiteIdOf(suite)) : undefined);
 
-	// First sign-in to an org with nothing tested yet: open /evaluate, the one start path, once per browser.
-	if (empty && evaluations.length === 0 && session.signedIn && mayRun && !firstRunSeen()) {
-		markFirstRunSeen();
-		return <Navigate to={"/evaluate" as never} replace />;
-	}
+	const showSetup = evals.isSuccess && !hasFinishedEvaluation(evaluations);
+	const agentList = agents.data?.agents ?? [];
+	const steps = setupSteps({
+		keys: (models.data?.keys.length ?? 0) > 0,
+		agent: ownAgents(agentList, Number.POSITIVE_INFINITY).length > 0,
+		evaluation: evaluations.length > 0,
+		finished: hasFinishedEvaluation(evaluations),
+	});
+	const kpiError = (onRetry: () => void) => (
+		<span className="inline-flex flex-wrap items-center gap-1">
+			<span className="text-chart-error-ink">{t("kpi.loadError")}</span>
+			<button type="button" className="text-foreground relative z-10 font-medium underline underline-offset-4" onClick={onRetry}>
+				{t("kpi.retry")}
+			</button>
+		</span>
+	);
 
 	const firstName = session.user?.name?.trim().split(/\s+/)[0];
 	const greeting = t(`greeting.${greetingKey(now)}`);
@@ -102,67 +125,77 @@ export default function HomeView() {
 						{t("intro")}
 					</p>
 				</div>
-				{mayRun && (
-					<div className="flex shrink-0 flex-wrap gap-2">
-						<Button asChild dataTestId="home-cta-run">
-							<Link to={"/evaluate" as never}>
-								<Play aria-hidden="true" />
-								{t("cta.run")}
-							</Link>
-						</Button>
-					</div>
-				)}
 			</header>
 
-			{empty && <OnboardingCard mayRun={mayRun} />}
+			{showSetup && <SetupCard mayRun={mayRun} steps={steps} />}
 
 			<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="home-kpis">
-				<StatCard
-					icon={Bot}
-					label={t("kpi.agents")}
-					value={evals.error ? "-" : evStats.agents}
-					hint={t("kpi.agentsHint")}
-					loading={evals.isLoading}
-					testId="home-kpi-agents"
-				/>
-				<StatCard
-					icon={Award}
-					label={t("kpi.evaluations")}
-					value={evals.error ? "-" : evStats.evaluations}
-					hint={t("kpi.evaluationsHint", { count: evStats.active })}
-					loading={evals.isLoading}
-					testId="home-kpi-evaluations"
-				/>
-				<StatCard
-					icon={CircleCheck}
-					label={t("kpi.passRate")}
-					value={runs.error || stats.passRate === null ? "-" : `${Math.round(stats.passRate * 100)}%`}
-					hint={stats.graded > 0 ? t("kpi.passRateHint", { pass: stats.passed, total: stats.graded }) : t("kpi.passRateNone")}
-					loading={runs.isLoading}
-					testId="home-kpi-pass"
-				/>
-				<StatCard
-					icon={Wallet}
-					label={t("kpi.spend")}
-					value={usd(stats.spendMonth)}
-					hint={t("kpi.spendHint", { date: monthStart(now).toLocaleDateString(locale, { month: "short", day: "numeric" }) })}
-					loading={list.isLoading}
-					testId="home-kpi-spend"
-				/>
+				<KpiLink to="/evaluations">
+					<StatCard
+						icon={Bot}
+						label={t("kpi.agents")}
+						value={evals.error || agents.error ? "-" : agents.data ? agentsWithResults(agentList, evaluations) : evStats.agents}
+						hint={evals.error ? kpiError(() => void evals.refetch()) : t("kpi.agentsHint")}
+						loading={evals.isLoading}
+						testId="home-kpi-agents"
+					/>
+				</KpiLink>
+				<KpiLink to="/evaluations">
+					<StatCard
+						icon={Award}
+						label={t("kpi.evaluations")}
+						value={evals.error ? "-" : evStats.evaluations}
+						hint={evals.error ? kpiError(() => void evals.refetch()) : t("kpi.evaluationsHint", { count: evStats.active })}
+						loading={evals.isLoading}
+						testId="home-kpi-evaluations"
+					/>
+				</KpiLink>
+				<KpiLink to="/runs">
+					<StatCard
+						icon={CircleCheck}
+						label={t("kpi.passRate")}
+						value={runs.error || stats.passRate === null ? "-" : `${Math.round(stats.passRate * 100)}%`}
+						hint={
+							runs.error
+								? kpiError(() => void runs.refetch())
+								: stats.graded > 0
+									? t("kpi.passRateHint", { pass: stats.passed, total: stats.graded })
+									: t("kpi.passRateNone")
+						}
+						loading={runs.isLoading}
+						testId="home-kpi-pass"
+					/>
+				</KpiLink>
+				<KpiLink to="/settings" search={{ tab: "usage" }}>
+					<StatCard
+						icon={Wallet}
+						label={t("kpi.spend")}
+						value={usage.error || !usage.data ? "-" : usd(usage.data.total_cost_usd)}
+						hint={
+							usage.error
+								? kpiError(() => void usage.refetch())
+								: t("kpi.spendHint", {
+										date: monthStartUTC(now).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" }),
+									})
+						}
+						loading={usage.isLoading}
+						testId="home-kpi-spend"
+					/>
+				</KpiLink>
 			</div>
 
-			{!agents.isError && (
-				<HomeSection title={ta("home.title")} testId="home-section-agents" link={{ to: "/agents", label: ta("home.viewAll") }}>
-					{agents.isLoading ? (
+			<HomeSection title={ta("home.title")} testId="home-section-agents" link={{ to: "/agents", label: ta("home.viewAll") }}>
+				{agents.isError ? (
+					<LoadError title={ta("home.title")} error={agents.error} onRetry={agents.refetch} testId="home-agents-error" />
+				) : agents.isLoading ? (
 						<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-loading" aria-hidden="true">
 							<div className="bg-muted h-44 animate-pulse rounded-xl" />
 							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
 						</div>
 					) : (
-						<YourAgents agents={agents.data?.agents ?? []} evaluations={evaluations} mayRun={mayRun} />
-					)}
-				</HomeSection>
-			)}
+					<YourAgents agents={agentList} evaluations={evaluations} mayRun={mayRun} />
+				)}
+			</HomeSection>
 
 			{!empty && (
 				<HomeSection
@@ -175,7 +208,17 @@ export default function HomeView() {
 							<div className="bg-muted h-44 animate-pulse rounded-xl" />
 							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
 						</div>
-					) : list.error && evals.error ? null : (
+					) : list.error || evals.error ? (
+						<LoadError
+							title={t("running.title")}
+							error={list.error ?? evals.error}
+							onRetry={() => {
+								void list.refetch();
+								void evals.refetch();
+							}}
+							testId="home-running-error"
+						/>
+					) : (
 						<RunningNowList
 							running={running}
 							onFinished={() => {
@@ -188,7 +231,7 @@ export default function HomeView() {
 				</HomeSection>
 			)}
 
-			{!evals.error && (!empty || evaluations.length > 0) && (
+			{(evals.error || !empty || evaluations.length > 0) && (
 				<HomeSection
 					title={t("evaluations.title")}
 					testId="home-section-evaluations"
@@ -197,6 +240,14 @@ export default function HomeView() {
 					<div className="bg-card overflow-hidden rounded-xl border shadow-(--shadow-card)">
 						{evals.isLoading ? (
 							<ListSkeleton rows={3} testId="home-evaluations-loading" />
+						) : evals.error ? (
+							<LoadError
+								title={t("evaluations.title")}
+								error={evals.error}
+								onRetry={evals.refetch}
+								testId="home-evaluations-error"
+								className="m-3"
+							/>
 						) : recentEvaluations.length === 0 ? (
 							<EmptyState
 								icon={Award}
@@ -361,23 +412,64 @@ function ListSkeleton({ rows, testId }: { rows: number; testId: string }) {
 	);
 }
 
-/** The one onboarding card on a fresh org: a big way into the /evaluate wizard. */
-function OnboardingCard({ mayRun }: { mayRun: boolean }) {
-	const { t } = useTranslation("home");
+/** A KPI tile as a link to the page behind its number (M2-13). */
+function KpiLink({ to, search, children }: { to: string; search?: Record<string, string>; children: ReactNode }) {
 	return (
-		<div className="bg-card flex flex-col gap-5 rounded-xl border p-6 sm:flex-row sm:items-center" data-testid="home-welcome-card">
-			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-				<h2 className="text-lg font-semibold tracking-tight">{t("onboarding.title")}</h2>
+		<Link
+			to={to as never}
+			search={search as never}
+			className="focus-visible:ring-ring/60 block min-w-0 rounded-xl transition-colors focus-visible:ring-2 focus-visible:outline-none [&>div]:h-full [&>div]:hover:border-primary/40"
+		>
+			{children}
+		</Link>
+	);
+}
+
+/**
+ * The set-up card (M2-10): four steps to the first report card, each ticked when done, shown on
+ * Home until an evaluation has finished. It replaces the one-time redirect to /evaluate.
+ */
+export function SetupCard({ mayRun, steps }: { mayRun: boolean; steps: ReturnType<typeof setupSteps> }) {
+	const { t } = useTranslation("home");
+	const next = steps.find((s) => !s.done);
+	return (
+		<section className="bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6" data-testid="home-welcome-card" aria-labelledby="home-setup-title">
+			<div className="flex min-w-0 flex-col gap-1.5">
+				<h2 id="home-setup-title" className="text-lg font-semibold tracking-tight">
+					{t("onboarding.title")}
+				</h2>
 				<p className="text-muted-foreground max-w-xl text-sm">{mayRun ? t("onboarding.body") : t("onboarding.viewer")}</p>
 			</div>
 			{mayRun && (
-				<Button asChild className="shrink-0">
-					<Link to={"/evaluate" as never} data-testid="home-welcome-open">
-						{t("onboarding.open")}
-						<ArrowRight className="size-4" aria-hidden="true" />
-					</Link>
-				</Button>
+				<ol className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="home-setup-steps">
+					{steps.map((step, i) => (
+						<li key={step.id} data-testid={`home-setup-${step.id}`} data-done={step.done}>
+							<Link
+								to={step.to as never}
+								search={step.search as never}
+								className={cn(
+									"hover:border-primary/40 flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors",
+									step === next ? "border-primary/40 bg-primary/5 font-medium" : "",
+								)}
+							>
+								<span
+									className={cn(
+										"flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+										step.done ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground",
+									)}
+									aria-hidden="true"
+								>
+									{step.done ? <Check className="size-3.5" /> : i + 1}
+								</span>
+								<span className="min-w-0">
+									{t(`onboarding.steps.${step.id}`)}
+									{step.done && <span className="sr-only"> ({t("onboarding.done")})</span>}
+								</span>
+							</Link>
+						</li>
+					))}
+				</ol>
 			)}
-		</div>
+		</section>
 	);
 }

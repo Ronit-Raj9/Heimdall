@@ -17,6 +17,7 @@ vi.mock("@/lib/store", () => ({
 		return { data: { suites: [] }, error: undefined, isLoading: false, refetch: () => undefined };
 	},
 }));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/shell", () => ({ PageHeader: ({ title }: { title: string }) => <h1>{title}</h1> }));
 
 const { default: QuickstartView, isSignedOutVisitor, QUICKSTART_LOGIN_HREF } = await import("./quickstartView");
@@ -45,5 +46,13 @@ describe("QuickstartView (G2.quickstart)", () => {
 		expect(html).not.toContain('data-testid="quickstart-signed-out"');
 		expect(html).toContain('data-testid="quickstart-no-mined"');
 		expect(state.suitesArg).toEqual([undefined]);
+	});
+
+	it("offers the website path: Evaluate and a model key link (M2-17)", () => {
+		state.session = hostedSession("member");
+		const html = renderToStaticMarkup(<QuickstartView />);
+		expect(html).toContain('data-testid="quickstart-web-evaluate"');
+		expect(html).toContain('data-testid="quickstart-web-keys"');
+		expect(html).toContain('data-testid="quickstart-step-install"');
 	});
 });

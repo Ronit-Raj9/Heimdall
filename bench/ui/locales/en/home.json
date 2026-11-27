@@ -11,8 +11,8 @@
 		"newExperiment": "Compare two setups"
 	},
 	"kpi": {
-		"agents": "Agents evaluated",
-		"agentsHint": "Different agents across your evaluations",
+		"agents": "Agents with results",
+		"agentsHint": "Agents with at least one evaluation",
 		"evaluations": "Evaluations",
 		"evaluationsHint_one": "{{count}} in progress",
 		"evaluationsHint_other": "{{count}} in progress",
@@ -25,7 +25,9 @@
 		"passRateHint": "{{pass}} of {{total}} runs solved their task",
 		"passRateNone": "No scored runs yet",
 		"spend": "Spent",
-		"spendHint": "This month, since {{date}}"
+		"spendHint": "This month (UTC), since {{date}}",
+		"loadError": "Could not load.",
+		"retry": "Retry"
 	},
 	"running": {
 		"title": "Running now",
@@ -80,10 +82,16 @@
 		"failed": "Failed to load"
 	},
 	"onboarding": {
-		"title": "Get your first result in about five minutes",
-		"body": "Pick your agent and a few benchmarks. Heimdall runs real tasks and gives your agent a report card.",
-		"open": "Evaluate your agent",
-		"viewer": "Nothing has been tested yet. Ask a team member to run the first test."
+		"title": "Set up Heimdall",
+		"body": "Four steps to your agent's first report card. This card stays until one evaluation has finished.",
+		"viewer": "Nothing has been tested yet. Ask a team member to run the first test.",
+		"done": "Done",
+		"steps": {
+			"keys": "Add a model key",
+			"agent": "Pick or add an agent",
+			"evaluate": "Run your first evaluation",
+			"report": "Read the report card"
+		}
 	},
 	"intro": "Heimdall tests your AI agent, not just its model, on real tasks and gives it a report card you can trust."
 }

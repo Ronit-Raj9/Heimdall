@@ -7,6 +7,7 @@ import { getLocale } from "@/lib/i18n";
 import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type Evaluation, type Report } from "@/lib/store/apis/evaluationsApi";
 import type { AgentSummary } from "@/lib/types/bench";
 import "@/lib/types/agentFirstI18n";
+import "./uf2aI18n";
 import { Link } from "@tanstack/react-router";
 import { Gauge, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,10 +15,49 @@ import { useTranslation } from "react-i18next";
 /** Agent cards shown on Home. */
 export const HOME_AGENTS_SHOWN = 6;
 
-/** The org's own agents (not baselines, not test doubles), in list order, at most n. */
-export function ownAgents(agents: readonly AgentSummary[], n = HOME_AGENTS_SHOWN): AgentSummary[] {
-	return agents.filter((a) => !a.error && !isTestAgent(a) && !isBaselineAgent(a)).slice(0, n);
+/** When each agent was last in an evaluation (newest created_at over the evaluations' arms), as ms. */
+export function lastEvaluated(evaluations: readonly Pick<Evaluation, "spec" | "created_at">[]): Map<string, number> {
+	const last = new Map<string, number>();
+	for (const ev of evaluations) {
+		const at = Date.parse(ev.created_at ?? "");
+		const t = Number.isFinite(at) ? at : 0;
+		for (const arm of ev.spec?.arms ?? []) if (arm.agent && t >= (last.get(arm.agent) ?? -1)) last.set(arm.agent, t);
+	}
+	return last;
 }
+
+/**
+ * The agents Home shows (M2-11, M1-19): the org's own agents plus built-in agents that were
+ * evaluated here, never test doubles or broken configs; agents with an evaluation first, newest
+ * evaluation first, then by name. At most n.
+ */
+export function ownAgents(
+	agents: readonly AgentSummary[],
+	n = HOME_AGENTS_SHOWN,
+	evaluations: readonly Pick<Evaluation, "spec" | "created_at">[] = [],
+): AgentSummary[] {
+	const last = lastEvaluated(evaluations);
+	return agents
+		.filter((a) => !a.error && !isTestAgent(a) && (!isBaselineAgent(a) || last.has(a.id)))
+		.map((a, i) => ({ a, i, at: last.get(a.id) }))
+		.sort((x, y) => {
+			if (x.at !== undefined && y.at !== undefined) return y.at - x.at || x.a.id.localeCompare(y.a.id);
+			if (x.at !== undefined) return -1;
+			if (y.at !== undefined) return 1;
+			return x.i - y.i;
+		})
+		.slice(0, n)
+		.map((x) => x.a);
+}
+
+/** How many of the shown agents have an evaluation: the "Agents with results" tile counts the same set (M1-19). */
+export function agentsWithResults(agents: readonly AgentSummary[], evaluations: readonly Pick<Evaluation, "spec" | "created_at">[]): number {
+	const last = lastEvaluated(evaluations);
+	return ownAgents(agents, Number.POSITIVE_INFINITY, evaluations).filter((a) => last.has(a.id)).length;
+}
+
+/** Built-in agents suggested when fewer than two agents have results (M2-11). */
+export const SUGGESTED_BUILTINS = ["codex", "claude-code"] as const;
 
 export interface AgentCardStats {
 	capabilities: { id: string; score: number }[];
@@ -58,7 +98,10 @@ export function agentCardStats(report: Report | undefined): AgentCardStats {
 	return { capabilities, costPerSolved: priced && solved > 0 ? cost / solved : null, worstDrop, faultsTested };
 }
 
-/** "Your agents" on Home: one card per own agent, or a way to add the first one. */
+/**
+ * "Your agents" on Home: one card per agent with results; agents without one as a short list
+ * (M2-12); a pointer to the built-in agents while few have results; a way to add the first agent.
+ */
 export function YourAgents({
 	agents,
 	evaluations,
@@ -69,37 +112,114 @@ export function YourAgents({
 	mayRun: boolean;
 }) {
 	const { t } = useTranslation("agentFirst");
-	const own = ownAgents(agents);
+	const { t: tf } = useTranslation("uf2a");
+	const own = ownAgents(agents, HOME_AGENTS_SHOWN, evaluations);
+	const last = lastEvaluated(evaluations);
+	const withResults = own.filter((a) => last.has(a.id));
+	const without = own.filter((a) => !last.has(a.id));
+	const builtins = SUGGESTED_BUILTINS.filter((id) => !last.has(id) && agents.some((a) => a.id === id));
+	const footer = (
+		<div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+			{mayRun && withResults.length < 2 && builtins.length > 0 && (
+				<span data-testid="home-agents-builtins">
+					{tf("home.tryBuiltin")}{" "}
+					{builtins.map((id, i) => (
+						<span key={id}>
+							{i > 0 && ", "}
+							<Link
+								to={"/evaluate" as never}
+								search={{ agent: id } as never}
+								className="text-foreground font-medium underline-offset-4 hover:underline"
+								data-testid={`home-agents-builtin-${id}`}
+							>
+								{id}
+							</Link>
+						</span>
+					))}
+				</span>
+			)}
+			<Link
+				to={"/scheduled-checks" as never}
+				className="hover:text-foreground ml-auto font-medium underline-offset-4 hover:underline"
+				data-testid="home-agents-scheduled"
+			>
+				{tf("home.scheduled")}
+			</Link>
+		</div>
+	);
 	if (own.length === 0) {
 		return (
-			<div
-				className="bg-card text-muted-foreground flex flex-wrap items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm"
-				data-testid="home-agents-empty"
-			>
-				<span>{t("home.empty")}</span>
-				{mayRun && (
-					<Button asChild size="sm">
-						<Link to="/agents/new" data-testid="home-agents-add">
-							<Plus aria-hidden="true" />
-							{t("home.add")}
-						</Link>
-					</Button>
-				)}
+			<div className="flex min-w-0 flex-col gap-3">
+				<div
+					className="bg-card text-muted-foreground flex flex-wrap items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm"
+					data-testid="home-agents-empty"
+				>
+					<span>{t("home.empty")}</span>
+					{mayRun && (
+						<Button asChild size="sm">
+							<Link to="/agents/new" data-testid="home-agents-add">
+								<Plus aria-hidden="true" />
+								{t("home.add")}
+							</Link>
+						</Button>
+					)}
+				</div>
+				{footer}
 			</div>
 		);
 	}
 	return (
-		<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-list">
-			{own.map((a) => (
-				<AgentCard key={a.id} agent={a} evaluations={evaluations} mayRun={mayRun} />
-			))}
-		</ul>
+		<div className="flex min-w-0 flex-col gap-3">
+			{withResults.length > 0 && (
+				<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-list">
+					{withResults.map((a) => (
+						<AgentCard key={a.id} agent={a} evaluations={evaluations} mayRun={mayRun} />
+					))}
+				</ul>
+			)}
+			{without.length > 0 && (
+				<div className="bg-card min-w-0 rounded-xl border" data-testid="home-agents-unevaluated">
+					{withResults.length === 0 && (
+						<p className="text-muted-foreground border-b px-4 py-3 text-sm">{tf("home.noneEvaluated", { count: without.length })}</p>
+					)}
+					<ul className="divide-y">
+						{without.map((a) => (
+							<li key={a.id} className="relative flex min-w-0 items-center gap-3 px-4 py-2.5" data-testid={`home-agent-${a.id}`}>
+								<AgentAvatar name={a.id} />
+								<div className="flex min-w-0 flex-1 flex-col">
+									<Link
+										to="/agents/$agentId"
+										params={{ agentId: a.id }}
+										className="truncate text-sm font-medium after:absolute after:inset-0 focus-visible:outline-none"
+									>
+										{a.id}
+									</Link>
+									<span className="text-muted-foreground truncate text-xs" data-testid={`home-agent-${a.id}-none`}>
+										{[a.model, t("home.notEvaluated")].filter(Boolean).join(" · ")}
+									</span>
+								</div>
+								{mayRun && (
+									<Button asChild size="sm" variant="ghost" className="relative z-10 shrink-0">
+										<Link to={"/evaluate" as never} search={{ agent: a.id } as never} data-testid={`home-agent-${a.id}-evaluate`}>
+											<Gauge aria-hidden="true" />
+											{t("home.evaluate")}
+										</Link>
+									</Button>
+								)}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+			{footer}
+		</div>
 	);
 }
 
 function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evaluations: readonly Evaluation[]; mayRun: boolean }) {
 	const { t } = useTranslation("agentFirst");
 	const { t: tg } = useTranslation("gw08");
+	const { t: tf } = useTranslation("uf2a");
 	const locale = getLocale();
 	const report = useGetAgentReportCardQuery({ agent: agent.id });
 	const versions = useGetAgentVersionsQuery(agent.id);
@@ -177,7 +297,7 @@ function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evalua
 					<span />
 				)}
 				{mayRun && (
-					<Button asChild size="sm" variant="outline">
+					<Button asChild size="sm" variant="ghost">
 						<Link to={"/evaluate" as never} search={{ agent: agent.id } as never} data-testid={`${testId}-evaluate`}>
 							<Gauge aria-hidden="true" />
 							{t("home.evaluate")}

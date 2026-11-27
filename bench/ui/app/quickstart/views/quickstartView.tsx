@@ -5,6 +5,8 @@ import { signupOffered, useSession, type SessionInfo } from "@/lib/session/sessi
 import { useGetSuitesQuery } from "@/lib/store";
 import "@/lib/types/u19I18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import "./fw22I18n";
 import { MinedTasks, QuickstartSteps } from "./quickstartCards";
@@ -38,6 +40,35 @@ export function QuickstartSignedOut({ signup }: { signup: boolean }) {
 	);
 }
 
+/** The website path to a first result, for people who do not want a terminal (M2-17). */
+export function QuickstartWeb() {
+	const { t } = useTranslation("u19");
+	return (
+		<div className="bg-card flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center" data-testid="quickstart-web">
+			<div className="flex min-w-0 flex-1 flex-col gap-1">
+				<h2 className="text-base font-semibold">{t("quickstart.web.title")}</h2>
+				<p className="text-muted-foreground text-sm">{t("quickstart.web.body")}</p>
+			</div>
+			<div className="flex shrink-0 flex-wrap items-center gap-3">
+				<Button asChild dataTestId="quickstart-web-evaluate">
+					<Link to={"/evaluate" as never}>
+						{t("quickstart.web.evaluate")}
+						<ArrowRight aria-hidden="true" />
+					</Link>
+				</Button>
+				<Link
+					to={"/settings" as never}
+					search={{ tab: "keys" } as never}
+					className="text-foreground text-sm font-medium underline-offset-4 hover:underline"
+					data-testid="quickstart-web-keys"
+				>
+					{t("quickstart.web.keys")}
+				</Link>
+			</div>
+		</div>
+	);
+}
+
 /** Get started: /quickstart, linked from Home. The four commands as step cards, then the mined tasks that need review. */
 export default function QuickstartView() {
 	const { t } = useTranslation("bench");
@@ -47,13 +78,14 @@ export default function QuickstartView() {
 	// A visitor has no organization: the suites call would only answer 401.
 	const { data, error, isLoading, refetch } = useGetSuitesQuery(signedOut ? skipToken : undefined);
 	return (
-		<section className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-8" data-testid="quickstart-view">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="quickstart-view">
 			<PageHeader
 				title={tu("quickstart.title")}
 				subtitle={tu("quickstart.subtitle")}
 				breadcrumbs={[{ label: t("home.title"), to: "/" }, { label: tu("quickstart.title") }]}
 				testId="quickstart-header"
 			/>
+			<QuickstartWeb />
 			<QuickstartSteps />
 			{signedOut ? (
 				<QuickstartSignedOut signup={signupOffered(session)} />

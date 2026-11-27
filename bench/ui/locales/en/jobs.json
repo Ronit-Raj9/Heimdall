@@ -17,12 +17,11 @@
 	},
 	"empty": "No jobs yet. Buttons like Import, Make tasks, Check grader and Download start a job, and it shows up here.",
 	"emptyFiltered": "No job matches these filters.",
-	"emptyAction": "Browse the catalog",
 	"loadError": "Could not load jobs",
 	"loadMore": "Load older jobs",
-	"cancel": "Cancel",
-	"confirmCancel": "Stop this job? It gets a few seconds to finish cleanly, then it is stopped.",
-	"confirm": "Stop job",
+	"cancel": "Cancel job",
+	"confirmCancel": "Cancel this job? Work done so far is kept.",
+	"confirm": "Cancel job",
 	"keep": "Keep running",
 	"retry": "Retry",
 	"retryTitle": "Start this job again with the same settings",
@@ -41,7 +40,7 @@
 		"title": "Job log",
 		"open": "Open job page",
 		"close": "Close",
-		"cancel": "Cancel",
+		"cancel": "Cancel job",
 		"queued": "Waiting to start. It begins when a worker is free.",
 		"failed": "The job failed:",
 		"addRunner": "No worker online. Open Settings > Workers to add a worker or check the shared worker",
@@ -54,5 +53,19 @@
 		"title": "Job log",
 		"open": "Log"
 	},
-	"jobOf": "{{kind}} of {{target}}"
+	"jobOf": "{{kind}}, {{target}}",
+	"retryConfirm": "Run this {{kind}} again? It calls models again and can cost up to {{budget}}.",
+	"retryConfirmNoBudget": "Run this {{kind}} again? It calls models again.",
+	"retryConfirmLabel": "Run again",
+	"actionErrorFor": "{{job}}: {{message}}",
+	"bulk": {
+		"column": "Pick",
+		"pick": "Pick {{job}}",
+		"selected_one": "{{count}} job picked",
+		"selected_other": "{{count}} jobs picked",
+		"cancel": "Cancel selected",
+		"clear": "Clear",
+		"confirm_one": "Cancel {{count}} job? Work done so far is kept.",
+		"confirm_other": "Cancel {{count}} jobs? Work done so far is kept."
+	}
 }

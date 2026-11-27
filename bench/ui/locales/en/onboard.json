@@ -1,6 +1,6 @@
 {
 	"title": "Add a benchmark",
-	"subtitle": "Drop a file or paste a link. Heimdall says what it found, drafts the tasks, proves each check passes the right answer and fails wrong ones, then adds the ready tasks to a private benchmark.",
+	"subtitle": "Drop a file or paste a link. Heimdall drafts and checks the tasks, then adds the ready ones to a private benchmark.",
 	"crumbs": { "benchmarks": "Benchmarks", "add": "Add" },
 	"steps": { "source": "1. Drop anything", "found": "2. What we found", "preview": "3. Preview the tasks", "ready": "4. Readiness checks", "publish": "5. Publish" },
 	"source": {
@@ -11,7 +11,7 @@
 		"drop": "Drop a file here or pick one",
 		"paste": "Or paste rows",
 		"pastePlaceholder": "question,answer\nWhat is the hotel cap per night?,250",
-		"connection": "Saved secret for the source (optional)",
+		"connection": "Access token (only for private datasets)",
 		"connectionHint": "The id of a secret holding a token, for a gated Hugging Face dataset.",
 		"inspect": "Look inside",
 		"clear": "Start over",
