@@ -108,8 +108,9 @@ func TestVerdictGatesFollowRegradeSource(t *testing.T) {
 }
 
 // The experiment's status names its newest committed re-score, so the page
-// can show it by default; the plain verdict route keeps answering the
-// original. An experiment without re-scores carries no field.
+// can show it by default; the plain verdict route answers that re-score too
+// (wave 4, decision 1: one grading rule after a re-score). An experiment
+// without re-scores carries no field.
 func TestStatusCarriesLatestRegrade(t *testing.T) {
 	idx := hx01Index()
 	d := fullDeps()
@@ -122,8 +123,11 @@ func TestStatusCarriesLatestRegrade(t *testing.T) {
 		t.Fatalf("latest_regrade = %v, want rg_new with its note and time", body["latest_regrade"])
 	}
 	checkKeys(t, "RegradeRef", lr, loadKeys(t, "RegradeRef"), false)
-	if v := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil)); v["grade_source"] != "original" {
-		t.Fatalf("plain verdict grade_source = %v, want original", v["grade_source"])
+	if v := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil)); v["grade_source"] != "rg_new" {
+		t.Fatalf("plain verdict grade_source = %v, want the newest re-score rg_new", v["grade_source"])
+	}
+	if v := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict?grade_source=original", nil, nil)); v["grade_source"] != "original" {
+		t.Fatalf("grade_source=original reads %v, want original", v["grade_source"])
 	}
 
 	plain := decodeBody(t, newTestClient(t, fullDeps()).do(t, "GET", "/api/bench/experiments/e_test", nil, nil))

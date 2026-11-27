@@ -436,7 +436,6 @@ func TestSuiteTaskDetail(t *testing.T) {
 		for path, status := range map[string]int{
 			"/suites/nope/tasks/c01":         404,
 			"/suites/canary/tasks/c99":       404,
-			"/suites/canary/tasks/..":        404,
 			"/suites/broken/tasks/c01":       422,
 			"/suites/canary/tasks/c01%2F..":  404,
 			"/suites/c%40n/tasks/c01":        404,
@@ -445,6 +444,16 @@ func TestSuiteTaskDetail(t *testing.T) {
 			if resp := get(path); resp.StatusCode() != status {
 				t.Errorf("%s: status = %d, want %d: %s", path, resp.StatusCode(), status, resp.Body())
 			}
+		}
+		// ".." is cleaned before routing, so the request names the benchmark
+		// itself; since wave 4 (N194, GET /suites/{id}) that path exists and
+		// the router redirects to it. No task file is ever read.
+		resp := get("/suites/canary/tasks/..")
+		if code := resp.StatusCode(); code != 404 && (code != 301 || !strings.HasSuffix(string(resp.Header.Peek("Location")), APIPrefix+"/suites/canary")) {
+			t.Errorf("/suites/canary/tasks/..: status = %d, location %q: %s", code, resp.Header.Peek("Location"), resp.Body())
+		}
+		if strings.Contains(string(resp.Body()), "instruction") {
+			t.Errorf("/suites/canary/tasks/.. served a task: %s", resp.Body())
 		}
 	})
 }
