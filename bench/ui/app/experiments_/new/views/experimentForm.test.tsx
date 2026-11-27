@@ -45,7 +45,7 @@ describe("ExperimentForm write token", () => {
 		const html = render(<ExperimentForm catalog={catalog} defaults={defaults} onStarted={() => undefined} />);
 		expect(html.indexOf("experiment-write-token-input")).toBeLessThan(html.indexOf('data-testid="experiment-plan-button"'));
 		expect(html).toMatch(/data-testid="experiment-plan-button"[^>]*disabled=""/);
-		expect(html).toContain("Enter the write token to plan and start.");
+		expect(html).toContain("Enter the access token to plan and start.");
 		storedToken.value = "t0ken";
 		const withToken = render(<ExperimentForm catalog={catalog} defaults={defaults} onStarted={() => undefined} />);
 		expect(withToken).not.toMatch(/data-testid="experiment-plan-button"[^>]*disabled=""/);

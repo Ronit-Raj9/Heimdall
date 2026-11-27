@@ -31,7 +31,7 @@ describe("Watch for new models", () => {
 	it("shows the sentence, the first-check line and what happened to each model", () => {
 		const empty = render(<ModelWatchView row={row} onRetry={() => undefined} />);
 		expect(empty).toContain("Heimdall checks Bifrost&#x27;s model catalog every day at 06:00.");
-		expect(empty).toContain("runs ev_core on it next to sonnet, once, with a budget of 5.00 USD");
+		expect(empty).toContain("runs ev_core on it next to sonnet, once, with a budget of $5.00 USD");
 		expect(empty).toContain("The first check only records the models that exist today. Nothing runs until a new one appears.");
 		const st: GwWatchState = {
 			schedule: row.name,

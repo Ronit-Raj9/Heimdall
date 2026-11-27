@@ -24,8 +24,8 @@ const form: ReplayForm = {
 };
 
 describe("shadow replay page", () => {
-	it("is reached from Why agents fail: the menu item covers /replays and the page links it", () => {
-		const why = BENCH_NAV_GROUPS.flatMap((g) => g.items).find((i) => i.to === "/why-agents-fail");
+	it("is reached from Comparisons (Spec 1): the menu item covers /replays and the page links it", () => {
+		const why = BENCH_NAV_GROUPS.flatMap((g) => g.items).find((i) => i.to === "/experiments");
 		expect(why?.also).toContain("/replays");
 		const html = renderToStaticMarkup(<ShadowReplayLink />);
 		expect(html).toContain('href="/replays"');

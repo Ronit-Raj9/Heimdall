@@ -38,7 +38,7 @@ export function sortRows<Row, K extends string>(rows: readonly Row[], sort: Tabl
 				if (va !== vb) return va === null ? 1 : -1;
 				return a.index - b.index;
 			}
-			const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+			const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), undefined, { numeric: true });
 			return cmp === 0 ? a.index - b.index : sign * cmp;
 		})
 		.map((x) => x.row);

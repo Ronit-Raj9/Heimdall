@@ -145,6 +145,6 @@ describe("HelpMenu", () => {
 		expect(html).toContain('href="/docs?doc=glossary"');
 		expect(html).toContain('href="/quickstart"');
 		expect(html).toContain('href="/status"');
-		for (const label of ["Guides", "Glossary", "Quickstart", "System status"]) expect(html).toContain(label);
+		for (const label of ["Guides", "Glossary", "CLI quickstart", "System status"]) expect(html).toContain(label);
 	});
 });
