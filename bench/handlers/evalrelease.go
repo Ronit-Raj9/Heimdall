@@ -148,6 +148,7 @@ func (h *evalReleaseHandler) buildPreview(ctx context.Context, ev *schemas.Evalu
 		p.ReplacesVersion = r.Live.Version
 	}
 	p.Baseline, p.Summary, p.Decision = r.Baseline, r.summary(), r.decision()
+	fillSideDates(p.Summary, evals, ev.Org)
 	p.Gate = ev.GateResult
 	if p.Gate == nil {
 		p.Gate = h.gates().judge(ev, r)
