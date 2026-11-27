@@ -19,7 +19,7 @@ describe("suitePillState", () => {
 	it("labels the frozen state in the header pill", () => {
 		const html = render(<SuiteStatusPill suite={{ ...base, id: "zz", lock_state: "locked" } as unknown as SuiteSummary} testId="pill" />);
 		expect(html).toContain('data-status="frozenNotChecked"');
-		expect(html).toContain("Frozen, readiness check not run");
+		expect(html).toContain("Next: run the readiness check (free, calls no model)");
 		expect(html).toContain('data-tone="neutral"');
 	});
 	it("uses the shared pill tones: green only when ready", () => {

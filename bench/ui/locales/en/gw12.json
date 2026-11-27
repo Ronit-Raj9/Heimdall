@@ -1,5 +1,5 @@
 {
 	"status": {
-		"frozenNotChecked": "Frozen, readiness check not run"
+		"frozenNotChecked": "Next: run the readiness check (free, calls no model)"
 	}
 }
