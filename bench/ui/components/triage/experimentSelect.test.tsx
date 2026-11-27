@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { okQuery, render, tagOf } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "./experimentSelect";
+import { ExperimentSelect, defaultPickerExperiment, evaluationNamesOf, useExperimentPicker } from "./experimentSelect";
 
 function exp(exp_id: string, name: string, at: string, extra: Partial<ExperimentStatus> = {}): ExperimentStatus {
 	return {
@@ -65,5 +65,18 @@ describe("ExperimentSelect (N5)", () => {
 		expect(defaultPickerExperiment(options, "e_other")).toBe("e_other");
 		expect(defaultPickerExperiment(options, null)).toBe("e_real");
 		expect(defaultPickerExperiment([], null)).toBeUndefined();
+	});
+});
+describe("finished evaluation names (M7-41)", () => {
+	it("names each evaluation by its spec name, else its id", () => {
+		const names = evaluationNamesOf([
+			{ id: "ev_1", spec: { name: " Nightly " } },
+			{ id: "ev_2", spec: {} },
+		] as never);
+		expect([...names]).toEqual([
+			["ev_1", "Nightly"],
+			["ev_2", "ev_2"],
+		]);
+		expect(evaluationNamesOf(undefined).size).toBe(0);
 	});
 });

@@ -1,3 +1,4 @@
+import { useBusyGuard } from "@/lib/hooks/useBusyGuard";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -200,6 +201,8 @@ export function MaximPanel() {
 	const [draft, setDraft] = useState<MaximDraft>(maximDraft(undefined));
 	const [busy, setBusy] = useState<MaximFormProps["busy"]>(null);
 	const [message, setMessage] = useState<MaximFormProps["message"]>(null);
+	// One Maxim call at a time, even on two clicks in one frame (M7-22).
+	const guard = useBusyGuard();
 	const loaded = conn.data;
 	useEffect(() => {
 		if (loaded) setDraft(maximDraft(loaded));
@@ -225,30 +228,36 @@ export function MaximPanel() {
 					onDraft={setDraft}
 					busy={busy}
 					message={message}
-					onSave={async () => {
-						setMessage(null);
-						setBusy("save");
-						const res = await save(maximUpdateBody(draft));
-						setBusy(null);
-						if ("error" in res) return fail(res.error);
-						setMessage({ ok: true, text: t("maxim.saved") });
-					}}
-					onTest={async () => {
-						setMessage(null);
-						setBusy("test");
-						const res = await test();
-						setBusy(null);
-						if ("error" in res) return fail(res.error);
-						setMessage({ ok: res.data.ok, text: testMessage(res.data, t("maxim.testOk")) });
-					}}
-					onDisconnect={async () => {
-						if (!(await confirm(t("maxim.disconnectConfirm")))) return;
-						setMessage(null);
-						setBusy("delete");
-						const res = await remove();
-						setBusy(null);
-						if ("error" in res) fail(res.error);
-					}}
+					onSave={() =>
+						void guard.run(async () => {
+							setMessage(null);
+							setBusy("save");
+							const res = await save(maximUpdateBody(draft));
+							setBusy(null);
+							if ("error" in res) return fail(res.error);
+							setMessage({ ok: true, text: t("maxim.saved") });
+						})
+					}
+					onTest={() =>
+						void guard.run(async () => {
+							setMessage(null);
+							setBusy("test");
+							const res = await test();
+							setBusy(null);
+							if ("error" in res) return fail(res.error);
+							setMessage({ ok: res.data.ok, text: testMessage(res.data, t("maxim.testOk")) });
+						})
+					}
+					onDisconnect={() =>
+						void guard.run(async () => {
+							if (!(await confirm(t("maxim.disconnectConfirm")))) return;
+							setMessage(null);
+							setBusy("delete");
+							const res = await remove();
+							setBusy(null);
+							if ("error" in res) fail(res.error);
+						})
+					}
 				/>
 			)}
 		</section>

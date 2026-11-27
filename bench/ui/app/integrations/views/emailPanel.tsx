@@ -13,6 +13,7 @@ import { Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { canRetry } from "@/lib/requestErrors";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import "@/components/ui/ufc0I18n";
 import { useTranslation } from "react-i18next";
 
 /** The caller's own email notifications: weekly digest and per-event email (handlers/notifications.go). */
@@ -32,7 +33,7 @@ export function EmailPanel() {
 		setDigest(data.prefs.digest);
 	}, [data]);
 	// Leaving with an unsaved choice asks first (M8-44).
-	useLeaveGuard(data ? !sameChoice(data, events, digest) : false);
+	useLeaveGuard(data ? !sameChoice(data, events, digest) : false, { body: t("leave.noDraft", { ns: "ufc0" }) });
 
 	if (isLoading) return <Skeleton className="h-40 w-full" />;
 	if (error || !data) {

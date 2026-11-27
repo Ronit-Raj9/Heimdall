@@ -1,4 +1,5 @@
 import "@/components/platform/fw23I18n";
+import { useBusyGuard } from "@/lib/hooks/useBusyGuard";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { LoadError } from "@/components/runs/screenStates";
 import "@/components/settings/w4m8I18n";
@@ -418,11 +419,13 @@ function WebhooksPanel() {
 	const [secret, setSecret] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [tests, setTests] = useState<Record<string, WebhookDelivery>>({});
+	// One webhook write at a time: a second click while one is in flight does nothing (M7-73).
+	const guard = useBusyGuard();
 
 	const fail = (err: unknown) =>
 		setMessage((err as { status?: number })?.status === 403 ? t("errors.adminOnly") : apiErrorMessage(err, t("errors.generic")));
 
-	const add = async () => {
+	const add = () => guard.run(async () => {
 		setMessage(null);
 		const res = await createHook({
 			url: url.trim() || undefined,
@@ -436,7 +439,7 @@ function WebhooksPanel() {
 		setUrl("");
 		setDesc("");
 		setRoutingKey("");
-	};
+	});
 
 	return (
 		<Section title={t("webhooks.heading")} intro={t("webhooks.intro")}>
@@ -489,7 +492,7 @@ function WebhooksPanel() {
 				/>
 				<Button
 					type="submit"
-					disabled={!webhookFormReady(format, url, routingKey, events, data?.hosted === true) || create.isLoading}
+					disabled={!webhookFormReady(format, url, routingKey, events, data?.hosted === true) || create.isLoading || guard.busy}
 					data-testid="webhook-add"
 				>
 					{create.isLoading ? t("webhooks.adding") : t("webhooks.add")}
@@ -534,20 +537,26 @@ function WebhooksPanel() {
 				<WebhookList
 					hooks={data?.webhooks ?? []}
 					tests={tests}
-					onTest={async (id) => {
-						const res = await testHook(id);
-						if ("data" in res && res.data) setTests((cur) => ({ ...cur, [id]: res.data }));
-						else if ("error" in res) fail(res.error);
-					}}
-					onToggle={async (h) => {
-						const res = await updateHook({ id: h.id, body: { enabled: !h.enabled } });
-						if ("error" in res) fail(res.error);
-					}}
-					onDelete={async (h) => {
-						if (!(await confirm(t("webhooks.deleteConfirm", { url: h.url })))) return;
-						const res = await deleteHook(h.id);
-						if ("error" in res) fail(res.error);
-					}}
+					onTest={(id) =>
+						void guard.run(async () => {
+							const res = await testHook(id);
+							if ("data" in res && res.data) setTests((cur) => ({ ...cur, [id]: res.data }));
+							else if ("error" in res) fail(res.error);
+						})
+					}
+					onToggle={(h) =>
+						void guard.run(async () => {
+							const res = await updateHook({ id: h.id, body: { enabled: !h.enabled } });
+							if ("error" in res) fail(res.error);
+						})
+					}
+					onDelete={(h) =>
+						void guard.run(async () => {
+							if (!(await confirm(t("webhooks.deleteConfirm", { url: h.url })))) return;
+							const res = await deleteHook(h.id);
+							if ("error" in res) fail(res.error);
+						})
+					}
 				/>
 			)}
 		</Section>
@@ -798,7 +807,7 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesLightQuery();
-	const files = useListExportsQuery(undefined, { pollingInterval: 5000 });
+	const files = useListExportsQuery(undefined, { pollingInterval: 5000, skipPollingIfUnfocused: true });
 	const { t: tm } = useTranslation("w4m8");
 	const [deleteExport] = useDeleteExportMutation();
 	const [format, setFormat] = useState<IntegrationExportFormat>("otlp");
