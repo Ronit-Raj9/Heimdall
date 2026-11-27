@@ -71,7 +71,9 @@ describe("FailoverSettings fallback list (N89)", () => {
 				onChange={() => undefined}
 			/>,
 		);
-		expect(html).toContain("gpt-4o-mini");
+		// The shared picker is a combobox: its list (only OpenAI here, see groupedModelPicker.test) opens on focus.
+		expect(html).toMatch(/data-testid="step4-failover-model-model-input"/);
+		expect(html).not.toMatch(/role="combobox"[^>]*disabled=""[^>]*data-testid="step4-failover-model-model-input"/);
 		expect(html).not.toContain("claude-haiku");
 		expect(html).not.toContain("Groq");
 		expect(html).toContain("Pick a fallback model.");

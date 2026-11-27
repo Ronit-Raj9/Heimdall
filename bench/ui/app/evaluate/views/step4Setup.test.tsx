@@ -246,9 +246,11 @@ describe("Step4Setup", () => {
 			/>,
 		);
 		expect(html).toContain('data-testid="step4-model-A-no-key"');
-		expect(html).toContain("The Mistral key does not work.");
-		expect(html).toContain('href="/models?add=mistral"');
-		expect(html).toContain("Mistral (key not working)");
+		// One shared picker: KeyMissingNote opens Settings, Model keys, on the Add panel (M8-12).
+		expect(html).toContain("No working Mistral key.");
+		expect(html).toContain('href="/settings?tab=keys&amp;add=mistral');
+		// The group name "Mistral (key not working)" shows in the open list (modelComboItems test).
+		expect(html).toMatch(/role="combobox"[^>]*value="devstral-medium-latest"/);
 	});
 
 	it("lets an agent that brings its own model leave the model blank", () => {
@@ -281,8 +283,8 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
 		// N189: each setup's model select is named for its setup (the label element of the select).
-		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Model for codex<\/label>/);
-		expect(html.match(/<label[^>]*for="[^"]+-model"[^>]*>Model for codex<\/label>/g)?.length).toBe(2);
+		expect(html).toMatch(/<label[^>]*for="[^"]+-input"[^>]*>Model for codex<\/label>/);
+		expect(html.match(/<label[^>]*for="[^"]+-input"[^>]*>Model for codex<\/label>/g)?.length).toBe(2);
 		expect(html).toContain("Pick at least one benchmark.");
 		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
 		expect(q.estimateArgs[1]).toEqual([presetsRequest(two), { skip: true }]);
@@ -387,7 +389,7 @@ describe("Step4Setup", () => {
 			/>,
 		);
 		expect(html).not.toContain(": gpt-5.6-terra");
-		expect(html).toContain(">gpt-5.6-terra</option>");
+		expect(html).toMatch(/role="combobox"[^>]*value="gpt-5.6-terra"/);
 		const listed = render(
 			<Step4Setup
 				spec={spec({
@@ -396,7 +398,8 @@ describe("Step4Setup", () => {
 				onChange={() => undefined}
 			/>,
 		);
-		expect(listed).toMatch(/<option value="openai\u0000gpt-4o-mini" selected=""/);
+		expect(listed).toContain('data-model="openai/gpt-4o-mini"');
+		expect(listed).toMatch(/role="combobox"[^>]*value="gpt-4o-mini"/);
 	});
 
 	it("groups faults from the catalog and keeps the built-in three while loading", () => {

@@ -40,7 +40,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => okQuery({ suites: [] }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
-	useListEvaluationsQuery: () => okQuery([{ id: "ev_1", spec: { name: "codex score" } }]),
+	useListEvaluationsLightQuery: () => okQuery([{ id: "ev_1", spec: { name: "codex score" } }]),
 }));
 vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "nightly" }] }) }));
 vi.mock("@/lib/store/apis/integrationsApi", async (importOriginal) => ({

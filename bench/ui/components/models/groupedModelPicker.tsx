@@ -1,9 +1,10 @@
 import { modelChoices, type ProviderId } from "@/components/models/modelPicker";
+import { KeyMissingNote } from "@/components/models/keyMissingNote";
 import { Badge } from "@/components/ui/badge";
+import { Combobox, type ComboboxItem } from "@/components/ui/combobox";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelOption, ModelProviderInfo } from "@/lib/types/models";
-import { Link } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/runs/uf5bI18n";
 import "@/components/runs/ufc4I18n";
@@ -11,9 +12,11 @@ import { InlineError } from "@/components/runs/screenStates";
 import { optionsState } from "@/lib/hooks/useOptionsState";
 
 /**
- * A single searchable model dropdown grouped by provider, built on ModelPicker's modelChoices.
- * Unlike ModelPicker it lists every provider /models returns (any Bifrost provider, not only the
- * seven ModelPicker knows), tags open-weight models and warns when the org has no working key.
+ * The one model picker of the app (M5-67, M4-86): a searchable Combobox grouped by provider, built
+ * on ModelPicker's modelChoices. It lists every provider /models returns (any Bifrost provider, not
+ * only the seven ModelPicker knows), keeps providers without a key behind "More providers (needs a
+ * key)", hides test objects, tags open-weight models and, when the org has no working key, shows
+ * KeyMissingNote with a way back to the page the person was on.
  */
 
 /** Catalog fields added by the agent-first contract (section 5); optional until the server sends them. */
@@ -128,9 +131,10 @@ export function visibleGroups(groups: readonly ModelGroup[], picked: string, sho
 	return { shown, hidden: groups.length - shown.length };
 }
 
-const OTHER = "__other__:";
-const MORE = "__more__";
-const selectClass = "border-input bg-background h-8 rounded-md border px-2 text-sm disabled:opacity-50";
+/** Value of the "type another model id" item of a provider. */
+const OTHER = "\u0001other:";
+/** Value of the item that lists the providers without a key. */
+const MORE = "\u0001more";
 
 export interface GroupedModelPickerProps {
 	value: PickedModel | null;
@@ -142,8 +146,63 @@ export interface GroupedModelPickerProps {
 	 * An empty list means the provider is not known yet: the picker is disabled and says so.
 	 */
 	providers?: readonly string[];
-	/** The name of the model select for screen readers and tests (fix wave 3, N189); "Model" by default. */
+	/** The name of the model box for screen readers and tests (fix wave 3, N189); "Model" by default. */
 	label?: string;
+	/** In-app path the key note comes back to; the current page when not given. */
+	returnTo?: string;
+}
+
+type PickerText = (key: "picker.other" | "picker.noKey" | "picker.keyNotWorking", o: { name: string }) => string;
+
+/**
+ * The searchable list of models, grouped by provider with its key state in the group name, plus
+ * one "Other <provider> model" item per provider (M5-67, M4-86). Pure.
+ */
+export function modelComboItems(groups: readonly ModelGroup[], t: PickerText): ComboboxItem[] {
+	const dup = duplicateIds(groups);
+	const items: ComboboxItem[] = [];
+	for (const g of groups) {
+		const group = g.keyState === "ok" ? g.name : g.keyState === "invalid" ? t("picker.keyNotWorking", { name: g.name }) : t("picker.noKey", { name: g.name });
+		for (const m of g.models) items.push({ value: `${g.provider}\u0000${m.id}`, label: optionLabel(m, g, dup.has(m.id)), group, hint: m.id });
+		items.push({ value: `${OTHER}${g.provider}`, label: t("picker.other", { name: g.name }), group });
+	}
+	return items;
+}
+
+/** The picked model of a combobox value; for an "Other" item, the provider with an empty model. Pure. */
+export function pickedOfValue(v: string): PickedModel {
+	if (v.startsWith(OTHER)) return { provider: v.slice(OTHER.length), model: "" };
+	const [provider, model = ""] = v.split("\u0000");
+	return { provider, model };
+}
+
+/** Whether a combobox value is the "More providers" item. Pure. */
+export function isMoreValue(v: string): boolean {
+	return v === MORE;
+}
+
+/**
+ * Every item the picker lists (M1-21): the visible groups, a "More providers" item when some wait
+ * behind it, and the picked model on its own row when no group carries it. Pure.
+ */
+export function pickerItems(
+	all: readonly ModelGroup[],
+	picked: { provider: string; model: string; custom: boolean; providerName: string },
+	showAll: boolean,
+	t: PickerText & ((key: "picker.more") => string),
+): ComboboxItem[] {
+	const { shown, hidden } = visibleGroups(all, picked.provider, showAll);
+	const items = modelComboItems(shown, t);
+	const value = `${picked.provider}\u0000${picked.model}`;
+	if (picked.model !== "" && !picked.custom && !items.some((i) => i.value === value))
+		items.unshift({ value, label: modelOptionLabel(picked.providerName, picked.model) });
+	if (hidden > 0) items.push({ value: MORE, label: t("picker.more") });
+	return items;
+}
+
+/** The current page as an in-app path, for KeyMissingNote's way back; undefined outside a browser. */
+function currentPath(): string | undefined {
+	return typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined;
 }
 
 /** The provider of the first group that lists model (one with a working key first), or "". */
@@ -165,10 +224,10 @@ export function GroupedModelPicker({
 	testId,
 	providers,
 	label,
+	returnTo,
 }: GroupedModelPickerProps) {
 	const { t } = useTranslation("uf5b");
 	const { t: tc } = useTranslation("ufc4");
-	const id = useId();
 	const name = label ?? t("picker.model");
 	const [showAll, setShowAll] = useState(false);
 	const tid = testId ?? "grouped-model-picker";
@@ -178,128 +237,76 @@ export function GroupedModelPicker({
 	const failed = !loaded && optionsState(models, 0) === "error";
 	const catalog = (models.data?.providers ?? []) as unknown as CatalogProvider[];
 	const keys = models.data?.keys ?? [];
-	const [query, setQuery] = useState("");
 	const [typing, setTyping] = useState<string | null>(null);
-	const only = (list: ModelGroup[]) => (providers ? list.filter((g) => providers.includes(g.provider)) : list);
-	const all = only(preferNative(groupModels(catalog, keys, query), catalog));
-	const dup = duplicateIds(only(preferNative(groupModels(catalog, keys), catalog)));
+	const groupsAll = groupModels(catalog, keys);
+	const all = preferNative(groupsAll, catalog).filter((g) => !providers || providers.includes(g.provider));
 	const noProvider = providers !== undefined && providers.length === 0;
 	const disabled = disabledProp || noProvider;
 	const model = value?.model ?? "";
 	// A model given without its provider (an agent's default model) takes the catalog provider that lists it.
-	const provider = value?.provider || providerOfModel(groupModels(catalog, keys), model);
-	const { shown: groups, hidden } = visibleGroups(all, provider, showAll || query.trim() !== "");
-	const listed = groups.some((g) => g.provider === provider && g.models.some((m) => m.id === model));
-	const pickedItem = groupModels(catalog, keys)
-		.find((g) => g.provider === provider)
-		?.models.find((m) => m.id === model);
+	const provider = value?.provider || providerOfModel(groupsAll, model);
+	const pickedItem = groupsAll.find((g) => g.provider === provider)?.models.find((m) => m.id === model);
 	// A model no group carries is a custom id once the catalog has loaded.
 	const customFor = typing ?? (loaded && model !== "" && provider !== "" && !pickedItem ? provider : null);
-	const selected = customFor ? `${OTHER}${customFor}` : model !== "" ? `${provider}\u0000${model}` : "";
+	const selected = customFor ? `${OTHER}${customFor}` : model !== "" ? `${provider}\u0000${model}` : null;
 	const keyState = provider ? keyStateFor(provider, keys) : "ok";
 	const providerName = catalog.find((p) => p.id === provider)?.name ?? provider;
+	const items = pickerItems(all, { provider, model, custom: Boolean(customFor), providerName }, showAll, t);
 
-	const pick = (v: string) => {
-		if (v === MORE) {
+	const pick = (v: string | null) => {
+		if (v === null) return;
+		if (isMoreValue(v)) {
 			setShowAll(true);
 			return;
 		}
-		if (v.startsWith(OTHER)) {
-			const p = v.slice(OTHER.length);
-			setTyping(p);
-			onChange({ provider: p, model: "" });
-			return;
-		}
-		const [p, m] = v.split("\u0000");
-		setTyping(null);
-		onChange({ provider: p, model: m });
+		const picked = pickedOfValue(v);
+		setTyping(v.startsWith(OTHER) ? picked.provider : null);
+		onChange(picked);
 	};
 
 	return (
-		<div className="flex flex-col gap-1.5" data-testid={tid}>
-			<div className="flex flex-wrap items-center gap-2">
-				<label className="sr-only" htmlFor={`${id}-search`}>
-					{label === undefined || label === t("picker.model") ? t("picker.search") : t("picker.searchFor", { label })}
-				</label>
-				<input
-					id={`${id}-search`}
-					className={`${selectClass} w-full sm:w-40`}
-					placeholder={t("picker.search")}
-					value={query}
-					disabled={disabled}
-					onChange={(e) => setQuery(e.target.value)}
-					data-testid={`${tid}-search`}
-				/>
-				<label className="sr-only" htmlFor={`${id}-model`}>
-					{name}
-				</label>
-				<select
-					id={`${id}-model`}
-					className={`${selectClass} w-full max-w-80 min-w-0 sm:w-auto sm:min-w-56`}
+		<div className="flex flex-col gap-1.5" data-testid={tid} data-model={provider && model ? `${provider}/${model}` : ""}>
+			<div className="flex flex-wrap items-end gap-2">
+				<Combobox
+					label={name}
+					hideLabel
+					items={items}
 					value={selected}
+					onChange={pick}
+					placeholder={noProvider ? t("picker.pickAgentFirst") : loaded ? t("picker.choose") : failed ? tc("picker.loadError") : t("picker.loading")}
+					query={models}
+					onRetry={() => void models.refetch()}
 					disabled={disabled}
-					onChange={(e) => pick(e.target.value)}
-					data-testid={`${tid}-model`}
-				>
-					<option value="" disabled>
-						{noProvider ? t("picker.pickAgentFirst") : loaded ? t("picker.choose") : failed ? tc("picker.loadError") : t("picker.loading")}
-					</option>
-					{model !== "" && !listed && !customFor && <option value={selected}>{modelOptionLabel(providerName, model)}</option>}
-					{groups.map((g) => (
-						<optgroup
-							key={g.provider}
-							label={
-								g.keyState === "ok"
-									? g.name
-									: g.keyState === "invalid"
-										? t("picker.keyNotWorking", { name: g.name })
-										: t("picker.noKey", { name: g.name })
-							}
-						>
-							{g.models.map((m) => (
-								<option key={m.id} value={`${g.provider}\u0000${m.id}`}>
-									{optionLabel(m, g, dup.has(m.id))}
-								</option>
-							))}
-							<option value={`${OTHER}${g.provider}`}>{t("picker.other", { name: g.name })}</option>
-						</optgroup>
-					))}
-					{hidden > 0 && (
-						<option value={MORE} data-testid={`${tid}-more`}>
-							{t("picker.more")}
-						</option>
-					)}
-				</select>
+					className="w-full max-w-80 sm:min-w-56"
+					testId={`${tid}-model`}
+				/>
 				{pickedItem?.open && (
 					<Badge variant="neutral" data-testid={`${tid}-open`} title={t("picker.openTitle")}>
 						{t("picker.open")}
 					</Badge>
 				)}
 				{customFor && (
-					<>
-						<label className="sr-only" htmlFor={`${id}-custom`}>
-							{t("picker.modelId")}
-						</label>
-						<input
-							id={`${id}-custom`}
-							className={`${selectClass} w-full min-w-0 sm:w-auto sm:min-w-48`}
-							placeholder={t("picker.modelId")}
-							value={model}
-							disabled={disabled}
-							onChange={(e) => onChange({ provider: customFor, model: e.target.value })}
-							data-testid={`${tid}-custom`}
-						/>
-					</>
+					<input
+						aria-label={t("picker.modelId")}
+						className="border-input bg-background h-(--control-h) w-full min-w-0 rounded-md border px-3 text-sm sm:w-auto sm:min-w-48"
+						placeholder={t("picker.modelId")}
+						value={model}
+						disabled={disabled}
+						onChange={(e) => onChange({ provider: customFor, model: e.target.value })}
+						data-testid={`${tid}-custom`}
+					/>
 				)}
 			</div>
 			{failed && <InlineError error={models.error} title={tc("picker.loadError")} onRetry={() => void models.refetch()} testId={`${tid}-error`} />}
 			{loaded && provider !== "" && keyState !== "ok" && (
-				<p className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
-					{keyState === "invalid" ? t("picker.keyBroken", { name: providerName }) : t("picker.keyNone", { name: providerName })}{" "}
-					<Link to="/models" search={{ add: provider } as never} className="text-primary underline">
-						{t("picker.addKey")}
-					</Link>
-				</p>
+				<div className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
+					<KeyMissingNote
+						provider={provider}
+						providerName={providerName}
+						returnTo={returnTo ?? currentPath()}
+						className="flex flex-wrap items-center gap-2 text-xs"
+					/>
+				</div>
 			)}
 		</div>
 	);
