@@ -15,6 +15,8 @@ import { SUITE_OPS_KINDS } from "@/lib/types/suiteops";
 import { cn } from "@/lib/utils";
 import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
+import "@/components/platform/ufintI18n";
+import i18n from "@/lib/i18n";
 
 // Z04: "Red-team my agent" in the evaluate wizard (step 3). Writes the org's red-team benchmark
 // (adaptive attacks run on the org's own model through Bifrost), starts its readiness check, adds
@@ -178,7 +180,11 @@ export function RedTeamForm({ catalog, selected, onAdd }: { catalog: RedTeamCata
 						then add it to this evaluation.
 					</p>
 					<div className="flex flex-wrap items-start gap-2">
-						<JobRunButton kind={SUITE_OPS_KINDS.admit} params={{ suite: done.suite }} label="Run readiness check" variant="outline" />
+						<JobRunButton
+							kind={SUITE_OPS_KINDS.admit}
+							params={{ suite: done.suite }}
+							confirm={i18n.t("redTeam.admitConfirm", { ns: "ufint", suite: done.suite })}
+							label="Run readiness check" variant="outline" />
 						<Button disabled={added} onClick={() => onAdd(done.suite)} dataTestId="red-team-add">
 							{added ? "Added to this evaluation" : "Add to this evaluation"}
 						</Button>

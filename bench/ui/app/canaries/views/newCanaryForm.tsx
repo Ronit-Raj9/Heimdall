@@ -21,6 +21,9 @@ import { runsPerDay } from "@/lib/utils/cron";
 import "@/components/canaries/uf7bI18n";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/platform/ufintI18n";
+import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 
 /** Splits "a, b,,c" into ["a","b","c"]. */
@@ -305,6 +308,7 @@ export function NewCanaryForm({
 	const { t: c } = useTranslation("uf7b");
 	const { t: d } = useTranslation("ufc6");
 	const [create, createState] = useCreateCanaryMutation();
+	const confirm = useConfirm();
 	// The org's alert channels (the hooks of the Repeat runs tab) for "Tell me when".
 	const hooks = useGetSchedulesQuery();
 	const [conflict, setConflict] = useState(false);
@@ -351,6 +355,19 @@ export function NewCanaryForm({
 			} else if ("error" in res) fail(res.error, "not saved");
 			return;
 		}
+		// A drift monitor is paid and lasting work: it asks first, with its cost (never on one click).
+		const cronNow = canaryCron(f);
+		const costNow = f.smoke ? null : checkCost(cronNow ? runsPerDay(cronNow) : 0, Number(f.perRun), Number(f.perDay));
+		if (
+			costNow &&
+			!(await confirm(i18n.t("canary.confirmBody", { ns: "ufint" }), {
+				title: i18n.t("canary.confirmTitle", { ns: "ufint", name: f.name }),
+				confirmLabel: c("canary.createUpTo", { day: usd(costNow.day) }),
+				costUsd: costNow.day,
+				costLine: c("cost.line", { count: costNow.runs, perRun: usd(costNow.perRun), day: usd(costNow.day), month: usd(costNow.month) }),
+			}))
+		)
+			return;
 		const res = await create(buildCanaryRequest(f));
 		if ("data" in res && res.data) {
 			setMsg(t("canary.createdWhen", { name: res.data.name, when: whenWords() }));

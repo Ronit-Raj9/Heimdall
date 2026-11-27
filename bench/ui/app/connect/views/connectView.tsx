@@ -5,6 +5,7 @@ import { Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
 import { Input } from "@/components/ui/input";
 import { WhyDisabled, firstReason } from "@/components/ui/whyDisabled";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -556,13 +557,15 @@ export default function ConnectView() {
 				<Section title={t("verify.title")} description={t("verify.description")} testId="connect-verify">
 					<div className="flex flex-col gap-4">
 						<div>
-							<Button
-								onClick={() => void doVerify()}
+							{/* One real task runs the agent, which calls its own model: paid, so it asks first. */}
+							<PaidButton
+								verb={verify ? t("verify.again") : t("verify.start")}
+								capUsd={null}
+								confirm="always"
+								onConfirm={doVerify}
 								isLoading={startState.isLoading || (Boolean(verify) && !verifyDone)}
-								data-testid="connect-verify-start"
-							>
-								{verify ? t("verify.again") : t("verify.start")}
-							</Button>
+								testId="connect-verify-start"
+							/>
 						</div>
 						{startState.error ? <p className="text-chart-error-ink text-sm">{getBenchErrorMessage(startState.error)}</p> : null}
 						{verify && <p className="text-muted-foreground text-sm">{t(verifyBenchmarkKey(verify.suite), { id: verify.suite ?? "" })}</p>}

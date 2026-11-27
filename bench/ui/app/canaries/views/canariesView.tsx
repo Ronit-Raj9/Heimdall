@@ -29,6 +29,8 @@ import type { CanaryDefinition, CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/platform/ufintI18n";
+import i18n from "@/lib/i18n";
 
 /**
  * Drift canaries: /canaries?name=. A small pinned suite re-run on a schedule through the gateway
@@ -261,7 +263,18 @@ export function CanaryActions({
 				}
 				variant="outline"
 			/>
-			<JobRunButton kind="canary.run" params={{ name }} label={t("canary.run")} variant="outline" />
+			<JobRunButton
+				kind="canary.run"
+				params={{ name }}
+				label={t("canary.run")}
+				// A run now is paid work like the baseline: it asks first (never on one click).
+				confirm={
+					definition?.smoke || !definition?.budget?.per_run_usd
+						? i18n.t("canary.runConfirmNoCap", { ns: "ufint" })
+						: i18n.t("canary.runConfirm", { ns: "ufint", usd: usd(definition.budget.per_run_usd).slice(1) })
+				}
+				variant="outline"
+			/>
 			{!scheduled && (
 				<span className="text-muted-foreground text-xs" data-testid="canary-no-schedule">
 					{t("canary.noSchedulePause")}
