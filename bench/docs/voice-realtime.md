@@ -82,7 +82,7 @@ dialled a real number from this repository.
 
 From Agents > New, pick one of:
 
-- **Connect your LiveKit or Pipecat voice agent**: how it joins (agent name,
+- **LiveKit or Pipecat voice**: how it joins (agent name,
   start URL, or every room) and, for your own server, its URL and key
   secrets.
 - **Call your voice agent's phone number**: the number, your trunk host,

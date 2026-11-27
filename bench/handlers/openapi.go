@@ -360,6 +360,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "kind", Description: "Only this kind"}, {Name: "status", Description: "queued, running, succeeded, failed or cancelled"},
 		{Name: "target", Description: "Only jobs on this target, e.g. exp:<id> or suite:<id>"}, {Name: "limit", Description: "1..500, default 50"},
 		{Name: "before", Description: "Page: jobs created before this job id (next of the previous page)"},
+		{Name: "q", Description: "Only jobs whose kind, target or id contains this text, ignoring case (at most 200 characters)"},
 		{Name: "fields", Description: "count: answer only count (at most 1000, with more true past it) of the jobs the other filters match"}}},
 	{Method: "POST", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Queue a job: suite.lint, suite.lock, suite.admit, agent.check, index.rebuild or experiment.regate, params validated per kind, paths inside the org's project folder (member)",
 		Auth: AuthWrite, Request: JobCreate{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
@@ -374,7 +375,7 @@ var APIRoutes = []RouteDoc{
 
 	// Auth area (P2, handlers/auth.go, docs/auth.md). Local mode answers config and me only; the rest are hosted mode.
 	{Method: "GET", Path: AuthPrefix + "/config", Tag: "auth", Summary: "Sign-in options: auth mode, signup policy, GitHub, bootstrap", Response: auth.AuthInfo{}},
-	{Method: "GET", Path: AuthPrefix + "/me", Tag: "auth", Summary: "The caller: user, orgs with roles, current org, CSRF value; kind anonymous (200) with no credential, 401 for an ended session", Response: auth.Me{}},
+	{Method: "GET", Path: AuthPrefix + "/me", Tag: "auth", Summary: "The caller: user, orgs with roles, current org, CSRF value; kind anonymous (200) with no credential, 401 for an ended session; has_password (signed-in user only) says whether the account has a password", Response: MeResponse{}},
 	{Method: "POST", Path: AuthPrefix + "/signup", Tag: "auth", Summary: "Create an account under the signup policy and sign in", Request: auth.SignupRequest{}, Status: fasthttp.StatusCreated, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/login", Tag: "auth", Summary: "Sign in with email and password; sets the session cookie", Request: auth.LoginRequest{}, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/logout", Tag: "auth", Summary: "End the session and clear the cookie", Status: fasthttp.StatusNoContent},

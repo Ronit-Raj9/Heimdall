@@ -43,6 +43,11 @@ type ErrorField struct {
 	// Link is an app path that fixes the error (X01: "/models" to add a
 	// model key); empty for most errors.
 	Link string `json:"link,omitempty"`
+	// Code names the cause more precisely than Type for the refusals the
+	// UI explains on their own (fix wave M1-44): no_model_key,
+	// budget_reached, worker_refused, image_preparing. Optional; Type and
+	// Message stay as they were.
+	Code string `json:"code,omitempty"`
 }
 
 // SendJSON writes payload as JSON with status and merges a top-level "mode"

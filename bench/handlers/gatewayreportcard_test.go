@@ -115,7 +115,7 @@ func TestReportCardEnabledFromPlugins(t *testing.T) {
 	if l := cardLine(t, c, "agent_gateway"); l.Headline != "2 registered agents" {
 		t.Errorf("agents headline %q", l.Headline)
 	}
-	if l := cardLine(t, c, "semantic_cache"); l.State != "not_measured" || l.Headline != "Not measured yet" {
+	if l := cardLine(t, c, "semantic_cache"); l.State != "not_measured" || l.Headline != "Not tested yet" {
 		t.Errorf("unmeasured line: %+v", l)
 	}
 }

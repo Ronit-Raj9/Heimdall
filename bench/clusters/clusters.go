@@ -110,20 +110,23 @@ type Report struct {
 
 // Cluster is the runs that share one signature.
 type Cluster struct {
-	Signature         string        `json:"signature"`
-	Title             string        `json:"title"`
-	Outcome           string        `json:"outcome"`
-	Layers            []Layer       `json:"layers"`
-	Count             int           `json:"count"`
-	Share             float64       `json:"share"`
-	Tasks             []string      `json:"tasks"`
-	Agents            []string      `json:"agents"`
-	ConfigHashes      []string      `json:"config_hashes"`
-	Conditions        []string      `json:"conditions"`
-	Experiments       []string      `json:"experiments"`
-	FirstSeen         time.Time     `json:"first_seen"`
-	LastSeen          time.Time     `json:"last_seen"`
-	Examples          []string      `json:"examples"`
+	Signature    string    `json:"signature"`
+	Title        string    `json:"title"`
+	Outcome      string    `json:"outcome"`
+	Layers       []Layer   `json:"layers"`
+	Count        int       `json:"count"`
+	Share        float64   `json:"share"`
+	Tasks        []string  `json:"tasks"`
+	Agents       []string  `json:"agents"`
+	ConfigHashes []string  `json:"config_hashes"`
+	Conditions   []string  `json:"conditions"`
+	Experiments  []string  `json:"experiments"`
+	FirstSeen    time.Time `json:"first_seen"`
+	LastSeen     time.Time `json:"last_seen"`
+	Examples     []string  `json:"examples"`
+	// ExampleRuns are the Examples with their benchmark and task, so a
+	// page can name the task instead of the run id (fix wave X-25).
+	ExampleRuns       []ExampleRun  `json:"example_runs,omitempty"`
 	Scope             string        `json:"scope"` // single_run | agent_and_task | agent | task | systemic
 	AfterConfigChange *ConfigChange `json:"after_config_change,omitempty"`
 	Related           []Related     `json:"related,omitempty"`

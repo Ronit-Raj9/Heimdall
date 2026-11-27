@@ -57,6 +57,12 @@ type EvalPresetEstimate struct {
 	MDEpp             *float64 `json:"mde_pp"`
 	MDEPerBenchmarkPP *float64 `json:"mde_per_benchmark_pp"`
 	FromLibrary       bool     `json:"from_library,omitempty"`
+	// Tasks is how many tasks the preset runs over all its benchmarks, and
+	// AllReady is true when some benchmark has fewer ready tasks than the
+	// preset asks, so it runs all of them (fix wave M4-96: "24 tasks (all
+	// that are ready)").
+	Tasks    int  `json:"tasks"`
+	AllReady bool `json:"all_ready,omitempty"`
 }
 
 // normalizePreset checks spec.Preset; the numbers of the spec are what
@@ -97,6 +103,7 @@ func estimatePresets(ctx context.Context, suites SuiteSource, src ForecastSource
 				MDEpp: est.Power.Overall.MDEpp, FromLibrary: est.FromLibrary}
 			pe.Faults = r.Faults
 			pe.MDEPerBenchmarkPP = worstMDE(est.Power.PerBenchmark)
+			pe.Tasks, pe.AllReady = presetTasks(est.PerBenchmark, r.TasksPerBenchmark)
 			results[i] = &pe
 		}()
 	}

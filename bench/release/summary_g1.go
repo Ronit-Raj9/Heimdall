@@ -22,6 +22,10 @@ func comparisonSummary(m *schemas.Manifest, a *schemas.Analysis, arm string) *sc
 		if am, ok := m.Arms[label]; ok {
 			s.Agent, s.Model = am.Config.ID, am.Config.Model
 		}
+		if !m.CreatedAt.IsZero() { // fix wave M7-78: both arms of a comparison share its date
+			at := m.CreatedAt.UTC()
+			s.At = &at
+		}
 		return s, true
 	}
 	cand, ok := side(arm)

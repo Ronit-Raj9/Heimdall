@@ -136,9 +136,12 @@ type Info struct {
 	TokenHint string `json:"token_hint"`
 	// EndpointLabel names the endpoint field; EndpointRequired when the
 	// platform cannot work without one.
-	EndpointLabel    string `json:"endpoint_label,omitempty"`
-	EndpointRequired bool   `json:"endpoint_required,omitempty"`
-	DocsURL          string `json:"docs_url,omitempty"`
+	EndpointLabel string `json:"endpoint_label,omitempty"`
+	// EndpointPlaceholder is an example value for the endpoint field (fix
+	// wave X-60); empty when the platform has no endpoint field.
+	EndpointPlaceholder string `json:"endpoint_placeholder,omitempty"`
+	EndpointRequired    bool   `json:"endpoint_required,omitempty"`
+	DocsURL             string `json:"docs_url,omitempty"`
 }
 
 // Errors.

@@ -138,6 +138,9 @@ type Filter struct {
 	// Before pages backwards: only jobs created before this job id's
 	// creation (ids sort by creation time).
 	Before string
+	// Q keeps jobs whose kind, target or id contains it, ignoring case
+	// (fix wave M1-59). At most QMaxLen bytes; longer is cut.
+	Q string
 }
 
 // Page is one page of List.
@@ -277,6 +280,10 @@ func (s *Store) List(ctx context.Context, orgID string, f Filter) (*Page, error)
 	}
 	if f.Before != "" {
 		where, args = append(where, "id < ?"), append(args, f.Before)
+	}
+	if pat, ok := likePattern(f.Q); ok {
+		where = append(where, `(LOWER(kind) LIKE ? ESCAPE '\' OR LOWER(target) LIKE ? ESCAPE '\' OR LOWER(id) LIKE ? ESCAPE '\')`)
+		args = append(args, pat, pat, pat)
 	}
 	args = append(args, limit+1)
 	rows, err := s.db.SQL().QueryContext(ctx, s.q(`SELECT `+jobColumns+` FROM jobs WHERE `+strings.Join(where, " AND ")+

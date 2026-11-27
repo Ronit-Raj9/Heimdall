@@ -531,8 +531,8 @@ func (h *policyDocs) judgeKeyOK(ctx *fasthttp.RequestCtx, provider string) bool 
 	case err == nil:
 		return true
 	case errors.Is(err, ErrModelKeyMissing):
-		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
-			"No working "+provider+" key in this organization. Add one under Models, then accept again.")
+		lib.SendErrorCode(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, lib.ErrCodeNoModelKey,
+			"No working "+provider+" key in this organization. Add one in Settings > Model keys, then accept again.", "")
 	case !SendModelKeyRefusal(ctx, h.mode, err):
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error())
 	}

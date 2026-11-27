@@ -21,11 +21,28 @@ type DocSummary struct {
 	// Snippet is, for a search (q), the first line of the guide that
 	// contains q, without markdown marks, cut to about 160 characters.
 	Snippet string `json:"snippet,omitempty"`
+	// Category is the id of the guide's group in Categories (fix wave
+	// M8-64); StartRank orders the "start" group (absent elsewhere).
+	Category  string `json:"category,omitempty"`
+	StartRank *int   `json:"start_rank,omitempty"`
 }
 
 // DocList is GET /docs: every guide embedded in the server binary.
 type DocList struct {
 	Docs []DocSummary `json:"docs"`
+	// Categories are the groups in display order (fix wave M8-64).
+	Categories []benchdocs.Category `json:"categories,omitempty"`
+}
+
+// withCategories fills each guide's category and the group index.
+func withCategories(docs []DocSummary) DocList {
+	for i := range docs {
+		docs[i].Category = benchdocs.CategoryOf(docs[i].Name)
+		if r := benchdocs.StartRank(docs[i].Name); r >= 0 {
+			docs[i].StartRank = &r
+		}
+	}
+	return DocList{Docs: docs, Categories: benchdocs.Categories}
 }
 
 // DocBody is GET /docs/{name}: one guide's markdown.
@@ -49,7 +66,7 @@ func listDocs(ctx *fasthttp.RequestCtx, mode schemas.Mode) {
 		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
 		return
 	}
-	lib.SendJSON(ctx, mode, fasthttp.StatusOK, DocList{Docs: searchDocs(benchdocs.Names(), benchdocs.Read, q)})
+	lib.SendJSON(ctx, mode, fasthttp.StatusOK, withCategories(searchDocs(benchdocs.Names(), benchdocs.Read, q)))
 }
 
 func getDoc(ctx *fasthttp.RequestCtx, mode schemas.Mode) {

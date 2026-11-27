@@ -158,6 +158,10 @@ type ReleaseSide struct {
 	CostPerSolved   *float64 `json:"cost_per_solved_usd,omitempty"`
 	FalseCompletion *float64 `json:"false_completion,omitempty"` // share of failed runs the agent claimed as solved
 	FaultSurvival   *float64 `json:"fault_survival,omitempty"`   // success rate on runs with a fault injected
+	// At is when the side's evaluation or comparison was created (fix wave
+	// M7-78), so two sides of one version can be told apart; omitted when
+	// not known.
+	At *time.Time `json:"at,omitempty"`
 }
 
 // ReleaseCapabilityScore is one capability's score, before and after.

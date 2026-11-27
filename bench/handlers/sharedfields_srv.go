@@ -17,6 +17,7 @@ var sharedHiddenFields = map[string]struct {
 // withoutNewSharedFields is part v of a shared page with the wave's new
 // fields of that part removed; other parts are returned as they are.
 func withoutNewSharedFields(part string, v any) any {
+	v = withoutCGSharedFields(part, v)
 	hide, ok := sharedHiddenFields[part]
 	m, isMap := v.(map[string]any)
 	if !ok || !isMap {

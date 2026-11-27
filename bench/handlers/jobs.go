@@ -135,7 +135,11 @@ func (h *JobsHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	q := ctx.QueryArgs()
 	f := jobs.Filter{Kind: string(q.Peek("kind")), Status: jobs.Status(q.Peek("status")), Target: string(q.Peek("target")),
-		Before: string(q.Peek("before"))}
+		Before: string(q.Peek("before")), Q: string(q.Peek("q"))}
+	if len(f.Q) > jobs.QMaxLen {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "q must be at most 200 characters")
+		return
+	}
 	if f.Status != "" && !f.Status.Valid() {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "status must be queued, running, succeeded, failed or cancelled")
 		return

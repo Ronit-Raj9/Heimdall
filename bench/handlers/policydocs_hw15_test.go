@@ -111,7 +111,7 @@ func TestPolicyAcceptRefusesProviderWithoutKey(t *testing.T) {
 	doc, tasks := hw15DraftedDesk(t, c)
 	req := PolicyReviewRequest{Accept: tasks[:1], SwitchGrader: true, Judge: &scaffold.JudgeConfig{Provider: "openai", Model: "x"}}
 	code, body := c.do(t, "POST", "/suites/desk/policy-docs/"+doc+"/review", jsonBody(t, req), nil)
-	if code != 422 || !strings.Contains(string(body), "No working openai key in this organization. Add one under Models, then accept again.") {
+	if code != 422 || !strings.Contains(string(body), "No working openai key in this organization. Add one in Settings \\u003e Model keys, then accept again.") {
 		t.Fatalf("accept with a keyless judge: %d %s", code, body)
 	}
 	raw, _ := os.ReadFile(filepath.Join(c.root, "benchmarks", "desk", "suite.yaml"))

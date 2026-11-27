@@ -227,7 +227,7 @@ func reproduceReadme(ev *schemas.Evaluation, locks []ReproduceLock, expFiles []s
 		fmt.Fprintf(&b, "- %s: agent `%s`%s on `%s%s`\n", a.Label, a.Agent, v, prov, a.Model)
 	}
 	b.WriteString("\n## On a Heimdall server\n\n")
-	b.WriteString("Start the same evaluation with your own API token (Settings, API tokens) and your own provider key added in Models & keys:\n\n")
+	b.WriteString("Start the same evaluation with your own API token (Settings > Access tokens) and your own provider key added in Settings > Model keys:\n\n")
 	server := strings.TrimRight(publicURL, "/")
 	if server == "" {
 		server = "https://<your heimdall>"

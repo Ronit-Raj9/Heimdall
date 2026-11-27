@@ -35,7 +35,7 @@ var rtcLiveKitServerParams = []TemplateParam{
 }
 
 var rtcTemplates = []AgentTemplate{
-	{ID: TemplateLiveKitAgent, Name: "Connect your LiveKit or Pipecat voice agent", Category: TemplateCategoryBYO, Adapter: "voice_rtc", Providers: abAnyProvider,
+	{ID: TemplateLiveKitAgent, Name: "LiveKit or Pipecat voice", Category: TemplateCategoryBYO, Adapter: "voice_rtc", Providers: abAnyProvider,
 		DefaultModel: "hosted", source: "inline", Docs: "docs/voice-realtime.md",
 		Description: "A voice agent that joins LiveKit rooms. For each voice task Heimdall opens a room, brings your agent in and calls it over WebRTC with a simulated caller.",
 		Params: append([]TemplateParam{

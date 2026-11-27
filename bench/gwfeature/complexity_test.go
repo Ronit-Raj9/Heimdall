@@ -46,7 +46,7 @@ func rtDetails(t *testing.T, e Effect) routerDetails {
 
 func TestRouterDraftArms(t *testing.T) {
 	f, ok := Lookup(schemas.GatewayFeatureComplexityRouter)
-	if !ok || f.Name != "Complexity router" {
+	if !ok || f.Name != "Send easy tasks to a cheaper model" {
 		t.Fatalf("feature not registered: %+v", f)
 	}
 	req := rtReq(nil)

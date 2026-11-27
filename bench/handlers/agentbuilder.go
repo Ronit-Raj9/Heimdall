@@ -246,7 +246,7 @@ var agentTemplates = []AgentTemplate{
 		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/a2a-agents.md",
 		Description: "An A2A agent reached through Bifrost's agent gateway by its agent card.",
 		Params:      connectA2AParams},
-	{ID: "openai-endpoint", Name: "Connect your OpenAI-compatible endpoint", Category: TemplateCategoryBYO, Adapter: "openai_agent", Providers: abAnyProvider,
+	{ID: "openai-endpoint", Name: "OpenAI-compatible endpoint", Category: TemplateCategoryBYO, Adapter: "openai_agent", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/openai-agents.md",
 		Description: "Your agent behind an OpenAI-style chat/completions URL. Heimdall sends each task as a chat and runs the task's tools for it.",
 		Params:      connectOpenAIParams},

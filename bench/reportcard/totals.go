@@ -23,6 +23,12 @@ type Totals struct {
 	FalseCompletion *float64 `json:"false_completion,omitempty"`    // mean false_completion over the clean runs that observed it
 	FaultSurvival   *float64 `json:"fault_survival,omitempty"`      // success rate over runs with an evaluation fault injected
 	FaultRuns       int      `json:"fault_runs,omitempty"`
+	// FaultCostUSD is the cost of the runs with an evaluation fault
+	// injected (fix wave M7-89), nil when any of their costs is not known;
+	// FaultCostRuns counts those whose cost is known. With CostUSD it splits
+	// the evaluation's cost into normal and fault runs.
+	FaultCostUSD  *float64 `json:"fault_cost_usd,omitempty"`
+	FaultCostRuns int      `json:"fault_cost_runs,omitempty"`
 }
 
 // totals computes Totals per arm label.
@@ -32,6 +38,7 @@ func totals(children []childRuns, labels []string, faultOf func(childRuns, strin
 		var clean []graded
 		var cs []cluster
 		faultSucc, faultRuns := 0, 0
+		var faulted []graded
 		for _, cr := range children {
 			c := filter(cr.arms[l], schemas.ConditionClean)
 			clean = append(clean, c...)
@@ -42,6 +49,7 @@ func totals(children []childRuns, labels []string, faultOf func(childRuns, strin
 				}
 				faultSucc += r.success
 				faultRuns++
+				faulted = append(faulted, r)
 			}
 		}
 		t := Totals{Runs: len(clean)}
@@ -72,6 +80,12 @@ func totals(children []childRuns, labels []string, faultOf func(childRuns, strin
 		if faultRuns > 0 {
 			v := round(float64(faultSucc) / float64(faultRuns))
 			t.FaultSurvival, t.FaultRuns = &v, faultRuns
+			total, known, _ := sumKnown(faulted, metricCostUSD)
+			t.FaultCostRuns = known
+			if known == len(faulted) {
+				c := round(total)
+				t.FaultCostUSD = &c
+			}
 		}
 		out[l] = t
 	}

@@ -255,6 +255,14 @@ type AgentList struct {
 	Agents []AgentSummary `json:"agents"`
 }
 
+// AgentLastScore is AgentSummary.LastScore.
+type AgentLastScore struct {
+	Score float64   `json:"score"` // 0..1
+	Runs  int       `json:"runs"`
+	ExpID string    `json:"exp_id"`
+	At    time.Time `json:"at"` // start of the latest scored run
+}
+
 // AgentSummary is one agent config as the agents page shows it. Env lists
 // variable names only: values can hold keys and are never served. Files
 // lists the container paths the adapter writes, never their content.
@@ -284,6 +292,14 @@ type AgentSummary struct {
 	// LastRunAt is when the latest run of this config id started; omitted
 	// when it never ran or there is no index.
 	LastRunAt *time.Time `json:"last_run_at,omitempty"`
+	// Versions counts the distinct config hashes this config id ran with
+	// (fix wave M2-21); omitted without runs or an index.
+	Versions *int `json:"versions,omitempty"`
+	// LastScore is the share of passing runs among this config id's sealed,
+	// scored, non-practice runs in the evaluation of its latest such run
+	// (fix wave M2-26), with that evaluation and the run count. Omitted
+	// when it has no scored run.
+	LastScore *AgentLastScore `json:"last_score,omitempty"`
 	// Capabilities is what the agent can do: its own capabilities: list, else
 	// the defaults of its adapter (EffectiveCapabilities). Empty when the
 	// config failed to decode.

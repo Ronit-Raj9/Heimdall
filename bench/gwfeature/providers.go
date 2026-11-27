@@ -20,7 +20,7 @@ import (
 // Feature 8: the same model on several providers (W4 design 3, section 11).
 
 func init() {
-	Register(Feature{ID: schemas.GatewayFeatureProviders, Name: "Same model on several providers", Draft: draftProviders, Compute: computeProviders})
+	Register(Feature{ID: schemas.GatewayFeatureProviders, Name: "Use the same model from several providers", Draft: draftProviders, Compute: computeProviders})
 }
 
 // p4ArmIDs are the arm ids of a feature test in order: A is the control.

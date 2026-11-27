@@ -190,7 +190,7 @@ func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	h.livePaused(ev)
 	fillChildCauses(ev)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(ev))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(h.withQueue(ctx, ev))) // fix wave M3-21 (uifix_cg_queue.go)
 }
 
 // cancel stops every child that still runs. A child that is not running is

@@ -104,7 +104,7 @@ func syncFlags(name string, args []string) (*syncOpts, int) {
 		return nil, exitUsage
 	}
 	if name == "push" && o.token == "" {
-		fmt.Fprintf(os.Stderr, "%s push: a token is required: pass -token or set %s (create one under Settings, API tokens)\n", progName, syncTokenEnv)
+		fmt.Fprintf(os.Stderr, "%s push: a token is required: pass -token or set %s (create one under Settings > Access tokens)\n", progName, syncTokenEnv)
 		return nil, exitUsage
 	}
 	return o, -1

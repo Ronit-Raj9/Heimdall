@@ -408,7 +408,7 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 			if m == "" {
 				continue
 			}
-			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is not known; set a price on its key in Models & keys to cost its finished runs", m))
+			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is not known; set a price on its key in Settings > Model keys to cost its finished runs", m))
 		}
 	}
 	per := make([]EvalBenchmarkEstimate, len(ids))

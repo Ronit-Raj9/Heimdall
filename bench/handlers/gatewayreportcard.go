@@ -62,7 +62,7 @@ const (
 	cardUnknown     = "unknown"
 	cardNotMeasured = "not_measured"
 	cardNoAnswer    = "the gateway did not answer"
-	cardNotMeasHead = "Not measured yet"
+	cardNotMeasHead = "Not tested yet"
 )
 
 // Report card ids of the lines that are not feature tests.
@@ -213,7 +213,7 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 	}
 
 	// Complexity router.
-	l := line(schemas.GatewayFeatureComplexityRouter, "Complexity router")
+	l := line(schemas.GatewayFeatureComplexityRouter, "Send easy tasks to a cheaper model")
 	var status struct {
 		State string `json:"state"`
 	}
@@ -275,7 +275,7 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 	}
 	card.Lines = append(card.Lines, l)
 
-	l = line(schemas.GatewayFeatureProviders, "Same model on several providers")
+	l = line(schemas.GatewayFeatureProviders, "Use the same model from several providers")
 	l.EnabledSource = "Heimdall cannot see your production routing"
 	card.Lines = append(card.Lines, l)
 
@@ -283,7 +283,7 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 	l.Enabled, l.EnabledSource = cardOn, "governance is always loaded"
 	card.Lines = append(card.Lines, l)
 
-	l = line(schemas.GatewayFeatureOverhead, "Gateway time per plugin")
+	l = line(schemas.GatewayFeatureOverhead, "Time each plugin adds")
 	l.Enabled, l.EnabledSource = cardOn, "every gateway call records it"
 	card.Lines = append(card.Lines, l)
 

@@ -482,7 +482,7 @@ func ImportScenarioRows(rows []ScenarioRow, o ScenarioOptions) ([]ScenarioTask, 
 	var problems []RowProblem
 	for _, r := range rows {
 		if r.ReplyRubric != "" && !o.Judged {
-			problems = append(problems, RowProblem{Line: r.Line, Message: "reply_rubric is graded by a judge model: pin the benchmark's judge first (Build > Grader), or drop the rubric"})
+			problems = append(problems, RowProblem{Line: r.Line, Message: "reply_rubric is graded by a judge model: pin the benchmark's judge first (the Judge card on the benchmark page), or drop the rubric"})
 			continue
 		}
 		id, msg := rowID(Row{ID: r.ID, Title: r.Title, Question: r.Opening, Line: r.Line}, isTaken)

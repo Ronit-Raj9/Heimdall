@@ -64,7 +64,7 @@ func WriteBenchmark(suiteDir string, st Store, d *Draft, judge *scaffold.JudgeCo
 			}
 			_ = yaml.Unmarshal(existing, &sj)
 			if sj.Grading != "judged" {
-				return nil, errors.New("the drafted tasks grade the reply with a judge, and this benchmark pins none: pin its judge first (Build > Grader)")
+				return nil, errors.New("the drafted tasks grade the reply with a judge, and this benchmark pins none: pin its judge first (the Judge card on the benchmark page)")
 			}
 		}
 	} else if d.Judged && (judge == nil || judge.Provider == "" || judge.Model == "") {

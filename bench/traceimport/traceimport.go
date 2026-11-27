@@ -60,10 +60,14 @@ const (
 
 // Session is one recorded agent session, normalized from any format.
 type Session struct {
-	ID          string         `json:"id"` // trace id, or the conversation's id
-	Format      string         `json:"format"`
-	Name        string         `json:"name,omitempty"`
-	Model       string         `json:"model,omitempty"`
+	ID     string `json:"id"` // trace id, or the conversation's id
+	Format string `json:"format"`
+	Name   string `json:"name,omitempty"`
+	Model  string `json:"model,omitempty"`
+	// Agent names the agent that made the trace (fix wave M7-12): an OTLP
+	// span's gen_ai.agent.name, else the resource's service.name. Empty when
+	// the trace names none.
+	Agent       string         `json:"agent,omitempty"`
 	Started     time.Time      `json:"started,omitzero"`
 	Ended       time.Time      `json:"ended,omitzero"`
 	Turns       []Turn         `json:"turns"`

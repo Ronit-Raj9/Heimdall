@@ -94,7 +94,7 @@ var ErrKeyStoreUnavailable = errors.New("model key store unavailable")
 type missingKeyError struct{ provider string }
 
 func (e *missingKeyError) Error() string {
-	return fmt.Sprintf("this organization has no working %s key: add one on Models & keys, then start again (runs use only the organization's own model keys)", e.provider)
+	return fmt.Sprintf("this organization has no working %s key: add one in Settings > Model keys, then start again (runs use only the organization's own model keys)", e.provider)
 }
 func (e *missingKeyError) Unwrap() error { return ErrModelKeyMissing }
 
@@ -177,7 +177,7 @@ func ModelKeyRefusal(ctx context.Context, keys KeySource, orgID string, provider
 func SendModelKeyRefusal(ctx *fasthttp.RequestCtx, mode schemas.Mode, err error) bool {
 	switch {
 	case errors.Is(err, ErrModelKeyMissing), errors.Is(err, ErrKeyOverBudget):
-		lib.SendErrorLink(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error(), ModelKeysLink)
+		lib.SendErrorCode(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, keyRefusalCode(err), err.Error(), ModelKeysLink)
 	case errors.Is(err, ErrKeyStoreUnavailable):
 		lib.SendError(ctx, mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, err.Error())
 	default:

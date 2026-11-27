@@ -52,9 +52,10 @@ var e2bPollEvery = 3 * time.Second
 func init() {
 	Register(Info{
 		Name: PlatformE2B, Title: "E2B",
-		TokenHint:     "A team API key from the E2B dashboard (e2b_...).",
-		EndpointLabel: "Domain (only for a self-hosted E2B)",
-		DocsURL:       "https://e2b.dev/docs/api-key",
+		TokenHint:           "A team API key from the E2B dashboard (e2b_...).",
+		EndpointLabel:       "Domain (only for a self-hosted E2B)",
+		EndpointPlaceholder: "e2b.your-company.com",
+		DocsURL:             "https://e2b.dev/docs/api-key",
 	}, func(c Credentials) (Platform, error) { return NewE2B(c, nil), nil })
 }
 

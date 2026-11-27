@@ -22,7 +22,7 @@ import (
 // solve rate per complexity tier, and an estimated best routing cut.
 
 func init() {
-	Register(Feature{ID: schemas.GatewayFeatureComplexityRouter, Name: "Complexity router", Draft: draftRouter, Compute: computeRouter})
+	Register(Feature{ID: schemas.GatewayFeatureComplexityRouter, Name: "Send easy tasks to a cheaper model", Draft: draftRouter, Compute: computeRouter})
 }
 
 // Complexity tiers, from the lowest to the highest.
