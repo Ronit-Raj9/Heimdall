@@ -140,7 +140,8 @@ describe("SuiteView stat tiles (N164)", () => {
 		fixture.suites = [bfcl()];
 		fixture.runs = undefined;
 		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
-		expect(html).toContain("Its own failure tests");
+		// D1 N164 (lead's rule 17): the header names them built-in failure tests.
+		expect(html).toContain("Built-in failure tests");
 		expect(html).toContain("Plus model faults (outage, brownout, flaky) that work on every benchmark.");
 	});
 	it("says it is working out task health while the health report loads", () => {

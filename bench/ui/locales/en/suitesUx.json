@@ -21,7 +21,7 @@
 	"stats": {
 		"tasks": "Tasks",
 		"admitted": "Ready to use",
-		"probes": "Its own failure tests",
+		"probes": "Built-in failure tests",
 		"lastRun": "Runs so far",
 		"never": "None yet",
 		"admittedValue": "{{ready}} of {{total}}",
