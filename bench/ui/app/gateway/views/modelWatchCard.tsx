@@ -1,5 +1,7 @@
-import { Section } from "@/components/runs/screenStates";
+import { InlineError, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { formatUsd } from "@/lib/money";
 import { useGetModelWatchQuery, useRetryModelWatchMutation } from "@/lib/store/apis/gatewayApi";
 import { useGetSchedulesQuery, useRunScheduleMutation } from "@/lib/store/apis/schedulesApi";
 import type { GwWatchItem, GwWatchState } from "@/lib/types/gateway";
@@ -45,9 +47,9 @@ export function ModelWatchView({
 }: {
 	row: WatchScheduleRow;
 	state?: GwWatchState;
-	onRetry(model: string): void;
+	onRetry(model: string): void | Promise<unknown>;
 	/** "Start now" on a skipped model: clear it, then run the schedule now. Defaults to onRetry. */
-	onStartNow?(model: string): void;
+	onStartNow?(model: string): void | Promise<unknown>;
 }) {
 	const { t } = useTranslation("w4p6");
 	const w = row.new_models as NewModelWatchFields;
@@ -59,7 +61,7 @@ export function ModelWatchView({
 					schedule: cronWords(row.cron),
 					evaluation: row.evaluation ?? row.name,
 					current: w.current,
-					usd: w.usd_per_model.toFixed(2),
+					usd: formatUsd(w.usd_per_model),
 				})}
 			</p>
 			{items.length === 0 && <p className="text-muted-foreground">{t("watch.firstCheck")}</p>}
@@ -95,15 +97,17 @@ export function ModelWatchView({
 										{(it.state === "failed" || it.state === "skipped") && (
 											<span className="flex flex-wrap items-center gap-2">
 												{t(it.state === "failed" ? "watch.failed" : "watch.skipped", { reason: it.reason ?? "" })}
-												<Button
-													type="button"
+												{/* Both start a paid evaluation of this model (M7-113): say so and ask first. */}
+												<PaidButton
 													size="sm"
 													variant="outline"
-													onClick={() => (it.state === "skipped" && onStartNow ? onStartNow(key) : onRetry(key))}
-													data-testid={`model-watch-retry-${key}`}
-												>
-													{it.state === "failed" ? t("watch.tryAgain") : t("watch.startNow")}
-												</Button>
+													verb={it.state === "failed" ? t("watch.tryAgain") : t("watch.startNow")}
+													capUsd={w.usd_per_model}
+													confirm="always"
+													estimateAt="title"
+													onConfirm={() => (it.state === "skipped" && onStartNow ? onStartNow(key) : onRetry(key))}
+													testId={`model-watch-retry-${key}`}
+												/>
 											</span>
 										)}
 									</td>
@@ -132,20 +136,35 @@ function WatchFor({ row }: { row: WatchScheduleRow }) {
 	const q = useGetModelWatchQuery(row.name);
 	const [retry] = useRetryModelWatchMutation();
 	const [run] = useRunScheduleMutation();
+	const [error, setError] = useState<unknown>(null);
+	// Every action reports its failure next to the watch (M1-44), never silently.
+	const attempt = async (fn: () => Promise<unknown>) => {
+		setError(null);
+		try {
+			await fn();
+		} catch (e) {
+			setError(e);
+		}
+	};
 	return (
-		<ModelWatchView
-			row={row}
-			state={q.data}
-			onRetry={(model) => void retry({ schedule: row.name, model })}
-			onStartNow={(model) =>
-				void startNow(
-					(a) => retry(a).unwrap(),
-					(s) => run(s).unwrap(),
-					row.name,
-					model,
-				).catch(() => undefined)
-			}
-		/>
+		<div className="flex flex-col gap-2">
+			<ModelWatchView
+				row={row}
+				state={q.data}
+				onRetry={(model) => attempt(() => retry({ schedule: row.name, model }).unwrap())}
+				onStartNow={(model) =>
+					attempt(() =>
+						startNow(
+							(a) => retry(a).unwrap(),
+							(s) => run(s).unwrap(),
+							row.name,
+							model,
+						),
+					)
+				}
+			/>
+			<InlineError error={error} testId={`model-watch-error-${row.name}`} />
+		</div>
 	);
 }
 
@@ -158,7 +177,9 @@ export function ModelWatchCard() {
 	const rows = ((q.data?.rows ?? []) as WatchScheduleRow[]).filter((r) => r.new_models);
 	return (
 		<Section title={t("watch.title")} testId="model-watch-card">
-			{rows.length === 0 ? (
+			{q.isError ? (
+				<LoadError title={t("watch.title")} error={q.error} onRetry={() => void q.refetch()} testId="model-watch-load-error" />
+			) : q.isLoading ? null : rows.length === 0 ? (
 				<p className="text-muted-foreground text-sm">{t("watch.none")}</p>
 			) : (
 				rows.map((r) => <WatchFor key={r.name} row={r} />)
