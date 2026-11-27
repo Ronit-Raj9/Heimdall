@@ -159,7 +159,13 @@ export function ReportSlices({ report, onShowOnly }: ReportSlicesProps) {
 									{onShowOnly && (
 										<TableCell className="text-right">
 											{!active && (slice.key in filtered || Object.keys(filtered).length < MAX_WHERE) && (
-												<Button type="button" size="sm" variant="outline" onClick={() => onShowOnly(slice.key, v.value)} data-testid={`slice-only-${v.value}`}>
+												<Button
+													type="button"
+													size="sm"
+													variant="outline"
+													onClick={() => onShowOnly(slice.key, v.value)}
+													data-testid={`slice-only-${v.value}`}
+												>
 													Show only this segment
 												</Button>
 											)}

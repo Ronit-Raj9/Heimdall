@@ -82,7 +82,12 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 	};
 
 	if (q.isLoading) return <Skeleton className="aspect-video w-full rounded-xl" data-testid="replay-loading" />;
-	if (q.error) return <p className="text-destructive text-sm" data-testid="replay-error">{t("loadError")}</p>;
+	if (q.error)
+		return (
+			<p className="text-destructive text-sm" data-testid="replay-error">
+				{t("loadError")}
+			</p>
+		);
 	if (frames.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-3 py-12 text-center" data-testid="replay-empty">
@@ -99,10 +104,21 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 	const src = frameImageUrl(runId, f.index);
 
 	return (
-		<div className="flex min-w-0 flex-col gap-4 lg:flex-row" data-testid="screen-replay" tabIndex={0} onKeyDown={onKey} aria-label={t("title")}>
+		<div
+			className="flex min-w-0 flex-col gap-4 lg:flex-row"
+			data-testid="screen-replay"
+			tabIndex={0}
+			onKeyDown={onKey}
+			aria-label={t("title")}
+		>
 			<div className="flex min-w-0 flex-1 flex-col gap-3">
 				<div ref={stage} className="bg-muted relative overflow-hidden rounded-xl border">
-					<img src={src} alt={t("frameOf", { n: index + 1, total: frames.length })} className="block h-auto w-full object-contain" data-testid="replay-frame" />
+					<img
+						src={src}
+						alt={t("frameOf", { n: index + 1, total: frames.length })}
+						className="block h-auto w-full object-contain"
+						data-testid="replay-frame"
+					/>
 					{live && (
 						<span className="bg-background/80 absolute top-3 left-3 flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs">
 							<span className="size-2 animate-pulse rounded-full bg-blue-500" aria-hidden="true" />
@@ -124,7 +140,11 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 					<div className="pointer-events-none absolute inset-x-0 top-0 h-1.5" aria-hidden="true">
 						{frames.map((fr) =>
 							fr.action ? (
-								<span key={fr.index} className="bg-primary/60 absolute top-0 h-1.5 w-0.5" style={{ left: `${(fr.offset_ms / total) * 100}%` }} />
+								<span
+									key={fr.index}
+									className="bg-primary/60 absolute top-0 h-1.5 w-0.5"
+									style={{ left: `${(fr.offset_ms / total) * 100}%` }}
+								/>
 							) : null,
 						)}
 					</div>
@@ -133,12 +153,7 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 					<Button size="sm" variant="ghost" onClick={() => step(-1)} aria-label={t("prev")} data-testid="replay-prev">
 						<ChevronLeft aria-hidden="true" />
 					</Button>
-					<Button
-						size="sm"
-						onClick={toggle}
-						aria-label={playing ? t("pause") : t("play")}
-						data-testid="replay-play"
-					>
+					<Button size="sm" onClick={toggle} aria-label={playing ? t("pause") : t("play")} data-testid="replay-play">
 						{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
 					</Button>
 					<Button size="sm" variant="ghost" onClick={() => step(1)} aria-label={t("next")} data-testid="replay-next">
@@ -181,7 +196,10 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 								setCur(i);
 							}}
 							aria-current={i === index ? "step" : undefined}
-							className={cn("hover:bg-muted flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm", i === index && "bg-muted font-medium")}
+							className={cn(
+								"hover:bg-muted flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+								i === index && "bg-muted font-medium",
+							)}
 						>
 							<span className="text-muted-foreground w-10 shrink-0 text-xs tabular-nums">{formatOffset(fr.offset_ms)}</span>
 							<span className="truncate" title={actionLabel(fr, t("look"))}>

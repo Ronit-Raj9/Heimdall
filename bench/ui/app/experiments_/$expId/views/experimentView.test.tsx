@@ -54,7 +54,10 @@ vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: 
 vi.mock("@/lib/store/apis/routingApi", () => ({ useGetExperimentRoutingQuery: () => ({}) }));
 vi.mock("./liveProgress", () => ({ LiveProgress: () => null, default: () => null }));
 vi.mock("@/components/shell/routeTabs", () => ({ RouteTabs: () => null }));
-vi.mock("@/lib/store/apis/validityApi", () => ({ useGetExperimentValidityQuery: () => ({}), useMarkValiditySeenMutation: () => [() => undefined, {}] }));
+vi.mock("@/lib/store/apis/validityApi", () => ({
+	useGetExperimentValidityQuery: () => ({}),
+	useMarkValiditySeenMutation: () => [() => undefined, {}],
+}));
 
 const created = (id: string) => ({ exp_id: id, name: id, state: "created", slots: { total: 2, done: 0, running: 0, failed: 0 } });
 

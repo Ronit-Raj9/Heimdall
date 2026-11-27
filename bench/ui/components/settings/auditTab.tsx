@@ -8,7 +8,20 @@ import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platf
 import type { AuditVerifyResult } from "@/lib/types/dataops";
 import type { AuditEntry, AuditList, Member, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Bot, ChevronLeft, ChevronRight, Cog, Download, KeyRound, Search, Server, ShieldAlert, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import {
+	Bot,
+	ChevronLeft,
+	ChevronRight,
+	Cog,
+	Download,
+	KeyRound,
+	Search,
+	Server,
+	ShieldAlert,
+	ShieldCheck,
+	UserRound,
+	type LucideIcon,
+} from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
@@ -92,7 +105,9 @@ export function AuditVerifyNote({ result }: { result: AuditVerifyResult }) {
 				<ShieldAlert className="text-chart-error-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 				<div className="flex flex-col gap-0.5">
 					<span className="text-chart-error-ink font-medium">{t("settings.audit.verifyBroken", { seq: result.broken_at })}</span>
-					{result.reason && <span className="text-muted-foreground text-xs">{t("settings.audit.verifyReason", { reason: result.reason })}</span>}
+					{result.reason && (
+						<span className="text-muted-foreground text-xs">{t("settings.audit.verifyReason", { reason: result.reason })}</span>
+					)}
 				</div>
 			</div>
 		);
@@ -202,7 +217,11 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	};
 
 	return (
-		<SettingsSection title={t("settings.audit.title")} description={t("settings.audit.description", { org: org.name })} testId="settings-audit">
+		<SettingsSection
+			title={t("settings.audit.title")}
+			description={t("settings.audit.description", { org: org.name })}
+			testId="settings-audit"
+		>
 			<AuditTools org={org} filters={{ action: action || undefined, actor: actor === "all" ? undefined : actor, q: text }} />
 			<form className="flex flex-wrap items-end gap-3" onSubmit={apply} data-testid="audit-filters">
 				<div className="flex min-w-48 flex-col gap-1.5">
@@ -240,7 +259,10 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 						{t("settings.audit.filterText")}
 					</label>
 					<div className="relative">
-						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" aria-hidden="true" />
+						<Search
+							className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
+							aria-hidden="true"
+						/>
 						<Input
 							id={`${formId}-text`}
 							className="h-9 pl-8"

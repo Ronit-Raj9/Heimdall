@@ -62,18 +62,34 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 	const err = state.error as { data?: { error?: { message?: string } } } | undefined;
 	const ready = applyReady(url, scope, scopeId, allowGlobal);
 	const missing = applyMissing(url, scope, scopeId, allowGlobal);
-	const why = missing === null ? null : missing === "scopeId" ? tw("apply.why.scopeId", { what: tw(`apply.why.${scope as "virtual_key" | "team" | "customer"}`) }) : tw(`apply.why.${missing}`);
+	const why =
+		missing === null
+			? null
+			: missing === "scopeId"
+				? tw("apply.why.scopeId", { what: tw(`apply.why.${scope as "virtual_key" | "team" | "customer"}`) })
+				: tw(`apply.why.${missing}`);
 	return (
 		<div className="flex flex-col gap-2 rounded-lg border p-3 text-sm" data-testid="model-switch-apply">
 			<span className="font-medium">{t("export.apply.title")}</span>
 			<span className="text-muted-foreground">{t("export.apply.description")}</span>
 			<label className="flex flex-col gap-1">
 				{t("export.apply.url")}
-				<input className="border-input bg-background h-9 rounded-lg border px-2" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://bifrost.example.com" data-testid="model-switch-apply-url" />
+				<input
+					className="border-input bg-background h-9 rounded-lg border px-2"
+					value={url}
+					onChange={(e) => setUrl(e.target.value)}
+					placeholder="https://bifrost.example.com"
+					data-testid="model-switch-apply-url"
+				/>
 			</label>
 			<label className="flex flex-col gap-1">
 				{t("export.apply.secret")}
-				<select className="border-input bg-background h-9 rounded-lg border px-2" value={secret} onChange={(e) => setSecret(e.target.value)} data-testid="model-switch-apply-secret">
+				<select
+					className="border-input bg-background h-9 rounded-lg border px-2"
+					value={secret}
+					onChange={(e) => setSecret(e.target.value)}
+					data-testid="model-switch-apply-secret"
+				>
 					<option value="">{t("export.apply.secretNone")}</option>
 					{secretNames.map((n) => (
 						<option key={n} value={n}>
@@ -81,7 +97,9 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 						</option>
 					))}
 				</select>
-				<span className="text-muted-foreground text-xs">{secrets.error ? t("export.apply.secretLoadError") : t("export.apply.secretHint")}</span>
+				<span className="text-muted-foreground text-xs">
+					{secrets.error ? t("export.apply.secretLoadError") : t("export.apply.secretHint")}
+				</span>
 			</label>
 			<label className="flex flex-col gap-1">
 				{t("export.apply.scope")}
@@ -101,7 +119,12 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 			{scope !== "global" && (
 				<label className="flex flex-col gap-1">
 					{t(`export.apply.scopeId.${scope}`)}
-					<input className="border-input bg-background h-9 rounded-lg border px-2" value={scopeId} onChange={(e) => setScopeId(e.target.value)} data-testid="model-switch-apply-scope-id" />
+					<input
+						className="border-input bg-background h-9 rounded-lg border px-2"
+						value={scopeId}
+						onChange={(e) => setScopeId(e.target.value)}
+						data-testid="model-switch-apply-scope-id"
+					/>
 				</label>
 			)}
 			<label className="flex items-center gap-2">
@@ -110,15 +133,33 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 			</label>
 			{scope === "global" && (
 				<label className="flex items-center gap-2">
-					<input type="checkbox" checked={allowGlobal} onChange={(e) => setAllowGlobal(e.target.checked)} data-testid="model-switch-apply-global" />
+					<input
+						type="checkbox"
+						checked={allowGlobal}
+						onChange={(e) => setAllowGlobal(e.target.checked)}
+						data-testid="model-switch-apply-global"
+					/>
 					{t("export.apply.allowGlobal")}
 				</label>
 			)}
 			<div className="flex gap-2">
-				<Button size="sm" variant="outline" disabled={!ready || state.isLoading} aria-describedby={why ? "model-switch-apply-why" : undefined} onClick={() => run(true)} dataTestId="model-switch-apply-preview">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={!ready || state.isLoading}
+					aria-describedby={why ? "model-switch-apply-why" : undefined}
+					onClick={() => run(true)}
+					dataTestId="model-switch-apply-preview"
+				>
 					{t("export.apply.dryRun")}
 				</Button>
-				<Button size="sm" disabled={!ready || state.isLoading} aria-describedby={why ? "model-switch-apply-why" : undefined} onClick={() => run(false)} dataTestId="model-switch-apply-run">
+				<Button
+					size="sm"
+					disabled={!ready || state.isLoading}
+					aria-describedby={why ? "model-switch-apply-why" : undefined}
+					onClick={() => run(false)}
+					dataTestId="model-switch-apply-run"
+				>
 					{t("export.apply.run")}
 				</Button>
 			</div>
@@ -141,7 +182,11 @@ export function ApplySteps({ result }: { result: ModelSwitchApplyResult }) {
 				<li key={s.rule} data-status={s.status}>
 					{s.status === "failed"
 						? t("export.apply.failed", { rule: s.rule, error: s.error ?? "" })
-						: t(s.status === "planned" ? "export.apply.planned" : "export.apply.done", { action: s.action, rule: s.rule, priority: s.priority })}
+						: t(s.status === "planned" ? "export.apply.planned" : "export.apply.done", {
+								action: s.action,
+								rule: s.rule,
+								priority: s.priority,
+							})}
 				</li>
 			))}
 			{result.stale.length > 0 && <li>{t("export.apply.stale", { rules: result.stale.join(", ") })}</li>}

@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import i18n from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
+import {
+	useGetOrgQuery,
+	useLeaveOrgMutation,
+	useRenameOrgMutation,
+	useSetPublicReadMutation,
+	useSwitchOrgMutation,
+} from "@/lib/store/apis/platformApi";
 import type { OrgInfo, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff } from "lucide-react";
@@ -26,7 +32,9 @@ export async function togglePublic(
 	info: Pick<OrgInfo, "id" | "name" | "public_read">,
 ): Promise<void> {
 	if (!info.public_read) {
-		const ok = await confirm(i18n.t("org.makePublicConfirm", { ns: "w4m8", org: info.name }), { confirmLabel: i18n.t("org.makePublic", { ns: "w4m8" }) });
+		const ok = await confirm(i18n.t("org.makePublicConfirm", { ns: "w4m8", org: info.name }), {
+			confirmLabel: i18n.t("org.makePublic", { ns: "w4m8" }),
+		});
 		if (!ok) return;
 	}
 	setPublic({ orgId: info.id, publicRead: !info.public_read });
@@ -96,7 +104,10 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 			// The session still points at the org just left, so requests would resolve no org: make
 			// a remaining membership current first. With none left the user lands on an empty app.
 			const next = session.orgs.find((candidate) => candidate.id !== info.id);
-			if (next) await switchOrg({ org: next.id }).unwrap().catch(() => undefined);
+			if (next)
+				await switchOrg({ org: next.id })
+					.unwrap()
+					.catch(() => undefined);
 			window.location.assign("/");
 		} catch {
 			// leaveState.error renders the failure.
@@ -203,32 +214,32 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 			<PromptLogsSection />
 
 			{(session.user || session.authMode === "hosted") && (
-			<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
-				<div className="border-chart-error/40 divide-chart-error/20 flex flex-col divide-y rounded-lg border">
-					{session.user && (
-						<div className="flex flex-wrap items-center gap-4 px-4 py-4">
-							<div className="flex min-w-60 flex-1 flex-col gap-1">
-								<span className="text-foreground text-sm font-medium">{t("settings.org.leaveTitle")}</span>
-								<span className="text-muted-foreground text-xs">{t("settings.org.leaveBody", { org: info.name })}</span>
+				<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
+					<div className="border-chart-error/40 divide-chart-error/20 flex flex-col divide-y rounded-lg border">
+						{session.user && (
+							<div className="flex flex-wrap items-center gap-4 px-4 py-4">
+								<div className="flex min-w-60 flex-1 flex-col gap-1">
+									<span className="text-foreground text-sm font-medium">{t("settings.org.leaveTitle")}</span>
+									<span className="text-muted-foreground text-xs">{t("settings.org.leaveBody", { org: info.name })}</span>
+								</div>
+								<ConfirmButton
+									label={t("settings.org.leave")}
+									question={t("settings.org.leaveConfirm", { org: info.name })}
+									confirmLabel={t("settings.org.leave")}
+									cancelLabel={t("settings.members.cancel")}
+									onConfirm={() => void onLeave()}
+									isLoading={leaveState.isLoading}
+									variant="destructive"
+									testId="org-leave"
+								/>
 							</div>
-							<ConfirmButton
-								label={t("settings.org.leave")}
-								question={t("settings.org.leaveConfirm", { org: info.name })}
-								confirmLabel={t("settings.org.leave")}
-								cancelLabel={t("settings.members.cancel")}
-								onConfirm={() => void onLeave()}
-								isLoading={leaveState.isLoading}
-								variant="destructive"
-								testId="org-leave"
-							/>
-						</div>
+						)}
+						{session.authMode === "hosted" && <DeleteOrgRow info={info} />}
+					</div>
+					{leaveState.error && (
+						<WriteFailure error={leaveState.error} title={t("settings.org.leaveError")} testId="org-leave-error" min="admin" />
 					)}
-					{session.authMode === "hosted" && <DeleteOrgRow info={info} />}
-				</div>
-				{leaveState.error && (
-					<WriteFailure error={leaveState.error} title={t("settings.org.leaveError")} testId="org-leave-error" min="admin" />
-				)}
-			</SettingsSection>
+				</SettingsSection>
 			)}
 		</div>
 	);

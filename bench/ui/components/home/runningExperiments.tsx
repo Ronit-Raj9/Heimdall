@@ -14,7 +14,23 @@ import { useExperimentEvents } from "./useExperimentEvents";
 
 const KNOWN_EVENTS = new Set(["slot_started", "stage", "slot_sealed", "budget_stop", "experiment_done", "error", "end"]);
 /** Stage ids the live feed sends, as plain words (live.json stage.*). */
-const KNOWN_STAGES = new Set(["planned", "leased", "image", "prepare", "arm", "run", "disarm", "export", "collect", "grade", "gate", "measure", "receipt", "cleanup", "seal"]);
+const KNOWN_STAGES = new Set([
+	"planned",
+	"leased",
+	"image",
+	"prepare",
+	"arm",
+	"run",
+	"disarm",
+	"export",
+	"collect",
+	"grade",
+	"gate",
+	"measure",
+	"receipt",
+	"cleanup",
+	"seal",
+]);
 
 /** Live progress of each running experiment, one card per experiment. */
 export function RunningExperiments({
@@ -172,7 +188,10 @@ export function RunningCardBody({
 					data-testid={`home-running-watch-${status.exp_id}`}
 				>
 					{t("running.watch")}
-					<ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+					<ArrowRight
+						className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+						aria-hidden="true"
+					/>
 				</Link>
 			</div>
 		</article>
@@ -192,7 +211,10 @@ function LastEvent({ event, locale }: { event: LiveEvent; locale: string }) {
 	const text = `${label}${event.message ? `: ${event.message}` : ""}`;
 	return (
 		<>
-			<span className={cn("size-1.5 shrink-0 rounded-full", event.kind === "error" ? "bg-chart-error" : "bg-chart-info")} aria-hidden="true" />
+			<span
+				className={cn("size-1.5 shrink-0 rounded-full", event.kind === "error" ? "bg-chart-error" : "bg-chart-info")}
+				aria-hidden="true"
+			/>
 			<span className={cn("min-w-0 truncate", event.kind === "error" ? "text-chart-error-ink" : "text-foreground")} title={text}>
 				{event.run_id ? (
 					<Link to="/runs/$runId" params={{ runId: event.run_id }} className="hover:underline">

@@ -82,7 +82,12 @@ export function detectFramework(params: Params): string | null {
 	return null;
 }
 
-const FRAMEWORK_LABEL: Record<string, string> = { langgraph: "LangGraph", crewai: "CrewAI", "openai-agents": "OpenAI Agents SDK", custom: "Custom" };
+const FRAMEWORK_LABEL: Record<string, string> = {
+	langgraph: "LangGraph",
+	crewai: "CrewAI",
+	"openai-agents": "OpenAI Agents SDK",
+	custom: "Custom",
+};
 
 const HINT_KEYS = {
 	langgraph: "new.frameworkHint.langgraph",
@@ -106,7 +111,13 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 	if (p.kind === "bool") {
 		return (
 			<label className="flex items-start gap-2 text-sm">
-				<input type="checkbox" className="mt-1" checked={value === "true"} onChange={(e) => onChange(e.target.checked ? "true" : "false")} data-testid={id} />
+				<input
+					type="checkbox"
+					className="mt-1"
+					checked={value === "true"}
+					onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+					data-testid={id}
+				/>
 				<span className="flex flex-col gap-0.5">
 					<span className="font-medium">{p.label}</span>
 					{p.help && <span className="text-muted-foreground text-xs">{p.help}</span>}
@@ -117,7 +128,12 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 	let control;
 	if (p.kind === "select") {
 		control = (
-			<select className="border-input bg-card h-9 rounded-md border px-3 text-sm" value={value} onChange={(e) => onChange(e.target.value)} data-testid={id}>
+			<select
+				className="border-input bg-card h-9 rounded-md border px-3 text-sm"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				data-testid={id}
+			>
 				{(p.options ?? []).map((o) => (
 					<option key={o} value={o}>
 						{optionLabel(p, o)}
@@ -188,7 +204,15 @@ export function NewSecretInline({ param, onSaved }: { param: string; onSaved(nam
 	if (!canUse(session, "admin")) return null;
 
 	const problem = secretNameProblem(name);
-	const nameError = !touched ? undefined : problem === "required" ? ts("nameRequired") : problem === "format" ? ts("nameFormat") : problem === "reserved" ? ts("nameReserved") : undefined;
+	const nameError = !touched
+		? undefined
+		: problem === "required"
+			? ts("nameRequired")
+			: problem === "format"
+				? ts("nameFormat")
+				: problem === "reserved"
+					? ts("nameReserved")
+					: undefined;
 	const tooBig = new TextEncoder().encode(value).length > MAX_SECRET_BYTES;
 	const valueError = !touched ? undefined : !value ? ts("valueRequired") : tooBig ? ts("valueTooLarge") : undefined;
 	const close = () => {
@@ -309,7 +333,8 @@ export function ParamFields({ tpl, params, onChange }: { tpl: AgentTemplate; par
 	const { t } = useTranslation("agentBuilder");
 	const set = (name: string, v: string) => onChange({ ...params, [name]: v });
 	const detected = tpl.id === "wrap-app" ? detectFramework(params) : null;
-	const field = (p: TemplateParam) => !paramVisible(p, params) ? null : <ParamField key={p.name} p={p} value={params[p.name] ?? ""} onChange={(v) => set(p.name, v)} />;
+	const field = (p: TemplateParam) =>
+		!paramVisible(p, params) ? null : <ParamField key={p.name} p={p} value={params[p.name] ?? ""} onChange={(v) => set(p.name, v)} />;
 	return (
 		<div className="flex flex-col gap-4" data-testid="connect-fields">
 			{tpl.params.filter((p) => !p.group).map(field)}
@@ -365,9 +390,17 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 	if (!result) return null;
 	const ok = result.ok;
 	return (
-		<div className={cn("flex flex-col gap-2 rounded-md border p-3 text-sm", ok ? "border-chart-success/40" : "border-destructive/40")} data-testid="endpoint-test-result" aria-live="polite">
+		<div
+			className={cn("flex flex-col gap-2 rounded-md border p-3 text-sm", ok ? "border-chart-success/40" : "border-destructive/40")}
+			data-testid="endpoint-test-result"
+			aria-live="polite"
+		>
 			<p className="flex items-center gap-2 font-medium">
-				{ok ? <CircleCheck className="text-chart-success-ink size-4" aria-hidden="true" /> : <CircleX className="text-destructive size-4" aria-hidden="true" />}
+				{ok ? (
+					<CircleCheck className="text-chart-success-ink size-4" aria-hidden="true" />
+				) : (
+					<CircleX className="text-destructive size-4" aria-hidden="true" />
+				)}
 				{ok ? t(result.matched ? "new.test.ok" : "new.test.okNoMatch", { ms: result.latency_ms }) : t("new.test.failed")}
 				{result.status ? <Badge variant="neutral">{t("new.test.status", { status: result.status })}</Badge> : null}
 			</p>
@@ -375,7 +408,10 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 			{result.answer && (
 				<div className="flex flex-col gap-1">
 					<span className="text-muted-foreground text-xs">{t("new.test.answer")}</span>
-					<pre className="bg-muted max-h-40 overflow-auto rounded p-2 font-mono text-xs whitespace-pre-wrap" data-testid="endpoint-test-answer">
+					<pre
+						className="bg-muted max-h-40 overflow-auto rounded p-2 font-mono text-xs whitespace-pre-wrap"
+						data-testid="endpoint-test-answer"
+					>
 						{result.answer}
 					</pre>
 				</div>
@@ -387,7 +423,9 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 			)}
 			{result.requests && result.requests.length > 0 && (
 				<details>
-					<summary className="text-muted-foreground cursor-pointer text-xs select-none">{t("new.test.requests", { count: result.requests.length })}</summary>
+					<summary className="text-muted-foreground cursor-pointer text-xs select-none">
+						{t("new.test.requests", { count: result.requests.length })}
+					</summary>
 					<div className="mt-1.5" data-testid="endpoint-test-requests">
 						<SentRequests requests={result.requests} />
 					</div>
@@ -396,7 +434,10 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 			{result.raw_response && (
 				<details>
 					<summary className="text-muted-foreground cursor-pointer text-xs select-none">{t("new.test.raw")}</summary>
-					<pre className="bg-muted mt-1.5 max-h-60 overflow-auto rounded p-2 font-mono text-[11px] break-all whitespace-pre-wrap" data-testid="endpoint-test-raw">
+					<pre
+						className="bg-muted mt-1.5 max-h-60 overflow-auto rounded p-2 font-mono text-[11px] break-all whitespace-pre-wrap"
+						data-testid="endpoint-test-raw"
+					>
 						{capText(result.raw_response)}
 					</pre>
 				</details>
@@ -431,7 +472,14 @@ export function SavedEndpointTest({ agentId }: { agentId: string }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid="saved-endpoint-test">
 			<div className="flex flex-wrap items-center gap-3">
-				<Button type="button" size="sm" variant="outline" disabled={state.isLoading} onClick={() => void run({ agent: agentId })} data-testid="saved-endpoint-test-button">
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					disabled={state.isLoading}
+					onClick={() => void run({ agent: agentId })}
+					data-testid="saved-endpoint-test-button"
+				>
 					{t("new.test.button")}
 				</Button>
 				<span className="text-muted-foreground text-xs">{t("new.test.help")}</span>
@@ -449,7 +497,9 @@ export function SentRequests({ requests }: { requests: SentRequest[] }) {
 			{requests.map((r, i) => (
 				<li key={i} className="bg-muted flex min-w-0 flex-col gap-1 rounded p-2 font-mono text-[11px]" data-testid="sent-request">
 					<span className="flex min-w-0 flex-wrap items-center gap-2">
-						{requests.length > 1 && r.step && <Badge variant="neutral">{t(`new.endpointPreview.step.${r.step}`, { defaultValue: r.step })}</Badge>}
+						{requests.length > 1 && r.step && (
+							<Badge variant="neutral">{t(`new.endpointPreview.step.${r.step}`, { defaultValue: r.step })}</Badge>
+						)}
 						<span className="font-semibold">{r.method}</span>
 						<span className="min-w-0 break-all">{r.url}</span>
 					</span>
@@ -484,7 +534,15 @@ export function EndpointPreviewPanel({ body }: { body: AgentFromTemplateRequest 
 	return <EndpointPreviewView data={state.data} error={state.error} loading={state.isLoading} />;
 }
 
-export function EndpointPreviewView({ data, error, loading }: { data?: { ok: boolean; error?: string; requests: SentRequest[]; reads: string }; error?: unknown; loading: boolean }) {
+export function EndpointPreviewView({
+	data,
+	error,
+	loading,
+}: {
+	data?: { ok: boolean; error?: string; requests: SentRequest[]; reads: string };
+	error?: unknown;
+	loading: boolean;
+}) {
 	const { t } = useTranslation("agentBuilder");
 	return (
 		<div className="flex min-w-0 flex-col gap-2 rounded-md border p-3 text-sm" data-testid="endpoint-preview" aria-live="polite">
@@ -548,7 +606,12 @@ export const DEFAULT_PULL_OPTIONS: PullOptions = { benchDrives: false, history: 
 /** The YAML of a new pull agent; pull.name is the agent id, which heimdall.serve registers under. */
 export function pullAgentYAML(id: string, o: PullOptions, notes?: string): string {
 	// Notes go in as comments: the YAML's notes key is the agent's instructions file, not free text.
-	const lines = (notes ?? "").trim() ? notes!.trim().split("\n").map((l) => `# ${l}`) : [];
+	const lines = (notes ?? "").trim()
+		? notes!
+				.trim()
+				.split("\n")
+				.map((l) => `# ${l}`)
+		: [];
 	lines.push(`id: ${id}`, "adapter: pull", "image: bench/coding-core-base:1");
 	lines.push("budgets:", "  wall_s: 900", "  cpus: 1", "  mem_gb: 2", "pull:", `  name: ${id}`);
 	if (o.repo) lines.push("  repo: tarball");
@@ -590,7 +653,13 @@ export function PullOptionsFields({ value, onChange }: { value: PullOptions; onC
 				</label>
 			)}
 			<label className="flex items-start gap-2 text-sm">
-				<input type="checkbox" className="mt-1" checked={value.repo} onChange={(e) => onChange({ ...value, repo: e.target.checked })} data-testid="pull-repo" />
+				<input
+					type="checkbox"
+					className="mt-1"
+					checked={value.repo}
+					onChange={(e) => onChange({ ...value, repo: e.target.checked })}
+					data-testid="pull-repo"
+				/>
 				<span className="flex flex-col gap-0.5">
 					<span className="font-medium">{t("pull.form.repo")}</span>
 					<span className="text-muted-foreground text-xs">{t("pull.form.repoHelp")}</span>

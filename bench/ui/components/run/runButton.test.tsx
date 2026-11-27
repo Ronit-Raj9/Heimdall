@@ -25,7 +25,7 @@ describe("RunButton and QuickRunDialog", () => {
 	it("renders an enabled Run button", () => {
 		const html = render(<RunButton />);
 		expect(html).toContain('data-testid="run-button"');
-		expect(html).not.toContain("disabled=\"\"");
+		expect(html).not.toContain('disabled=""');
 		expect(html).toContain(">Run<");
 	});
 
@@ -37,7 +37,12 @@ describe("RunButton and QuickRunDialog", () => {
 		expect(full).toContain('data-testid="quickrun-agent"');
 		expect(full).toContain('data-testid="quickrun-model"');
 		const given = render(
-			<QuickRunDialog suite="coding-core" agent="agents/codex.yaml" model={{ provider: "openai", model: "gpt-5.4-mini" }} onClose={() => undefined} />,
+			<QuickRunDialog
+				suite="coding-core"
+				agent="agents/codex.yaml"
+				model={{ provider: "openai", model: "gpt-5.4-mini" }}
+				onClose={() => undefined}
+			/>,
 		);
 		expect(given).not.toContain('data-testid="quickrun-suite"');
 		expect(given).not.toContain('data-testid="quickrun-agent"');

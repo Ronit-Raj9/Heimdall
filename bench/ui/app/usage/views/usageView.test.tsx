@@ -119,7 +119,12 @@ describe("usage link parameters", () => {
 		expect(rangeFromSearch({}, now)).toEqual({ ...defaultRange(now), invalid: [] });
 	});
 	it("swaps a reversed range", () => {
-		expect(rangeFromSearch({ from: "2026-11-20", to: "2026-11-01" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-20", invalid: [], swapped: true });
+		expect(rangeFromSearch({ from: "2026-11-20", to: "2026-11-01" }, now)).toEqual({
+			from: "2026-11-01",
+			to: "2026-11-20",
+			invalid: [],
+			swapped: true,
+		});
 	});
 	it("falls back to the last 30 days and flags a date that is not real", () => {
 		expect(rangeFromSearch({ from: "2026-02-30" }, now)).toEqual({ ...defaultRange(now), invalid: ["2026-02-30"] });

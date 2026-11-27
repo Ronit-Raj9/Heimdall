@@ -52,7 +52,8 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 	const pages = Math.max(1, Math.ceil(total / AGENT_RUNS_PAGE));
 
 	if (query.isLoading) return <BlockSkeleton rows={6} testId="agent-runs-loading" />;
-	if (query.isError) return <LoadError title={t("runs.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="agent-runs-error" />;
+	if (query.isError)
+		return <LoadError title={t("runs.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="agent-runs-error" />;
 	const failedBox = (
 		<label className="ml-auto inline-flex items-center gap-2 text-sm">
 			<input
@@ -146,7 +147,13 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 						{t("runs.prev")}
 					</Button>
 					<span className="text-muted-foreground tabular-nums">{t("runs.page", { page: page + 1, pages })}</span>
-					<Button size="sm" variant="outline" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)} data-testid="agent-runs-next">
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={page + 1 >= pages}
+						onClick={() => setPage((p) => p + 1)}
+						data-testid="agent-runs-next"
+					>
 						{t("runs.next")}
 					</Button>
 				</div>

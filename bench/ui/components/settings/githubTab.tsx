@@ -176,7 +176,11 @@ function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (
 					{list.map((r) => {
 						const isPicked = picked?.full_name === r.full_name;
 						return (
-							<li key={r.full_name} className="flex items-center justify-between gap-3 px-3 py-2" data-testid={`github-repo-${r.full_name}`}>
+							<li
+								key={r.full_name}
+								className="flex items-center justify-between gap-3 px-3 py-2"
+								data-testid={`github-repo-${r.full_name}`}
+							>
 								<div className="flex min-w-0 flex-col">
 									<span className="text-foreground flex items-center gap-1.5 truncate text-sm font-medium">
 										{r.full_name}
@@ -205,10 +209,24 @@ function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (
 			)}
 			{(page > 1 || repos.data?.more) && (
 				<div className="flex gap-2">
-					<Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)} dataTestId="github-repos-prev">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						disabled={page <= 1}
+						onClick={() => setPage(page - 1)}
+						dataTestId="github-repos-prev"
+					>
 						{t("repos.prev")}
 					</Button>
-					<Button type="button" size="sm" variant="outline" disabled={!repos.data?.more} onClick={() => setPage(page + 1)} dataTestId="github-repos-next">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						disabled={!repos.data?.more}
+						onClick={() => setPage(page + 1)}
+						dataTestId="github-repos-next"
+					>
 						{t("repos.more")}
 					</Button>
 				</div>
@@ -236,7 +254,9 @@ function CIInstallSection({ repo }: { repo: GithubRepo | null }) {
 	const branches = (refs.data?.refs ?? []).filter((r) => r.kind === "branch");
 	const result = installState.data;
 	const canSubmit = !!repo && !!base && (mode === "recorded" || validBaseAgent(baseAgent));
-	const why = repo ? firstReason(!base && tm("github.whyBase"), mode === "live" && !validBaseAgent(baseAgent) && tm("github.whyFile")) : null;
+	const why = repo
+		? firstReason(!base && tm("github.whyBase"), mode === "live" && !validBaseAgent(baseAgent) && tm("github.whyFile"))
+		: null;
 
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();

@@ -54,7 +54,10 @@ vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: 
 vi.mock("@/lib/store/apis/routingApi", () => ({ useGetExperimentRoutingQuery: () => ({}) }));
 vi.mock("./liveProgress", () => ({ LiveProgress: () => null, default: () => null }));
 // The flip banner of the validity ledger (group G) reads its own query at the top of the page.
-vi.mock("@/lib/store/apis/validityApi", () => ({ useGetExperimentValidityQuery: () => ({}), useMarkValiditySeenMutation: () => [() => undefined, {}] }));
+vi.mock("@/lib/store/apis/validityApi", () => ({
+	useGetExperimentValidityQuery: () => ({}),
+	useMarkValiditySeenMutation: () => [() => undefined, {}],
+}));
 vi.mock("@/components/shell/routeTabs", () => ({
 	RouteTabs: ({ children }: { children: (active: string) => unknown }) => children("runs"),
 }));

@@ -90,8 +90,12 @@ export default function MaximFailuresView() {
 									data-testid={`maxim-import-${b.id}`}
 								>
 									<span className="block font-medium">{new Date(b.created).toLocaleString()}</span>
-									<span className="text-muted-foreground block">{t("imports.row", { failed: b.counts.failed, clusters: b.clusters, tasks: b.tasks })}</span>
-									{b.pending > 0 && <span className="block text-amber-700 dark:text-amber-400">{t("imports.pending", { count: b.pending })}</span>}
+									<span className="text-muted-foreground block">
+										{t("imports.row", { failed: b.counts.failed, clusters: b.clusters, tasks: b.tasks })}
+									</span>
+									{b.pending > 0 && (
+										<span className="block text-amber-700 dark:text-amber-400">{t("imports.pending", { count: b.pending })}</span>
+									)}
 								</button>
 							</li>
 						))}
@@ -132,7 +136,12 @@ function PullForm({ onPulled }: { onPulled(id: string): void }) {
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="font-medium">{t("filter.scoreBelow")}</span>
-						<Input inputMode="decimal" value={form.scoreBelow} onChange={(e) => set({ scoreBelow: e.target.value })} data-testid="maxim-filter-score" />
+						<Input
+							inputMode="decimal"
+							value={form.scoreBelow}
+							onChange={(e) => set({ scoreBelow: e.target.value })}
+							data-testid="maxim-filter-score"
+						/>
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="font-medium">{t("filter.scoreEvaluators")}</span>
@@ -175,7 +184,8 @@ function BatchPanel({ id }: { id: string }) {
 		skipPollingIfUnfocused: true,
 	});
 	if (q.isLoading) return <BlockSkeleton testId="maxim-batch-loading" rows={4} />;
-	if (q.isError || !q.data) return <LoadError title={t("clusters.title")} error={q.error} onRetry={() => void q.refetch()} testId="maxim-batch-error" />;
+	if (q.isError || !q.data)
+		return <LoadError title={t("clusters.title")} error={q.error} onRetry={() => void q.refetch()} testId="maxim-batch-error" />;
 	return <BatchBody batch={q.data} />;
 }
 

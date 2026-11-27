@@ -139,8 +139,8 @@ function Timeline({ a }: { a: VoiceAnalysis }) {
 		<div className="flex flex-col gap-1" data-testid="voice-timeline">
 			{(["caller", "agent"] as const).map((who) => (
 				<div key={who} className="flex items-center gap-2">
-					<span className="w-14 shrink-0 text-muted-foreground">{t(`voice.who.${who}`)}</span>
-					<div className="relative h-4 flex-1 rounded bg-muted">
+					<span className="text-muted-foreground w-14 shrink-0">{t(`voice.who.${who}`)}</span>
+					<div className="bg-muted relative h-4 flex-1 rounded">
 						{bars
 							.filter((b) => b.who === who)
 							.map((b) => (
@@ -165,7 +165,7 @@ function Turns({ a }: { a: VoiceAnalysis }) {
 	return (
 		<table className="w-full table-fixed" data-testid="voice-turns">
 			<thead>
-				<tr className="text-left text-muted-foreground">
+				<tr className="text-muted-foreground text-left">
 					<th className="w-28 font-normal">{t("voice.turn")}</th>
 					<th className="font-normal">{t("voice.latency")}</th>
 					<th className="w-20 font-normal">{t("voice.gap")}</th>
@@ -176,7 +176,7 @@ function Turns({ a }: { a: VoiceAnalysis }) {
 					<tr key={`${x.kind}-${x.floor_ms}`} data-testid="voice-turn-row">
 						<td>{t(`voice.kind.${x.kind}`, { defaultValue: x.kind, turn: x.caller_turn ?? 0 })}</td>
 						<td>
-							<div className="h-2 rounded bg-muted">
+							<div className="bg-muted h-2 rounded">
 								<div
 									className={`h-2 rounded ${x.dead_air ? "bg-red-500" : "bg-emerald-500"}`}
 									style={{ width: pct(x.gap_ms, longest) }}
@@ -213,7 +213,7 @@ function Transcript({ a }: { a: VoiceAnalysis }) {
 		<ol className="flex flex-col gap-1" data-testid="voice-transcript">
 			{rows.map((r) => (
 				<li key={`${r.who}-${r.start}`} className="flex gap-2">
-					<span className="w-16 shrink-0 text-muted-foreground">{formatMs(r.start)}</span>
+					<span className="text-muted-foreground w-16 shrink-0">{formatMs(r.start)}</span>
 					<span className="w-14 shrink-0 font-medium">{t(`voice.who.${r.who}`)}</span>
 					<span className={r.tone === "bad" ? "text-muted-foreground italic" : ""}>{r.label || t("voice.inaudible")}</span>
 				</li>

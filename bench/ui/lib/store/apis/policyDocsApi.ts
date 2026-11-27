@@ -1,5 +1,13 @@
 import { withOrgParam } from "./orgParam";
-import type { PolicyClause, PolicyDocList, PolicyDocUpload, PolicyDocView, PolicyReport, PolicyReviewRequest, PolicyReviewResult } from "@/lib/types/policyDocs";
+import type {
+	PolicyClause,
+	PolicyDocList,
+	PolicyDocUpload,
+	PolicyDocView,
+	PolicyReport,
+	PolicyReviewRequest,
+	PolicyReviewResult,
+} from "@/lib/types/policyDocs";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 
@@ -31,7 +39,11 @@ export const policyDocsApi = benchApi.injectEndpoints({
 			invalidatesTags: (r, _e, { suite }) => (r ? [...docTags(suite), { type: "BenchSuites" as const, id: "LIST" }] : []),
 		}),
 		setPolicyClauses: builder.mutation<PolicyDocView, { suite: string; doc: string; clauses: PolicyClause[] }>({
-			query: ({ suite, doc, clauses }) => ({ url: `/suites/${seg(suite)}/policy-docs/${seg(doc)}/clauses`, method: "PUT", body: { clauses } }),
+			query: ({ suite, doc, clauses }) => ({
+				url: `/suites/${seg(suite)}/policy-docs/${seg(doc)}/clauses`,
+				method: "PUT",
+				body: { clauses },
+			}),
 			invalidatesTags: (r, _e, { suite }) => (r ? docTags(suite) : []),
 		}),
 		deletePolicyDoc: builder.mutation<void, { suite: string; doc: string }>({

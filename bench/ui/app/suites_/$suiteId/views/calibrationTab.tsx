@@ -50,19 +50,19 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 					{isBuiltinSuite(suite) ? (
 						<BuiltinReadOnlyNote testId="calibration-builtin" />
 					) : (
-					<LabelForm
-						key={`${suite.id}-${formKey}`}
-						tasks={suite.tasks.map((task) => task.id)}
-						mode={status.data.mode}
-						submitting={added.isLoading}
-						submitError={submitError}
-						onSubmit={(body) =>
-							void addLabel({ suiteId: suite.id, body })
-								.unwrap()
-								.then(() => setFormKey((k) => k + 1))
-								.catch(() => {})
-						}
-					/>
+						<LabelForm
+							key={`${suite.id}-${formKey}`}
+							tasks={suite.tasks.map((task) => task.id)}
+							mode={status.data.mode}
+							submitting={added.isLoading}
+							submitError={submitError}
+							onSubmit={(body) =>
+								void addLabel({ suiteId: suite.id, body })
+									.unwrap()
+									.then(() => setFormKey((k) => k + 1))
+									.catch(() => {})
+							}
+						/>
 					)}
 				</div>
 			)}
@@ -77,20 +77,20 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 			)}
 			{/* The labels list is part of a loaded status; with the status in error the page shows only that error (p11-7e). */}
 			{status.data && (
-			<Section title={t("calibration.labelsTitle")} testId="calibration-labels-section">
-				{labels.data ? (
-					<LabelsTable items={labels.data.items} />
-				) : labels.isError ? (
-					<LoadError
-						title={t("calibration.loadError")}
-						error={labels.error}
-						onRetry={() => void labels.refetch()}
-						testId="calibration-labels-error"
-					/>
-				) : (
-					<BlockSkeleton rows={3} testId="calibration-labels-loading" />
-				)}
-			</Section>
+				<Section title={t("calibration.labelsTitle")} testId="calibration-labels-section">
+					{labels.data ? (
+						<LabelsTable items={labels.data.items} />
+					) : labels.isError ? (
+						<LoadError
+							title={t("calibration.loadError")}
+							error={labels.error}
+							onRetry={() => void labels.refetch()}
+							testId="calibration-labels-error"
+						/>
+					) : (
+						<BlockSkeleton rows={3} testId="calibration-labels-loading" />
+					)}
+				</Section>
 			)}
 		</div>
 	);

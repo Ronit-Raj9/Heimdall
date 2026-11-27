@@ -112,7 +112,10 @@ export function GuideFields({ kind, session, golden, values, errors, disabled, o
 							{session?.final_answer && (
 								<div className="flex flex-col gap-1">
 									<p className="text-muted-foreground text-xs">{t("answers.recorded")}</p>
-									<pre className="bg-muted max-h-32 overflow-auto rounded-sm px-2 py-1 text-xs whitespace-pre-wrap" data-testid="inbox-guide-recorded">
+									<pre
+										className="bg-muted max-h-32 overflow-auto rounded-sm px-2 py-1 text-xs whitespace-pre-wrap"
+										data-testid="inbox-guide-recorded"
+									>
 										{session.final_answer}
 									</pre>
 									<Check
@@ -168,7 +171,11 @@ function CallsEditor({
 								) : (
 									<code className="font-mono text-xs break-all">{call.tool}</code>
 								)}
-								<div role="radiogroup" aria-label={t("calls.verdict", { tool: call.tool || t("calls.toolPlaceholder") })} className="ml-auto flex gap-1">
+								<div
+									role="radiogroup"
+									aria-label={t("calls.verdict", { tool: call.tool || t("calls.toolPlaceholder") })}
+									className="ml-auto flex gap-1"
+								>
 									{VERDICTS.map((v) => (
 										<Button
 											key={v}
@@ -226,7 +233,12 @@ function CallsEditor({
 				</Button>
 			</div>
 			{values.calls.filter((c) => c.verdict === "right").length > 1 && (
-				<Check checked={values.ordered} onChange={(v) => onChange({ ordered: v })} label={t("calls.ordered")} testId="inbox-guide-ordered" />
+				<Check
+					checked={values.ordered}
+					onChange={(v) => onChange({ ordered: v })}
+					label={t("calls.ordered")}
+					testId="inbox-guide-ordered"
+				/>
 			)}
 			<Field label={t("rubric.label")} htmlFor={`${ids}-rubric`} hint={t("rubric.hint")}>
 				<textarea
@@ -248,12 +260,31 @@ function CallsEditor({
 	);
 }
 
-function Check({ checked, onChange, label, hint, testId }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string; testId: string }) {
+function Check({
+	checked,
+	onChange,
+	label,
+	hint,
+	testId,
+}: {
+	checked: boolean;
+	onChange: (v: boolean) => void;
+	label: string;
+	hint?: string;
+	testId: string;
+}) {
 	const id = useId();
 	return (
 		<div className="flex flex-col gap-0.5">
 			<label htmlFor={id} className="flex items-start gap-2 text-sm">
-				<input id={id} type="checkbox" className="mt-1" checked={checked} onChange={(e) => onChange(e.target.checked)} data-testid={testId} />
+				<input
+					id={id}
+					type="checkbox"
+					className="mt-1"
+					checked={checked}
+					onChange={(e) => onChange(e.target.checked)}
+					data-testid={testId}
+				/>
 				<span>{label}</span>
 			</label>
 			{hint && <p className="text-muted-foreground pl-6 text-xs">{hint}</p>}

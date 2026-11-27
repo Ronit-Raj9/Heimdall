@@ -42,8 +42,28 @@ const fx = vi.hoisted(() => {
 		est_minutes: { low: 4, high: 9 },
 		per_benchmark: [{ benchmark: "coding-core", runs: 20, est_cost_usd: { low: 1.25, high: 2.5, known: true } }],
 	};
-	const ok = (data: unknown) => ({ data, currentData: data, error: undefined, isLoading: false, isFetching: false, isError: false, isSuccess: true, isUninitialized: false, refetch: () => undefined });
-	const loading = () => ({ data: undefined, currentData: undefined, error: undefined, isLoading: true, isFetching: true, isError: false, isSuccess: false, isUninitialized: false, refetch: () => undefined });
+	const ok = (data: unknown) => ({
+		data,
+		currentData: data,
+		error: undefined,
+		isLoading: false,
+		isFetching: false,
+		isError: false,
+		isSuccess: true,
+		isUninitialized: false,
+		refetch: () => undefined,
+	});
+	const loading = () => ({
+		data: undefined,
+		currentData: undefined,
+		error: undefined,
+		isLoading: true,
+		isFetching: true,
+		isError: false,
+		isSuccess: false,
+		isUninitialized: false,
+		refetch: () => undefined,
+	});
 	const data = {
 		compatibility: {
 			agent: "oracle",
@@ -71,8 +91,24 @@ const fx = vi.hoisted(() => {
 		evaluations: { evaluations: [evaluation] },
 		models: {
 			providers: [
-				{ id: "anthropic", name: "Anthropic", needs_base_url: false, key_hint: "", bifrost_provider: "anthropic", custom_base_url: false, models: [{ id: "claude-sonnet-4-5", purposes: ["agent"], rank: 1 }] },
-				{ id: "openrouter", name: "OpenRouter", needs_base_url: false, key_hint: "", bifrost_provider: "openrouter", custom_base_url: false, models: [{ id: "deepseek/deepseek-chat", purposes: ["agent"], rank: 1, open_weights: true, family: "deepseek" }] },
+				{
+					id: "anthropic",
+					name: "Anthropic",
+					needs_base_url: false,
+					key_hint: "",
+					bifrost_provider: "anthropic",
+					custom_base_url: false,
+					models: [{ id: "claude-sonnet-4-5", purposes: ["agent"], rank: 1 }],
+				},
+				{
+					id: "openrouter",
+					name: "OpenRouter",
+					needs_base_url: false,
+					key_hint: "",
+					bifrost_provider: "openrouter",
+					custom_base_url: false,
+					models: [{ id: "deepseek/deepseek-chat", purposes: ["agent"], rank: 1, open_weights: true, family: "deepseek" }],
+				},
 			],
 			keys: [],
 			keys_ready: true,
@@ -80,9 +116,24 @@ const fx = vi.hoisted(() => {
 		agents: {
 			agents: [
 				{
-					id: "oracle", path: "agents/oracle.yaml", adapter: "scripted", image: "bench/coding-core-base:1", dockerfile: "", base_arg: "", per_suite_build: false,
-					parser: "", evidence_level: "gateway", model: "claude-sonnet-4-5", scripted_kind: "oracle", notes_project_file: "CLAUDE.md", notes_user_file: "",
-					budgets: { wall_s: 900, cpus: 1, mem_gb: 1 }, gateway: { provider: "anthropic", max_retries: 0 }, env_names: [], file_paths: [], sealed_runs: 0,
+					id: "oracle",
+					path: "agents/oracle.yaml",
+					adapter: "scripted",
+					image: "bench/coding-core-base:1",
+					dockerfile: "",
+					base_arg: "",
+					per_suite_build: false,
+					parser: "",
+					evidence_level: "gateway",
+					model: "claude-sonnet-4-5",
+					scripted_kind: "oracle",
+					notes_project_file: "CLAUDE.md",
+					notes_user_file: "",
+					budgets: { wall_s: 900, cpus: 1, mem_gb: 1 },
+					gateway: { provider: "anthropic", max_retries: 0 },
+					env_names: [],
+					file_paths: [],
+					sealed_runs: 0,
 					capabilities: ["shell", "tools"],
 				},
 			],
@@ -109,7 +160,10 @@ const fx = vi.hoisted(() => {
 			return () => {
 				const value = pick(name);
 				const trigger = () => ({ unwrap: () => Promise.resolve(value) });
-				return [trigger, { isLoading: false, error: undefined, data: name.toLowerCase().includes("estimate") ? value : undefined, reset: () => undefined }];
+				return [
+					trigger,
+					{ isLoading: false, error: undefined, data: name.toLowerCase().includes("estimate") ? value : undefined, reset: () => undefined },
+				];
 			};
 		}
 		const result = () => {

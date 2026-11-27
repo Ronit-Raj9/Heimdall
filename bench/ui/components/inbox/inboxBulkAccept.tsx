@@ -43,7 +43,15 @@ export function bulkRequestFrom(v: BulkAcceptValues): InboxBulkAcceptRequest {
  * Several open items into one benchmark with one shared setting: "the recorded sessions were
  * right" for goldens, or one reply rubric. Items the server could not accept are listed with why.
  */
-export function InboxBulkAccept({ items, suites, disabled }: { items: readonly InboxItem[]; suites: readonly InboxSuite[]; disabled?: boolean }) {
+export function InboxBulkAccept({
+	items,
+	suites,
+	disabled,
+}: {
+	items: readonly InboxItem[];
+	suites: readonly InboxSuite[];
+	disabled?: boolean;
+}) {
 	const { t } = useTranslation("inboxGuide");
 	const { t: w } = useTranslation("w4m7");
 	const ids = useId();
@@ -149,7 +157,14 @@ export function InboxBulkAccept({ items, suites, disabled }: { items: readonly I
 				)}
 			</div>
 			<label className="flex items-start gap-2 text-sm">
-				<input type="checkbox" className="mt-1" checked={values.recorded} disabled={off} onChange={(e) => set({ recorded: e.target.checked })} data-testid="inbox-bulk-recorded" />
+				<input
+					type="checkbox"
+					className="mt-1"
+					checked={values.recorded}
+					disabled={off}
+					onChange={(e) => set({ recorded: e.target.checked })}
+					data-testid="inbox-bulk-recorded"
+				/>
 				<span>{t("bulk.recorded")}</span>
 			</label>
 			<div className="flex flex-col gap-1">

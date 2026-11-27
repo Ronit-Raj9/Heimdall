@@ -213,12 +213,24 @@ export function metricLabel(metric: string, tu: TFunction<"u14">): string {
 export function checkSentence(c: PolicyCheck, tu: TFunction<"u14">): string {
 	const kind = checkKind(c);
 	const action = String(tu(`policies.sentenceAction.${c.severity === "warn" ? "warn" : "block"}` as never));
-	return String(tu(`policies.sentence.${kind}` as never, { action, metric: metricLabel(c.metric, tu), value: thresholdOf(c) ?? 0 } as never));
+	return String(
+		tu(`policies.sentence.${kind}` as never, { action, metric: metricLabel(c.metric, tu), value: thresholdOf(c) ?? 0 } as never),
+	);
 }
 
 const chipSelect = "border-input bg-background h-8 rounded-md border px-2 text-xs";
 
-function CheckRow({ index, check, onChange, onRemove }: { index: number; check: PolicyCheck; onChange(c: PolicyCheck): void; onRemove(): void }) {
+function CheckRow({
+	index,
+	check,
+	onChange,
+	onRemove,
+}: {
+	index: number;
+	check: PolicyCheck;
+	onChange(c: PolicyCheck): void;
+	onRemove(): void;
+}) {
 	const { t } = useTranslation("govern");
 	const { t: tu } = useTranslation("u14");
 	const [advanced, setAdvanced] = useState(false);
@@ -284,7 +296,9 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 							{t(`policies.${o.key}` as never)}
 						</option>
 					))}
-					{!isListedCondition(check.condition) && <option value={check.condition}>{t("policies.conditionCustom", { id: check.condition })}</option>}
+					{!isListedCondition(check.condition) && (
+						<option value={check.condition}>{t("policies.conditionCustom", { id: check.condition })}</option>
+					)}
 				</select>
 				<span className="text-muted-foreground">{tu("policies.then")}</span>
 				<select

@@ -13,7 +13,22 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { PROJECT_AREAS, type ProjectArea, type ProjectEntry } from "@/lib/types/projectfiles";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { Bot, ChevronRight, CornerLeftUp, Download, FilePlus, FileText, FlaskConical, Folder, FolderOpen, Lock, ShieldCheck, Upload, ListChecks, type LucideIcon } from "lucide-react";
+import {
+	Bot,
+	ChevronRight,
+	CornerLeftUp,
+	Download,
+	FilePlus,
+	FileText,
+	FlaskConical,
+	Folder,
+	FolderOpen,
+	Lock,
+	ShieldCheck,
+	Upload,
+	ListChecks,
+	type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -72,7 +87,10 @@ export default function FilesView() {
 		if (d) s.dir = d;
 		if (next.path) s.path = next.path;
 		// Stays on the page it is shown in (/settings?tab=files), keeping that page's tab.
-		void navigate({ to: ".", search: ((prev: Record<string, unknown>) => (typeof prev.tab === "string" ? { tab: prev.tab, ...s } : s)) as never });
+		void navigate({
+			to: ".",
+			search: ((prev: Record<string, unknown>) => (typeof prev.tab === "string" ? { tab: prev.tab, ...s } : s)) as never,
+		});
 	};
 
 	const openEntry = (e: ProjectEntry) => (e.dir ? go({ dir: e.path }) : go({ path: e.path }));
@@ -150,7 +168,10 @@ export default function FilesView() {
 								<ChevronRight className="text-muted-foreground size-3 shrink-0" aria-hidden="true" />
 								<button
 									type="button"
-									className={cn("truncate font-mono transition-colors", i === crumbs.length - 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+									className={cn(
+										"truncate font-mono transition-colors",
+										i === crumbs.length - 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+									)}
 									onClick={() => go({ dir: crumbs.slice(0, i + 1).join("/"), path: undefined })}
 									title={crumbs.slice(0, i + 1).join("/")}
 								>
@@ -158,7 +179,11 @@ export default function FilesView() {
 								</button>
 							</span>
 						))}
-						{dir && <span className="sr-only" data-testid="files-dir">/ {dir}</span>}
+						{dir && (
+							<span className="sr-only" data-testid="files-dir">
+								/ {dir}
+							</span>
+						)}
 					</nav>
 					<div className="flex min-h-0 flex-1 flex-col p-1.5">
 						{dir && (
@@ -186,7 +211,14 @@ export default function FilesView() {
 								))}
 							</div>
 						) : entries.length === 0 ? (
-							<EmptyState compact icon={FolderOpen} className="m-1.5 border-0" message={canWrite ? t("empty") : t("emptyViewer")} action={canWrite ? { label: t("emptyUpload"), to: "/upload" } : { label: t("emptyCatalog"), to: "/catalog" }} testId="files-empty" />
+							<EmptyState
+								compact
+								icon={FolderOpen}
+								className="m-1.5 border-0"
+								message={canWrite ? t("empty") : t("emptyViewer")}
+								action={canWrite ? { label: t("emptyUpload"), to: "/upload" } : { label: t("emptyCatalog"), to: "/catalog" }}
+								testId="files-empty"
+							/>
 						) : (
 							<ul className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto" data-testid="files-table">
 								{entries.map((e) => {
@@ -211,7 +243,10 @@ export default function FilesView() {
 												)}
 												<span className="min-w-0 flex-1 truncate">{baseName(e.path)}</span>
 												{e.dir ? (
-													<ChevronRight className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+													<ChevronRight
+														className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+														aria-hidden="true"
+													/>
 												) : (
 													<span className="text-muted-foreground shrink-0 text-xs tabular-nums">{formatSize(e.size)}</span>
 												)}

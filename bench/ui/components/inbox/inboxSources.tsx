@@ -13,7 +13,15 @@ import { SessionImport } from "./sessionImport";
  * Each trace source and how its last pull went: when, from where on, how many traces, the last error. With manage
  * (live mode), each row has Remove: the inbox.source job with remove, asked first (wave 4, p13-2).
  */
-export function InboxSourcesTable({ sources, manage, onChanged }: { sources: readonly InboxSourceStatus[]; manage?: boolean; onChanged?: () => void }) {
+export function InboxSourcesTable({
+	sources,
+	manage,
+	onChanged,
+}: {
+	sources: readonly InboxSourceStatus[];
+	manage?: boolean;
+	onChanged?: () => void;
+}) {
 	const { t } = useTranslation("bench");
 	const { t: w } = useTranslation("w4m7");
 	if (sources.length === 0) return <EmptyNote testId="inbox-sources-none">{w("sources.none")}</EmptyNote>;

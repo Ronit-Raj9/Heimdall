@@ -2,7 +2,12 @@ import { LoadError } from "@/components/runs/screenStates";
 import "@/components/settings/w4m8I18n";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiErrorMessage, useGetEmailSettingsQuery, usePutEmailSettingsMutation, useTestEmailMutation } from "@/lib/store/apis/integrationsApi";
+import {
+	apiErrorMessage,
+	useGetEmailSettingsQuery,
+	usePutEmailSettingsMutation,
+	useTestEmailMutation,
+} from "@/lib/store/apis/integrationsApi";
 import type { EmailEventType, EmailSettings } from "@/lib/types/integrations";
 import { Mail } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -51,13 +56,19 @@ export function EmailPanel() {
 			onSave={async () => {
 				setNote(null);
 				const res = await save({ events, digest });
-				setNote("error" in res ? { ok: false, text: apiErrorMessage(res.error, t("errors.generic")) } : { ok: true, text: t("email.saved") });
+				setNote(
+					"error" in res ? { ok: false, text: apiErrorMessage(res.error, t("errors.generic")) } : { ok: true, text: t("email.saved") },
+				);
 			}}
 			onTest={async () => {
 				setNote(null);
 				const res = await sendTest();
 				if ("error" in res) setNote({ ok: false, text: apiErrorMessage(res.error, t("errors.generic")) });
-				else if (res.data) setNote({ ok: true, text: res.data.delivers ? t("email.testSent", { to: res.data.to }) : t("email.testLogged", { to: res.data.to }) });
+				else if (res.data)
+					setNote({
+						ok: true,
+						text: res.data.delivers ? t("email.testSent", { to: res.data.to }) : t("email.testLogged", { to: res.data.to }),
+					});
 			}}
 		/>
 	);
@@ -133,7 +144,11 @@ export function EmailForm({ settings, events, digest, dirty, saving, testing, no
 							{t("email.test")}
 						</Button>
 						{note && (
-							<span className={note.ok ? "text-chart-success-ink text-xs" : "text-chart-error-ink text-xs"} role={note.ok ? "status" : "alert"} data-testid="email-note">
+							<span
+								className={note.ok ? "text-chart-success-ink text-xs" : "text-chart-error-ink text-xs"}
+								role={note.ok ? "status" : "alert"}
+								data-testid="email-note"
+							>
 								{note.text}
 							</span>
 						)}

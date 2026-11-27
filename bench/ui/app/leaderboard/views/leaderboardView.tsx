@@ -65,9 +65,22 @@ export default function LeaderboardView() {
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
 			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} actions={<LeaderboardShare />} />
-			<RouteTabs tabs={tabs} defaultTab={suiteParam ? "leaderboard" : "agents"} label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
+			<RouteTabs
+				tabs={tabs}
+				defaultTab={suiteParam ? "leaderboard" : "agents"}
+				label={t("leaderboard.tabs.label")}
+				testId="leaderboard-tabs"
+			>
 				{(active) =>
-					active === "trends" ? <TrendsTab /> : active === "leaderboard" ? <LeaderboardTab /> : active === "reference" ? <ReferenceTab /> : <AgentBoardTab />
+					active === "trends" ? (
+						<TrendsTab />
+					) : active === "leaderboard" ? (
+						<LeaderboardTab />
+					) : active === "reference" ? (
+						<ReferenceTab />
+					) : (
+						<AgentBoardTab />
+					)
 				}
 			</RouteTabs>
 		</section>
@@ -91,7 +104,9 @@ function LeaderboardShare() {
 	const active = tab ?? (suite ? "leaderboard" : "agents");
 	if (active === "trends" || active === "reference" || split) return null;
 	if (active === "agents") return <ShareButton kind="leaderboard" target="agents" query={shareQuery({ capability, model })} />;
-	return <ShareButton kind="leaderboard" target="models" query={shareQuery({ suite, condition, scope, synthetic, grade_source: gradeSource })} />;
+	return (
+		<ShareButton kind="leaderboard" target="models" query={shareQuery({ suite, condition, scope, synthetic, grade_source: gradeSource })} />
+	);
 }
 
 /**

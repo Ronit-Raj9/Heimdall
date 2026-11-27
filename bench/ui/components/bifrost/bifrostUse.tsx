@@ -83,7 +83,8 @@ export function BifrostUsePanel() {
 	const { t: tg } = useTranslation("w4p6");
 	const q = useGetBifrostUseQuery();
 	if (q.isLoading) return <BlockSkeleton rows={4} testId="bifrost-use-loading" />;
-	if (q.error || !q.data) return <LoadError title={t("loadError")} error={q.error} onRetry={() => void q.refetch()} testId="bifrost-use-error" />;
+	if (q.error || !q.data)
+		return <LoadError title={t("loadError")} error={q.error} onRetry={() => void q.refetch()} testId="bifrost-use-error" />;
 	return (
 		<Section title={t("title")} description={t("orgDesc")} testId="bifrost-use-panel">
 			<div className="flex flex-col gap-4">
@@ -150,7 +151,12 @@ export function CacheABTable({ report }: { report: EvaluationCacheAB }) {
 						</thead>
 						<tbody>
 							{report.children.map((c) => (
-								<tr key={c.experiment_id} className="border-t" data-testid={`evaluation-bifrost-cache-${c.benchmark}`} title={c.report.summary}>
+								<tr
+									key={c.experiment_id}
+									className="border-t"
+									data-testid={`evaluation-bifrost-cache-${c.benchmark}`}
+									title={c.report.summary}
+								>
 									<td className="py-1 pr-3">{c.benchmark}</td>
 									<td className="py-1 pr-3">{c.report.tasks}</td>
 									<td className="py-1 pr-3">{pct(c.report.on.hit_rate)}</td>

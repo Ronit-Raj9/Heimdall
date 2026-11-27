@@ -92,11 +92,23 @@ function LintPanel({ suiteId }: { suiteId: string }) {
 		<div className="flex min-w-0 flex-col gap-3 rounded-md border p-3" data-testid="suite-edit-lint">
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="text-sm font-medium">{t("edit.lint")}</span>
-				<Button size="sm" variant="outline" onClick={() => void lint.refetch()} disabled={lint.isFetching} data-testid="suite-edit-lint-now">
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() => void lint.refetch()}
+					disabled={lint.isFetching}
+					data-testid="suite-edit-lint-now"
+				>
 					{t("edit.lintNow")}
 				</Button>
 				<JobRunButton kind="suite.lint" params={{ suite: suiteId }} label={t("edit.lintJob")} variant="outline" />
-				<JobRunButton kind="suite.lock" params={{ suite: suiteId }} label={t("edit.lock")} confirm={t("edit.lockConfirm")} variant="outline" />
+				<JobRunButton
+					kind="suite.lock"
+					params={{ suite: suiteId }}
+					label={t("edit.lock")}
+					confirm={t("edit.lockConfirm")}
+					variant="outline"
+				/>
 			</div>
 			{lint.error ? (
 				<p className="text-destructive text-sm">{authoringError(lint.error, t("edit.lintUnavailable"))}</p>
@@ -120,7 +132,8 @@ export function LintResult({ report }: { report: SuiteLintReport }) {
 		<div className="flex flex-col gap-1 text-sm" data-testid="suite-edit-lint-result">
 			{report.errors === 0 ? (
 				<p className="text-chart-success-ink" data-testid="suite-edit-lint-ok">
-					{t("edit.lintOk", { tasks: report.tasks })} {report.warnings > 0 && t("edit.lintSummary", { errors: 0, warnings: report.warnings })}
+					{t("edit.lintOk", { tasks: report.tasks })}{" "}
+					{report.warnings > 0 && t("edit.lintSummary", { errors: 0, warnings: report.warnings })}
 				</p>
 			) : (
 				<p className="text-destructive">{t("edit.lintSummary", { errors: report.errors, warnings: report.warnings })}</p>
@@ -206,7 +219,7 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 						<button
 							type="button"
 							onClick={() => onSelect(f.path)}
-							className={`w-full truncate rounded-sm px-1 py-0.5 text-left hover:bg-muted ${selected === f.path ? "bg-muted font-semibold" : ""}`}
+							className={`hover:bg-muted w-full truncate rounded-sm px-1 py-0.5 text-left ${selected === f.path ? "bg-muted font-semibold" : ""}`}
 							title={f.path}
 						>
 							{f.path}
@@ -225,7 +238,12 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 					}
 				}}
 			>
-				<Input value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder={t("edit.newFileHint")} aria-label={t("edit.newFile")} />
+				<Input
+					value={newPath}
+					onChange={(e) => setNewPath(e.target.value)}
+					placeholder={t("edit.newFileHint")}
+					aria-label={t("edit.newFile")}
+				/>
 				<Button
 					type="submit"
 					size="sm"
@@ -349,7 +367,13 @@ function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDi
 				</label>
 				<label className="flex flex-col gap-1">
 					{t("edit.uploadZip")}
-					<input type="file" accept=".zip,application/zip" disabled={busy || !target} onChange={(e) => void onZip(e.target.files?.[0])} data-testid="suite-edit-upload-zip" />
+					<input
+						type="file"
+						accept=".zip,application/zip"
+						disabled={busy || !target}
+						onChange={(e) => void onZip(e.target.files?.[0])}
+						data-testid="suite-edit-upload-zip"
+					/>
 				</label>
 			</div>
 			{busy && <p className="text-muted-foreground text-xs">{t("edit.uploading")}</p>}
