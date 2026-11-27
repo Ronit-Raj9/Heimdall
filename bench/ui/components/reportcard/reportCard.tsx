@@ -293,7 +293,7 @@ function ScoreCell({ metrics }: { metrics?: ReportArmMetrics }) {
 		<span className="flex items-center gap-2">
 			<span className="text-foreground w-10 font-medium tabular-nums">{pct(metrics.score)}</span>
 			<CiBar metrics={metrics} />
-			<span className="text-muted-foreground text-xs tabular-nums">
+			<span className="text-muted-foreground text-sm tabular-nums">
 				<span className="sr-only">95% range </span>
 				{pct(range.low)}-{pct(range.high)}
 			</span>

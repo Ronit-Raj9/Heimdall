@@ -134,17 +134,17 @@ export function ReportFailures({ report, agent }: { report: Report; agent?: stri
 				{groups.map((g) => (
 					<div key={g.key} className="flex min-w-0 flex-col gap-2">
 						{groups.length > 1 && (
-							<h4 className="text-sm font-semibold">
+							<h3 className="text-sm font-semibold">
 								{g.key}
 								<span className="text-muted-foreground ml-2 font-normal">{g.version ? `${g.agent} v${g.version}` : g.agent}</span>
-							</h4>
+							</h3>
 						)}
 						<PatternList group={g} testId={`report-failure-patterns-${g.key}`} />
 					</div>
 				))}
 				{top.length > 0 && (
 					<div className="flex min-w-0 flex-col gap-2">
-						<h4 className="text-sm font-semibold">{t("failures.topGroups")}</h4>
+						<h3 className="text-sm font-semibold">{t("failures.topGroups")}</h3>
 						<TopClusters clusters={top} />
 					</div>
 				)}
