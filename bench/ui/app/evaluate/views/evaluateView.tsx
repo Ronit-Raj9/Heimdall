@@ -186,10 +186,27 @@ export function planLink(
 		return { kind: "patch", patch };
 	}
 	const { draft: next, badMode } = draftFromLink(p, row);
-	const putAside = draft.agent || draft.benchmarks.length > 0 || draft.pack ? draft : null;
+	const putAside = realEarlierDraft(draft, next) ? draft : null;
 	const step: EvaluateStep | null =
 		stepRaw != null ? null : p.agent && p.suite && p.task ? 4 : p.agent && p.mode ? 2 : p.agent && p.suite ? 3 : null;
 	return { kind: "replace", draft: next, putAside, ...(badMode ? { badMode } : {}), step };
+}
+
+/**
+ * Whether a stored draft is a real earlier draft the link would replace (Q-305): it has an agent, benchmarks or a
+ * pack, and it is not the same picks the link makes (a refresh, or the draft an earlier visit of this link made).
+ */
+export function realEarlierDraft(
+	draft: Pick<EvaluateDraft, "agent" | "benchmarks" | "pack" | "mode">,
+	next: Pick<EvaluateDraft, "agent" | "benchmarks" | "pack" | "mode">,
+): boolean {
+	if (!draft.agent && draft.benchmarks.length === 0 && !draft.pack) return false;
+	const same =
+		draft.agent === next.agent &&
+		draft.mode === next.mode &&
+		!draft.pack &&
+		draft.benchmarks.every((b) => next.benchmarks.includes(b));
+	return !same;
 }
 
 /**

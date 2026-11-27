@@ -1,3 +1,5 @@
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { isBuiltinAgent, type AgentWithCaps as RaAgent } from "./evaluate.utils";
 import { READINESS_CHECKLIST_ID } from "@/components/suites/readinessChecklist";
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
@@ -181,6 +183,21 @@ export function ownNotReady<T extends Pick<SuiteSummary, "id" | "builtin" | "sou
 	return suites.filter((s) => !s.builtin && s.source !== "library" && (s.admitted_count ?? 0) === 0);
 }
 
+/** How many not-ready benchmarks step 3 shows before "Show N more" (Q-304). */
+export const NOT_READY_SHOWN = 3;
+
+/**
+ * The not-ready benchmarks to list (Q-304): the ones closest to ready first (most tasks to check), at most
+ * NOT_READY_SHOWN unless `all`, and the linked one always.
+ */
+export function notReadyShown<T extends { id: string; task_count?: number }>(list: readonly T[], linked: string | null | undefined, all: boolean): T[] {
+	const sorted = [...list].sort((a, b) => (b.task_count ?? 0) - (a.task_count ?? 0) || a.id.localeCompare(b.id));
+	if (all) return sorted;
+	const head = sorted.slice(0, NOT_READY_SHOWN);
+	const extra = linked ? sorted.find((s) => s.id === linked && !head.includes(s)) : undefined;
+	return extra ? [...head, extra] : head;
+}
+
 /** Whether a benchmark has at least one ready (admitted) task: only those are offered for an evaluation. */
 export function hasReadyTasks(s: Pick<SuiteRow, "admitted_count">): boolean {
 	return (s.admitted_count ?? 0) > 0;
@@ -277,6 +294,8 @@ function plural(n: number, word: string): string {
 }
 
 export interface Step3BenchmarksViewProps {
+	/** The picked agent when it is the person's own (not built-in): step 3 points it to the free Check agent while nothing is ready (Q-303). */
+	ownAgent?: string | null;
 	/** The suite a link named (?suite=): its not-ready row is marked, so the link is never dropped in silence (Q-266). */
 	linkedSuite?: string | null;
 	suites: readonly SuiteRow[];
@@ -310,7 +329,9 @@ export function Step3BenchmarksView({
 	ownTasks,
 	leftOut,
 	linkedSuite,
+	ownAgent,
 }: Step3BenchmarksViewProps) {
+	const [moreNotReady, setMoreNotReady] = useState(false);
 	const { t: tr } = useTranslation("reference");
 	const { t: te } = useTranslation("evaluate");
 	const { t: tc } = useTranslation("ufc2");
@@ -414,11 +435,21 @@ export function Step3BenchmarksView({
 				/>
 			</section>
 
+			{ownAgent && !loading && !suites.some(hasReadyTasks) && (
+				// Q-303: the free agent check, where a new user is blocked. It needs a benchmark to run on (freeCheck.tsx,
+				// freeCheckPlan "noBenchmark"), so with none ready it is the agent page's Check agent, never a practice evaluation.
+				<p role="status" className="bg-muted/40 rounded-lg border px-3 py-2 text-sm" data-testid="step3-free-check">
+					{te("benchmarks.freeCheckWhileWaiting")}{" "}
+					<Link to="/agents/$agentId" params={{ agentId: ownAgent }} className="text-primary underline underline-offset-2" data-testid="step3-free-check-link">
+						{te("benchmarks.freeCheckLink", { agent: ownAgent })}
+					</Link>
+				</p>
+			)}
 			{ownNotReady(suites).length > 0 && (
 				<section className="flex flex-col gap-2" data-testid="step3-own-not-ready">
 					<h2 className="text-sm font-medium">{tc("step3.ownTitle")}</h2>
 					<ul className="flex flex-col rounded-lg border">
-						{ownNotReady(suites).map((s) => (
+						{notReadyShown(ownNotReady(suites), linkedSuite, moreNotReady).map((s) => (
 							<li
 								key={s.id}
 								className={cn(
@@ -447,6 +478,16 @@ export function Step3BenchmarksView({
 							</li>
 						))}
 					</ul>
+					{!moreNotReady && ownNotReady(suites).length > notReadyShown(ownNotReady(suites), linkedSuite, false).length && (
+						<button
+							type="button"
+							className="text-primary w-fit text-sm hover:underline"
+							onClick={() => setMoreNotReady(true)}
+							data-testid="step3-own-not-ready-more"
+						>
+							{te("benchmarks.showMore", { count: ownNotReady(suites).length - notReadyShown(ownNotReady(suites), linkedSuite, false).length })}
+						</button>
+					)}
 				</section>
 			)}
 
@@ -502,6 +543,9 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({
 	linkedSuite,
 }: Step3BenchmarksProps<D> & { redTeam?: "first" | "last" | "hidden"; linkedSuite?: string | null }) {
 	const suites = useGetSuitesLightQuery();
+	const agentsQ = useGetAgentsQuery();
+	const agentRow = ((agentsQ.data?.agents ?? []) as RaAgent[]).find((a) => a.id === draft.agent);
+	const ownAgent = agentRow && !isBuiltinAgent(agentRow) ? agentRow.id : null;
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
 	const reference = useGetReferenceBoardQuery(); // a failure only hides the hints
@@ -568,6 +612,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({
 					reference={reference.data?.entries}
 					leftOut={<LeftOutNote items={leftOut} />}
 					linkedSuite={linkedSuite}
+					ownAgent={ownAgent}
 					ownTasks={
 						<OwnTasksCard
 							onAdd={(id) =>

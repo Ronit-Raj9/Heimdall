@@ -221,7 +221,11 @@
 		"rowReady_one": "{{count}} ready task",
 		"rowReady_other": "{{count}} ready tasks",
 		"rowNoReady": "No ready tasks",
-		"linkedNotOffered": "The link named {{id}}, which is not offered here: it has no ready task yet or this agent cannot run it."
+		"linkedNotOffered": "The link named {{id}}, which is not offered here: it has no ready task yet or this agent cannot run it.",
+		"freeCheckWhileWaiting": "While a benchmark gets ready you can check that your agent runs, for free.",
+		"freeCheckLink": "Check {{agent}} on its page",
+		"showMore_one": "Show {{count}} more",
+		"showMore_other": "Show {{count}} more"
 	},
 	"skill": {
 		"terminal": "Terminal",

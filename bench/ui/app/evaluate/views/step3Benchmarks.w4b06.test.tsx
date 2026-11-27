@@ -15,6 +15,7 @@ vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<Record<string, unknown>>()),
+	useGetAgentsQuery: () => okQuery({ agents: [] }),
 	useGetSuitesQuery: () => {
 		calls.full++;
 		return okQuery({ suites: [] });

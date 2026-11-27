@@ -129,3 +129,22 @@ describe("Q-72 and Q-256", () => {
 		expect(armText(spec.arms[0])).toBe("codex latest version on gpt-6-luna");
 	});
 });
+
+describe("Q-304 and Q-305", () => {
+	it("lists the 3 closest to ready, plus the linked one", async () => {
+		const { notReadyShown } = await import("./step3Benchmarks");
+		const list = [{ id: "a", task_count: 0 }, { id: "b", task_count: 5 }, { id: "c", task_count: 2 }, { id: "d", task_count: 9 }, { id: "e" }];
+		expect(notReadyShown(list, null, false).map((s) => s.id)).toEqual(["d", "b", "c"]);
+		expect(notReadyShown(list, "e", false).map((s) => s.id)).toEqual(["d", "b", "c", "e"]);
+		expect(notReadyShown(list, null, true)).toHaveLength(5);
+	});
+	it("puts a draft aside only when a real, different one exists", async () => {
+		const { realEarlierDraft } = await import("./evaluateView");
+		const next = { agent: "codex", mode: "score" as const, benchmarks: ["cl-bench"], pack: null };
+		expect(realEarlierDraft({ agent: null, mode: "score", benchmarks: [], pack: null }, next)).toBe(false);
+		expect(realEarlierDraft({ ...next }, next)).toBe(false);
+		expect(realEarlierDraft({ agent: "codex", mode: "score", benchmarks: [], pack: null }, next)).toBe(false);
+		expect(realEarlierDraft({ agent: "other", mode: "score", benchmarks: ["x"], pack: null }, next)).toBe(true);
+		expect(realEarlierDraft({ agent: "codex", mode: "score", benchmarks: ["x"], pack: null }, next)).toBe(true);
+	});
+});
