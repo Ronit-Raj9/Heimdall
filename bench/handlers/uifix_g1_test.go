@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/maximhq/bifrost/bench/evalstore"
+	"github.com/maximhq/bifrost/bench/sharelinks"
+	"github.com/valyala/fasthttp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -107,5 +110,34 @@ func TestReleasePreviewProblemCode(t *testing.T) {
 	}
 	if p := preview(); p.ProblemCode != ReleaseProblemNotFinished {
 		t.Fatalf("running code %q", p.ProblemCode)
+	}
+}
+
+func TestShareViewNamesCreator(t *testing.T) {
+	installMembers(t, map[string]string{"usr_1": "Ada"})
+	h := &shareHandler{now: time.Now}
+	st := sharelinks.Open(t.TempDir())
+	sh := sharelinks.Share{ID: "sh_1", CreatedBy: "usr_1"}
+	if v := h.viewNamed(asCaller(actorMember), st, sh, callerNames(asCaller(actorMember))); v.CreatedByName != "Ada" || v.CreatedBy != "usr_1" {
+		t.Fatalf("member view %+v", v)
+	}
+	if v := h.view(&fasthttp.RequestCtx{}, st, sh); v.CreatedByName != "" {
+		t.Fatalf("local view names %q", v.CreatedByName)
+	}
+}
+
+// The list of every link (GET /shares without kind or target) reads only
+// the caller's organization's links.
+func TestShareListIsPerOrganization(t *testing.T) {
+	ra, _ := shareRouter(t)
+	rb, _ := shareRouter(t)
+	if res := shareCall(ra, "POST", APIPrefix+"/shares", map[string]any{"kind": "evaluation", "target": "ev_1"}); res.StatusCode() != 201 {
+		t.Fatalf("create: %d %s", res.StatusCode(), res.Body())
+	}
+	var a, b ShareList
+	_ = json.Unmarshal(shareCall(ra, "GET", APIPrefix+"/shares", nil).Body(), &a)
+	_ = json.Unmarshal(shareCall(rb, "GET", APIPrefix+"/shares", nil).Body(), &b)
+	if len(a.Shares) != 1 || len(b.Shares) != 0 {
+		t.Fatalf("org a %d links, org b %d", len(a.Shares), len(b.Shares))
 	}
 }
