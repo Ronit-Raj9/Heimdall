@@ -1,3 +1,5 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { cn } from "@/lib/utils";
 import CatalogView from "@/app/catalog/views/catalogView";
 import { RouteTabs } from "@/components/shell";
 import "@/lib/types/hubsI18n";
@@ -12,7 +14,7 @@ export default function SuitesPage() {
   const { t } = useTranslation("hubs");
   // X-42: one header (h1, subtitle, Add menu) above the tabs; the tab views carry no h1 of their own.
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-4">
+    <div className={cn(pageWidthClass("wide"), "flex flex-col gap-4")} data-page-width="wide">
       <SuitesPageHeader
         tabs={
           <RouteTabs

@@ -108,7 +108,7 @@ export function SuiteFacts({
 		{ label: t("suites.facts.lockedAt"), value: formatDateTime(suite.locked_at ?? undefined, locale) ?? none, testId: "locked-at" },
 	);
 	const factList = (list: typeof facts, mono: boolean) => (
-		<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
+		<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label={t("suites.facts.label")}>
 			{list.map((fact) => (
 				<div key={fact.testId} className="flex min-w-0 flex-col gap-0.5" data-testid={`suites-fact-${fact.testId}`}>
 					<dt className="text-muted-foreground">{fact.label}</dt>

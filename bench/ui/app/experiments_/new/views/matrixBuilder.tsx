@@ -146,7 +146,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
 	const [started, setStarted] = useState(false);
 	useLeaveGuard(!started && builderDirty(v, defaults));
-	useDraftSync(MATRIX_DRAFT_KEY, v, builderDirty(v, defaults), started);
+	useDraftSync(MATRIX_DRAFT_KEY, v, builderDirty(v, defaults), started || Boolean(actionError?.createdId));
 
 	const suite = catalog.suites.find((s) => suiteRef(s) === v.suite);
 	const errors = useMemo(() => validateBuilder(v, suite, ready), [v, suite, ready]);

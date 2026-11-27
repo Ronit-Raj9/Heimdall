@@ -128,7 +128,7 @@ export default function LibraryView() {
 							{t("library.noMatch")}
 						</p>
 					) : (
-						<ul className="grid gap-4 md:grid-cols-2" data-testid="library-list">
+						<ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3" data-testid="library-list">
 							{shown.map((b) => (
 								<BenchmarkCard key={b.id} b={b} packs={lib.data?.packs ?? []} canOpen={canOpen} />
 							))}

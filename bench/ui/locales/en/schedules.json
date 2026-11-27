@@ -141,7 +141,7 @@
 			"agent": "Pick an agent.",
 			"suite": "Pick a benchmark.",
 			"tasks": "Pick the tasks to check, or choose all tasks.",
-			"targets": "Add at least one model to watch.",
+			"targets": "Pick a model in every row of Models to watch, or remove the empty row.",
 			"cron": "Enter a cron line for the custom schedule.",
 			"budget": "Set both spending limits, or tick Practice mode.",
 			"budgetOrder": "The limit per check is above the limit per day, so no check could start.",

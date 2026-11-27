@@ -1,3 +1,5 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { cn } from "@/lib/utils";
 import CanariesView from "@/app/canaries/views/canariesView";
 import SchedulesView from "@/app/schedules/views/schedulesView";
 import LiveMonitorsView from "./views/liveMonitorsView";
@@ -17,7 +19,7 @@ export default function ScheduledChecksPage() {
 	const { t: m } = useTranslation("uf7b");
 	const { t: r } = useTranslation("ufrj");
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-4" data-testid="scheduled-checks-page">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-4")} data-page-width="wide" data-testid="scheduled-checks-page">
 			<PageHeader
 				title={m("checks.title")}
 				subtitle={m("checks.subtitle")}

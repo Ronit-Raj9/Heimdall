@@ -1,3 +1,5 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { cn } from "@/lib/utils";
 import PoliciesView from "@/app/policies/views/policiesView";
 import ReviewView from "@/app/review/views/reviewView";
 import { PageHeader, RouteTabs } from "@/components/shell";
@@ -13,7 +15,7 @@ export default function ReleasesPage() {
 	const { t } = useTranslation("hubs");
 	const { t: tu } = useTranslation("u14");
 	return (
-		<div className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4" data-testid="releases-page">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-4")} data-page-width="wide" data-testid="releases-page">
 			<PageHeader title={tu("releases.title")} subtitle={tu("releases.subtitle")} testId="releases-header" />
 			<RouteTabs
 				tabs={[

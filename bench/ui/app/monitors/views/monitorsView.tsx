@@ -37,7 +37,7 @@ export default function MonitorsView() {
 	const exps = useListExperimentsQuery();
 	const noComparison = exps.isSuccess && !hasFinishedComparison(exps.data?.experiments ?? []);
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="monitors-screen">
+		<section className="flex w-full flex-col gap-8" data-testid="monitors-screen">
 			<PageHeader
 				title={tu("monitors.title")}
 				subtitle={tu("monitors.subtitle")}
@@ -85,7 +85,7 @@ function CertificationList({
 	return (
 		<>
 			{q.isLoading ? (
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="monitors-list-loading">
+				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-testid="monitors-list-loading">
 					<Skeleton className="h-44 rounded-xl" />
 					<Skeleton className="h-44 rounded-xl" />
 					<Skeleton className="h-44 rounded-xl" />

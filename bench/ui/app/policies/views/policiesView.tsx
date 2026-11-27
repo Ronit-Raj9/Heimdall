@@ -1,4 +1,5 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
+import { policyErrorText } from "@/components/govern/policyError";
 import { PolicyForm, checkSentence, policyNameProblem, starterPolicy } from "@/components/govern/policyForm";
 import "@/components/canaries/uf7bI18n";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
@@ -31,6 +32,11 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+/** The error line of a rule set file, or the plain "not a rule set" text for schedules.yaml (Q-265). */
+function errText(file: string, error: string | undefined): string | undefined {
+	return policyErrorText(file, error, (k) => String(i18n.t(k as never, { ns: "govern" } as never)));
+}
+
 /** The release policy editor: every policies/*.yaml on the left, a form or YAML editor on the right. */
 export default function PoliciesView() {
 	const { t } = useTranslation("govern");
@@ -49,7 +55,7 @@ export default function PoliciesView() {
 	};
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="policies-screen">
+		<section className="flex w-full flex-col gap-8" data-testid="policies-screen">
 			<PageHeader
 				title={t("policies.title")}
 				subtitle={t("policies.subtitle")}
@@ -120,9 +126,9 @@ export default function PoliciesView() {
 													<Badge variant="destructive" className="w-fit">
 														{t("policies.invalid")}
 													</Badge>
-													{p.error && (
-														<span className="text-danger-ink line-clamp-2 text-xs break-words" title={p.error} data-testid={`policies-item-error-${p.file}`}>
-															{p.error}
+													{errText(p.file, p.error) && (
+														<span className="text-danger-ink line-clamp-2 text-xs break-words" title={errText(p.file, p.error)} data-testid={`policies-item-error-${p.file}`}>
+															{errText(p.file, p.error)}
 														</span>
 													)}
 												</span>
@@ -172,9 +178,9 @@ function ExistingPolicy({ file, onDeleted }: { file: string; onDeleted(): void }
 		return <PolicyReadView policy={q.data.policy} onEdit={() => setEditing(true)} />;
 	return (
 		<div className="flex flex-col gap-3">
-			{!q.data.valid && q.data.error && (
+			{!q.data.valid && errText(file, q.data.error) && (
 				<p role="alert" className="text-danger-ink text-sm break-words" data-testid="policy-invalid-error">
-					{q.data.error}
+					{errText(file, q.data.error)}
 				</p>
 			)}
 			<PolicyEditor

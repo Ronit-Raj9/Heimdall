@@ -169,7 +169,7 @@ export default function AddBenchmarkView() {
 	};
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="onboard-screen">
+		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="onboard-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

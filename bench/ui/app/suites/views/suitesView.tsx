@@ -25,6 +25,7 @@ import { parseAsInteger, parseAsString, useQueryState, useQueryStates } from "nu
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/ufw3I18n";
 
 /**
  * The one header of the Benchmarks hub (X-42): title, subtitle and the Add menu, with the hub's
@@ -46,7 +47,7 @@ export default function SuitesView() {
 	const data = query.data;
 	const suites = data?.suites ?? [];
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suites-screen">
+		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="suites-screen">
 			{data?.mode === "synthetic" && (
 				<p
 					role="note"
@@ -110,6 +111,7 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 	const filters = filtersFromUrl(url);
 	const sort = sortFromUrl(url.sort);
 	const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1).withOptions({ history: "replace" }));
+	const { t: tw } = useTranslation("ufw3");
 	const [showTests, setShowTests] = useShowTests();
 	// A filter change starts again at page 1.
 	const set = (patch: Partial<SuiteFilters>) => {
@@ -178,7 +180,7 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 					/>
 					<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="suites-show-tests" />
 					<span className="ml-auto" aria-live="polite">
-						<ListCount shown={shown.length} total={real.length} hidden={hidden} testId="suites-count" />
+						<ListCount shown={shown.length} total={real.length} hidden={showTests ? 0 : hidden} noun={tw("suites.noun")} testId="suites-count" />
 					</span>
 				</div>
 				<FilterTokens tokens={tokens} onClear={() => void setUrl({ category: null, source: null })} testId="suites-tokens" />

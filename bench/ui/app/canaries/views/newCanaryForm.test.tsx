@@ -126,7 +126,7 @@ describe("every missing field at once (N81)", () => {
 		expect(submitTag(html)).toContain('disabled=""');
 		for (const f of ["name", "agent", "suite", "targets"]) expect(html).toContain(`data-testid="canary-new-missing-${f}"`);
 		expect(html).toContain("Pick an agent.");
-		expect(html).toContain("Add at least one model to watch.");
+		expect(html).toContain("Pick a model in every row of Models to watch, or remove the empty row.");
 		expect(html).toContain("pick an agent, a benchmark, the tasks and at least one model");
 	});
 

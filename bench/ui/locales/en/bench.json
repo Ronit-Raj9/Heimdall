@@ -2508,7 +2508,7 @@
 			"stale": "Changed since frozen",
 			"unknown": "Frozen state not checked",
 			"lockedHint": "The tasks are pinned so every run sees exactly the same version (technical: the lock file matches every file).",
-			"unlockedHint": "Not frozen yet, so no task can be used until the benchmark is frozen and its tasks pass the readiness check.",
+			"unlockedHint": "Draft version, so no task can be used until the benchmark is frozen and its tasks pass the readiness check.",
 			"staleHint": "Files changed after the benchmark was frozen. Changed tasks are not ready until it is frozen and checked again.",
 			"unknownHint": "The frozen version exists but the files could not be compared to it."
 		},
