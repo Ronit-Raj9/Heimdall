@@ -97,10 +97,34 @@ func TestShareListRoles(t *testing.T) {
 // TestSharedCreatorName: the name is a member name only, never an email
 // or an id.
 func TestSharedCreatorName(t *testing.T) {
-	prev := memberNames
-	t.Cleanup(func() { SetMemberNames(prev) })
+	prev := memberRealNames
+	t.Cleanup(func() { SetMemberRealNames(prev) })
 	var ctx fasthttp.RequestCtx
 	if got := sharedCreatorName(&ctx, "usr_1"); got != "" {
 		t.Fatalf("no org: %q", got)
+	}
+}
+
+// TestCleanSharedName: the public creator name drops control and format
+// characters and is absent when it looks like an email or an id, or is
+// too long.
+func TestCleanSharedName(t *testing.T) {
+	for in, want := range map[string]string{
+		"Asha":                        "Asha",
+		"  Asha \t Rao ":              "Asha Rao",
+		"Asha\u202eoaR":               "AshaoaR",
+		"A\x1b[31mred":                "A[31mred",
+		"asha@example.com":            "",
+		"usr_123":                     "",
+		"":                            "",
+		strings.Repeat("a", 121):      "",
+		"usr_actor_is_the_name_check": "",
+	} {
+		if got := cleanSharedName(in, "usr_x"); got != want {
+			t.Fatalf("cleanSharedName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := cleanSharedName("u_9", "u_9"); got != "" {
+		t.Fatalf("the actor id itself: %q", got)
 	}
 }

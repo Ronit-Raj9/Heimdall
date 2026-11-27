@@ -3,6 +3,9 @@ package handlers
 import (
 	"context"
 	"strings"
+	"sync"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/sharelinks"
@@ -45,18 +48,39 @@ func shareSecretsAllowed(ctx *fasthttp.RequestCtx) bool {
 	return isLocalCaller(ctx) || auth.PrincipalFrom(ctx).Can(auth.RoleMember)
 }
 
+var (
+	memberRealNamesMu sync.RWMutex
+	memberRealNames   func(ctx context.Context, orgID string) (map[string]string, error)
+)
+
+// SetMemberRealNames installs the resolver from user id, and from
+// lower-case email, to the name a member chose, for an organization; a
+// member with no name is absent (never the email or a part of it, never
+// the id). Only the shared comparison page uses it; nil removes it.
+func SetMemberRealNames(f func(ctx context.Context, orgID string) (map[string]string, error)) {
+	memberRealNamesMu.Lock()
+	defer memberRealNamesMu.Unlock()
+	memberRealNames = f
+}
+
+// sharedNameMax bounds the creator name on a public page, in bytes.
+const sharedNameMax = 120
+
 // sharedCreatorName is the display name of the member who made a link, for
-// its visitor: the organization's member name only, never an email or an
-// id; "" when there is none (local mode, a former member, no resolver).
+// its visitor: the name the member chose only, never an email, a part of
+// one, a login or an id; control and format characters (such as a
+// right-to-left override) dropped and spaces folded; "" when there is none
+// (local mode, a former member, a member without a name, no resolver) or
+// when it is longer than sharedNameMax.
 func sharedCreatorName(ctx *fasthttp.RequestCtx, actor string) string {
 	actor = strings.TrimSpace(actor)
 	o, ok := tenancy.OrgFrom(ctx)
 	if actor == "" || !ok || o.ID == "" {
 		return ""
 	}
-	memberNamesMu.RLock()
-	f := memberNames
-	memberNamesMu.RUnlock()
+	memberRealNamesMu.RLock()
+	f := memberRealNames
+	memberRealNamesMu.RUnlock()
 	if f == nil {
 		return ""
 	}
@@ -66,14 +90,24 @@ func sharedCreatorName(ctx *fasthttp.RequestCtx, actor string) string {
 	if err != nil {
 		return ""
 	}
-	name := strings.TrimSpace(names[actor])
-	if name == "" {
-		name = strings.TrimSpace(names[strings.ToLower(actor)])
+	name, ok := names[actor]
+	if !ok {
+		name = names[strings.ToLower(actor)]
 	}
-	if local, _, isEmail := strings.Cut(name, "@"); isEmail {
-		name = local
-	}
-	if name == "" || name == actor || strings.HasPrefix(name, "usr_") || len(name) > 120 {
+	return cleanSharedName(name, actor)
+}
+
+// cleanSharedName drops control and format runes, folds spaces, and
+// refuses what looks like an email or an id.
+func cleanSharedName(name, actor string) string {
+	name = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == utf8.RuneError {
+			return -1
+		}
+		return r
+	}, name)
+	name = strings.Join(strings.Fields(name), " ")
+	if name == "" || strings.Contains(name, "@") || strings.EqualFold(name, actor) || strings.HasPrefix(name, "usr_") || len(name) > sharedNameMax {
 		return ""
 	}
 	return name
