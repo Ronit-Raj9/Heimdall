@@ -137,7 +137,7 @@
 			"github": "GitHub",
 			"audit": "Activity log",
 			"org": "Organization",
-			"account": "Account",
+			"account": "Password",
 			"admin": "Server admin",
 			"billing": "Billing"
 		},

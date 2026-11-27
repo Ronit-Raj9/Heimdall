@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { priorityProps, type ColumnPriority } from "@/components/ui/pager";
 import { useScrollEdges } from "@/lib/hooks/useScrollEdges";
 import { cn } from "@/lib/utils";
 
@@ -125,11 +126,11 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
 }
 
 /**
- * Column priority on phones (M1-57): "low" cells and heads are hidden below sm, so a row keeps its
- * name, status and one number on a 390 px screen. Give the head and the cells of a column the same value.
+ * Column priority on phones (M1-57, Spec 10): "secondary" cells and heads are hidden below sm, so a
+ * row keeps its name, status and one number on a 390 px screen. Give the head and the cells of a
+ * column the same value.
  */
-export type ColumnPriority = "high" | "low";
-const priorityClass = (priority?: ColumnPriority) => (priority === "low" ? "max-sm:hidden" : undefined);
+export type { ColumnPriority };
 
 function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	return (
@@ -146,9 +147,9 @@ function TableHead({ className, priority, scope = "col", ...props }: React.Compo
 		<th
 			data-slot="table-head"
 			scope={scope}
-			data-priority={priority}
+			data-priority={priorityProps(priority)["data-priority"]}
 			className={cn(
-				priorityClass(priority),
+				priorityProps(priority).className,
 				"text-muted-foreground sticky top-0 z-[2] h-(--row-h) bg-(--table-head-bg) px-4 text-left align-middle text-xs font-medium tracking-[0.01em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}
@@ -161,9 +162,9 @@ function TableCell({ className, priority, ...props }: React.ComponentProps<"td">
 	return (
 		<td
 			data-slot="table-cell"
-			data-priority={priority}
+			data-priority={priorityProps(priority)["data-priority"]}
 			className={cn(
-				priorityClass(priority),
+				priorityProps(priority).className,
 				"px-4 py-1 align-middle whitespace-nowrap tabular-nums [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}

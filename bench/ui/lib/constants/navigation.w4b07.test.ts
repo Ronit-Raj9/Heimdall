@@ -16,7 +16,7 @@ describe("navigation items of wave 4", () => {
 		expect(production.at(-1)?.testId).toBe("nav-link-monitors");
 		expect(activeNavItem("/monitors")?.to).toBe("/monitors");
 		expect(activeNavItem("/quickstart")).toBeNull();
-		expect(i18n.t("shell.nav.monitors", { ns: "bench" })).toBe("Safety monitor tests");
+		expect(i18n.t("shell.nav.monitors", { ns: "bench" })).toBe("Safety rule tests");
 		expect(i18n.t("shell.navHint.monitors", { ns: "bench" })).toBe("Check that your safety monitors catch what they should.");
 	});
 });

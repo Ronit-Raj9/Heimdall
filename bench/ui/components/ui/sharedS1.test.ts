@@ -1,6 +1,5 @@
 import { scrollEdges } from "@/lib/hooks/useScrollEdges";
 import { trapTarget } from "@/lib/hooks/useDialogFocus";
-import { withDoneCount } from "@/lib/routing/pageTitle";
 import { describe, expect, it } from "vitest";
 import { menuKeyTarget } from "./dropdownMenu";
 import { filterOptions, groupOptions, toggleAll, type OptionItem } from "./optionList";
@@ -42,7 +41,7 @@ describe("option list helpers", () => {
 	});
 });
 
-describe("scroll edges, focus trap, done count, numeric sort", () => {
+describe("scroll edges, focus trap, numeric sort", () => {
 	it("reports which edge hides content", () => {
 		expect(scrollEdges({ scrollLeft: 0, scrollWidth: 100, clientWidth: 100 })).toEqual({ start: false, end: false });
 		expect(scrollEdges({ scrollLeft: 0, scrollWidth: 300, clientWidth: 100 })).toEqual({ start: false, end: true });
@@ -54,10 +53,6 @@ describe("scroll edges, focus trap, done count, numeric sort", () => {
 		expect(trapTarget(items, "x", true)).toBe("z");
 		expect(trapTarget(items, "y", false)).toBeNull();
 		expect(trapTarget(items, "outside", false)).toBe("x");
-	});
-	it("prefixes the title with finished work", () => {
-		expect(withDoneCount("Runs · Heimdall", 0)).toBe("Runs · Heimdall");
-		expect(withDoneCount("Runs · Heimdall", 2)).toBe("(2 done) Runs · Heimdall");
 	});
 	it("sorts task ids numerically", () => {
 		const rows = [{ id: "t-10" }, { id: "t-2" }, { id: "t-1" }];

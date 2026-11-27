@@ -24,7 +24,7 @@
 		"docs": "Guides",
 		"jobs": "Background jobs",
 		"job": "Background job",
-		"monitors": "Safety monitor tests",
+		"monitors": "Safety rule tests",
 		"gateway": "Gateway report card",
 		"validity": "Changed results",
 		"replays": "Replay on a new model",

@@ -5,6 +5,7 @@ import { canUse, useSession, type SessionInfo } from "@/lib/session/sessionConte
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -349,8 +350,6 @@ function useSafeSearch(): Readonly<Record<string, unknown>> | undefined {
 	}
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
  * The navigation as a modal drawer below md. Focus moves to the close button and stays inside
  * until it closes (Escape, the backdrop, the close button or following a link); then it returns
@@ -396,20 +395,7 @@ function NavDrawer({
 	}, []);
 
 	// Keep Tab inside the drawer.
-	const trap = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-		if (event.key !== "Tab" || !panel.current) return;
-		const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null);
-		if (items.length === 0) return;
-		const first = items[0];
-		const last = items[items.length - 1];
-		if (event.shiftKey && document.activeElement === first) {
-			event.preventDefault();
-			last.focus();
-		} else if (!event.shiftKey && document.activeElement === last) {
-			event.preventDefault();
-			first.focus();
-		}
-	};
+	useFocusTrap(panel);
 
 	return (
 		<div className="fixed inset-0 z-50 md:hidden" data-testid="nav-drawer">
@@ -424,7 +410,6 @@ function NavDrawer({
 				role="dialog"
 				aria-modal="true"
 				aria-label={t("nav.label")}
-				onKeyDown={trap}
 				className="bg-sidebar animate-in slide-in-from-left absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-2 border-r px-2.5 py-3 shadow-2xl duration-200 ease-(--ease-out)"
 			>
 				<div className="flex items-center gap-1">

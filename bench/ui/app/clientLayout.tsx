@@ -11,7 +11,9 @@ import { SessionProvider } from "@/components/platform/sessionProvider";
 import { VerifyEmailBanner } from "@/components/platform/verifyEmailBanner";
 import { ThemeProvider } from "@/components/themeProvider";
 import { pageTitle } from "@/lib/constants/navigation";
-import { useDoneCount, withDoneCount } from "@/lib/routing/pageTitle";
+import { loginSearch } from "@/components/platform/sessionProvider";
+import { Toaster, useUnseenDone } from "@/components/ui/toaster";
+import { titleWithDone } from "@/lib/notify";
 import i18n from "@/lib/i18n";
 import { frameFor, useSession } from "@/lib/session/sessionContext";
 import { ReduxProvider } from "@/lib/store";
@@ -49,9 +51,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 function Frame({ children }: { children: React.ReactNode }) {
 	const session = useSession();
 	const location = useRouterState({ select: (state) => state.location });
-	// Whether this tab was signed in before: a later redirect to /login means the session ended.
-	const wasSignedIn = useRef(false);
-	if (session.signedIn) wasSignedIn.current = true;
 	switch (frameFor(session, location.pathname)) {
 		case "share":
 			return <SharedFrame>{children}</SharedFrame>;
@@ -69,13 +68,8 @@ function Frame({ children }: { children: React.ReactNode }) {
 				</PublicFrame>
 			);
 		case "login":
-			return (
-				<Navigate
-					to="/login"
-					search={(wasSignedIn.current ? { return_to: location.href, reason: "expired" } : { return_to: location.href }) as never}
-					replace
-				/>
-			);
+			// After a session ends the login page says so (reason=expired).
+			return <Navigate to="/login" search={loginSearch(location.href) as never} replace />;
 		case "error":
 			return <SessionError />;
 		default:
@@ -145,6 +139,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 				</div>
 			</div>
 			<PlanLimitPrompt />
+			<Toaster />
 		</div>
 	);
 }
@@ -158,11 +153,11 @@ function useRouteChange() {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	// Settings names its tab in the title, so the tab is part of the title's input.
 	const tab = useRouterState({ select: (state) => (state.location.search as Record<string, unknown>).tab });
-	const doneCount = useDoneCount();
+	const doneCount = useUnseenDone();
 	// The path focus was last handled for; the first load and a repeated effect run do nothing.
 	const handled = useRef(pathname);
 	useEffect(() => {
-		document.title = withDoneCount(pageTitle(pathname, tab === undefined ? undefined : { tab }), doneCount);
+		document.title = titleWithDone(pageTitle(pathname, tab === undefined ? undefined : { tab }), doneCount);
 	}, [pathname, tab, doneCount, t]);
 	useEffect(() => {
 		if (handled.current === pathname) return;
