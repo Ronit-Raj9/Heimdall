@@ -12,6 +12,8 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Dialog } from "@/components/ui/dialog";
 import { PaidButton } from "@/components/ui/paidButton";
+import { canRetryFree } from "@/components/jobs/jobRetryCost";
+import "@/components/settings/ufrkI18n";
 import { ShowTestsChip } from "@/components/ui/toolbar";
 import { notify } from "@/lib/notify";
 import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
@@ -350,7 +352,7 @@ export function JobsTable({
 				))}
 			</ul>
 			<div className="bg-card hidden min-w-0 overflow-x-auto rounded-xl border md:block">
-				<table className="w-full text-sm" data-testid="jobs-table">
+				<table className="w-full min-w-[960px] text-sm" data-testid="jobs-table">
 					<thead className="bg-muted/40 text-muted-foreground sticky top-0 text-left text-xs">
 						<tr className="border-b">
 							{onSelect && (
@@ -360,7 +362,7 @@ export function JobsTable({
 							)}
 							<th className="px-4 py-2.5 font-medium">{t("columns.kind")}</th>
 							<th className="px-4 py-2.5 font-medium">{t("columns.status")}</th>
-							<th className="px-4 py-2.5 font-medium">{t("columns.created")}</th>
+							<th className="min-w-28 px-4 py-2.5 font-medium whitespace-nowrap">{t("columns.created")}</th>
 							<th className="bg-muted sticky right-0 px-4 py-2.5 text-right font-medium">{t("columns.actions")}</th>
 						</tr>
 					</thead>
@@ -394,7 +396,7 @@ export function JobsTable({
 											<JobReason job={job} />
 										</div>
 									</td>
-									<td className="text-muted-foreground px-4 py-3 text-xs whitespace-nowrap">
+									<td className="text-muted-foreground min-w-28 px-4 py-3 text-xs whitespace-nowrap">
 										{formatRelative(job.created_at, locale) ?? "-"}
 									</td>
 									<td className="bg-card sticky right-0 z-10 px-4 py-3 text-right">
@@ -441,6 +443,7 @@ function JobActions({
 	onOpenLog?: (job: Job) => void;
 }) {
 	const { t } = useTranslation("jobs");
+	const { t: tr } = useTranslation("ufrk");
 	const active = isActiveJob(job);
 	return (
 		<>
@@ -468,6 +471,20 @@ function JobActions({
 						variant="destructive"
 						testId={`${idPrefix}-cancel-${job.id}`}
 					/>
+				) : canRetryJob(job) && canRetryFree(job) ? (
+					// R3-4: a replay calls no model, so its Retry says free and asks nothing.
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="h-7 gap-1 px-2.5 text-xs"
+						disabled={busy}
+						title={tr("jobs.retryFreeTitle")}
+						onClick={() => void onRetry(job)}
+						data-testid={`${idPrefix}-retry-${job.id}`}
+					>
+						{tr("jobs.retryFree")}
+					</Button>
 				) : canRetryJob(job) ? (
 					<PaidButton
 						verb={t("retry")}

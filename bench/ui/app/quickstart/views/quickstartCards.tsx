@@ -19,8 +19,8 @@ function CommandWell({ command, testId }: { command: string; testId: string }) {
 		void navigator.clipboard?.writeText(command).then(() => setCopied(true));
 	};
 	return (
-		<div className="group/cmd relative flex min-w-0 items-center rounded-lg bg-zinc-950 text-zinc-100 dark:bg-black/60" data-testid={testId}>
-			<code className="min-w-0 flex-1 overflow-x-auto px-3 py-2.5 pr-10 font-mono text-xs whitespace-nowrap">
+		<div className="group/cmd relative flex min-w-0 items-center rounded-lg bg-zinc-950 pr-10 text-zinc-100 dark:bg-black/60" data-testid={testId}>
+			<code className="min-w-0 flex-1 overflow-x-auto px-3 py-2.5 font-mono text-xs whitespace-nowrap">
 				<span className="text-zinc-400 select-none">$ </span>
 				{command}
 			</code>
