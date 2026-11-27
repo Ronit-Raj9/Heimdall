@@ -130,7 +130,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 						<main
 							id="bench-main"
 							tabIndex={-1}
-							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 duration-300 outline-none md:px-8 md:py-8 lg:px-(--page-px)"
+							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-(--page-max-wide) flex-col px-4 py-6 duration-300 outline-none md:px-8 md:py-8 lg:px-(--page-px)"
 							data-bench-main
 						>
 							<VerifyEmailBanner />

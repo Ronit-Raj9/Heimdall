@@ -17,3 +17,17 @@ describe("global link underline rule", () => {
 		}
 	});
 });
+
+describe("print stylesheet (Q-42, RK)", () => {
+	const print = css.slice(css.indexOf("@media print"));
+	it("hides the shell and controls and opens folded sections", () => {
+		for (const part of ['[data-testid="bench-sidebar"]', '[data-testid="bench-header"]', '[role="tablist"]', '[role="menu"]', "button", '[data-testid="toaster"]']) {
+			expect(print).toContain(part);
+		}
+		expect(print).toContain("details > *:not(summary)");
+	});
+	it("never hides tables or status pills", () => {
+		const hidden = print.split("display: none")[0];
+		expect(hidden).not.toMatch(/\btable\b|status-pill|statusPill/);
+	});
+});

@@ -121,7 +121,7 @@ describe("TrialsPanel", () => {
 		expect(html).toContain("no later look could decide at look 1 of 2");
 		expect(html).toContain("To detect 10.0 pp you need about 52 more tasks, estimated cost $0.0000.");
 		expect(html).toContain("SD 0.30 assumed");
-		expect(html).toContain("pooling it with this experiment is exploratory");
+		expect(html).toContain("pooling it with this comparison is exploratory");
 		expect(html).toContain("heimdall extend -exp e_hd_w7_seq -tasks 52");
 		expect(html).toContain("follow-up of e_first");
 	});

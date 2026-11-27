@@ -22,6 +22,12 @@ export interface ConfirmOptions {
 	costUsd?: number | null;
 	/** One sentence under the cost line, for example the estimate ("About 24 runs, about $1.20."). */
 	costLine?: string;
+	/** Paid work without a cap: the estimate in USD, said instead of "no cap is set". */
+	estimateUsd?: number | null;
+	/** Paid work without a cap: about how many runs it starts. */
+	estimateRuns?: number;
+	/** What limits the spend when there is no cap; defaults to "It stops when those runs are done." when runs are known. */
+	limitText?: string;
 }
 
 /** A destructive confirmation must name what it deletes: the type a page lane moves to (X-104). */
@@ -117,10 +123,31 @@ export interface ConfirmDialogProps {
 	onKey?(key: string): boolean;
 }
 
-/** The cost sentence of a paid confirmation, or null when the action is not paid. */
-export function costSentence(t: (k: string, o?: Record<string, unknown>) => string, costUsd: number | null | undefined): string | null {
+/**
+ * The cost sentence of a paid confirmation, or null when the action is not paid. A known cap names
+ * it; without a cap an estimate and what limits the spend are said; only with neither does it warn
+ * that no cap is set. Pure.
+ */
+export function costSentence(
+	t: (k: string, o?: Record<string, unknown>) => string,
+	costUsd: number | null | undefined,
+	extra: Pick<ConfirmOptions, "estimateUsd" | "estimateRuns" | "limitText"> = {},
+): string | null {
 	if (costUsd === undefined) return null;
-	return costUsd === null ? t("confirm.bodyUnknown", { ns: "paid" }) : t("confirm.body", { ns: "paid", cap: formatUsd(costUsd) });
+	if (costUsd !== null) return t("confirm.body", { ns: "paid", cap: formatUsd(costUsd) });
+	const usd = typeof extra.estimateUsd === "number" && Number.isFinite(extra.estimateUsd) ? formatUsd(extra.estimateUsd) : null;
+	const runs = typeof extra.estimateRuns === "number" && Number.isFinite(extra.estimateRuns) ? extra.estimateRuns : null;
+	const limit = extra.limitText ?? (runs !== null ? t("confirm.limitRuns", { ns: "paid" }) : null);
+	if (usd === null && runs === null && !limit) return t("confirm.bodyUnknown", { ns: "paid" });
+	const est =
+		usd !== null && runs !== null
+			? t("confirm.bodyEstimate", { ns: "paid", usd, runs })
+			: usd !== null
+				? t("confirm.bodyEstimateUsd", { ns: "paid", usd })
+				: runs !== null
+					? t("confirm.bodyEstimateRuns", { ns: "paid", runs })
+					: "";
+	return [est, limit].filter(Boolean).join(" ");
 }
 
 /** What a confirmation is: paid (it names a cost), destructive (it cannot be undone) or plain. */
@@ -159,7 +186,7 @@ export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }
 		window.addEventListener("keydown", handle, true);
 		return () => window.removeEventListener("keydown", handle, true);
 	}, [onKey, onCancel]);
-	const cost = costSentence(t as never, opts.costUsd);
+	const cost = costSentence(t as never, opts.costUsd, opts);
 	return (
 		<Dialog
 			open

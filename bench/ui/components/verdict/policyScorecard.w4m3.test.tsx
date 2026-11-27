@@ -12,6 +12,7 @@ describe("PolicyScorecard without a release rule set (p05-1)", () => {
 		const html = renderToStaticMarkup(<PolicyScorecard policy={null} expId="e_x" />);
 		expect(html).not.toContain("-policy");
 		// Round 2 Q-60: the sentence is replaced by a link to Releases, Rules.
+		expect(html).toContain("No release rule set applies to this comparison.");
 		expect(html).toContain("Pick a rule set");
 		expect(html).toContain("policy-scorecard-pick-rules");
 	});
