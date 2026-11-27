@@ -33,6 +33,11 @@ export function liveNow(releases: readonly ReleaseRecord[], t: (k: string, o?: R
 	});
 }
 
+/** True once the comparisons list is in and empty: nothing can be recorded (X-110, Q-312). Exported for tests. */
+export function noComparisonYet(q: { isSuccess: boolean; data?: { experiments?: readonly unknown[] } }): boolean {
+	return q.isSuccess && (q.data?.experiments ?? []).length === 0;
+}
+
 /** The releases screen: the hash-chained release log as a timeline, newest first; "New release" opens the record dialog. */
 export default function ReleasesView() {
 	const { t } = useTranslation("bench");
@@ -45,7 +50,7 @@ export default function ReleasesView() {
 	const { t: m } = useTranslation("uf7b");
 	const experiments = useListExperimentsQuery();
 	// X-110: with no comparison at all, "Record a release" leads nowhere, so the empty state points to an evaluation.
-	const noComparison = experiments.isSuccess && (experiments.data?.experiments ?? []).length === 0;
+	const noComparison = noComparisonYet(experiments);
 	const live = liveNow(list, m as never);
 	const flipped = (useGetValidityQuery().data?.entries ?? []).filter((e) => e.flipped).length;
 	// M7-83: ?release=<id> (the copied link) scrolls to that record once the list is in.
@@ -66,10 +71,21 @@ export default function ReleasesView() {
 				) : (
 					<span />
 				)}
-				<Button onClick={() => setOpen(true)} data-testid="release-new">
-					<Plus className="size-4" aria-hidden="true" />
-					{tu("releases.new")}
-				</Button>
+				{/* Q-312: with no comparison there is nothing to record; say why and where to start. */}
+				<div className="flex flex-col items-end gap-1">
+					<Button onClick={() => setOpen(true)} disabled={noComparison} aria-describedby={noComparison ? "release-new-reason" : undefined} data-testid="release-new">
+						<Plus className="size-4" aria-hidden="true" />
+						{tu("releases.new")}
+					</Button>
+					{noComparison && (
+						<p id="release-new-reason" className="text-muted-foreground max-w-xs text-right text-xs" data-testid="release-new-reason">
+							{tu("releases.emptyNoComparison")}{" "}
+							<Link to="/evaluate" className="text-primary hover:underline">
+								{m("releases.evaluateAgent")}
+							</Link>
+						</p>
+					)}
+				</div>
 			</div>
 			<div className="grid grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start" data-testid="releases-layout">
 				<div className="flex min-w-0 flex-col gap-4">

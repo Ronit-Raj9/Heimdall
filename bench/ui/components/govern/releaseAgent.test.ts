@@ -34,3 +34,12 @@ describe("compliance hint (Q-210, Q-225)", () => {
 		expect(i18n.getFixedT("en", "govern")("releases.complianceHint")).toBe("Makes a report you can download below.");
 	});
 });
+
+describe("Record a release with no comparison (Q-312)", () => {
+	it("is blocked only once the list is in and empty", async () => {
+		const { noComparisonYet } = await import("@/app/releases/views/releasesView");
+		expect(noComparisonYet({ isSuccess: true, data: { experiments: [] } })).toBe(true);
+		expect(noComparisonYet({ isSuccess: true, data: { experiments: [{}] } })).toBe(false);
+		expect(noComparisonYet({ isSuccess: false })).toBe(false);
+	});
+});
