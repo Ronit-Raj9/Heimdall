@@ -50,14 +50,8 @@ export function estimateLine(
 	const { tasks, readiness_runs: runs, judge_calls: judge } = inv.estimate;
 	if (tasks === 0) return "";
 	if (grader === "judge") return w4m5Text("estimate.judge", { tasks, runs });
-	// Q-57: about ten readiness runs a minute, so the line also gives the time.
-	const line = tx("found.estimate", { tasks, runs, minutes: readinessMinutes(runs) });
+	const line = tx("found.estimate", { tasks, runs });
 	return judge > 0 ? `${line} ${tx("found.estimateJudge", { judge })}` : line;
-}
-
-/** Q-57: the minutes the free readiness runs take, about ten a minute, at least one. */
-export function readinessMinutes(runs: number): number {
-	return Math.max(1, Math.ceil(runs / 10));
 }
 
 /** Where a source that cannot become tasks here is built instead (M2-112, M6-50): OpenAPI and GitHub. */

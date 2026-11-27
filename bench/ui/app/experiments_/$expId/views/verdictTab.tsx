@@ -32,7 +32,9 @@ import "@/components/verdict/uf4aI18n";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
 import { EXPERIMENT_POLL_MS, useGetExperimentQuery, useGetVerdictQuery as useVerdictForPicker } from "@/lib/store/apis/benchApi"; // the grade picker reads benchApi directly
 import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
+import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
 import { skipToken } from "@reduxjs/toolkit/query/react";
+import { suiteGone } from "./actionsTab";
 import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
 import { Activity, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -200,6 +202,8 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
 	const diagnostics = useGetDiagnosticsQuery(gradeQuery(expId, grade), { skip: debug });
 	const grid = useGetGridQuery(expId);
+	// A deleted benchmark has no task pages, so the grid shows its tasks as plain text (Q-76).
+	const suiteLookup = useGetSuiteQuery(verdict.data?.suite ?? skipToken);
 	// The average (mean) cost per run of each of two setups (M4-2): the same query the Cost tab reads, so it is shared.
 	const pairArms =
 		verdict.data && !isSetupsVerdict(verdict.data.verdict) && !isScoreVerdict(verdict.data.verdict) ? armOrder(verdict.data) : [];
@@ -440,7 +444,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 							testId="verdict-grid-error"
 						/>
 					) : (
-						<TaskGrid grid={grid.data} onOpenPair={openPair} suite={payload.suite} />
+						<TaskGrid grid={grid.data} onOpenPair={openPair} suite={payload.suite} suiteGone={suiteGone(suiteLookup.error)} />
 					)}
 				</Disclosure>
 

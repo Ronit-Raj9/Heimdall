@@ -29,6 +29,8 @@ vi.mock("@/lib/store", async (importOriginal) => ({
 	useGetCatalogQuery: () => ({ data: undefined, isLoading: true, isError: false }),
 }));
 vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetCostExplainQuery: () => ({}) }));
+// The grid asks whether the benchmark still exists (Q-76); here it does.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuiteQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useGetExperimentQuery: (id: string) => ({

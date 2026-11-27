@@ -16,6 +16,8 @@ export interface LiveVersion {
 	released_at?: string;
 	approver?: string;
 	evaluation_id?: string;
+	/** Which rule gave the live version: "release" or "saved_config" (handlers/evalgate.go). */
+	source?: string;
 }
 
 export interface EvaluationReleaseChild {
