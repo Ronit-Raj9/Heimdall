@@ -4,6 +4,10 @@
 import { WeeklySync } from "@/components/issuebench/weeklySync";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { Button } from "@/components/ui/button";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import { isPicked, LabeledModelPicker, usePickedKeyState } from "@/components/models/labeledModelPicker";
+import type { PickedModel } from "@/components/models/groupedModelPicker";
+import "@/components/suites/uf6aI18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetGithubStatusQuery, useListGithubReposQuery } from "@/lib/store/apis/githubApi";
 import {
@@ -92,7 +96,7 @@ export function ReadinessBanner({ readiness, t }: { readiness: IssueReadiness | 
 	return (
 		<div
 			role="alert"
-			className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs"
+			className="border-danger bg-danger-soft text-danger-ink flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs"
 			data-testid="issuebench-readiness"
 		>
 			<span>{message}</span>
@@ -187,8 +191,12 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 	const run = useGetIssueRunQuery(id, { pollingInterval: poll });
 	const [start, startState] = useStartIssueRunMutation();
 	const [consent, setConsent] = useState(false);
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
+	// M6-27: provider and model come from the shared model picker (your model keys), not two free text boxes.
+	const [picked, setPicked] = useState<PickedModel | null>(null);
+	const { t: tf } = useTranslation("uf6a");
+	const keyState = usePickedKeyState(picked);
+	const provider = isPicked(picked) && keyState === "ok" ? picked.provider : "";
+	const model = isPicked(picked) && keyState === "ok" ? picked.model : "";
 	const [error, setError] = useState("");
 	const data = run.data;
 	const running = data?.status === "running";
@@ -197,6 +205,14 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 	if (!data) return null;
 	const items = data.items ?? [];
 	const blocked = startBlocked(readiness);
+	// M6-27: why Start is off, as visible text (not only a tooltip).
+	const startWhy = !writable
+		? tf("issues.whyViewer")
+		: blocked
+			? t(blocked === "worker" ? "readiness.startNoWorker" : "readiness.startNoGateway")
+			: !consent
+				? tf("issues.whyConsent")
+				: "";
 
 	const onStart = async () => {
 		setError("");
@@ -216,26 +232,19 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 				<p className="text-muted-foreground">{t("none")}</p>
 			) : (
 				<div className="flex flex-wrap items-end gap-3">
-					<label className="flex flex-col gap-1">
-						<span className="text-xs font-medium">{t("provider")}</span>
-						<input
-							className="border-input bg-background h-9 w-36 rounded-md border px-2"
-							value={provider}
-							placeholder={data.builder_model?.provider || "openai"}
-							onChange={(e) => setProvider(e.target.value)}
-							data-testid="issuebench-provider"
+					<div className="w-full min-w-0 sm:w-80">
+						<LabeledModelPicker
+							label={t("model")}
+							hint={
+								data.builder_model?.model
+									? tf("issues.modelDefault", { model: `${data.builder_model.provider}/${data.builder_model.model}` })
+									: undefined
+							}
+							value={picked}
+							onChange={setPicked}
+							testId="issuebench-model"
 						/>
-					</label>
-					<label className="flex flex-col gap-1">
-						<span className="text-xs font-medium">{t("model")}</span>
-						<input
-							className="border-input bg-background h-9 w-48 rounded-md border px-2"
-							value={model}
-							placeholder={data.builder_model?.model || t("modelDefault")}
-							onChange={(e) => setModel(e.target.value)}
-							data-testid="issuebench-model"
-						/>
-					</label>
+					</div>
 					<label className="flex items-center gap-2">
 						<input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} data-testid="issuebench-consent" />
 						<span>{t("consent")}</span>
@@ -244,14 +253,18 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 						size="sm"
 						disabled={!writable || !consent || running || startState.isLoading || blocked !== ""}
 						title={blocked ? t(blocked === "worker" ? "readiness.startNoWorker" : "readiness.startNoGateway") : undefined}
+						aria-describedby={startWhy ? "issuebench-start-why" : undefined}
 						onClick={onStart}
 						dataTestId="issuebench-start"
 					>
 						{running ? t("running") : t("start")}
 					</Button>
-					<span className="text-muted-foreground text-xs">{t("cost", { cost: data.cost_usd.toFixed(2) })}</span>
-				</div>
-			)}
+					<span className="text-muted-foreground text-xs" data-testid="issuebench-cost">
+						{t("cost", { cost: data.cost_usd.toFixed(2) })}
+					</span>
+					</div>
+					)}
+					{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
 			{error && (
 				<p className="text-destructive" role="alert">
 					{error}

@@ -126,12 +126,15 @@ describe("reviewTab helpers", () => {
 		const clean = text(render(<QualityBody report={{ ...report, duplicates: null, contamination: [] }} t={t as never} />));
 		expect(clean).toContain("nothing found in 835 public tasks");
 	});
-	it("points an empty queue to the Policy tab, where policy drafts are made", () => {
+	it("points an empty queue to drafting above, and to the policy section only on a support benchmark (M6-78)", () => {
 		queue.data = { ...generated, pending: 0, accepted: 0, tasks: [] };
 		try {
 			const html = render(<ReviewTab suite={qa} />);
-			expect(html).toContain("No drafts to review yet. Policy drafts are made on the Policy tab of a support benchmark.");
-			expect(html).toMatch(/<a[^>]*href="\/suites\/support-faq\?tab=policy"[^>]*data-testid="suite-review-queue-policy-link"/);
+			expect(html).toContain("No drafts to review yet. Make some with Draft with a model above.");
+			expect(html).not.toContain("suite-review-queue-policy-link");
+			const support = render(<ReviewTab suite={{ ...qa, track: "support" } as SuiteSummary} />);
+			expect(support).toMatch(/<a[^>]*href="\/suites\/support-faq\?tab=policy"[^>]*data-testid="suite-review-queue-policy-link"/);
+			expect(html.indexOf("suite-review-quality")).toBeLessThan(html.indexOf("suite-review-draft"));
 		} finally {
 			queue.data = generated;
 		}

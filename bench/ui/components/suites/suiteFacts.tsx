@@ -1,4 +1,4 @@
-import { GradingBadge, JudgedNotice, OutputBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
+import { JudgedNotice, OutputBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -6,6 +6,7 @@ import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./uf6aI18n";
 import { CopyCodeBlock } from "./copyCodeBlock";
 import { LockBadge, VerifierBadge } from "./suiteBadges";
 import { LockKindBadge } from "./suiteLockKind";
@@ -31,22 +32,34 @@ export function SuiteFacts({
 	showImported?: boolean;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
 	const locale = getLocale();
-	const none = <span className="text-muted-foreground">{t("suites.facts.none")}</span>;
+	// M6-36: an empty fact is a plain dash, not the word "none".
+	const none = <span className="text-muted-foreground">-</span>;
 	const grading = suiteGrading(suite);
 	const services = suite.services ?? [];
 	const facts: { label: string; value: React.ReactNode; testId: string }[] = [
 		{ label: t("suites.facts.track"), value: <TrackBadge track={suiteTrack(suite)} />, testId: "track" },
-		{ label: t("suites.facts.grading"), value: <GradingBadge grading={grading} />, testId: "grading" },
+		// M6-36: grading as plain words (no green "Verified" on a benchmark that may not be finished).
+		{
+			label: t("suites.facts.grading"),
+			value: <span title={t(`scenario.grading.${grading}Hint`)}>{t(`scenario.grading.${grading}`)}</span>,
+			testId: "grading",
+		},
 		{ label: t("suites.facts.output"), value: <OutputBadge output={suite.output || "diff"} />, testId: "output" },
 		{
 			label: t("suites.facts.services"),
 			value: services.length > 0 ? <span className="break-all">{services.join(", ")}</span> : none,
 			testId: "services",
 		},
+	];
+	// M6-36: ids and hashes are for experts: they sit behind "Technical details".
+	const technical: { label: string; value: React.ReactNode; testId: string }[] = [
 		{ label: t("suites.facts.environment"), value: <code>{suite.environment}</code>, testId: "environment" },
 		{ label: t("suites.facts.grader"), value: <code>{suite.grader}</code>, testId: "grader" },
 		{ label: t("suites.facts.verifier"), value: <VerifierBadge format={suite.verifier_result} />, testId: "verifier" },
+	];
+	facts.push(
 		{
 			label: t("suites.facts.timeout"),
 			value: suite.verifier_timeout_s ? t("suites.facts.seconds", { count: suite.verifier_timeout_s }) : none,
@@ -55,6 +68,8 @@ export function SuiteFacts({
 		...(suite.pass_threshold !== null
 			? [{ label: t("suites.facts.threshold"), value: <span className="tabular-nums">{suite.pass_threshold}</span>, testId: "threshold" }]
 			: []),
+	);
+	technical.push(
 		{ label: t("suites.facts.image"), value: <code className="break-all">{suite.base_image.tag}</code>, testId: "image" },
 		{
 			label: t("suites.facts.digest"),
@@ -67,7 +82,17 @@ export function SuiteFacts({
 			testId: "lock-hash",
 		},
 		{ label: t("suites.facts.lockedAt"), value: formatDateTime(suite.locked_at ?? undefined, locale) ?? none, testId: "locked-at" },
-	];
+	);
+	const factList = (list: typeof facts, mono: boolean) => (
+		<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
+			{list.map((fact) => (
+				<div key={fact.testId} className="flex min-w-0 flex-col gap-0.5" data-testid={`suites-fact-${fact.testId}`}>
+					<dt className="text-muted-foreground">{fact.label}</dt>
+					<dd className={mono ? "text-foreground min-w-0 font-mono" : "text-foreground min-w-0"}>{fact.value}</dd>
+				</div>
+			))}
+		</dl>
+	);
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid="suites-facts">
 			<div className="flex flex-wrap items-center gap-2">
@@ -84,14 +109,11 @@ export function SuiteFacts({
 					</Link>
 				)}
 			</div>
-			<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
-				{facts.map((fact) => (
-					<div key={fact.testId} className="flex min-w-0 flex-col gap-0.5" data-testid={`suites-fact-${fact.testId}`}>
-						<dt className="text-muted-foreground">{fact.label}</dt>
-						<dd className="text-foreground min-w-0 font-mono">{fact.value}</dd>
-					</div>
-				))}
-			</dl>
+			{factList(facts, false)}
+			<details className="text-xs" data-testid="suites-facts-technical">
+				<summary className="text-muted-foreground hover:text-foreground cursor-pointer">{tf("facts.technical")}</summary>
+				<div className="mt-2">{factList(technical, true)}</div>
+			</details>
 			{suite.artifacts && suite.artifacts.length > 0 && <DeclaredArtifacts artifacts={suite.artifacts} testId="suites-artifacts" />}
 			{grading === "judged" && <JudgedNotice testId="suites-judged-note" />}
 			{showImported && suite.imported && <ImportedFrom record={suite.imported} />}
@@ -106,10 +128,10 @@ export function SuiteDriftNotice({ suite }: { suite: SuiteSummary }) {
 		return (
 			<div
 				role="alert"
-				className="border-chart-error/50 bg-chart-error/10 flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
+				className="border-danger bg-danger-soft flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
 				data-testid="suites-lock-error"
 			>
-				<CircleX className="text-chart-error-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+				<CircleX className="text-danger-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 				<span className="min-w-0 break-words">{t("suites.drift.lockError", { error: suite.lock_error })}</span>
 			</div>
 		);
@@ -117,11 +139,11 @@ export function SuiteDriftNotice({ suite }: { suite: SuiteSummary }) {
 	if (suite.drift.length === 0) return null;
 	return (
 		<div
-			className="border-chart-warning/50 bg-chart-warning/10 flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2"
+			className="border-warning bg-warning-soft flex min-w-0 flex-col gap-2 rounded-sm border px-3 py-2"
 			data-testid="suites-drift"
 		>
 			<div className="flex items-start gap-2">
-				<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<p className="text-foreground text-sm font-medium">{t("suites.drift.title")}</p>
 					<p className="text-muted-foreground text-xs">{t("suites.drift.description")}</p>
@@ -158,11 +180,11 @@ export function BrokenSuite({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div
 			role="alert"
-			className="border-chart-error/50 bg-chart-error/5 flex min-w-0 flex-col gap-2 rounded-sm border px-4 py-3"
+			className="border-danger bg-danger-soft flex min-w-0 flex-col gap-2 rounded-sm border px-4 py-3"
 			data-testid="suites-broken"
 		>
 			<p className="text-foreground flex items-center gap-2 text-sm font-medium">
-				<CircleX className="text-chart-error-ink size-4 shrink-0" aria-hidden="true" />
+				<CircleX className="text-danger-ink size-4 shrink-0" aria-hidden="true" />
 				{t("suites.broken.title")}
 			</p>
 			<pre className="text-foreground min-w-0 overflow-x-auto font-mono text-xs break-all whitespace-pre-wrap">{suite.error}</pre>

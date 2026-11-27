@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CapabilityCoverage, LicenseSummary, ProbeList } from "./suiteCoverage";
+import { CapabilityCoverage, LicenseSummary, ProbeList, probeLabel } from "./suiteCoverage";
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
 const suite = (id: string) => list.suites.find((s) => s.id === id)!;
@@ -40,5 +40,11 @@ describe("ProbeList", () => {
 		expect(families).toEqual(["unavailable_model", "broken_tool", "misleading_instruction"]);
 		expect(html).toMatch(/data-testid="suites-probe-family-broken_tool"[\s\S]*?test-crash[\s\S]*?tool shim/);
 		expect(html).toContain("still solvable");
+	});
+});
+describe("probeLabel (M6-38)", () => {
+	it("reads a probe id in plain words", () => {
+		expect(probeLabel("unavailable-model")).toBe("Unavailable model");
+		expect(probeLabel("test_crash")).toBe("Test crash");
 	});
 });

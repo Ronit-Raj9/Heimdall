@@ -1,5 +1,5 @@
 {
-	"intro": "Turn merged pull requests that close an issue into tasks: the issue text is the instruction, the repository before the fix is the start, the pull request's tests grade the agent. Python with pytest for now.",
+	"intro": "Turn merged pull requests that close an issue into tasks: the issue text is the instruction, the repository before the fix is the start, the pull request's tests grade the agent.",
 	"repo": "Repository",
 	"repoPlaceholder": "owner/repository or a GitHub link",
 	"repoInvalid": "Type a repository as owner/repository, for example marshmallow-code/marshmallow, or paste its GitHub link.",

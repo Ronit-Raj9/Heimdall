@@ -52,12 +52,12 @@ describe("SuiteCards", () => {
 
 	it("shows readiness as a dot and words, the task count and a quiet Run, and hides engineering detail", () => {
 		const core = card(html, "coding-core");
-		expect(core).toMatch(/data-testid="suites-row-coding-core-status" data-status="ready">.*Ready/);
+		expect(core).toMatch(/data-testid="suites-row-coding-core-status"[^>]*data-status="ready"[^>]*>.*Ready/);
 		expect(core).toContain("4 tasks");
 		expect(core).toContain('data-testid="suites-row-coding-core-run"');
 		expect(core).toContain("md:inline-flex"); // M6-44: Run shows without hover from md up
 		const acme = card(html, "acme-payments");
-		expect(acme).toMatch(/data-status="needsAdmission">.*1 of 3 tasks ready/);
+		expect(acme).toMatch(/data-status="needsAdmission">.*1 of 3 ready/);
 		expect(acme).not.toContain("task init");
 		expect(card(html, "harbor-shell")).not.toContain("Reward file");
 		expect(card(html, "harbor-shell")).not.toContain("test.sh");
@@ -101,21 +101,23 @@ describe("suite facts", () => {
 });
 describe("scenario facts", () => {
 	it("shows track, grading, output and services for every suite", () => {
+		// M6-36: grading is plain words (no green badge) and an empty fact is "-".
 		const html = renderToStaticMarkup(<SuiteFacts suite={suite("support-desk")} />);
+		expect(html).not.toMatch(/data-testid="suites-fact-grading"[^>]*>(?:(?!suites-fact-output).)*data-tone=/);
 		expect(html).toMatch(/data-testid="suites-fact-track".*?>Tool use</);
-		expect(html).toMatch(/data-testid="suites-fact-grading".*?data-tone="good".*?>Verified</);
+		expect(html).toMatch(/data-testid="suites-fact-grading"[^>]*>.*?>Verified</);
 		expect(html).toMatch(/data-testid="suites-fact-output".*?>State</);
 		expect(html).toMatch(/data-testid="suites-fact-services".*?>crm</);
 		expect(html).not.toContain("suites-judged-note");
 		expect(html).not.toContain("suites-imported");
 		const core = renderToStaticMarkup(<SuiteFacts suite={suite("coding-core")} />);
 		expect(core).toMatch(/data-testid="suites-fact-output".*?>Diff</);
-		expect(core).toMatch(/data-testid="suites-fact-services".*?>none</);
+		expect(core).toMatch(/data-testid="suites-fact-services".*?>-</);
 	});
 
 	it("explains a judged suite in plain words and shows where an imported suite came from", () => {
 		const html = renderToStaticMarkup(<SuiteFacts suite={suite("memory-recall")} />);
-		expect(html).toMatch(/data-testid="suites-fact-grading".*?data-tone="warn".*?>Judged</);
+		expect(html).toMatch(/data-testid="suites-fact-grading"[^>]*>.*?>Judged</);
 		expect(html).toMatch(/data-testid="suites-judged-note"/);
 		expect(html).toContain("a judge model decides whether each answer is correct");
 		expect(html).toContain("never ranked against, or compared with, a verified benchmark");

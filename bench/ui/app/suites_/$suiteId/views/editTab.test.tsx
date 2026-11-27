@@ -4,7 +4,7 @@ import { mutation, okQuery, render } from "@/lib/testing/render";
 import { LOCAL_SESSION } from "@/lib/session/sessionContext";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { describe, expect, it, vi } from "vitest";
-import { EditTab, LintResult } from "./editTab";
+import { EditTab, groupFiles, LintResult } from "./editTab";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/jobs/jobRunButton", () => ({ JobRunButton: ({ kind }: { kind: string }) => <button data-testid={`job-run-${kind}`} /> }));
@@ -53,5 +53,14 @@ describe("EditTab", () => {
 		expect(bad).toContain("tasks/t01/instruction.md");
 		const broken = render(<LintResult report={{ suite: "s", version: "", tasks: 0, probes: 0, errors: 1, warnings: 0, problems: [], load_error: "schema" }} />);
 		expect(broken).toContain('data-testid="suite-edit-lint-load-error"');
+	});
+});
+
+describe("groupFiles (M6-39)", () => {
+	it("groups task files by task folder, root files first, numbers in order", () => {
+		const groups = groupFiles(["tasks/t10/task.toml", "suite.toml", "tasks/t2/task.toml", "tasks/t2/tests/test_a.py", "base/Dockerfile"]);
+		expect(groups.map((g) => g.folder)).toEqual(["", "base", "tasks/t2", "tasks/t10"]);
+		expect(groups[2].files.map((f) => f.name)).toEqual(["task.toml", "tests/test_a.py"]);
+		expect(groups[2].files[0].path).toBe("tasks/t2/task.toml");
 	});
 });

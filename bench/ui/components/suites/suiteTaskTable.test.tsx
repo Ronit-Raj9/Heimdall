@@ -59,9 +59,9 @@ describe("SuiteTaskTable", () => {
   it("flags a missing license and an unadmitted task", () => {
     const html = render(undefined, harbor.tasks);
     expect(row(html, "h02")).toMatch(
-      /data-testid="suites-task-license-h02"><span class="text-chart-warning-ink">none</,
+      /data-testid="suites-task-license-h02"><span class="text-warning-ink">none</,
     );
-    expect(row(html, "h01")).toContain("readiness check not run yet");
+		expect(row(html, "h01")).not.toContain("readiness check not run yet");
   });
 
   it("opens a task from a real button that reports whether it is expanded", () => {

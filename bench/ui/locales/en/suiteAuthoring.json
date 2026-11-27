@@ -2,11 +2,11 @@
 	"tab": "Edit",
 	"new": {
 		"title": "New benchmark",
-		"subtitle": "Start from a template. You can add tasks, upload files and lint right after.",
+		"subtitle": "Start from a template. You can add tasks, upload files and check them right after.",
 		"id": "Benchmark id",
 		"idHint": "Lowercase letters, digits, '.', '_' or '-'. It becomes the folder name.",
 		"template": "Template",
-		"image": "Existing toolchain image (optional)",
+		"image": "Existing container image (optional)",
 		"imageHint": "Leave empty to build base/Dockerfile from the template.",
 		"create": "Create benchmark",
 		"creating": "Creating...",
@@ -72,14 +72,14 @@
 		"createTask": "Create task",
 		"taskCreated": "Task {{task}} created",
 		"taskError": "Could not create the task",
-		"lint": "Lint",
-		"lintNow": "Check now",
-		"lintJob": "Lint (job)",
-		"lock": "Lock",
-		"lockConfirm": "Write the benchmark lock file from the files as they are now?",
-		"lintOk": "Lint passes: {{tasks}} tasks, no errors.",
+		"lint": "File check",
+		"lintNow": "Check files",
+		"lintJob": "Check in the background",
+		"lock": "Freeze this version",
+		"lockConfirm": "Freeze this version? Every task is pinned to its current files. Later edits to a task need a new freeze.",
+		"lintOk": "Files pass the check: {{tasks}} tasks, no errors.",
 		"lintSummary": "{{errors}} errors, {{warnings}} warnings",
 		"loadErrorLint": "The benchmark does not load",
-		"lintUnavailable": "Lint unavailable"
+		"lintUnavailable": "File check unavailable"
 	}
 }

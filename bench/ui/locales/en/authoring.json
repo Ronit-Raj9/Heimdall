@@ -19,7 +19,7 @@
 		},
 		"provider": "Provider",
 		"model": "Model",
-		"modelHint": "Pick a model from another family than the judge and the agent you test, so one model does not grade its own words.",
+		"modelHint": "Pick a model from your model keys. Choose another family than the judge and the agent you test, so one model does not grade its own words.",
 		"budget": "Budget (USD)",
 		"budgetHint": "A hard cap for the whole job, charged to your own model key.",
 		"estimate": "Estimate the cost",
@@ -76,7 +76,7 @@
 		"confirmPublic": "Hold out public tasks too",
 		"preview": "Preview",
 		"apply": "Hold out",
-		"applyConfirm": "Hold out {{count}} tasks? Their instructions change, so lock the benchmark and run the readiness check again.",
+		"applyConfirm": "Hold out {{count}} tasks? Their instructions change, so freeze this version and run the readiness check again.",
 		"result": "{{held}} held out, {{public}} public",
 		"refused": "Public data, not held out: {{tasks}}"
 	}

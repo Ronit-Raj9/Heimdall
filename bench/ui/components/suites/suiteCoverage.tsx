@@ -69,10 +69,10 @@ export function LicenseSummary({ tasks }: { tasks: readonly SuiteTask[] }) {
 			{missing.length > 0 && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
+					className="border-warning bg-warning-soft text-foreground flex items-start gap-2 rounded-sm border px-3 py-2 text-xs"
 					data-testid="suites-license-missing"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 					<span className="min-w-0 break-words">
 						{t("suites.licenses.missingWarning", { count: missing.length, tasks: missing.join(", ") })}
 					</span>
@@ -83,6 +83,12 @@ export function LicenseSummary({ tasks }: { tasks: readonly SuiteTask[] }) {
 }
 
 /** Probes grouped by the PS2 failure family they cover. */
+/** M6-38: a probe id in plain words: "unavailable-model" reads "Unavailable model". Exported for tests. */
+export function probeLabel(id: string): string {
+	const words = id.replace(/[-_.]+/g, " ").trim();
+	return words ? words[0].toUpperCase() + words.slice(1) : id;
+}
+
 export function ProbeList({ probes }: { probes: readonly SuiteProbe[] }) {
 	const { t } = useTranslation("bench");
 	const groups = probesByFamily(probes);
@@ -105,14 +111,14 @@ export function ProbeList({ probes }: { probes: readonly SuiteProbe[] }) {
 							<ul className="flex min-w-0 flex-col gap-2">
 								{group.probes.map((probe) => (
 									<li key={probe.id} className="flex min-w-0 flex-col gap-1" data-testid={`suites-probe-${probe.id}`}>
-										<span className="flex flex-wrap items-center gap-1.5">
-											<span className="text-foreground font-mono text-xs">{probe.id}</span>
-											<ToneBadge tone="neutral" className="px-1 py-0 text-[10px]">
+										{/* M6-38: a plain label; the probe id and axis are in the tooltip. */}
+										<span className="flex flex-wrap items-center gap-1.5" title={`${probe.id} · ${t("suites.probes.axis", { axis: probe.axis })}`}>
+											<span className="text-foreground text-xs font-medium">{probeLabel(probe.id)}</span>
+											<ToneBadge tone="neutral" className="px-1.5 py-0 text-xs">
 												{layerLabel(probe.layer, t)}
 											</ToneBadge>
-											<span className="text-muted-foreground text-[11px]">{t("suites.probes.axis", { axis: probe.axis })}</span>
 											{probe.goal_preserving && (
-												<ToneBadge tone="good" className="px-1 py-0 text-[10px]" hint={t("suites.probes.goalPreservingHint")}>
+												<ToneBadge tone="good" className="px-1.5 py-0 text-xs" hint={t("suites.probes.goalPreservingHint")}>
 													{t("suites.probes.goalPreserving")}
 												</ToneBadge>
 											)}

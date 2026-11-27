@@ -38,10 +38,9 @@ describe("SuiteDeleteSection (N288)", () => {
 		state.error = undefined;
 		const html = render(<SuiteDeleteSection suiteId="zz-test-del" builtin={false} />);
 		expect(html).toContain("Delete this benchmark");
-		expect(html).toContain(
-			"Delete zz-test-del? Its tasks and files go. Comparisons, evaluations and runs that used it stay readable. This cannot be undone.",
-		);
-		expect(html).toContain("|Delete benchmark</span>");
+		// M6-35: the same question and confirm label as the benchmarks list row Delete.
+		expect(html).toContain("Delete the benchmark zz-test-del? Its tasks and files are removed. Past results stay. This cannot be undone.");
+		expect(html).toContain("|Delete</span>");
 	});
 
 	it("shows the server's refusal", () => {

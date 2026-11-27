@@ -6,6 +6,7 @@ import type { HealthFlag, SuiteSummary, SuiteTask, TaskHealth, TaskQuarantine } 
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, CircleDashed, EyeOff, ShieldAlert, ShieldOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./uf6aI18n";
 import { ToneBadge } from "./suiteBadges";
 import {
 	HEALTH_FLAG_TONE,
@@ -81,12 +82,15 @@ function chipLabel(chip: HealthChip, health: TaskHealth | undefined, t: TFunctio
  */
 export function TaskHealthCell({ task, health }: { task: SuiteTask; health: HealthState }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
 	const locale = getLocale();
 	const testId = `suites-task-health-${task.id}`;
 	if (health.state === "loading") {
 		return (
+			// M6-5: one status line above the tabs says health is loading; each cell shows only a dash.
 			<span className="text-muted-foreground text-xs" data-testid={testId} data-state="loading">
-				{t("suiteHealth.loading")}
+				<span aria-hidden="true">-</span>
+				<span className="sr-only">{t("suiteHealth.loading")}</span>
 			</span>
 		);
 	}
@@ -108,7 +112,7 @@ export function TaskHealthCell({ task, health }: { task: SuiteTask; health: Heal
 								hint={t(`suiteHealth.flagHints.${chip.key}`)}
 								testId={`${testId}-${chip.key}`}
 							>
-								{chipLabel(chip, taskHealth, t, locale)}
+								{chip.key === "insufficient_data" ? tf("health.tooFewChip") : chipLabel(chip, taskHealth, t, locale)}
 							</ToneBadge>
 						),
 					)}
@@ -151,6 +155,7 @@ export function healthUnavailableText(health: Extract<HealthState, { state: "una
  */
 export function SuiteHealthSummary({ suite, health }: { suite: SuiteSummary; health: HealthState }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
 	const locale = getLocale();
 	const { heldOut, quarantined } = heldOutAndQuarantined(suite);
 	const stats: { key: string; label: string; hint?: string; value: React.ReactNode }[] = [
@@ -198,6 +203,11 @@ export function SuiteHealthSummary({ suite, health }: { suite: SuiteSummary; hea
 						<span className="font-medium">{t("suiteHealth.unavailable")}.</span> {healthUnavailableText(health, t)}
 					</span>
 				</p>
+			) : health.health.runs === 0 ? (
+				// M6-37: with no runs there is nothing to rate; one line says when health appears.
+				<p className="text-muted-foreground text-sm" data-testid="suites-health-no-runs">
+					{tf("health.noRuns", { count: health.health.thresholds.min_runs })}
+				</p>
 			) : (
 				<div className="flex min-w-0 flex-col gap-2" data-testid="suites-health-report">
 					<p className="text-muted-foreground text-xs">
@@ -208,17 +218,20 @@ export function SuiteHealthSummary({ suite, health }: { suite: SuiteSummary; hea
 						})}
 					</p>
 					<FlagCounts counts={health.health.counts} />
-					<p className="text-muted-foreground text-[11px]" data-testid="suites-health-thresholds">
-						{t("suiteHealth.thresholds", {
-							minRuns: health.health.thresholds.min_runs,
-							minConfigs: health.health.thresholds.min_configs,
-							easy: formatPercent(health.health.thresholds.easy_above, locale) ?? "",
-							hard: formatPercent(health.health.thresholds.hard_below, locale) ?? "",
-							level: formatPercent(health.health.thresholds.interval_level, locale) ?? "",
-							infra: formatPercent(health.health.thresholds.infra_rate, locale) ?? "",
-							timeout: formatPercent(health.health.thresholds.timeout_rate, locale) ?? "",
-						})}
-					</p>
+					<details className="text-xs">
+						<summary className="text-muted-foreground hover:text-foreground cursor-pointer">{tf("health.method")}</summary>
+						<p className="text-muted-foreground mt-1 text-xs" data-testid="suites-health-thresholds">
+							{t("suiteHealth.thresholds", {
+								minRuns: health.health.thresholds.min_runs,
+								minConfigs: health.health.thresholds.min_configs,
+								easy: formatPercent(health.health.thresholds.easy_above, locale) ?? "",
+								hard: formatPercent(health.health.thresholds.hard_below, locale) ?? "",
+								level: formatPercent(health.health.thresholds.interval_level, locale) ?? "",
+								infra: formatPercent(health.health.thresholds.infra_rate, locale) ?? "",
+								timeout: formatPercent(health.health.thresholds.timeout_rate, locale) ?? "",
+							})}
+						</p>
+					</details>
 					{health.health.notes.length > 0 && (
 						<div className="flex min-w-0 flex-col gap-0.5 text-xs" data-testid="suites-health-notes">
 							<span className="text-muted-foreground">{t("suiteHealth.notes")}</span>
@@ -240,10 +253,11 @@ export function SuiteHealthSummary({ suite, health }: { suite: SuiteSummary; hea
 /** Tasks per health flag; the flaky verifier count is red, everything else amber or grey. */
 function FlagCounts({ counts }: { counts: Record<string, number> }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
 	const rows = flagCounts(counts);
 	if (rows.length === 0) {
 		return (
-			<p className="text-chart-success-ink text-xs" data-testid="suites-health-no-flags">
+			<p className="text-success-ink text-xs" data-testid="suites-health-no-flags">
 				{t("suiteHealth.noFlags")}
 			</p>
 		);
@@ -261,7 +275,10 @@ function FlagCounts({ counts }: { counts: Record<string, number> }) {
 							testId={`suites-health-count-${flag}`}
 							className={cn("tabular-nums")}
 						>
-							{known ? t(`suiteHealth.flags.${flag as HealthFlag}`) : flag}: {count}
+							{/* M6-9: "3 tasks have too few runs to rate", not "New: not enough runs yet: 3". */}
+						{flag === "insufficient_data"
+							? tf("health.tooFewRuns", { count })
+							: `${known ? t(`suiteHealth.flags.${flag as HealthFlag}`) : flag}: ${count}`}
 						</ToneBadge>
 					</li>
 				);

@@ -24,6 +24,7 @@ import type { SuiteLintReport } from "@/lib/types/suiteAuthoring";
 import { FileText, Lock } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/uf6aI18n";
 
 const MAX_FILE = 1 << 20;
 
@@ -131,7 +132,7 @@ export function LintResult({ report }: { report: SuiteLintReport }) {
 	return (
 		<div className="flex flex-col gap-1 text-sm" data-testid="suite-edit-lint-result">
 			{report.errors === 0 ? (
-				<p className="text-chart-success-ink" data-testid="suite-edit-lint-ok">
+				<p className="text-success-ink" data-testid="suite-edit-lint-ok">
 					{t("edit.lintOk", { tasks: report.tasks })}{" "}
 					{report.warnings > 0 && t("edit.lintSummary", { errors: 0, warnings: report.warnings })}
 				</p>
@@ -202,8 +203,29 @@ function AddTaskForm({ suiteId, onCreated }: { suiteId: string; onCreated(task: 
 	);
 }
 
+/**
+ * M6-39: file paths grouped by folder: "tasks/<id>" for a task's files, else the top folder, ""
+ * for files at the root. Groups and files keep a stable sorted order. Exported for tests.
+ */
+export function groupFiles(paths: readonly string[]): { folder: string; files: { path: string; name: string }[] }[] {
+	const groups = new Map<string, { path: string; name: string }[]>();
+	for (const path of paths) {
+		const parts = path.split("/");
+		const depth = parts[0] === "tasks" && parts.length > 2 ? 2 : parts.length > 1 ? 1 : 0;
+		const folder = parts.slice(0, depth).join("/");
+		const name = parts.slice(depth).join("/");
+		const list = groups.get(folder) ?? [];
+		list.push({ path, name });
+		groups.set(folder, list);
+	}
+	return [...groups.entries()]
+		.sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b, undefined, { numeric: true })))
+		.map(([folder, files]) => ({ folder, files: files.sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true })) }));
+}
+
 function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: string | null; onSelect(p: string): void }) {
 	const { t } = useTranslation("suiteAuthoring");
+	const { t: tf } = useTranslation("uf6a");
 	const files = useGetSuiteFilesQuery(suiteId);
 	const [newPath, setNewPath] = useState("");
 	const pathWhy = suitePathProblem(newPath);
@@ -213,20 +235,36 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 			<span className="px-1 text-sm font-medium">{t("edit.files")}</span>
 			{files.error && <p className="text-destructive px-1 text-xs">{authoringError(files.error, t("edit.loadError"))}</p>}
 			{list.length === 0 && !files.isLoading && !files.error && <p className="text-muted-foreground px-1 text-xs">{t("edit.noFiles")}</p>}
-			<ul className="flex max-h-[28rem] flex-col overflow-auto font-mono text-xs">
-				{list.map((f) => (
-					<li key={f.path}>
-						<button
-							type="button"
-							onClick={() => onSelect(f.path)}
-							className={`hover:bg-muted w-full truncate rounded-sm px-1 py-0.5 text-left ${selected === f.path ? "bg-muted font-semibold" : ""}`}
-							title={f.path}
-						>
-							{f.path}
-						</button>
-					</li>
+			{/* M6-39: files grouped by task folder, each group collapsible; rows show the name, the full path is the title. */}
+			<div className="flex max-h-[28rem] flex-col gap-1 overflow-auto text-xs">
+				{groupFiles(list.map((f) => f.path)).map((group) => (
+					<details
+						key={group.folder}
+						open={group.files.some((f) => f.path === selected) || undefined}
+						className="group/folder"
+						data-testid={`suite-edit-folder-${group.folder || "root"}`}
+					>
+						<summary className="hover:bg-muted text-muted-foreground flex min-h-8 cursor-pointer items-center gap-1 rounded-sm px-1 font-mono">
+							{group.folder || tf("edit.rootFolder")}
+							<span className="ml-auto tabular-nums">{group.files.length}</span>
+						</summary>
+						<ul className="flex flex-col pl-3 font-mono">
+							{group.files.map((f) => (
+								<li key={f.path}>
+									<button
+										type="button"
+										onClick={() => onSelect(f.path)}
+										className={`hover:bg-muted flex min-h-8 w-full items-center truncate rounded-sm px-1 text-left ${selected === f.path ? "bg-muted font-semibold" : ""}`}
+										title={f.path}
+									>
+										{f.name}
+									</button>
+								</li>
+							))}
+						</ul>
+					</details>
 				))}
-			</ul>
+			</div>
 			<form
 				className="flex flex-col gap-1 border-t pt-2"
 				onSubmit={(e) => {

@@ -11,7 +11,7 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useQuarantineTaskMutation, useRestoreTaskMutation } from "@/lib/store/apis/suiteOpsApi";
 import { useAppDispatch } from "@/lib/store/hooks";
-import type { Job, SuiteSummary, SuiteTask } from "@/lib/types/bench";
+import type { SuiteSummary, SuiteTask } from "@/lib/types/bench";
 import { SUITE_OPS_KINDS, type RepoSource, type TaskFromCommitParams, type TasksMineParams } from "@/lib/types/suiteops";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,7 +27,7 @@ type T = ReturnType<typeof useTranslation<"suiteops">>["t"];
 /** A job button that cannot run yet, with the reason as visible text under it (p11-7d). */
 export function DisabledRun({ label, reason, testId }: { label: string; reason: string; testId: string }) {
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col items-start gap-1">
 			<Button disabled aria-describedby={`${testId}-why`} data-testid={testId}>
 				{label}
 			</Button>
@@ -42,13 +42,16 @@ const splitList = (s: string) =>
 		.map((v) => v.trim())
 		.filter(Boolean);
 
-/** Ops tab of a suite (web parity lane L11): checks and admission, quarantine, task from commit, mine. */
+/**
+ * Ops part of a suite (web parity lane L11): pausing tasks. Since M6-11 and M6-12 it is a section of
+ * the Build tab: the readiness steps live in the ReadinessChecklist (Build section 4 and the Tasks tab),
+ * and task from a commit and history mining are the "From a bug fix commit" source of Build "2. Add tasks".
+ */
 export function OpsTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("suiteops");
 	const session = useSession();
 	const builtin = isBuiltinSuite(suite); // built-in library: read-only for every org
 	const writable = canUse(session, "member") && !builtin;
-	const hosted = session.authMode === "hosted";
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-ops-tab">
 			{builtin && <BuiltinReadOnlyNote testId="suite-ops-builtin" />}
@@ -57,10 +60,7 @@ export function OpsTab({ suite }: { suite: SuiteSummary }) {
 					{t("viewerNote")}
 				</p>
 			)}
-			<ChecksSection suite={suite} writable={writable} hosted={hosted && !builtin} t={t} />
 			<QuarantineSection suite={suite} writable={writable} t={t} />
-			{writable && <FromCommitSection suite={suite} hosted={hosted} t={t} />}
-			{writable && <MineSection suite={suite} hosted={hosted} t={t} />}
 		</div>
 	);
 }
@@ -76,52 +76,6 @@ function useRefreshSuite(suiteId: string) {
 			]),
 		);
 	}, [dispatch, suiteId]);
-}
-
-function ChecksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; writable: boolean; hosted: boolean; t: T }) {
-	const refresh = useRefreshSuite(suite.id);
-	const [frozen, setFrozen] = useState(false);
-	const lockDone = useCallback(
-		(job: Job) => {
-			refresh();
-			setFrozen(job.status === "succeeded");
-		},
-		[refresh],
-	);
-	return (
-		<Section title={t("checks.title")} description={t("checks.description")} testId="suite-ops-checks">
-			{writable ? (
-				<div className="flex flex-wrap items-start gap-2">
-					<JobRunButton kind={SUITE_OPS_KINDS.lint} params={{ suite: suite.id }} label={t("checks.lint")} variant="outline" />
-					<JobRunButton
-						kind={SUITE_OPS_KINDS.lock}
-						params={{ suite: suite.id }}
-						label={t("checks.lock")}
-						variant="outline"
-						confirm={t("checks.lockConfirm", { suite: suite.id })}
-						onDone={lockDone}
-					/>
-					<JobRunButton
-						kind={SUITE_OPS_KINDS.admit}
-						params={{ suite: suite.id }}
-						label={t("checks.admit")}
-						confirm={hosted ? t("checks.hostedAdmitConfirm", { suite: suite.id }) : t("checks.admitConfirm", { suite: suite.id })}
-						onDone={refresh}
-					/>
-				</div>
-			) : null}
-			{frozen && (
-				<p role="status" className="mt-2 text-sm" data-testid="suite-ops-lock-done">
-					{t("checks.lockDone")}
-				</p>
-			)}
-			{hosted && (
-				<p className="text-muted-foreground mt-2 text-sm" data-testid="suite-ops-hosted-admit">
-					{t("checks.hostedAdmit", { suite: suite.id })}
-				</p>
-			)}
-		</Section>
-	);
 }
 
 function QuarantineSection({ suite, writable, t }: { suite: SuiteSummary; writable: boolean; t: T }) {
@@ -157,6 +111,8 @@ function QuarantineSection({ suite, writable, t }: { suite: SuiteSummary; writab
 
 function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: SuiteTask; writable: boolean; t: T }) {
 	const [reason, setReason] = useState("");
+	// M6-28: the reason box opens only after Pause is pressed on this row, not on every row.
+	const [asking, setAsking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [quarantine, q] = useQuarantineTaskMutation();
 	const [restore, r] = useRestoreTaskMutation();
@@ -169,7 +125,10 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 		setError(null);
 		const res = await quarantine({ suite: suiteId, task: task.id, reason: reason.trim() });
 		if ("error" in res && res.error) setError(getBenchErrorMessage(res.error));
-		else setReason("");
+		else {
+			setReason("");
+			setAsking(false);
+		}
 	};
 	const doRestore = async () => {
 		setError(null);
@@ -182,7 +141,7 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 				<span className="font-mono text-sm">{task.id}</span>
 				{task.redacted && <span className="text-muted-foreground text-xs">{t("health.redacted")}</span>}
 				{task.quarantine ? (
-					<span className="text-chart-warning-ink text-xs">{t("health.quarantined", { reason: task.quarantine.reason })}</span>
+					<span className="text-warning-ink text-xs">{t("health.quarantined", { reason: task.quarantine.reason })}</span>
 				) : (
 					<>
 						<AdmissionBadge task={task} testId={`suite-ops-admission-${task.id}`} />
@@ -201,31 +160,51 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 							>
 								{t("health.restore")}
 							</Button>
-						) : (
-							<>
-								<Input
-									className="h-8 w-56"
-									value={reason}
-									maxLength={500}
-									placeholder={t("health.reasonPlaceholder")}
-									aria-label={t("health.reasonPlaceholder")}
-									onChange={(e) => setReason(e.target.value)}
-									data-testid={`suite-ops-reason-${task.id}`}
-								/>
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={busy}
-									onClick={() => void doQuarantine()}
-									data-testid={`suite-ops-quarantine-${task.id}`}
-								>
-									{t("health.quarantine")}
-								</Button>
-							</>
-						)}
+						) : !asking ? (
+							<Button size="sm" variant="outline" onClick={() => setAsking(true)} data-testid={`suite-ops-quarantine-${task.id}`}>
+								{t("health.quarantine")}
+							</Button>
+						) : null}
 					</span>
 				)}
 			</div>
+			{writable && !task.quarantine && asking && (
+				<form
+					className="flex flex-wrap items-center gap-2"
+					aria-label={t("health.askTitle", { task: task.id })}
+					onSubmit={(e) => {
+						e.preventDefault();
+						void doQuarantine();
+					}}
+					data-testid={`suite-ops-ask-${task.id}`}
+				>
+					<Input
+						className="h-8 w-full min-w-0 sm:w-72"
+						value={reason}
+						maxLength={500}
+						autoFocus
+						placeholder={t("health.reasonPlaceholder")}
+						aria-label={t("health.reasonPlaceholder")}
+						onChange={(e) => setReason(e.target.value)}
+						data-testid={`suite-ops-reason-${task.id}`}
+					/>
+					<Button size="sm" type="submit" disabled={busy} data-testid={`suite-ops-quarantine-confirm-${task.id}`}>
+						{t("health.quarantine")}
+					</Button>
+					<Button
+						size="sm"
+						variant="ghost"
+						type="button"
+						onClick={() => {
+							setAsking(false);
+							setError(null);
+						}}
+						data-testid={`suite-ops-quarantine-cancel-${task.id}`}
+					>
+						{t("health.cancel")}
+					</Button>
+				</form>
+			)}
 			{error && (
 				<p role="alert" className="text-destructive text-xs">
 					{error}
@@ -306,8 +285,35 @@ export function repoParams(v: RepoSource): RepoSource | null {
 	return branch ? { github, branch } : { github };
 }
 
-export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
+/**
+ * M6-29: Build "2. Add tasks", source "From a bug fix commit": one repository and branch for both
+ * ways of cutting tasks (one commit, or a search of the history).
+ */
+export function CommitSources({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
 	const [src, setSrc] = useState<RepoSource>({ github: "" });
+	return (
+		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-build-commit-sources">
+			<RepoPicker value={src} onChange={setSrc} hosted={hosted} t={t} testId="suite-ops-commit-repo" />
+			<FromCommitSection suite={suite} hosted={hosted} t={t} src={src} />
+			<MineSection suite={suite} hosted={hosted} t={t} src={src} />
+		</div>
+	);
+}
+
+export function FromCommitSection({
+	suite,
+	hosted,
+	t,
+	src: shared,
+}: {
+	suite: SuiteSummary;
+	hosted: boolean;
+	t: T;
+	/** The repository picked once above (CommitSources); without it the section has its own picker. */
+	src?: RepoSource;
+}) {
+	const [own, setOwn] = useState<RepoSource>({ github: "" });
+	const src = shared ?? own;
 	const [id, setId] = useState("");
 	const [base, setBase] = useState("");
 	const [reference, setReference] = useState("");
@@ -327,7 +333,7 @@ export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; h
 	return (
 		<Section title={t("fromCommit.title")} description={t("fromCommit.description")} testId="suite-ops-from-commit">
 			<div className="flex min-w-0 flex-col gap-3">
-				<RepoPicker value={src} onChange={setSrc} hosted={hosted} t={t} testId="suite-ops-from-commit-repo" />
+				{!shared && <RepoPicker value={src} onChange={setOwn} hosted={hosted} t={t} testId="suite-ops-from-commit-repo" />}
 				<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
 					<Field label={t("fromCommit.id")}>
 						<Input value={id} onChange={(e) => setId(e.target.value)} data-testid="suite-ops-from-commit-id" />
@@ -354,8 +360,9 @@ export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; h
 	);
 }
 
-function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
-	const [src, setSrc] = useState<RepoSource>({ github: "" });
+function MineSection({ suite, hosted, t, src: shared }: { suite: SuiteSummary; hosted: boolean; t: T; src?: RepoSource }) {
+	const [own, setOwn] = useState<RepoSource>({ github: "" });
+	const src = shared ?? own;
 	const [since, setSince] = useState("");
 	const [limit, setLimit] = useState(5);
 	const [dryRun, setDryRun] = useState(true);
@@ -369,7 +376,7 @@ function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolea
 	return (
 		<Section title={t("mine.title")} description={t("mine.description")} testId="suite-ops-mine">
 			<div className="flex min-w-0 flex-col gap-3">
-				<RepoPicker value={src} onChange={setSrc} hosted={hosted} t={t} testId="suite-ops-mine-repo" />
+				{!shared && <RepoPicker value={src} onChange={setOwn} hosted={hosted} t={t} testId="suite-ops-mine-repo" />}
 				<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
 					<Field label={t("mine.since")}>
 						<Input value={since} onChange={(e) => setSince(e.target.value)} />

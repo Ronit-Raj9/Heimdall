@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/uf6aI18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -57,7 +58,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -101,9 +102,10 @@ export const canDecide = (decision: "accepted" | "rejected", note: string) => de
 export function ReviewTab({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-review-tab">
+			{/* M6-78: the free quality checks come first; the paid drafting after them. */}
+			<QualitySection suite={suite} />
 			<DraftSection suite={suite} />
 			<QueueSection suite={suite} />
-			<QualitySection suite={suite} />
 			<GuardChecks suite={suite} />
 			<SplitSection suite={suite} />
 		</div>
@@ -118,6 +120,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 		judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"],
 	);
 	const { t: tm } = useTranslation("hw15");
+	const { t: tf } = useTranslation("uf6a");
 	const queue = useGetGeneratedTasksQuery(suite.id);
 	const [picked, setPicked] = useState<PickedModel | null>(null);
 	// N278: the picker starts on the last assist model recorded on the generated fields, until a person picks.
@@ -151,7 +154,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 						<label key={op} className={cn("flex items-start gap-2 text-sm", off && "opacity-50")}>
 							<input
 								type="checkbox"
-								className="mt-1"
+								className="mt-0.5 size-4 shrink-0"
 								checked={ops.includes(op) && !off}
 								disabled={off}
 								onChange={() => toggle(op)}
@@ -192,7 +195,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 					<JobRunButton
 						kind={ASSIST_KIND}
 						params={run}
-						label={t("draft.run")}
+						label={tf("review.run", { budget: budget.toFixed(2) })}
 						confirm={t("draft.confirm", { model: `${provider.trim()}/${model.trim()}`, budget: budget.toFixed(2) })}
 						onDone={onDone}
 					/>
@@ -227,21 +230,27 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 	return (
 		<Section title={t("queue.title")} description={t("queue.description")} testId="suite-review-queue">
 			{q.isError ? (
-				<p role="alert" className="text-chart-error-ink text-sm">
+				<p role="alert" className="text-danger-ink text-sm">
 					{t("queue.loadError")}: {getBenchErrorMessage(q.error as never)}
 				</p>
 			) : !q.data || q.data.tasks.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="suite-review-queue-empty">
-					{tp("reviewEmpty")}{" "}
-					<Link
-						to="/suites/$suiteId"
-						params={{ suiteId: suite.id }}
-						search={{ tab: "policy" } as never}
-						className="text-primary underline"
-						data-testid="suite-review-queue-policy-link"
-					>
-						{tp("reviewEmptyLink")}
-					</Link>
+					{tp("reviewEmpty")}
+					{/* The policy section applies to support benchmarks only (M6-17). */}
+					{suite.track === "support" && (
+						<>
+							{" "}
+							<Link
+								to="/suites/$suiteId"
+								params={{ suiteId: suite.id }}
+								search={{ tab: "policy" } as never}
+								className="text-primary underline"
+								data-testid="suite-review-queue-policy-link"
+							>
+								{tp("reviewEmptyLink")}
+							</Link>
+						</>
+					)}
 				</p>
 			) : (
 				<>
@@ -260,9 +269,9 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 }
 
 const stateTone: Record<string, string> = {
-	pending: "border-chart-warning/50 bg-chart-warning/10",
-	accepted: "border-chart-success/40 bg-chart-success/10",
-	rejected: "border-chart-error/40 bg-chart-error/10",
+	pending: "border-warning bg-warning-soft",
+	accepted: "border-success bg-success-soft",
+	rejected: "border-danger bg-danger-soft",
 };
 
 function GeneratedRow({ suite, task, t }: { suite: string; task: GeneratedTask; t: T }) {
@@ -392,7 +401,7 @@ export function QualityBody({ report, t }: { report: QualityReport; t: T }) {
 					<h4 className="mb-1 font-medium">{t("quality.public")}</h4>
 					<ul className="flex flex-col gap-1">
 						{hits.map((h) => (
-							<li key={h.task} className={cn("text-xs", h.severity === "error" && "text-chart-error-ink")}>
+							<li key={h.task} className={cn("text-xs", h.severity === "error" && "text-danger-ink")}>
 								<span className="font-mono">{h.task}</span> {t("quality.overlap", { pct: pct(h.overlap), matches: h.matches.join(", ") })}
 								{h.severity === "error" && ` (${t("quality.heldOutError")})`}
 							</li>
@@ -541,7 +550,7 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 				<div className="flex flex-col gap-1 text-sm" data-testid="suite-review-split-result">
 					<span>{t("split.result", { held: state.result.held_out, public: state.result.public })}</span>
 					{(state.result.refused?.length ?? 0) > 0 && (
-						<span className="text-chart-warning-ink">{t("split.refused", { tasks: state.result.refused!.join(", ") })}</span>
+						<span className="text-warning-ink">{t("split.refused", { tasks: state.result.refused!.join(", ") })}</span>
 					)}
 					<span className="text-muted-foreground">{state.result.next}</span>
 				</div>

@@ -16,7 +16,10 @@ import type {
 	RowImportStatus,
 	RowMapping,
 } from "@/lib/types/suiteBuild";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileDrop } from "@/components/onboard/sourceBox";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import "@/components/suites/uf6aI18n";
 import { useTranslation } from "react-i18next";
 
 // Row import with a column mapping step, attached files and background imports (lane Y13).
@@ -39,7 +42,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 export function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -176,6 +179,14 @@ export function columnLabel(c: RowColumn, t: T): string {
 	return `${c.path} (${kind})${ex}`;
 }
 
+/** M3-60: the fields shown at once (Question, Expected answer); the rest sit under "More columns". */
+export const PRIMARY_MAP_FIELDS: readonly string[] = ["question", "expected"];
+
+/** Splits the offered fields into the shown ones and the "More columns" ones, keeping their order. */
+export function splitMapFields<F extends string>(fields: readonly F[]): { main: F[]; more: F[] } {
+	return { main: fields.filter((f) => PRIMARY_MAP_FIELDS.includes(f)), more: fields.filter((f) => !PRIMARY_MAP_FIELDS.includes(f)) };
+}
+
 /** Mapping step: one column per task field, metadata columns, and the remember checkbox. */
 export function MappingStep({
 	columns,
@@ -214,40 +225,47 @@ export function MappingStep({
 		const next = meta.has(path) ? [...meta].filter((p) => p !== path) : [...meta, path];
 		onChange({ ...mapping, metadata: next });
 	};
+	const { t: tf } = useTranslation("uf6a");
+	const split = splitMapFields(fields);
+	const fieldSelect = (f: (typeof MAP_FIELDS)[number]) => (
+		<Field key={f} label={t(`rows.map.field.${f}`)}>
+			<select
+				className={selectClass}
+				value={mapping[f] ?? ""}
+				disabled={disabled}
+				onChange={(e) => onChange({ ...mapping, [f]: e.target.value })}
+				data-testid={`suite-build-map-${f}`}
+			>
+				<option value="">{t("rows.map.auto")}</option>
+				<option value="-">{t("rows.map.skip")}</option>
+				{columns.map((c) => (
+					<option key={c.path} value={c.path}>
+						{columnLabel(c, t)}
+					</option>
+				))}
+			</select>
+		</Field>
+	);
 	return (
 		<div className="flex min-w-0 flex-col gap-3 rounded-md border px-3 py-3" data-testid="suite-build-mapping">
 			<div>
 				<p className="text-sm font-medium">{t("rows.map.title")}</p>
 				<p className="text-muted-foreground text-xs">{help ?? t("rows.map.help")}</p>
 			</div>
-			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{fields.map((f) => (
-					<Field key={f} label={t(`rows.map.field.${f}`)}>
-						<select
-							className={selectClass}
-							value={mapping[f] ?? ""}
-							disabled={disabled}
-							onChange={(e) => onChange({ ...mapping, [f]: e.target.value })}
-							data-testid={`suite-build-map-${f}`}
-						>
-							<option value="">{t("rows.map.auto")}</option>
-							<option value="-">{t("rows.map.skip")}</option>
-							{columns.map((c) => (
-								<option key={c.path} value={c.path}>
-									{columnLabel(c, t)}
-								</option>
-							))}
-						</select>
-					</Field>
-				))}
-			</div>
+			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{split.main.map(fieldSelect)}</div>
+			{split.more.length > 0 && (
+				<details className="min-w-0" open={split.more.some((f) => !!mapping[f])} data-testid="suite-build-map-more">
+					<summary className="text-muted-foreground min-h-11 cursor-pointer py-2 text-sm">{tf("rows.moreColumns")}</summary>
+					<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">{split.more.map(fieldSelect)}</div>
+				</details>
+			)}
 			{showMetadata && columns.length > 0 && (
 				<fieldset className="flex min-w-0 flex-col gap-1" data-testid="suite-build-map-metadata">
 					<legend className="text-muted-foreground text-sm">{t("rows.map.metadata")}</legend>
 					<div className="flex flex-wrap gap-x-4 gap-y-1">
 						{columns.map((c) => (
-							<label key={c.path} className="flex items-center gap-1.5 font-mono text-xs">
-								<input type="checkbox" checked={meta.has(c.path)} disabled={disabled} onChange={() => toggleMeta(c.path)} />
+							<label key={c.path} className="flex min-h-11 items-center gap-2 font-mono text-xs">
+								<input type="checkbox" className="size-4 shrink-0" checked={meta.has(c.path)} disabled={disabled} onChange={() => toggleMeta(c.path)} />
 								{c.path}
 							</label>
 						))}
@@ -274,9 +292,10 @@ export function MappingStep({
 				</fieldset>
 			)}
 			{onSaveMapping && (
-				<label className="flex items-center gap-2 text-sm">
+				<label className="flex min-h-11 items-center gap-2 text-sm">
 					<input
 						type="checkbox"
+						className="size-4 shrink-0"
 						checked={!!saveMapping}
 						disabled={disabled}
 						onChange={(e) => onSaveMapping(e.target.checked)}
@@ -302,9 +321,8 @@ export function AttachmentsInput({
 	t: T;
 }) {
 	const [problem, setProblem] = useState("");
-	const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
-		const picked = Array.from(e.target.files ?? []);
-		e.target.value = "";
+	const { t: tf } = useTranslation("uf6a");
+	const onPick = async (picked: File[]) => {
 		if (picked.length === 0) return;
 		const merged = [...files.filter((f) => !picked.some((p) => p.name === f.name)), ...picked.map((p) => ({ name: p.name, size: p.size }))];
 		const bad = attachmentProblem(merged);
@@ -321,13 +339,15 @@ export function AttachmentsInput({
 	return (
 		<div className="flex min-w-0 flex-col gap-1" data-testid="suite-build-attachments">
 			<Field label={t("rows.attach.label")} hint={t("rows.attach.help")}>
-				<input
-					type="file"
+				<FileDrop
+					file={null}
+					onFile={() => undefined}
 					multiple
+					onFiles={(picked) => void onPick(picked)}
 					disabled={disabled}
-					onChange={(e) => void onPick(e)}
-					className="text-sm"
-					data-testid="suite-build-attachments-file"
+					label={tf("rows.attachDrop")}
+					testId="suite-build-attachments-drop"
+					inputTestId="suite-build-attachments-file"
 				/>
 			</Field>
 			{files.length > 0 && (
@@ -348,7 +368,7 @@ export function AttachmentsInput({
 				</ul>
 			)}
 			{problem && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid="suite-build-attachments-error">
+				<p role="alert" className="text-danger-ink text-xs" data-testid="suite-build-attachments-error">
 					{problem}
 				</p>
 			)}
@@ -384,9 +404,9 @@ export function ImportProgress({ status, t }: { status: RowImportStatus; t: T })
 			>
 				<div className="bg-primary h-full transition-[width]" style={{ width: `${pct}%` }} />
 			</div>
-			{status.error && <p className="text-chart-error-ink text-xs">{status.error}</p>}
+			{status.error && <p className="text-danger-ink text-xs">{status.error}</p>}
 			{status.problem_count > 0 && (
-				<p className="text-chart-warning-ink text-xs">{t("rows.progress.problems", { count: status.problem_count })}</p>
+				<p className="text-warning-ink text-xs">{t("rows.progress.problems", { count: status.problem_count })}</p>
 			)}
 			{status.problems.length > 0 && <ProblemList problems={status.problems} t={t} />}
 			{status.next && <p className="text-muted-foreground text-xs">{status.next}</p>}
@@ -466,7 +486,7 @@ export function RowPreview({ result, t }: { result: RowImportResult; t: T }) {
 
 export function ProblemList({ problems, t }: { problems: RowImportResult["problems"]; t: T }) {
 	return (
-		<ul className="text-chart-warning-ink flex flex-col gap-0.5 text-xs" data-testid="suite-build-problems">
+		<ul className="text-warning-ink flex flex-col gap-0.5 text-xs" data-testid="suite-build-problems">
 			{problems.map((p, i) => (
 				<li key={`${p.line}-${i}`}>{t("rows.problem", { line: p.line, message: p.message })}</li>
 			))}
@@ -501,6 +521,7 @@ export interface RowsImportFormProps {
  * for large data, with live progress).
  */
 export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsImportFormProps) {
+	const { t: tf } = useTranslation("uf6a");
 	const tickets = format === "tickets";
 	const dispatch = useAppDispatch();
 	const [data, setData] = useState("");
@@ -562,8 +583,7 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 		setStarted(null);
 		setMapping(null);
 	};
-	const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
+	const onFile = (file: File | null) => {
 		if (!file) return;
 		const f = formatOfFile(file.name);
 		if (f && !tickets) setFileFormat(f);
@@ -608,29 +628,36 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 	const busy = state.isLoading || job?.status === "running";
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid={`suite-build-${format}`}>
-			<p className="text-muted-foreground max-w-3xl text-xs">{tickets ? t("rows.ticketsHelp") : t("rows.help")}</p>
+			{/* M6-21: the columns as a 3-row example table, not a 4-line paragraph. */}
+			{tickets ? (
+				<p className="text-muted-foreground max-w-3xl text-xs">{t("rows.ticketsHelp")}</p>
+			) : (
+				<RowsExample />
+			)}
 			<p className="text-muted-foreground max-w-3xl text-xs" data-testid="suite-build-verbatim">
 				{t("rows.verbatim")}
 			</p>
 			{tickets && exact && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 rounded-md border px-3 py-2 text-xs"
+					className="border-warning bg-warning-soft rounded-md border px-3 py-2 text-xs"
 					data-testid="suite-build-tickets-exact"
 				>
 					{t("rows.ticketsNeedJudge")}
 				</p>
 			)}
 			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("rows.file")}>
-					<input
-						type="file"
+				<div className="flex w-full min-w-0 flex-col gap-1 text-sm sm:w-80">
+					<span className="text-muted-foreground">{t("rows.file")}</span>
+					<FileDrop
+						file={null}
+						onFile={onFile}
 						accept={tickets ? ".json,.jsonl,.txt" : ".csv,.tsv,.jsonl,.ndjson,.json"}
-						onChange={onFile}
-						className="text-sm"
-						data-testid={`suite-build-${format}-file`}
+						label={source ? source : tf("rows.drop")}
+						testId={`suite-build-${format}-drop`}
+						inputTestId={`suite-build-${format}-file`}
 					/>
-				</Field>
+				</div>
 				{!tickets && (
 					<Field label={t("rows.format")}>
 						<select
@@ -660,23 +687,26 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					</Field>
 				)}
 			</div>
-			<textarea
-				className="border-input bg-background min-h-40 w-full rounded-md border p-2 font-mono text-xs"
-				value={data}
-				placeholder={tickets ? t("rows.ticketsPlaceholder") : fileFormat === "csv" ? t("rows.csvPlaceholder") : t("rows.jsonlPlaceholder")}
-				aria-label={t("rows.paste")}
-				onChange={(e) => (setData(e.target.value), reset())}
-				data-testid={`suite-build-${format}-data`}
-			/>
+			<label className="flex min-w-0 flex-col gap-1 text-sm">
+				<span className="text-muted-foreground">{tf("rows.pasteLabel")}</span>
+				<textarea
+					className="border-input bg-card min-h-40 w-full rounded-md border p-2 font-mono text-xs"
+					value={data}
+					placeholder={tickets ? t("rows.ticketsPlaceholder") : fileFormat === "csv" ? t("rows.csvPlaceholder") : t("rows.jsonlPlaceholder")}
+					onChange={(e) => (setData(e.target.value), reset())}
+					data-testid={`suite-build-${format}-data`}
+				/>
+			</label>
 			{mode === "too_big" && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid="suite-build-too-big">
+				<p role="alert" className="text-danger-ink text-xs" data-testid="suite-build-too-big">
 					{t("rows.tooBig")}
 				</p>
 			)}
 			{mode === "async" && <p className="text-muted-foreground text-xs">{t("rows.background")}</p>}
-			<label className="flex items-center gap-2 text-sm">
+			<label className="flex min-h-11 items-center gap-2 text-sm">
 				<input
 					type="checkbox"
+					className="size-4 shrink-0"
 					checked={heldOut}
 					onChange={(e) => (setHeldOut(e.target.checked), reset())}
 					data-testid={`suite-build-${format}-held-out`}
@@ -697,11 +727,19 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					disabled={!preview || count === 0 || busy}
 					isLoading={state.isLoading}
 					onClick={() => void doImport()}
+					aria-describedby={!preview ? `suite-build-${format}-import-why` : undefined}
 					dataTestId={`suite-build-${format}-import`}
 				>
 					{preview ? t("rows.import", { count }) : t("rows.importIdle")}
 				</Button>
 			</div>
+			{!preview && !busy && (
+				<WhyDisabled
+					reason={data.trim() ? tf("rows.whyPreview") : tf("rows.whyNothing")}
+					id={`suite-build-${format}-import-why`}
+					testId={`suite-build-${format}-import-why`}
+				/>
+			)}
 			<ErrorLine error={state.error} testId={`suite-build-${format}-error`} />
 			{preview && !tickets && mapping && (
 				<MappingStep
@@ -731,6 +769,42 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					{done.problems.length > 0 && <ProblemList problems={done.problems} t={t} />}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** M6-21: what a rows file looks like, as a small example table (question, answer, rubric). */
+function RowsExample() {
+	const { t } = useTranslation("uf6a");
+	const cols = ["question", "answer", "rubric"] as const;
+	return (
+		<div className="flex min-w-0 flex-col gap-1" data-testid="suite-build-rows-example">
+			<p className="text-muted-foreground text-xs">{t("rows.exampleIntro")}</p>
+			<div className="max-w-full overflow-x-auto rounded-md border">
+				<table className="w-full text-left text-xs">
+					<thead className="bg-muted/40">
+						<tr>
+							{cols.map((c) => (
+								<th key={c} scope="col" className="px-2 py-1 font-mono font-medium">
+									{c}
+								</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						{[1, 2, 3].map((n) => (
+							<tr key={n} className="border-t">
+								{cols.map((c) => (
+									<td key={c} className="text-muted-foreground px-2 py-1">
+										{t(`rows.example.${c}${n}` as "rows.example.question1")}
+									</td>
+								))}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p className="text-muted-foreground text-xs">{t("rows.exampleMore")}</p>
 		</div>
 	);
 }

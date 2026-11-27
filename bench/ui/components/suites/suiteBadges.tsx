@@ -2,6 +2,7 @@ import type { SuiteLockState, SuiteTask, VerifierResultFormat } from "@/lib/type
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, CircleDashed, CircleX, Lock, LockOpen, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./uf6aI18n";
 import { ADMISSION_TONE, LOCK_TONE, TONE_CLASS, admissionState, type AdmissionState, type Tone } from "./suites.utils";
 
 /** A small labelled pill in one of the chart tones. The hint is its title and part of its accessible name. */
@@ -64,18 +65,34 @@ const ADMISSION_ICON: Record<AdmissionState, LucideIcon> = {
 	admitted: CircleCheck,
 	stale: CircleAlert,
 	draft: CircleX,
+	unchecked: CircleDashed,
 	not_locked: CircleDashed,
 	quarantined: CircleAlert,
 	retired: CircleDashed,
 };
 
+/** M6-2: states whose label and hint come from the lane 6a texts ("Check failed", "Not checked yet"). */
+const UF6A_STATES = new Set<AdmissionState>(["draft", "unchecked"]);
+
+/** The label and hint of an admission state. */
+export function useAdmissionLabel(): (state: AdmissionState, hint?: boolean) => string {
+	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
+	const bench = t as unknown as (key: string) => string;
+	const lane = tf as unknown as (key: string) => string;
+	return (state, hint = false) => {
+		const suffix = hint ? "Hint" : "";
+		return UF6A_STATES.has(state) ? lane(`status.${state}${suffix}`) : bench(`suites.status.${state}${suffix}`);
+	};
+}
+
 /** A task's admission state, with what it means. */
 export function AdmissionBadge({ task, testId }: { task: SuiteTask; testId?: string }) {
-	const { t } = useTranslation("bench");
+	const label = useAdmissionLabel();
 	const state = admissionState(task);
 	return (
-		<ToneBadge tone={ADMISSION_TONE[state]} icon={ADMISSION_ICON[state]} hint={t(`suites.status.${state}Hint`)} testId={testId}>
-			{t(`suites.status.${state}`)}
+		<ToneBadge tone={ADMISSION_TONE[state]} icon={ADMISSION_ICON[state]} hint={label(state, true)} testId={testId}>
+			{label(state)}
 		</ToneBadge>
 	);
 }

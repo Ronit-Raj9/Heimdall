@@ -14,10 +14,18 @@ import { isBuiltinSuite, suiteDisplayCategory, suiteDisplayDescription, suiteDis
 // Everything here is testable without a browser.
 
 /** What the admission column shows: the lock status, with "stale" when files changed since. */
-export type AdmissionState = "admitted" | "stale" | "draft" | "not_locked" | "quarantined" | "retired";
+export type AdmissionState = "admitted" | "stale" | "draft" | "unchecked" | "not_locked" | "quarantined" | "retired";
 
 /** Filter and sort order of the admission states: usable first. */
-export const ADMISSION_STATES: readonly AdmissionState[] = ["admitted", "stale", "draft", "not_locked", "quarantined", "retired"];
+export const ADMISSION_STATES: readonly AdmissionState[] = [
+	"admitted",
+	"stale",
+	"draft",
+	"unchecked",
+	"not_locked",
+	"quarantined",
+	"retired",
+];
 
 /** Difficulty order; an unset difficulty sorts last. */
 export const DIFFICULTIES = ["easy", "medium", "hard"] as const;
@@ -44,9 +52,9 @@ export const EXTRA_CONTROLS: readonly AdmissionControl[] = ["stale_notes", "othe
 
 /** Tone classes from the chart tokens, so badges follow light and dark mode. */
 export const TONE_CLASS = {
-	good: "border-chart-success/50 bg-chart-success/10 text-chart-success-ink",
-	warn: "border-chart-warning/50 bg-chart-warning/10 text-chart-warning-ink",
-	bad: "border-chart-error/50 bg-chart-error/10 text-chart-error-ink",
+	good: "border-success bg-success-soft text-success-ink",
+	warn: "border-warning bg-warning-soft text-warning-ink",
+	bad: "border-danger bg-danger-soft text-danger-ink",
 	neutral: "border-border bg-muted text-muted-foreground",
 } as const;
 
@@ -58,6 +66,7 @@ export const ADMISSION_TONE: Record<AdmissionState, Tone> = {
 	admitted: "good",
 	stale: "warn",
 	draft: "bad",
+	unchecked: "neutral",
 	not_locked: "neutral",
 	quarantined: "warn",
 	retired: "neutral",
@@ -73,7 +82,8 @@ export function admissionState(task: SuiteTask): AdmissionState {
 		case "retired":
 			return task.status;
 		default:
-			return "draft";
+			// M6-2: a task whose readiness check never ran is "not checked yet" (neutral), apart from a failed check (red).
+			return (task.checks?.length ?? 0) === 0 ? "unchecked" : "draft";
 	}
 }
 
@@ -133,6 +143,11 @@ function sortValue(task: SuiteTask, key: TaskSortKey): string | number | null {
 	}
 }
 
+/** M6-4: text compare with numbers in order, so task -2 sorts before -10. */
+export function compareText(a: string, b: string): number {
+	return a.localeCompare(b, undefined, { numeric: true });
+}
+
 /** Tasks sorted by one column, stable, ties by id; unknown values last in either direction. */
 export function sortTasks(tasks: readonly SuiteTask[], sort: TaskSort): SuiteTask[] {
 	const sign = sort.dir === "asc" ? 1 : -1;
@@ -142,10 +157,10 @@ export function sortTasks(tasks: readonly SuiteTask[], sort: TaskSort): SuiteTas
 		if (va === null && vb !== null) return 1;
 		if (vb === null && va !== null) return -1;
 		if (va !== null && vb !== null && va !== vb) {
-			const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+			const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : compareText(String(va), String(vb));
 			return sign * cmp;
 		}
-		return a.id.localeCompare(b.id);
+		return compareText(a.id, b.id);
 	});
 }
 

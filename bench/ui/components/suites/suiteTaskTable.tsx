@@ -8,6 +8,7 @@ import { HeldOutBadge, TaskHealthCell } from "./suiteHealth";
 import { isHeldOut, isRedacted, type HealthState } from "./suiteHealth.utils";
 import { taskLicense, type TaskSort, type TaskSortKey } from "./suites.utils";
 import { TaskCategoryCell, type TaskCategories } from "./taskCategoryCell";
+import "./uf6aI18n";
 
 export interface SuiteTaskTableProps {
 	suiteId: string;
@@ -30,13 +31,6 @@ export interface SuiteTaskTableProps {
  * One row per task. Each sortable header is a button with aria-sort; the task id opens its detail.
  * A held-out task the server withholds shows its id and a "held out" badge only, with no detail link.
  */
-/** Soft pill colours for the difficulty column (lane U04). */
-const DIFFICULTY_PILL: Record<string, string> = {
-	easy: "bg-chart-success/10 text-chart-success-ink",
-	medium: "bg-chart-warning/10 text-chart-warning-ink",
-	hard: "bg-chart-error/10 text-chart-error-ink",
-};
-
 export function SuiteTaskTable({
 	suiteId,
 	rows,
@@ -50,10 +44,13 @@ export function SuiteTaskTable({
 }: SuiteTaskTableProps) {
 	const { t } = useTranslation("bench");
 	const { t: tc } = useTranslation("w444");
+	const { t: tf } = useTranslation("uf6a");
 	const kindOfWork = moreColumns && categories !== undefined;
-	const head = (key: TaskSortKey, label: string, align: "left" | "right" = "left") => (
-		<SortableHead sortKey={key} label={label} sort={sort} onSort={onSort} align={align} />
+	const head = (key: TaskSortKey, label: string, align: "left" | "right" = "left", className?: string) => (
+		<SortableHead sortKey={key} label={label} sort={sort} onSort={onSort} align={align} className={className} />
 	);
+	// M6-3: on phones only Task and Status stay; difficulty and health come back from sm up.
+	const wideOnly = "hidden sm:table-cell";
 	return (
 		<Table data-testid="suites-task-table" aria-label={t("suites.tasks.label", { suite: suiteId })} containerClassName="rounded-xl border">
 			<TableHeader>
@@ -61,12 +58,12 @@ export function SuiteTaskTable({
 					{head("id", t("suites.tasks.task"))}
 					{moreColumns && head("kind", t("suites.tasks.kind"))}
 					{kindOfWork && <TableHead data-testid="suites-head-category">{tc("categories.column")}</TableHead>}
-					{head("difficulty", t("suites.tasks.difficulty"))}
+					{head("difficulty", t("suites.tasks.difficulty"), "left", wideOnly)}
 					{moreColumns && <TableHead>{t("suites.tasks.capabilities")}</TableHead>}
-					{head("admission", t("suites.tasks.admission"))}
+					{head("admission", tf("tasks.statusColumn"))}
 					{moreColumns && head("license", t("suites.tasks.license"))}
 					{moreColumns && head("hidden", t("suites.tasks.hiddenTests"), "right")}
-					{health && <TableHead data-testid="suites-head-health">{t("suiteHealth.column")}</TableHead>}
+					{health && <TableHead className={wideOnly} data-testid="suites-head-health">{t("suiteHealth.column")}</TableHead>}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -74,7 +71,6 @@ export function SuiteTaskTable({
 					if (isRedacted(task))
 						return <RedactedRow key={task.id} task={task} health={health} moreColumns={moreColumns} kindOfWork={kindOfWork} />;
 					const license = taskLicense(task);
-					const passed = task.checks.filter((check) => check.passed).length;
 					return (
 						<TableRow
 							key={task.id}
@@ -83,7 +79,7 @@ export function SuiteTaskTable({
 							data-state={selected === task.id ? "selected" : undefined}
 							className={cn(selected === task.id && "bg-muted/60")}
 						>
-							<TableCell className="max-w-80 min-w-48 align-top whitespace-normal">
+							<TableCell className="max-w-[14rem] align-top break-words whitespace-normal sm:max-w-80 sm:min-w-48">
 								<button
 									type="button"
 									onClick={() => onOpen(task.id)}
@@ -91,11 +87,14 @@ export function SuiteTaskTable({
 									aria-label={t("suites.tasks.open", {
 										task: `${task.id}: ${task.title}`,
 									})}
-									className="focus-visible:ring-ring/50 group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-[3px] focus-visible:outline-none"
+									className="focus-visible:ring-(--focus) group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
 									data-testid={`suites-task-open-${task.id}`}
 								>
-									<span className="text-foreground text-sm font-medium group-hover:underline">{task.title}</span>
-									<span className="text-muted-foreground font-mono text-xs">{task.id}</span>
+									<span className="text-foreground text-sm font-medium break-words group-hover:underline">{task.title || task.id}</span>
+									{/* M6-4: the id prints once when the title is the id. */}
+									{task.title && task.title !== task.id && (
+										<span className="text-muted-foreground font-mono text-xs break-all">{task.id}</span>
+									)}
 								</button>
 								{isHeldOut(task) && <HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} className="mt-1" />}
 							</TableCell>
@@ -105,14 +104,10 @@ export function SuiteTaskTable({
 									<TaskCategoryCell suiteId={suiteId} taskId={task.id} label={categories.labels?.[task.id]} canEdit={categories.canEdit} />
 								</TableCell>
 							)}
-							<TableCell className="align-top text-xs">
+							<TableCell className={cn("align-top text-xs", wideOnly)}>
+								{/* M6-6: difficulty is plain grey text; only the status is a pill. */}
 								{task.difficulty ? (
-									<span
-										className={cn(
-											"inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-											DIFFICULTY_PILL[task.difficulty] ?? "bg-muted text-muted-foreground",
-										)}
-									>
+									<span className="text-muted-foreground text-xs">
 										{task.difficulty === "easy" || task.difficulty === "medium" || task.difficulty === "hard"
 											? t(`suites.difficulty.${task.difficulty}`)
 											: task.difficulty}
@@ -137,16 +132,17 @@ export function SuiteTaskTable({
 								</TableCell>
 							)}
 							<TableCell className="align-top">
+								{/* M6-2: the badge says "Not checked yet" itself; the count line shows only once a check ran. */}
 								<span className="flex flex-col items-start gap-1">
 									<AdmissionBadge task={task} testId={`suites-task-admission-${task.id}`} />
-									<span className="text-muted-foreground text-[11px] tabular-nums">
-										{task.checks.length > 0
-											? t("suites.tasks.checksPassed", {
-													passed,
-													total: task.checks.length,
-												})
-											: t("suites.tasks.noChecks")}
-									</span>
+									{task.checks.length > 0 && (
+										<span className="text-muted-foreground text-xs tabular-nums">
+											{t("suites.tasks.checksPassed", {
+												passed: task.checks.filter((check) => check.passed).length,
+												total: task.checks.length,
+											})}
+										</span>
+									)}
 								</span>
 							</TableCell>
 							{moreColumns && (
@@ -154,7 +150,7 @@ export function SuiteTaskTable({
 									{license ? (
 										<span className="font-mono">{license}</span>
 									) : (
-										<span className="text-chart-warning-ink">{t("suites.tasks.noLicense")}</span>
+										<span className="text-warning-ink">{t("suites.tasks.noLicense")}</span>
 									)}
 								</TableCell>
 							)}
@@ -167,7 +163,7 @@ export function SuiteTaskTable({
 								</TableCell>
 							)}
 							{health && (
-								<TableCell className="max-w-72 align-top whitespace-normal">
+								<TableCell className={cn("max-w-72 align-top whitespace-normal", wideOnly)}>
 									<TaskHealthCell task={task} health={health} />
 								</TableCell>
 							)}
@@ -197,13 +193,16 @@ function RedactedRow({
 	const { t } = useTranslation("bench");
 	return (
 		<TableRow data-testid={`suites-task-row-${task.id}`} data-redacted="true">
-			<TableCell className="max-w-80 min-w-48 align-top whitespace-normal">
+			<TableCell className="max-w-[14rem] align-top break-words whitespace-normal sm:max-w-80 sm:min-w-48">
 				<span className="flex flex-col items-start gap-1">
 					<span className="text-foreground font-mono text-xs">{task.id}</span>
 					<HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} />
 				</span>
 			</TableCell>
-			<TableCell colSpan={moreColumns ? (kindOfWork ? 4 : 3) : 1} className="text-muted-foreground align-top text-xs whitespace-normal">
+			<TableCell
+				colSpan={moreColumns ? (kindOfWork ? 4 : 3) : 1}
+				className={cn("text-muted-foreground align-top text-xs whitespace-normal", !moreColumns && "hidden sm:table-cell")}
+			>
 				{t("suiteHealth.heldOutRow")}
 			</TableCell>
 			<TableCell className="align-top">
@@ -215,7 +214,7 @@ function RedactedRow({
 				</TableCell>
 			)}
 			{health && (
-				<TableCell className="max-w-72 align-top whitespace-normal">
+				<TableCell className="hidden max-w-72 align-top whitespace-normal sm:table-cell">
 					<TaskHealthCell task={task} health={health} />
 				</TableCell>
 			)}
@@ -229,10 +228,11 @@ interface SortableHeadProps {
 	sort: TaskSort;
 	onSort: (key: TaskSortKey) => void;
 	align: "left" | "right";
+	className?: string;
 }
 
 /** A header that sorts its column: a real button, so it is reachable and operable by keyboard. */
-function SortableHead({ sortKey, label, sort, onSort, align }: SortableHeadProps) {
+function SortableHead({ sortKey, label, sort, onSort, align, className }: SortableHeadProps) {
 	const { t } = useTranslation("bench");
 	const active = sort.key === sortKey;
 	const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
@@ -240,7 +240,7 @@ function SortableHead({ sortKey, label, sort, onSort, align }: SortableHeadProps
 	return (
 		<TableHead
 			aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-			className={cn(align === "right" && "text-right")}
+			className={cn(align === "right" && "text-right", className)}
 			data-testid={`suites-head-${sortKey}`}
 		>
 			<button
@@ -248,7 +248,7 @@ function SortableHead({ sortKey, label, sort, onSort, align }: SortableHeadProps
 				onClick={() => onSort(sortKey)}
 				aria-label={active ? `${name}, ${t(sort.dir === "asc" ? "suites.tasks.sortedAsc" : "suites.tasks.sortedDesc")}` : name}
 				className={cn(
-					"focus-visible:ring-ring/50 -mx-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+					"focus-visible:ring-(--focus) -mx-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
 					active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
 					align === "right" && "flex-row-reverse",
 				)}

@@ -1,9 +1,9 @@
 {
 	"tab": "Policy",
 	"intro": "Upload a policy or SOP (PDF, DOCX, Markdown or text). Heimdall splits it into numbered clauses and drafts three support conversations per clause: a normal case, an edge case and a customer who insists on breaking the rule. Drafts wait for your review; accepted ones become tasks, and the readiness check proves a compliant reply passes and a violating one fails.",
-	"noShape": "Policy tasks are support conversations: this benchmark has no task with a simulated customer. Use a support benchmark (Benchmarks > New, template support).",
-	"reviewEmpty": "No drafts to review yet. Policy drafts are made on the Policy tab of a support benchmark.",
-	"reviewEmptyLink": "Open the Policy tab",
+	"noShape": "Policy tasks are support conversations, and this benchmark has no task with a simulated customer.",
+	"reviewEmpty": "No drafts to review yet. Make some with Draft with a model above.",
+	"reviewEmptyLink": "Or draft from a policy document",
 	"viewerNote": "Policy documents and their drafts include reference replies, so only members can open them. The report is below.",
 	"upload": {
 		"title": "Upload a policy",
@@ -18,6 +18,7 @@
 		"open": "Open",
 		"summary": "{{clauses}} clauses, {{pending}} drafts pending review",
 		"delete": "Delete",
+		"deleteTitle": "Delete {{name}}?",
 		"deleteConfirm": "Delete {{name}} and its pending drafts? Accepted tasks stay in the benchmark.",
 		"viewerList": "Pick a policy to see its compliance report."
 	},
@@ -79,5 +80,6 @@
 		"untested": "Untested clauses: {{list}}",
 		"markdown": "Download Markdown",
 		"pdf": "Download PDF"
-	}
+	},
+	"noShapeLink": "Create a support benchmark"
 }

@@ -5,7 +5,17 @@ import { hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, render } from "@/lib/testing/render";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { describe, expect, it, vi } from "vitest";
-import { OpsTab, repoParams } from "./opsTab";
+import { ReadinessChecklist } from "@/components/suites/readinessChecklist";
+import { useTranslation } from "react-i18next";
+import { CommitSources, OpsTab, repoParams } from "./opsTab";
+
+// M6-12, M6-29: the readiness steps moved to ReadinessChecklist and task from a commit and history
+// mining to CommitSources (Build "From a bug fix commit"); OpsTab keeps pausing tasks.
+function Commit({ hosted = false }: { hosted?: boolean }) {
+	const { t } = useTranslation("suiteops");
+	return <CommitSources suite={{ id: "coding-core", tasks: [] } as unknown as SuiteSummary} hosted={hosted} t={t} />;
+}
+const own = (s: SuiteSummary) => ({ ...s, lock_state: "unlocked", admitted_count: 0, task_count: 2 }) as unknown as SuiteSummary;
 
 vi.mock("@/lib/store/apis/suiteOpsApi", () => ({
 	useQuarantineTaskMutation: () => mutation(),
@@ -30,27 +40,34 @@ const suite = {
 describe("OpsTab", () => {
 	it("offers checks, quarantine, restore, task from commit and mine to a member", () => {
 		const html = render(<OpsTab suite={suite} />);
-		expect(html).toContain('data-testid="job-run-suite.lint"');
-		expect(html).toContain('data-testid="job-run-suite.admit"');
+		const steps = render(<ReadinessChecklist suite={own(suite)} writable />);
+		expect(steps).toContain('data-testid="job-run-suite.lint"');
+		expect(steps).toContain('data-testid="job-run-suite.admit"');
+		expect(html).not.toContain("job-run-suite.admit");
 		expect(html).toContain('data-testid="job-run-suite.quarantine-flaky"');
 		expect(html).toContain('data-testid="suite-ops-restore-fix-a"');
 		expect(html).toContain('data-testid="suite-ops-quarantine-fix-b"');
 		expect(html).toContain("flaky verifier");
-		expect(html).toContain('data-testid="suite-ops-from-commit-disabled"');
-		expect(html).toContain('data-testid="suite-ops-mine-disabled"');
+		const commit = render(<Commit />);
+		expect(commit).toContain('data-testid="suite-ops-from-commit-disabled"');
+		expect(commit).toContain('data-testid="suite-ops-mine-disabled"');
+		// One repository field for both.
+		expect(commit.match(/data-testid="suite-ops-commit-repo"/g)).toHaveLength(1);
 	});
 	it("shows a viewer the state but no actions", () => {
 		const html = render(<OpsTab suite={suite} />, { ...LOCAL_SESSION, authMode: "hosted", role: "viewer" });
 		expect(html).toContain('data-testid="suite-ops-viewer"');
 		expect(html).not.toContain("job-run-");
 		expect(html).not.toContain("suite-ops-restore-fix-a");
-		expect(html).toContain('data-testid="suite-ops-hosted-admit"');
+		expect(render(<ReadinessChecklist suite={own(suite)} writable={false} hosted />, { ...LOCAL_SESSION, authMode: "hosted", role: "viewer" })).not.toContain(
+			"job-run-",
+		);
 	});
 	it("offers hosted admission and a full mine to a hosted member", () => {
-		const html = render(<OpsTab suite={suite} />, hostedSession("member"));
+		const html = render(<ReadinessChecklist suite={own(suite)} writable hosted />, hostedSession("member"));
 		expect(html).toContain('data-testid="job-run-suite.admit"');
-		expect(html).toContain('data-testid="suite-ops-hosted-admit"');
-		expect(html).toContain('data-testid="suite-ops-mine-dry-run"');
+		expect(html).toContain("on a worker. Ready tasks can be run right after.");
+		expect(render(<Commit hosted />, hostedSession("member"))).toContain('data-testid="suite-ops-mine-dry-run"');
 	});
 	it("keeps a built-in library suite read-only, even for a member", () => {
 		const lib = { ...suite, id: "hd-harbor-tb2", builtin: true, source: "library" } as unknown as SuiteSummary;
@@ -69,7 +86,7 @@ describe("OpsTab", () => {
 		expect(repoParams({ repo: "" })).toEqual({ repo: "." });
 	});
 	it("asks before Freeze and says what it does (N116)", () => {
-		const html = render(<OpsTab suite={suite} />);
+		const html = render(<ReadinessChecklist suite={own(suite)} writable />);
 		expect(html).toMatch(/data-testid="job-run-suite.lock" data-confirm="Freeze coding-core\? Every task is pinned to its current files\./);
 	});
 	it("shows each task's readiness instead of In use, and the pause reason when paused (N117)", () => {
@@ -84,7 +101,7 @@ describe("OpsTab", () => {
 		const html = render(<OpsTab suite={s} />);
 		expect(html).not.toContain("In use");
 		expect(html).toMatch(/data-testid="suite-ops-task-t1"[\s\S]*?Not frozen yet/);
-		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Check failed/);
+		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Not checked yet/);
 		expect(html).toContain("Paused: flaky");
 	});
 });

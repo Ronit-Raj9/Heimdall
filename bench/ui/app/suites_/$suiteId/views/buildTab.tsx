@@ -3,7 +3,12 @@ import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { ReadinessResults, readinessReport } from "@/components/suites/admissionResults";
+import { ReadinessChecklist } from "@/components/suites/readinessChecklist";
+import "@/components/suites/uf6aI18n";
 import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
+import { Input } from "@/components/ui/input";
+import { searchTasks, taskPage } from "@/components/suites/taskPaging";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { benchApi } from "@/lib/store/apis/benchApi";
 import { useSetSuiteGraderMutation, useSetTaskSplitMutation } from "@/lib/store/apis/suiteBuildApi";
@@ -16,7 +21,7 @@ import { Link } from "@tanstack/react-router";
 import { Braces, CircleDot, FileSpreadsheet, GitCommitHorizontal, Headset, Inbox, MessageSquareText } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FromCommitSection } from "./opsTab";
+import { CommitSources } from "./opsTab";
 import { ErrorLine, Field, JudgeFields, RowsImportForm, selectClass, type T } from "./rowMapper";
 import { MockFromOpenAPI, ScenarioRowsImport } from "./scenarioBuild";
 
@@ -97,6 +102,13 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 			(provider.trim() !== (pinned?.provider ?? "") || model.trim() !== (pinned?.model ?? "") || votes !== (pinned?.votes || 1)));
 	const judgeReady = choice !== "judge" || (provider.trim() !== "" && model.trim() !== "");
 	const enabled = (c: GraderChoice) => (answer ? c === "exact" || c === "judge" : c === current);
+	const { t: tf } = useTranslation("uf6a");
+	// M6-22: a card that cannot be picked says why, in one line under it.
+	const whyOff = (c: GraderChoice): string | null => {
+		if (enabled(c)) return null;
+		if (answer) return c === "state" ? tf("grader.why.state") : tf("grader.why.tests");
+		return tf("grader.why.answerOnly");
+	};
 	const submit = () => {
 		if (!answer || !judgeReady) return;
 		const grader: AnswerGrader = choice === "judge" ? "judge" : "answer_match";
@@ -132,6 +144,11 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 								{current === c && <span className="text-muted-foreground ml-auto text-xs font-normal">{t("grader.current")}</span>}
 							</span>
 							<span className="text-muted-foreground text-xs">{t(`grader.hint.${c}`)}</span>
+							{whyOff(c) && (
+								<span className="text-muted-foreground text-xs italic" data-testid={`suite-build-grader-${c}-why`}>
+									{whyOff(c)}
+								</span>
+							)}
 						</label>
 					))}
 				</div>
@@ -151,14 +168,17 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 				)}
 				{answer && writable && (
 					<div className="flex flex-wrap items-center gap-3">
-						<Button
-							onClick={submit}
-							disabled={!changed || !judgeReady || saved.isLoading}
-							isLoading={saved.isLoading}
-							dataTestId="suite-build-grader-save"
-						>
-							{choice === "judge" ? t("grader.pin") : t("grader.save")}
-						</Button>
+						{/* M6-22: no disabled primary on load; the button shows once another card (or judge setting) is picked. */}
+						{changed && (
+							<Button
+								onClick={submit}
+								disabled={!judgeReady || saved.isLoading}
+								isLoading={saved.isLoading}
+								dataTestId="suite-build-grader-save"
+							>
+								{choice !== current ? tf("grader.switchTo", { name: t(`grader.choice.${choice}`) }) : t("grader.pin")}
+							</Button>
+						)}
 						{suite.grading === "judged" && (
 							<Link
 								to="/suites/$suiteId"
@@ -207,33 +227,47 @@ export function sourcesFor(suite: Pick<SuiteSummary, "output" | "track">): Sourc
 function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; writable: boolean; hosted: boolean; t: T }) {
 	const { t: tops } = useTranslation("suiteops");
 	const { t: ts } = useTranslation("scenarioBuild");
+	const { t: tf } = useTranslation("uf6a");
 	const sources = sourcesFor(suite);
 	const [source, setSource] = useState<Source>(sources[0]);
 	return (
 		<Section title={t("add.title")} description={t("add.description")} testId="suite-build-add">
 			<div className="flex min-w-0 flex-col gap-4">
-				<div className="flex flex-wrap gap-2" role="tablist" aria-label={t("add.title")}>
+				{/* M6-23: the sources are one segmented choice (a radio group), not a row of toggle-looking buttons. */}
+				<div
+					className="bg-muted/40 flex w-full max-w-full flex-wrap gap-1 rounded-lg border p-1 sm:w-fit"
+					role="radiogroup"
+					aria-label={t("add.title")}
+				>
 					{sources.map((s) => {
 						const Icon = SOURCE_ICONS[s];
+						const on = source === s;
 						return (
-							<Button
+							<button
 								key={s}
-								role="tab"
-								aria-selected={source === s}
-								size="sm"
-								variant={source === s ? "default" : "outline"}
+								type="button"
+								role="radio"
+								aria-checked={on}
 								onClick={() => setSource(s)}
-								dataTestId={`suite-build-source-${s}`}
+								className={cn(
+									"focus-visible:ring-(--focus) inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+									on ? "bg-card text-foreground border shadow-xs" : "text-muted-foreground hover:text-foreground",
+								)}
+								data-testid={`suite-build-source-${s}`}
 							>
 								<Icon className="size-4" aria-hidden="true" />
-								{s === "scenarios" || s === "mock" ? ts(`source.${s}`) : t(`add.source.${s}`)}
-							</Button>
+								{s === "scenarios" || s === "mock" ? ts(`source.${s}`) : s === "commit" ? tf("add.commit") : t(`add.source.${s}`)}
+							</button>
 						);
 					})}
 				</div>
 				{!isAnswerSuite(suite) && (
 					<p className="text-muted-foreground text-xs" data-testid="suite-build-no-rows">
-						{t("add.codeSuite")}
+						{/* X-89: a link to the builder (code start), not "Benchmarks > New". */}
+						{tf("add.codeSuite")}{" "}
+						<Link to="/suites/new" search={{ start: "code" } as never} className="text-primary hover:underline" data-testid="suite-build-no-rows-create">
+							{tf("add.codeSuiteLink")}
+						</Link>
 					</p>
 				)}
 				{source === "scenarios" &&
@@ -252,7 +286,7 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 				{source === "tickets" && <RowsImport suite={suite} writable={writable} format="tickets" t={t} />}
 				{source === "commit" &&
 					(writable ? (
-						<FromCommitSection suite={suite} hosted={hosted} t={tops} />
+						<CommitSources suite={suite} hosted={hosted} t={tops} />
 					) : (
 						<p className="text-muted-foreground text-sm">{t("viewerNote")}</p>
 					))}
@@ -279,7 +313,14 @@ function RowsImport({ suite, writable, format, t }: { suite: SuiteSummary; writa
 // Held-out tasks
 
 function PrivateSection({ suite, writable, t }: { suite: SuiteSummary; writable: boolean; t: T }) {
-	const heldOut = suite.tasks.filter((x) => x.split === "held_out").length;
+	const { t: tf } = useTranslation("uf6a");
+	const heldOutTasks = useMemo(() => suite.tasks.filter((x) => x.split === "held_out"), [suite.tasks]);
+	const heldOut = heldOutTasks.length;
+	// M6-24: the list holds the held-out tasks only; a search finds any task to hold out, 50 at a time.
+	const [search, setSearch] = useState("");
+	const [page, setPage] = useState(1);
+	const rows = search.trim() ? searchTasks(suite.tasks, search) : heldOutTasks;
+	const paged = taskPage(rows, page, null);
 	return (
 		<Section title={t("private.title")} description={t("private.description")} testId="suite-build-private">
 			{suite.tasks.length === 0 ? (
@@ -287,11 +328,40 @@ function PrivateSection({ suite, writable, t }: { suite: SuiteSummary; writable:
 			) : (
 				<div className="flex min-w-0 flex-col gap-2">
 					<p className="text-muted-foreground text-xs">{t("private.count", { heldOut, total: suite.tasks.length })}</p>
-					<ul className="divide-border flex max-h-96 flex-col divide-y overflow-auto rounded-md border">
-						{suite.tasks.map((task) => (
-							<SplitRow key={task.id} suiteId={suite.id} task={task} writable={writable} t={t} />
-						))}
-					</ul>
+					<label className="flex w-full min-w-0 flex-col gap-1 text-sm sm:w-72">
+						<span className="text-muted-foreground text-xs">{tf("private.search")}</span>
+						<Input
+							type="search"
+							className="h-8"
+							value={search}
+							placeholder={tf("tasks.searchPlaceholder")}
+							onChange={(e) => {
+								setSearch(e.target.value);
+								setPage(1);
+							}}
+							data-testid="suite-build-private-search"
+						/>
+					</label>
+					{rows.length === 0 ? (
+						<p className="text-muted-foreground text-sm" data-testid="suite-build-private-none">
+							{search.trim() ? tf("private.noMatch") : tf("private.noneHeldOut")}
+						</p>
+					) : (
+						<>
+							<ul className="divide-border flex flex-col divide-y rounded-md border">
+								{paged.rows.map((task) => (
+									<SplitRow key={task.id} suiteId={suite.id} task={task} writable={writable} t={t} />
+								))}
+							</ul>
+							<Pager
+								page={paged.page}
+								pageCount={paged.pages}
+								onPage={setPage}
+								rangeText={tf("tasks.pageOf", { first: paged.first, last: paged.last, total: paged.total })}
+								testId="suite-build-private-pager"
+							/>
+						</>
+					)}
 				</div>
 			)}
 		</Section>
@@ -331,6 +401,7 @@ function SplitRow({ suiteId, task, writable, t }: { suiteId: string; task: Suite
 // Readiness
 
 function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
+	const { t: tf } = useTranslation("uf6a");
 	const dispatch = useAppDispatch();
 	const [task, setTask] = useState("");
 	const [job, setJob] = useState<Job | null>(null);
@@ -368,6 +439,14 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 				{suite.tasks.length === 0 ? (
 					<p className="text-muted-foreground text-sm">{t("readiness.noTasks")}</p>
 				) : (
+					// M6-12: the three steps with their states; step 3 keeps the "Check: All tasks" scope here.
+					<ReadinessChecklist
+						suite={suite}
+						// The job buttons disable themselves for a viewer, as the readiness run here always did.
+						writable
+						hosted={hosted}
+						testId="suite-build-checklist"
+						admitControl={
 					<div className="flex flex-wrap items-end gap-3">
 						<Field label={t("readiness.scope")}>
 							<select
@@ -389,21 +468,23 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 							key={task}
 							kind={SUITE_OPS_KINDS.admit}
 							params={params}
-							label={t("readiness.run")}
+							label={tf("checklist.steps.admit")}
 							confirm={confirm}
 							disabled={askJudge && !judgeConsent}
 							onDone={onDone}
 						/>
 					</div>
+						}
+					/>
 				)}
 				{askJudge && judge && suite.tasks.length > 0 && (
-					<label className="flex items-start gap-2 text-sm" data-testid="suite-build-readiness-judge-consent">
-						<input type="checkbox" className="mt-1" checked={judgeConsent} onChange={(e) => setJudgeConsent(e.target.checked)} />
+					<label className="flex min-h-11 items-start gap-2 text-sm" data-testid="suite-build-readiness-judge-consent">
+						<input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={judgeConsent} onChange={(e) => setJudgeConsent(e.target.checked)} />
 						<span>{t("readiness.judgeConsent", { calls, provider: judge.provider, model: judge.model })}</span>
 					</label>
 				)}
 				{job && !report && job.error && (
-					<p role="alert" className="text-chart-error-ink text-sm" data-testid="suite-build-readiness-error">
+					<p role="alert" className="text-danger-ink text-sm" data-testid="suite-build-readiness-error">
 						{job.error}
 					</p>
 				)}

@@ -23,6 +23,7 @@ import type {
 import type { SuiteSummary } from "@/lib/types/bench";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/uf6aI18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -49,7 +50,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
 	if (!error) return null;
 	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink text-xs" data-testid={testId}>
 			{getBenchErrorMessage(error as never)}
 		</p>
 	);
@@ -138,6 +139,17 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 	const kindList = view.kinds && view.kinds.length ? view.kinds : [...PII_KINDS];
 	const modeList = view.modes && view.modes.length ? PII_MODES.filter((m) => view.modes!.includes(m)) : PII_MODES;
 	const toggle = (k: string) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+	const { t: tf } = useTranslation("uf6a");
+	// M6-32: each card has its own Save; both send the whole form, so nothing typed in the other card is lost.
+	const saveRow = (testId: string) =>
+		writable && (
+			<div className="flex flex-wrap items-center justify-end gap-3">
+				{saved.isSuccess && <span className="text-muted-foreground text-xs">{t("policy.saved")}</span>}
+				<Button type="submit" variant="outline" disabled={saved.isLoading} data-testid={testId}>
+					{t("policy.save")}
+				</Button>
+			</div>
+		);
 	return (
 		<form
 			className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2"
@@ -166,25 +178,43 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 					</Field>
 					<fieldset className="flex flex-col gap-2 text-sm" disabled={!writable || mode === "off"}>
 						<legend className="text-muted-foreground mb-1">{t("policy.kinds")}</legend>
-						<div className="grid grid-cols-2 gap-1.5">
+						<div className="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+							{/* M6-34: "Everything" is a real first choice; ticking it clears the others. */}
+							<label className="flex min-h-11 items-center gap-2 sm:col-span-2">
+								<input
+									type="checkbox"
+									className="size-4 shrink-0"
+									checked={kinds.length === 0}
+									onChange={() => setKinds([])}
+									data-testid="suite-data-pii-kind-all"
+								/>
+								{tf("data.everything")}
+							</label>
 							{kindList.map((k) => (
-								<label key={k} className="flex items-center gap-2">
-									<input type="checkbox" checked={kinds.includes(k)} onChange={() => toggle(k)} data-testid={`suite-data-pii-kind-${k}`} />
+								<label key={k} className="flex min-h-11 items-center gap-2">
+									<input
+										type="checkbox"
+										className="size-4 shrink-0"
+										checked={kinds.includes(k)}
+										onChange={() => toggle(k)}
+										data-testid={`suite-data-pii-kind-${k}`}
+									/>
 									{t(`policy.kind.${k}` as "policy.kind.email", { defaultValue: k })}
 								</label>
 							))}
 						</div>
-						<span className="text-muted-foreground text-xs">{t("policy.kindsAll")}</span>
 					</fieldset>
+					{saveRow("suite-data-pii-save")}
 				</div>
 			</Section>
 			<Section title={t("access.title")} description={t("access.description")} testId="suite-data-access">
 				<div className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5">
 					<div className="flex flex-col gap-2 text-sm" role="radiogroup" aria-label={t("access.title")}>
 						{(["org", "restricted"] as AccessMode[]).map((m) => (
-							<label key={m} className="flex items-center gap-2">
+							<label key={m} className="flex min-h-11 items-center gap-2">
 								<input
 									type="radio"
+									className="size-4 shrink-0"
 									name={`access-${view.benchmark}`}
 									checked={access === m}
 									disabled={!view.can_edit_access}
@@ -210,24 +240,21 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 							{t("access.adminOnly")}
 						</p>
 					)}
+					{view.can_edit_access && saveRow("suite-data-policy-save")}
 				</div>
 			</Section>
 			{writable && (
-				<div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
+				<div className="flex flex-wrap items-center gap-3 lg:col-span-2">
 					{(view.updated_by_name || view.policy.updated_by) && (
 						<span
-							className="text-muted-foreground mr-auto text-xs"
+							className="text-muted-foreground text-xs"
 							title={view.policy.updated_by || undefined}
 							data-testid="suite-data-policy-updated"
 						>
 							{t("policy.updated", { who: view.updated_by_name || view.policy.updated_by })}
 						</span>
 					)}
-					{saved.isSuccess && <span className="text-muted-foreground text-xs">{t("policy.saved")}</span>}
 					<ErrorLine error={saved.error} testId="suite-data-policy-save-error" />
-					<Button type="submit" disabled={saved.isLoading} data-testid="suite-data-policy-save">
-						{t("policy.save")}
-					</Button>
 				</div>
 			)}
 		</form>
@@ -265,8 +292,8 @@ export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T
 					<tr>
 						<th className="px-4 py-2 font-medium">{t("versions.version")}</th>
 						<th className="px-4 py-2 font-medium">{t("versions.when")}</th>
-						<th className="px-4 py-2 font-medium">{t("versions.by")}</th>
-						<th className="px-4 py-2 font-medium">{t("versions.source")}</th>
+						<th className="hidden px-4 py-2 font-medium sm:table-cell">{t("versions.by")}</th>
+						<th className="hidden px-4 py-2 font-medium sm:table-cell">{t("versions.source")}</th>
 						<th className="px-4 py-2 font-medium">{t("versions.changes")}</th>
 						<th className="px-4 py-2 text-right font-medium">{t("versions.tasks")}</th>
 					</tr>
@@ -278,10 +305,10 @@ export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T
 								v{v.version}
 							</td>
 							<td className="text-muted-foreground px-4 py-2 text-xs">{new Date(v.at).toLocaleString()}</td>
-							<td className="text-muted-foreground px-4 py-2 text-xs" title={v.actor || undefined}>
+							<td className="text-muted-foreground hidden px-4 py-2 text-xs sm:table-cell" title={v.actor || undefined}>
 								{v.actor_name || v.actor || "-"}
 							</td>
-							<td className="text-muted-foreground max-w-48 truncate px-4 py-2 text-xs" title={v.source}>
+							<td className="text-muted-foreground hidden max-w-48 truncate px-4 py-2 text-xs sm:table-cell" title={v.source}>
 								{v.source || "-"}
 							</td>
 							<td className="px-4 py-2 text-xs tabular-nums">
@@ -336,10 +363,11 @@ export function ImportForm({
 	t: T;
 }) {
 	const [run, result] = useImportFromPlatformMutation();
+	const { t: tf } = useTranslation("uf6a");
 	const [platformId, setPlatformId] = useState(platforms[0]!.id);
 	const [kind, setKind] = useState<"dataset" | "traces">("dataset");
-	const [dataset, setDataset] = useState("");
-	const [project, setProject] = useState("");
+	const [datasetText, setDataset] = useState("");
+	const [projectText, setProject] = useState("");
 	const [query, setQuery] = useState("");
 	const [limit, setLimit] = useState(100);
 	const [baseUrl, setBaseUrl] = useState("");
@@ -348,6 +376,8 @@ export function ImportForm({
 	const platform = platforms.find((p) => p.id === platformId) ?? platforms[0]!;
 	const missing = missingSecrets(platform, chosen, secrets);
 	const request = (dryRun: boolean): PlatformImportRequest => {
+		const dataset = kind === "dataset" ? datasetText : "";
+		const project = kind === "traces" ? projectText : "";
 		const body: PlatformImportRequest = {
 			platform: platform.id,
 			kind,
@@ -423,12 +453,15 @@ export function ImportForm({
 					</Field>
 					{kind === "dataset" && (
 						<Field label={t("import.dataset")} hint={platform.dataset_hint}>
-							<Input value={dataset} onChange={(e) => (setDataset(e.target.value), reset())} data-testid="suite-data-import-dataset" />
+							<Input value={datasetText} onChange={(e) => (setDataset(e.target.value), reset())} data-testid="suite-data-import-dataset" />
 						</Field>
 					)}
-					<Field label={t("import.project")} hint={platform.project_hint}>
-						<Input value={project} onChange={(e) => (setProject(e.target.value), reset())} data-testid="suite-data-import-project" />
-					</Field>
+					{/* M6-33: Dataset for a dataset import, Project for traces; never both. */}
+					{kind === "traces" && (
+						<Field label={t("import.project")} hint={platform.project_hint}>
+							<Input value={projectText} onChange={(e) => (setProject(e.target.value), reset())} data-testid="suite-data-import-project" />
+						</Field>
+					)}
 					{kind === "traces" && (
 						<Field label={t("import.query")}>
 							<Input value={query} onChange={(e) => (setQuery(e.target.value), reset())} data-testid="suite-data-import-query" />
@@ -452,7 +485,7 @@ export function ImportForm({
 							>
 								{Array.from(new Set([s.default, ...secrets])).map((name) => (
 									<option key={name} value={name}>
-										{name}
+										{secrets.includes(name) ? name : tf("data.noSecret", { name })}
 									</option>
 								))}
 							</select>
@@ -510,7 +543,7 @@ export function ImportPreview({ result, t }: { result: PlatformImportResult; t: 
 				</p>
 			)}
 			{(result.benchmark?.problems?.length ?? 0) > 0 && (
-				<p className="text-chart-error-ink text-xs">{t("import.problems", { count: result.benchmark!.problems!.length })}</p>
+				<p className="text-danger-ink text-xs">{t("import.problems", { count: result.benchmark!.problems!.length })}</p>
 			)}
 			{(result.preview ?? []).length > 0 && (
 				<ul className="flex max-h-64 flex-col gap-1 overflow-auto rounded-md border p-2 text-xs">

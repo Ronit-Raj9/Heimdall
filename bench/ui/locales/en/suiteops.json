@@ -3,14 +3,14 @@
 	"viewerNote": "You can see these tools, but only members can use them. Ask an org owner for the member role.",
 	"checks": {
 		"title": "Readiness check",
-		"description": "Before a task is used in tests, Heimdall checks it is fair: a correct solution must pass and an agent that does nothing must fail. Step 1, Check files: finds mistakes in the task files. Step 2, Freeze: pins every task so each run sees the same version. Step 3, Run readiness check: tries each task and marks it Ready or Not ready.",
+		"description": "Before a task is used in tests, Heimdall checks it is fair: a correct solution must pass and an agent that does nothing must fail.",
 		"lint": "Check files",
-		"lock": "Freeze",
-		"admit": "Run readiness check",
+		"lock": "Freeze this version",
+		"admit": "Run the readiness check",
 		"lockConfirm": "Freeze {{suite}}? Every task is pinned to its current files. Later edits to a task need a new freeze.",
-		"lockDone": "Frozen. Next step: Run readiness check.",
+		"lockDone": "Frozen. Next step: Run the readiness check.",
 		"admitConfirm": "Run the readiness check on every task of {{suite}}? This builds images and tries a correct solution for each task.",
-		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker (Workers page). Ready tasks can be run right after.",
+		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker. Ready tasks can be run right after.",
 		"hostedAdmitConfirm": "Run the readiness check on every task of {{suite}}? Each task runs on a worker in practice mode (no real model, free)."
 	},
 	"health": {
@@ -27,7 +27,9 @@
 		"reasonPlaceholder": "Why? (required)",
 		"quarantine": "Pause",
 		"restore": "Restore",
-		"reasonRequired": "Type a reason first: say why the task is paused."
+		"reasonRequired": "Type a reason first: say why the task is paused.",
+		"askTitle": "Why pause {{task}}?",
+		"cancel": "Cancel"
 	},
 	"source": {
 		"github": "GitHub repository",
@@ -52,9 +54,9 @@
 		"title": "Find tasks in your history",
 		"description": "Looks through recent bug-fix commits that changed tests and makes ready tasks from the best ones.",
 		"since": "Since (commit, tag or YYYY-MM-DD, optional)",
-		"limit": "Tasks to cut",
+		"limit": "How many tasks",
 		"dryRun": "Preview only (write nothing)",
-		"hostedDryRun": "A full search makes the tasks, runs the readiness check on a worker (Workers page), and keeps only the tasks that pass.",
+		"hostedDryRun": "A full search makes the tasks, runs the readiness check on a worker, and keeps only the tasks that pass.",
 		"run": "Find tasks",
 		"preview": "Preview candidates",
 		"missing": "Pick a repository first."
