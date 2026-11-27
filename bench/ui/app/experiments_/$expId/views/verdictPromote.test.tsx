@@ -55,6 +55,6 @@ describe("VerdictPromote follows what differs between the setups (N165)", () => 
 	it("warns that promoting without a clear winner is an exception", () => {
 		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="agent" decision="inconclusive" />);
 		expect(html).toContain('data-testid="verdict-promote"');
-		expect(html).toContain("No clear winner yet. Promoting now records the release as an exception to your release rules.");
+		expect(html).toContain("No clear winner. Promoting records an exception to your release rules.");
 	});
 });

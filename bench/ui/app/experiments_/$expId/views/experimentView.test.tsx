@@ -99,9 +99,6 @@ describe("ExperimentView one benchmark of an evaluation (J7.tabs)", () => {
 		api.status = okQuery(done({ arms: ["A"], evaluation_id: "ev_1" }));
 		const html = render(<ExperimentView expId="e_child" />);
 		expect(html).toContain('data-testid="experiment-evaluation-note"');
-		expect(html).toContain(
-			"This is one benchmark of an evaluation. A comparison of two setups on the same tasks adds Switch decision, and Actions can add more tasks.",
-		);
 		expect(html).toContain("Open the evaluation");
 		expect(html).toContain('href="/evaluations/ev_1"');
 	});

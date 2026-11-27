@@ -82,7 +82,6 @@ export default function CompareView() {
 						: [{ label: t("runs.list.title"), to: "/runs" }, { label: t("runs.title") }]
 				}
 				title={t("runs.title")}
-				subtitle={t("runs.subtitle")}
 			/>
 			{pairId ? (
 				<PairComparison pairId={pairId} onClear={() => void setPairId(null)} />
@@ -103,10 +102,7 @@ function PickOrLaunch({ expParam, onPick }: { expParam: string | null; onPick: (
 			{/* X-34: the picker's own Section heading is the one heading here; no outer card or icon tile. */}
 			<PairPicker expParam={expParam} onPick={onPick} />
 			<div className="flex min-w-0 flex-col gap-3">
-				<div className="flex flex-col gap-0.5">
-					<h2 className="text-base font-semibold tracking-tight">{t("launch.newTitle")}</h2>
-					<p className="text-muted-foreground text-sm">{t("launch.newSubtitle")}</p>
-				</div>
+				<h2 className="text-base font-semibold tracking-tight">{t("launch.newTitle")}</h2>
 				<CompareLaunch />
 			</div>
 		</div>
@@ -251,7 +247,6 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			{/* Q-143, Q-144: proof and human reviews fold to one line each, so nine runs do not make a 6000 px page. */}
 			<DetailsDisclosure label={t("runs.evidence.title")} testId="runs-evidence-fold">
 			<div className="flex min-w-0 flex-col gap-3" data-testid="runs-evidence-section">
-				<p className="text-muted-foreground text-sm">{t("runs.evidence.description")}</p>
 				<div className="grid min-w-0 gap-6 xl:grid-cols-2">
 					{lanes.map((lane) => (
 						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
@@ -294,7 +289,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				<LanesBody pair={data} lanes={lanes} />
 			</Section>
 
-			<Section title={t("runs.gateway.title")} description={t("runs.gateway.description")} testId="runs-gateway-section">
+			<Section title={t("runs.gateway.title")} testId="runs-gateway-section">
 				<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
 					{lanes.map((lane) => (
 						<GatewayLaneBlock key={lane.pairRun.arm} lane={lane} />
@@ -320,7 +315,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				</PerSetup>
 			</Section>
 
-			<Section title={t("runs.agents.title")} description={t("runs.agents.description")} testId="runs-agents-section">
+			<Section title={t("runs.agents.title")} testId="runs-agents-section">
 				<PerSetup lanes={lanes}>
 					{(lane) => (
 						<>
@@ -330,7 +325,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				</PerSetup>
 			</Section>
 
-			<Section title={t("runs.output.title")} description={t("runs.output.description")} testId="runs-diff-section">
+			<Section title={t("runs.output.title")} testId="runs-diff-section">
 				<PerSetup lanes={lanes}>
 					{(lane) => (
 						<>
@@ -352,7 +347,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			{scenarioLanes.length > 0 && (
-				<Section title={t("runs.scenario.title")} description={t("runs.scenario.description")} testId="runs-scenario-section">
+				<Section title={t("runs.scenario.title")} testId="runs-scenario-section">
 					<PerSetup lanes={scenarioLanes}>
 						{(lane) => (
 							<>

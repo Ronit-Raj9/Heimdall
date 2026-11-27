@@ -67,7 +67,7 @@ describe("VerdictCard", () => {
 			decisionText: ">REGRESSED<",
 			tone: "bad",
 			actionText: "ACTION: HOLD",
-			contains: [">-25 pp<", "0 positive, 6 negative", ">0.0313<", "Regressed on the primary endpoint or a guard failed."],
+			contains: [">-25 pp<", "0 positive, 6 negative", ">0.0313<", "Regressed, or a guard failed."],
 		},
 		{
 			name: "inconclusive (the fixture)",
@@ -102,7 +102,7 @@ describe("VerdictCard", () => {
 			contains: [
 				'data-testid="verdict-invalid-reasons"',
 				"graded-coverage: coverage 0.82 in arm B",
-				"An instrument gate fired: graded-coverage: coverage 0.82 in arm B.",
+				"Instrument gate fired: graded-coverage: coverage 0.82 in arm B.",
 				">not assessed<",
 				">not computed<",
 			],

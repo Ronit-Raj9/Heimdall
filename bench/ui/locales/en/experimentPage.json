@@ -86,7 +86,7 @@
 			"holdRegressed": "Keep {{arm}}. Open the runs where the new setup failed.",
 			"holdViolations": "Hold off. A safety rule or check failed. Review it below.",
 			"no_decision": "Not enough evidence yet. Add more tasks.",
-			"fix_harness": "The measurement broke. Fix the failed runs, then re-score.",
+			"fix_harness": "The measurement broke, not the agent. Check the failed runs, then re-score.",
 			"setupsTied": "Not enough evidence. Add tasks, not tries.",
 			"setupsLeader": "Use {{leader}}.",
 			"setupsLeaderFlagged_one": "Hold off: {{leader}} broke a safety rule on {{count}} task.",
@@ -142,15 +142,15 @@
 		}
 	},
 	"sectionHints": {
-		"guards": "Limits B must stay within, even when better.",
+		"guards": "",
 		"gates": "A check that fires fails the run.",
 		"diagnostics": "",
 		"meters": "",
 		"statistics": "",
 		"changes": "",
 		"policy": "",
-		"tasks": "Click a cell to compare the two runs.",
-		"guardsMany": "Limits each new setup must stay within.",
+		"tasks": "",
+		"guardsMany": "",
 		"diagnosticsMany": ""
 	},
 	"exportTab": {

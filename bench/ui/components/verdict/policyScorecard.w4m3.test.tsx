@@ -21,6 +21,6 @@ describe("PolicyScorecard without a release rule set (p05-1)", () => {
 describe("Compare runs subtitle (p06-7)", () => {
 	it("does not name two setups", () => {
 		const s = i18n.t("runs.subtitle", { ns: "bench" });
-		expect(s).toBe("The same task, run by each setup in the same way, side by side.");
+		expect(s).not.toMatch(/\bA and B\b|two setups/);
 	});
 });

@@ -69,10 +69,7 @@ export function RunDiff({ lanes }: { lanes: readonly DiffLane[] }) {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-3" data-testid="compare-diff">
-			<div className="flex flex-col gap-0.5">
-				<h2 className="text-foreground text-base font-semibold tracking-tight">{t("diff.title")}</h2>
-				<p className="text-muted-foreground text-sm">{t("diff.subtitle")}</p>
-			</div>
+			<h2 className="text-foreground text-base font-semibold tracking-tight">{t("diff.title")}</h2>
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 				<div className="min-w-fit text-sm" role="table" aria-label={t("diff.title")}>
 					<div className="bg-muted/40 sticky top-0 grid border-b" style={cols} role="row">

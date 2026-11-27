@@ -24,6 +24,7 @@
 		"tasksFirstSuffix": "tasks of {{count}}",
 		"tasksFirstNone": "tasks",
 		"tasksAll": "All {{count}} tasks",
+		"tasksAll_zero": "All tasks",
 		"trials": "Trials per task",
 		"adaptive": "Adaptive trials",
 		"adaptiveHint": "Stop a task once all setups agree. Trials is the max.",

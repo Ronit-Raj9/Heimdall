@@ -128,7 +128,7 @@ describe("A/B form native selects (N233)", () => {
 			hostedSession("member"),
 		);
 		expect(tagOf(unknown, "experiment-plan-button")).toContain('disabled=""');
-		expect(unknown).toContain("Heimdall cannot tell which tasks of coding-core are ready. Run the readiness checks on its page first.");
+		expect(unknown).toContain("Cannot tell which tasks of coding-core are ready. Run its readiness checks first.");
 	});
 });
 

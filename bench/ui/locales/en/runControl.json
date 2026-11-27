@@ -79,18 +79,18 @@
 	},
 	"run": {
 		"cancel": "Cancel run",
-		"confirmCancel": "Cancel run {{id}}? It is not counted and waits for a requeue.",
+		"confirmCancel": "Cancel run {{id}}? It is not counted, uses no attempt and waits for a requeue.",
 		"confirm": "Cancel run",
 		"keep": "Keep running",
 		"requeue": "Requeue",
-		"requeueHint": "Run again. This run is kept, not counted.",
+		"requeueHint": "Run again. This run is kept, not counted, uses no attempt.",
 		"cancelError": "Could not cancel the run",
 		"requeueError": "Could not requeue the run",
 		"superseded": "Replaced by a requeue: not counted"
 	},
 	"rerun": {
 		"button": "Rerun failures",
-		"hint": "Reruns failed tasks as a new comparison.",
+		"hint": "Reruns failed tasks as a new comparison. This result stays.",
 		"started": "Started {{id}}: {{tasks}} tasks",
 		"open": "Open",
 		"error": "Could not rerun failures",

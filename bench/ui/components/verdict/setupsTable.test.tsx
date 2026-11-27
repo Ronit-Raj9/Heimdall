@@ -53,7 +53,7 @@ describe("SetupsTable", () => {
 describe("VerdictTabNotes", () => {
 	it("says a readiness check is not a comparison and links the benchmark's Build tab", () => {
 		const html = renderToStaticMarkup(<VerdictTabNotes system="readiness" suite="coding-core@1.0.0" />);
-		expect(html).toContain("This is a readiness check, not a comparison. Its result is on the benchmark&#x27;s Build tab.");
+		expect(html).toContain("Readiness check. Result is on the Build tab.");
 		expect(html).toMatch(/href="\/suites\/coding-core[^"]*tab=build/);
 	});
 	it("sends a draft benchmark's readiness check to Add benchmark", () => {
@@ -62,7 +62,7 @@ describe("VerdictTabNotes", () => {
 	});
 	it("says how many runs are done while the comparison runs", () => {
 		const html = renderToStaticMarkup(<VerdictTabNotes partial={{ done: 3, total: 12 }} />);
-		expect(html).toContain("Still running: 3 of 12 runs done. The result below counts only finished runs and is not final.");
+		expect(html).toContain("Still running: 3 of 12 runs done. Result not final.");
 	});
 	it("says nothing for a finished user comparison", () => {
 		expect(renderToStaticMarkup(<VerdictTabNotes suite="coding-core@1.0.0" />)).toBe("");

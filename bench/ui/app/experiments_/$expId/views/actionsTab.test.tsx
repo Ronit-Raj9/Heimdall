@@ -140,7 +140,7 @@ describe("ActionsTab fault test (N65)", () => {
 		expect(html).toContain('data-testid="actions-probe-rate-limit"');
 		expect(html).toContain('data-testid="actions-probe-job-disabled"');
 		expect(html).toContain("Tick at least one fault.");
-		expect(html).toContain("Re-run each setup with faults added, on the same tasks, to see how it holds up.");
+		expect(html).toContain("Re-run each setup with faults on the same tasks.");
 	});
 });
 

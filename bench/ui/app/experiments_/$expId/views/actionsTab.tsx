@@ -63,7 +63,6 @@ export function ActionsTab({ expId, suite, suiteVersion, gradeSource, openAll }:
 	const formKey = first ? `${first.agent_file}|${first.model}` : "none";
 	return (
 		<div className="flex flex-col gap-3" data-testid="experiment-actions">
-			<p className="text-muted-foreground text-sm">{tu("actions.intro")}</p>
 			<ExtendCard expId={expId} gradeSource={gradeSource} arms={setups.length || undefined} />
 			<ProbeCard expId={expId} suite={suite} open={openAll} />
 			<ActionCard

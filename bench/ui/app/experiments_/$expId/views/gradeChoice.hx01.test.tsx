@@ -109,7 +109,7 @@ describe("RegradeNotice", () => {
 		page.query.grade = ORIGINAL_GRADE;
 		const html = render(<RegradeNotice expId="e_x" />);
 		expect(tagOf(html, "regrade-notice")).toContain('data-showing="original"');
-		expect(html).toContain("Showing the original result. A newer re-score rg_new from");
+		expect(html).toContain("Original result. Newer re-score rg_new from");
 		expect(tagOf(html, "regrade-notice-latest")).toContain('href="/experiments/e_x?tab=verdict"');
 		expect(html).toContain("Show re-score");
 	});

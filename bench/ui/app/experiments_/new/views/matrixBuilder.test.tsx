@@ -47,7 +47,7 @@ describe("MatrixBuilder", () => {
 		expect(html).toContain('data-testid="builder-plan"');
 		// Run waits for a plan.
 		expect(html).toMatch(/data-testid="builder-run"[^>]*disabled=""/);
-		expect(html).toContain("Plan the experiment first");
+		expect(html).toContain("Plan first.");
 		expect(html).not.toContain("builder-write-token");
 	});
 

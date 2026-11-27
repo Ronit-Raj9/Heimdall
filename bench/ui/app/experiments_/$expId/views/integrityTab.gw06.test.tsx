@@ -50,7 +50,7 @@ describe("IntegrityTab (N68, N77)", () => {
 	it("shows a one-setup noise floor note, not a card claiming an A/A measurement", () => {
 		const html = render(<IntegrityTab expId="e_x" />);
 		expect(html).toContain(
-			"The noise floor compares two setups. This run scored one setup, so there is no difference to test against noise.",
+			"Needs two setups. This run has one.",
 		);
 		expect(html).not.toContain("measured from the A/A setup");
 		expect(html).not.toContain('data-testid="variance-card"');

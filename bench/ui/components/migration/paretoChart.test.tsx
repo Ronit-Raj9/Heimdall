@@ -11,14 +11,14 @@ describe("ParetoChart", () => {
 	it("is an image with a title and the frontier in words", () => {
 		expect(html).toMatch(/<svg role="img" aria-labelledby="[^"]+ [^"]+"/);
 		expect(html).toContain("Cost against verified success: 2 of 2 configs placed; x is Cost per verified success");
-		expect(html).toMatch(/On the frontier: [^<]*custom-python/);
+		expect(html).toMatch(/Best for their cost: [^<]*custom-python/);
 	});
 
 	it("fills the frontier point and greys the dominated one, and says so in text", () => {
 		expect(html.match(/data-testid="pareto-chart-mark" data-frontier="true"/g)).toHaveLength(1);
 		expect(html.match(/data-testid="pareto-chart-mark" data-frontier="false"/g)).toHaveLength(1);
-		expect(html).toContain("dominated by B");
-		expect(html).toContain("Hollow, grey: dominated");
+		expect(html).toContain("beaten by B");
+		expect(html).toContain("Hollow, grey: beaten on cost and score");
 	});
 
 	it("lists a point it cannot place with the reason, and draws no mark for it", () => {

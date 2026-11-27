@@ -314,7 +314,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 			data-testid="matrix-builder"
 		>
 			<div className="flex min-w-0 flex-col gap-4">
-				<Step n={1} title={t("steps.what")} hint={t("steps.whatHint")}>
+				<Step n={1} title={t("steps.what")}>
 					<div className="grid gap-4 md:grid-cols-2">
 						<Field label={t("fields.name")} error={shown.name}>
 							{(id) => <Input id={id} value={v.name} onChange={(e) => set("name", e.target.value)} data-testid="builder-name-input" />}
@@ -516,10 +516,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 						<span className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
 							4
 						</span>
-						<span className="flex min-w-0 flex-1 flex-col">
-							<span className="text-sm font-semibold tracking-tight">{t("steps.extras")}</span>
-							<span className="text-muted-foreground text-xs">{t("steps.extrasHint")}</span>
-						</span>
+						<span className="min-w-0 flex-1 text-sm font-semibold tracking-tight">{t("steps.extras")}</span>
 						<ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
 					</summary>
 					<div className="flex flex-col gap-5 border-t px-5 py-5">

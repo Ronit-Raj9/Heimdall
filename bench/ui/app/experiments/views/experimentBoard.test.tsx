@@ -164,7 +164,7 @@ describe("ExperimentBoard", () => {
 		expect(tagOf(html, "experiments-new")).toContain('href="/experiments/new"');
 		expect(html).toContain("New comparison");
 		// M4-73: the subtitle is one short line now.
-		expect(html).toContain("A and B on the same tasks: which is better, and at what cost.");
+		expect(html).toContain("Two setups on the same tasks.");
 	});
 
 	it("offers Cancelled, counts each status and puts analyzing under Running (N1)", () => {
@@ -212,7 +212,7 @@ describe("ExperimentBoard", () => {
 		url.extra = [{ ...rows[1], exp_id: "e_replay_r_n697kiewjt_x4qq", name: "replay r_n697kiewjt", arms: ["A"], decision: undefined }];
 		const html = render(<ExperimentBoard />);
 		expect(html).not.toContain("experiment-row-e_replay_r_n697kiewjt_x4qq");
-		expect(html).toContain("debug runs");
+		expect(html).toMatch(/\(\d+ hidden\)/);
 		url.all = "1";
 		const every = render(<ExperimentBoard />);
 		url.all = null;
@@ -278,7 +278,7 @@ describe("ExperimentBoard kinds, practice rule and hidden matches (fix wave 3)",
 		url.q = null;
 		url.extra = [];
 		expect(html).not.toContain("experiment-row-e_c10_quick");
-		expect(html).toContain("1 match is hidden (checks, practice runs and single benchmarks of evaluations).");
+		expect(html).toContain("1 match is hidden.");
 		expect(html).toContain('data-testid="experiment-show-hidden-matches"');
 	});
 	it("labels a deleted drift monitor's runs and reads leader as a found leader (N257, N244)", () => {

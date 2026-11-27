@@ -8,7 +8,7 @@ describe("plainInvalidReason", () => {
 	it.each([
 		[
 			"gate model_fidelity fired in 3 of 3 runs (100.0%) of arm B, above 5%",
-			"the model gateway answered 3 of 3 runs of setup B with a different model than the one asked for (model check)",
+			"the gateway used a different model in 3 of 3 runs of setup B",
 		],
 		["graded coverage 0.000 (0 of 3 runs) in arm A on clean is below 0.90", "only 0 of 3 runs of setup A were graded"],
 		["gate egress fired in 2 of 12 runs of arm B", "the egress check fired in 2 of 12 runs"],

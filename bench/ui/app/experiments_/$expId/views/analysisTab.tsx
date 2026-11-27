@@ -1,3 +1,4 @@
+import "@/components/experiments/ufvp4I18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { BlameReplay } from "@/components/experiments/blameReplay";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
@@ -408,6 +409,14 @@ function ViewCard({
 	);
 }
 
+/** A cluster titled by raw gate ids ("g1_protected_paths, g4_regrade gate") reads as the checks' plain names. */
+export function plainGateTitle(title: string): string {
+	const m = /^((?:g\d+_[a-z_]+)(?:,\s*g\d+_[a-z_]+)*)\s+gates?$/i.exec(title.trim());
+	if (!m) return title;
+	const names = m[1].split(/,\s*/).map((id) => i18n.t(`gates.names.${id}`, { ns: "uf5a", defaultValue: id.replace(/^g\d+_/, "").replace(/_/g, " ") }));
+	return i18n.t("analysis.failedChecks", { ns: "ufvp4", list: names.join(", ") });
+}
+
 /**
  * Failure clusters as horizontal bars. M4-37: a bar is the share of all runs (2 of 16 is an eighth),
  * in a neutral colour; without a run count the largest cluster is the full width.
@@ -421,7 +430,7 @@ function ClusterBars({ clusters, total }: { clusters: readonly { signature: stri
 					<span className="flex items-baseline justify-between gap-3">
 						{/* M4-39: two lines, not one cut at 25 characters on a phone. */}
 						<span className="line-clamp-2 min-w-0 break-words" title={`${c.signature}: ${c.title}`}>
-							{c.title}
+							{plainGateTitle(c.title)}
 						</span>
 						<span className="text-xs font-semibold tabular-nums">{c.count}</span>
 					</span>

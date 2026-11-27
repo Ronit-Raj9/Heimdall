@@ -1,3 +1,4 @@
+import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
@@ -11,7 +12,6 @@ import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import "./uf4aI18n";
 import "@/components/share/ufd4I18n";
-import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import {
 	DECISION_TONE,
 	formatPp,
@@ -238,7 +238,11 @@ function ArmPanel({
 					{label}
 				</span>
 				{tooFew ? (
-					<span className="text-right text-sm font-semibold" data-testid={`verdict-summary-too-few-${arm}`}>
+					<span
+						className="text-right text-sm font-semibold"
+						title={ratio ? td("shared.tooFewDetail", { den: ratio.den, min: DEFAULT_MIN_RUNS }) : undefined}
+						data-testid={`verdict-summary-too-few-${arm}`}
+					>
 						{td("shared.tooFew")}
 					</span>
 				) : (
@@ -247,7 +251,7 @@ function ArmPanel({
 					</span>
 				)}
 			</div>
-			<div className="flex items-center gap-2">
+			<div className={cn("flex items-center gap-2", tooFew && "hidden")}>
 				<span className="text-muted-foreground w-3 shrink-0 font-mono text-xs font-semibold" aria-hidden="true">
 					{arm.length <= 2 ? arm : arm.slice(0, 1).toUpperCase()}
 				</span>
@@ -267,7 +271,6 @@ function ArmPanel({
 			</div>
 			<span className="text-muted-foreground text-xs">
 				{ratio ? t("summary.passCount", { num: ratio.num, den: ratio.den }) : t("summary.passRate")}
-				{tooFew && ratio ? ` · ${td("shared.tooFewDetail", { den: ratio.den, min: DEFAULT_MIN_RUNS })}` : ""}
 			</span>
 			{thrown > 0 && (
 				<Link
@@ -404,11 +407,11 @@ function hint(
 	t: TFn,
 	tr: (k: string, o?: Record<string, unknown>) => string,
 ): string | null {
-	if (partial) return t("summary.partialHint");
+	if (partial) return t("summary.partialHint") || null;
 	// Q-140: the server's setups note is statistics; the page says it in plain words.
 	if (isSetupsVerdict(verdict))
 		return verdict.decision === "invalid" ? t("summary.invalidHint") : verdict.setups ? plainSetupsNote(verdict.setups, tr) : null;
-	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint");
+	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint") || null;
 	if (verdict.decision === "invalid" && !verdict.invalid_reasons?.length) return t("summary.invalidHint");
 	return null;
 }

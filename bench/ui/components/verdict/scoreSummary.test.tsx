@@ -41,7 +41,7 @@ describe("ScoreSummary", () => {
 	});
 	it("says when the range is unknown and when the test broke", () => {
 		expect(render("score", { ...score, interval: undefined })).toContain("Range not known");
-		expect(render("invalid")).toContain("score is not trusted");
+		expect(render("invalid")).toContain("Some runs broke for reasons outside the agent");
 	});
 	it("says why a cost is missing and blames the price only for an unpriced model", () => {
 		const verdict = verdictWith({ decision: "score", action: "no_decision", effect: undefined, score });
@@ -57,7 +57,7 @@ describe("ScoreSummary", () => {
 		const lost = withCost("telemetry_incomplete");
 		expect(lost).toContain("Not known: telemetry_incomplete");
 		expect(lost).not.toContain("no price set");
-		expect(withCost("unpriced_model")).toContain("Not known: this model has no price set");
+		expect(withCost("unpriced_model")).toContain("Not known: no price set");
 	});
 });
 

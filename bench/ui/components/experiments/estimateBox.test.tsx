@@ -80,7 +80,7 @@ describe("EstimateBox", () => {
 		expect(piece(html, "estimate-cost-value")).toBe("$4.80 to $10.56 (median $6.84)");
 		expect(piece(html, "estimate-agent-time-value")).toBe("1.7h to 4.3h (median 2.6h)");
 		expect(piece(html, "estimate-wall-clock-value")).toBe("26m to 1.1h (median 39.4m)");
-		expect(html).toContain("Agent time over a concurrency of 4, no queueing assumed.");
+		expect(html).toContain("Agent time over concurrency 4, no queueing.");
 		expect(html).toContain('data-testid="estimate-basis"');
 		expect(html).toContain("Every arm from sealed runs of its own config.");
 		expect(piece(html, "estimate-arm-cost-A")).toBe("$2.16 to $4.32 (median $3.00)");
@@ -122,14 +122,14 @@ describe("EstimateBox", () => {
 			price_ref: "bifrost-datasheet-2026-11-14-openai",
 		});
 		expect(piece(html, "estimate-cost-value")).toBe(
-			"Not known yet: nothing like this has run on this benchmark, so there is no history to estimate from.",
+			"Not known yet. No past runs on this benchmark.",
 		);
 		expect(piece(html, "estimate-arm-cost-A")).toBe("Not known yet (no history)");
 		expect(piece(html, "estimate-budget-cap")).toBe("The budget of $20.00 stops the comparison when it is spent.");
 		expect(piece(html, "estimate-agent-time-value")).toBe("at most 2.5h (from each agent&#x27;s time limit)");
 		expect(piece(html, "estimate-wall-clock-value")).toBe("at most 37.5m (from each agent&#x27;s time limit)");
 		expect(piece(html, "estimate-price-ref")).toBe(
-			"Model prices come from bifrost-datasheet-2026-11-14-openai. They are used once there is history to price.",
+			"Model prices come from bifrost-datasheet-2026-11-14-openai, used once there is history.",
 		);
 		expect(html).not.toContain("Prices checked against");
 		expect(html).not.toContain("no history, cannot estimate");
@@ -166,7 +166,7 @@ describe("EstimateBox", () => {
 			price_ref: "prices-2026-11-01",
 		});
 		expect(html).toContain('data-testid="estimate-judge"');
-		expect(html).toContain("Judge, separate from the agent cost: 48 runs, $0.12 to $0.31 (median $0.19).");
+		expect(html).toContain("Judge cost, separate: 48 runs, $0.12 to $0.31 (median $0.19).");
 		expect(html).toContain("30 past judge records");
 		expect(html).toContain("planner refused: arms A and B have the same config hash");
 		expect(html).toContain("Model prices come from prices-2026-11-01.");

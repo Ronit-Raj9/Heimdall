@@ -107,7 +107,7 @@ describe("MigrationTab release rule set (N280)", () => {
 		const report = { ...base, policy: "" };
 		api.query = { data: report, currentData: report, isLoading: false };
 		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
-		expect(html).toContain("No release rule set applied: this comparison did not choose one.");
+		expect(html).toContain("No release rule set: none chosen in this comparison.");
 	});
 	it("offers a select of the rule set files, the comparison's choice first", () => {
 		api.search = { policy: "my-release-policy" };
@@ -129,7 +129,7 @@ describe("MigrationTab release rule set (N280)", () => {
 		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
 		expect(html).toContain('data-testid="migration-routing-note"');
 		expect(html).toContain(
-			"A Bifrost routing file is made from an evaluation&#x27;s model comparison. Use Actions &gt; Compare models to make one.",
+			"Make one with Actions &gt; Compare models.",
 		);
 		ms.config = {
 			data: { ready: true, config: { governance: { routing_rules: [{}] } } },
