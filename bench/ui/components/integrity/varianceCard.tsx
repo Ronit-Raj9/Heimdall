@@ -7,6 +7,36 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { bandScale, insideBand, isHarnessNoise } from "./integrity.utils";
+import "@/components/verdict/uf4aI18n";
+
+type Translate = (key: string, opts?: Record<string, unknown>) => string;
+
+/**
+ * The noise floor in one plain sentence (M4-42, M4-15): "With 8 tasks, only a difference of 35
+ * points or more could be seen. The real difference is 0." Null without a floor to state. Pure.
+ */
+export function noiseSentence(t: Translate, verdict: Pick<Verdict, "mde" | "effect" | "variance">): string | null {
+	const mde = verdict.variance?.mde ?? verdict.mde;
+	if (!Number.isFinite(mde) || mde <= 0) return null;
+	const points = Math.round(mde);
+	const tasks = verdict.effect?.n_tasks;
+	const floor = tasks ? t("noise.floorTasks", { count: tasks, points }) : t("noise.floor", { points });
+	const d = verdict.effect?.d_bar;
+	if (d === undefined || !Number.isFinite(d)) return floor;
+	return `${floor} ${t("noise.real", { points: Math.round(Math.abs(d) * 100) })}`;
+}
+
+/** The noise floor sentence alone, for the Result tab (M4-15); nothing when there is no floor. */
+export function NoiseFloorLine({ verdict, className }: { verdict: Verdict; className?: string }) {
+	const { t } = useTranslation("uf4a");
+	const line = noiseSentence(t as unknown as Translate, verdict);
+	if (!line) return null;
+	return (
+		<p className={cn("text-muted-foreground text-sm", className)} data-testid="noise-floor-line">
+			{line}
+		</p>
+	);
+}
 
 export interface VarianceCardProps {
 	verdict: Verdict;
@@ -20,8 +50,10 @@ export interface VarianceCardProps {
  */
 export function VarianceCard({ verdict, className }: VarianceCardProps) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4a");
 	const locale = getLocale();
 	const v = verdict.variance;
+	const plain = noiseSentence(tu as unknown as Translate, verdict);
 	// Without a variance card the analysis only says whether the SD was assumed; "not assumed" is not
 	// proof of an A/A measurement (N68), so no source is claimed then.
 	const source = v?.source ?? (verdict.mde_assumed_sd ? "assumed" : null);
@@ -42,6 +74,16 @@ export function VarianceCard({ verdict, className }: VarianceCardProps) {
 				)}
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
+				{noise && (
+					<p role="alert" className={cn("rounded-sm border px-3 py-2 text-sm", TONE_CLASS.bad)} data-testid="variance-harness-noise">
+						{t("integrity.variance.harnessNoise")}
+					</p>
+				)}
+				{plain && (
+					<p className="text-foreground text-sm" data-testid="variance-plain">
+						{plain}
+					</p>
+				)}
 				<NoiseBand
 					releaseDBar={verdict.effect?.d_bar}
 					aaDBar={v?.aa_effect?.d_bar}
@@ -49,52 +91,57 @@ export function VarianceCard({ verdict, className }: VarianceCardProps) {
 					releaseLabel={t("integrity.variance.band.release")}
 					aaLabel={t("integrity.variance.band.aa")}
 				/>
-				<dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 xl:grid-cols-4">
-					<Stat label={t("integrity.variance.sdUsed")} testId="variance-sd">
-						{formatSd(v?.sd ?? verdict.sd, locale)}
-					</Stat>
-					<Stat label={t("integrity.variance.measuredSd")} testId="variance-measured-sd">
-						{typeof v?.measured_sd === "number" ? formatSd(v.measured_sd, locale) : <Muted>{t("integrity.variance.notMeasured")}</Muted>}
-					</Stat>
-					<Stat label={t("integrity.variance.assumedSd")} testId="variance-assumed-sd">
-						{formatSd(v?.assumed_sd ?? 0.3, locale)}
-					</Stat>
-					<Stat label={t("integrity.variance.mde")} testId="variance-mde">
-						{formatPp(v?.mde ?? verdict.mde, locale)} pp
-					</Stat>
-					{v?.aa_arm && (
-						<>
-							<Stat label={t("integrity.variance.aaTasks")} testId="variance-aa-tasks">
-								{v.aa_tasks ?? 0}
+				{/* M4-42: the SD figures and the A/A notes are for statisticians. */}
+				<details className="group" data-testid="variance-statistics">
+					<summary className="text-primary w-fit cursor-pointer text-sm font-medium">{tu("verdict.forStatisticians")}</summary>
+					<div className="mt-3 flex flex-col gap-3">
+						<dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 xl:grid-cols-4">
+							<Stat label={t("integrity.variance.sdUsed")} testId="variance-sd">
+								{formatSd(v?.sd ?? verdict.sd, locale)}
 							</Stat>
-							<Stat label={t("integrity.variance.aaEffect")} testId="variance-aa-effect">
-								{v.aa_effect ? `${formatSignedPp(v.aa_effect.d_bar, locale)} pp` : <Muted>{t("integrity.variance.notMeasured")}</Muted>}
+							<Stat label={t("integrity.variance.measuredSd")} testId="variance-measured-sd">
+								{typeof v?.measured_sd === "number" ? (
+									formatSd(v.measured_sd, locale)
+								) : (
+									<Muted>{t("integrity.variance.notMeasured")}</Muted>
+								)}
 							</Stat>
-							{v.aa_decision && (
-								<Stat label={t("integrity.variance.aaDecision")} testId="variance-aa-decision">
-									<AADecision decision={v.aa_decision} />
-								</Stat>
+							<Stat label={t("integrity.variance.assumedSd")} testId="variance-assumed-sd">
+								{formatSd(v?.assumed_sd ?? 0.3, locale)}
+							</Stat>
+							<Stat label={t("integrity.variance.mde")} testId="variance-mde">
+								{formatPp(v?.mde ?? verdict.mde, locale)} pp
+							</Stat>
+							{v?.aa_arm && (
+								<>
+									<Stat label={t("integrity.variance.aaTasks")} testId="variance-aa-tasks">
+										{v.aa_tasks ?? 0}
+									</Stat>
+									<Stat label={t("integrity.variance.aaEffect")} testId="variance-aa-effect">
+										{v.aa_effect ? `${formatSignedPp(v.aa_effect.d_bar, locale)} pp` : <Muted>{t("integrity.variance.notMeasured")}</Muted>}
+									</Stat>
+									{v.aa_decision && (
+										<Stat label={t("integrity.variance.aaDecision")} testId="variance-aa-decision">
+											<AADecision decision={v.aa_decision} />
+										</Stat>
+									)}
+								</>
 							)}
-						</>
-					)}
-				</dl>
-				{noise && (
-					<p role="alert" className={cn("rounded-sm border px-3 py-2 text-sm", TONE_CLASS.bad)} data-testid="variance-harness-noise">
-						{t("integrity.variance.harnessNoise")}
-					</p>
-				)}
-				<div className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="variance-detail">
-					{v?.detail && <p>{v.detail}</p>}
-					{v && !v.aa_arm && !v.detail && <p>{t("integrity.variance.noAA")}</p>}
-					{!v && (
-						<p>
-							{t("integrity.variance.legacy", {
-								kind: verdict.mde_assumed_sd ? t("integrity.variance.legacyAssumed") : t("integrity.variance.legacyMeasured"),
-								sd: formatSd(verdict.sd, locale),
-							})}
-						</p>
-					)}
-				</div>
+						</dl>
+						<div className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="variance-detail">
+							{v?.detail && <p>{v.detail}</p>}
+							{v && !v.aa_arm && !v.detail && <p>{t("integrity.variance.noAA")}</p>}
+							{!v && (
+								<p>
+									{t("integrity.variance.legacy", {
+										kind: verdict.mde_assumed_sd ? t("integrity.variance.legacyAssumed") : t("integrity.variance.legacyMeasured"),
+										sd: formatSd(verdict.sd, locale),
+									})}
+								</p>
+							)}
+						</div>
+					</div>
+				</details>
 			</CardContent>
 		</Card>
 	);
@@ -153,10 +200,10 @@ export function NoiseBand({
 						testId="variance-band-release"
 					/>
 				)}
-				<span className="text-muted-foreground absolute top-10 left-0 text-[10px] tabular-nums">
+				<span className="text-muted-foreground absolute top-10 left-0 text-xs tabular-nums">
 					{formatSignedPp(-scale.domain / 100, locale)} pp
 				</span>
-				<span className="text-muted-foreground absolute top-10 right-0 text-[10px] tabular-nums">
+				<span className="text-muted-foreground absolute top-10 right-0 text-xs tabular-nums">
 					{formatSignedPp(scale.domain / 100, locale)} pp
 				</span>
 			</div>

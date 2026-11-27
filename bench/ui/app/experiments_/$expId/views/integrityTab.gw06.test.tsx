@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({ verdict: {} as unknown, certs: {} as unknown }))
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetGridQuery: () => ({}),
 	useGetVerdictQuery: () => api.verdict,
 	useGetExperimentQuery: (id: string) => ({ data: { exp_id: id, state: "done" } }),
 }));

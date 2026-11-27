@@ -6,6 +6,10 @@ import { ActionsTab } from "./actionsTab";
 
 const api = vi.hoisted(() => ({ adaptive: {} as unknown, verdict: {} as unknown }));
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => api.adaptive }));
+// M4-34: the Actions tab reads one benchmark (GET /suites/{id}).
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuiteQuery: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...((await orig()) as Record<string, unknown>),
 	useGetSuitesQuery: () => ({ data: { suites: [] }, isLoading: false }),
@@ -41,7 +45,9 @@ describe("Extend on a broken comparison", () => {
 		expect(html).not.toContain('data-testid="actions-extend-force"');
 	});
 	it("keeps Extend anyway for a decided, valid comparison", () => {
-		api.adaptive = { data: { decision: "improved", more_evidence: null, extends: null } };
+		api.adaptive = {
+			data: { decision: "improved", more_evidence: null, extends: null },
+		};
 		const html = render(<ActionsTab expId="e_ok" />);
 		expect(html).toContain('data-testid="actions-extend-force"');
 		expect(html).not.toContain('data-testid="actions-extend-broken"');

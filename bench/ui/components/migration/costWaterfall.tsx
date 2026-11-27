@@ -6,7 +6,10 @@ import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
 import type { CostArm, CostExplanation, CostWaterfall as Waterfall, Value } from "@/lib/types/bench";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { FadeScroll } from "./fadeScroll";
+import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed, signedUsd, waterfallBars } from "./pareto.utils";
+import { formatUsd2, observedNumber } from "@/components/verdict/armCost";
 
 /**
  * Why arm B cost more than arm A (docs/cost-explain.md): the two arms side by side, then the
@@ -19,6 +22,7 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 	const locale = getLocale();
 	const { a, b } = explanation;
 	const { t: tw } = useTranslation("w4b06");
+	const { t: tu } = useTranslation("uf4a");
 	const unknown = t("migration.unknown");
 	// N200: the configured model, then the provider's own name for it on a second line only when it differs.
 	const modelCell = (arm: CostArm): ReactNode => {
@@ -36,10 +40,17 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 	const rows: [string, (arm: CostArm) => ReactNode][] = [
 		[tw("cost.model"), modelCell],
 		[t("migration.cost.row.runs"), (arm) => t("migration.cost.runsValue", { runs: arm.runs, successes: arm.successes })],
-		[t("migration.cost.row.perRun"), (arm) => costText(arm.cost_per_run, locale) ?? valueReason(arm.cost_per_run, unknown)],
-		[t("migration.cost.row.perSuccess"), (arm) => costText(arm.cost_per_success, locale) ?? valueReason(arm.cost_per_success, unknown)],
+		// The mean, the one cost per run of every tab, with two significant digits (M4-2).
 		[
-			t("migration.cost.row.cacheNeutral"),
+			tu("cost.perRun"),
+			(arm) => {
+				const mean = observedNumber(arm.cost_per_run);
+				return mean !== null ? formatUsd2(mean, locale) : valueReason(arm.cost_per_run, unknown);
+			},
+		],
+		[tu("cost.perSuccess"), (arm) => costText(arm.cost_per_success, locale) ?? valueReason(arm.cost_per_success, unknown)],
+		[
+			tu("cost.cacheNeutral"),
 			(arm) => costText(arm.cache_neutral_per_success, locale) ?? valueReason(arm.cache_neutral_per_success, unknown),
 		],
 		[t("migration.cost.row.cacheRead"), (arm) => formatShare(observed(arm.cache_read_share), locale) ?? unknown],
@@ -52,7 +63,15 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 			t("migration.cost.row.attempts"),
 			(arm) => `${arm.retries_per_run.toFixed(2)} / ${arm.fallbacks_per_run.toFixed(2)} / ${arm.rejected_per_run.toFixed(2)}`,
 		],
-		[t("migration.cost.row.unpriced"), (arm) => `${arm.unpriced_rows} / ${arm.unattributed_rows}`],
+		// M4-24: a row that is 0 for both setups says nothing and is left out.
+		...(a.unpriced_rows + a.unattributed_rows + b.unpriced_rows + b.unattributed_rows > 0
+			? [
+					[t("migration.cost.row.unpriced"), (arm: CostArm) => `${arm.unpriced_rows} / ${arm.unattributed_rows}`] as [
+						string,
+						(arm: CostArm) => ReactNode,
+					],
+				]
+			: []),
 	];
 	return (
 		<section className="flex flex-col gap-4" data-testid="cost-explanation" aria-label={t("migration.cost.title")}>
@@ -61,23 +80,29 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 					{t("migration.synthetic")}
 				</p>
 			)}
-			<div className="overflow-x-auto">
+			<FadeScroll pinStart>
 				<table className="w-full min-w-[420px] text-sm" data-testid="cost-arms">
 					<thead>
 						<tr className="text-muted-foreground text-left text-xs">
 							<th className="py-1 pr-3 font-medium" scope="col" />
 							<th className="py-1 pr-3 font-medium" scope="col">
-								{t("migration.cost.arm", { arm: a.arm, label: a.label })}
+								{t("migration.cost.arm", {
+									arm: a.arm,
+									label: a.label,
+								})}
 							</th>
 							<th className="py-1 pr-3 font-medium" scope="col">
-								{t("migration.cost.arm", { arm: b.arm, label: b.label })}
+								{t("migration.cost.arm", {
+									arm: b.arm,
+									label: b.label,
+								})}
 							</th>
 						</tr>
 					</thead>
 					<tbody>
 						{rows.map(([label, cell]) => (
 							<tr key={label} className="border-t">
-								<th className="text-muted-foreground py-1 pr-3 text-left font-normal" scope="row">
+								<th className="text-muted-foreground bg-card sticky left-0 py-1 pr-3 text-left font-normal" scope="row">
 									{label}
 								</th>
 								<td className="py-1 pr-3 font-mono tabular-nums">{cell(a)}</td>
@@ -86,7 +111,7 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 						))}
 					</tbody>
 				</table>
-			</div>
+			</FadeScroll>
 			<WaterfallView title={t("migration.cost.perRun")} waterfall={explanation.per_run} testId="cost-waterfall-run" />
 			<WaterfallView title={t("migration.cost.perSuccess")} waterfall={explanation.per_success} testId="cost-waterfall-success" />
 			<div className="flex flex-col gap-1 text-sm" data-testid="cost-apart">
@@ -203,12 +228,14 @@ function WaterfallView({ title, waterfall, testId }: { title: string; waterfall:
 				})}
 				<li className="grid grid-cols-[minmax(8rem,14rem)_1fr_6rem] items-center gap-2 border-t pt-1" data-testid={`${testId}-total`}>
 					<span className="text-foreground text-xs font-medium">{t("migration.cost.total")}</span>
-					<span className="text-muted-foreground text-xs">{t("migration.cost.legend")}</span>
+					<span aria-hidden="true" />
 					<span className="text-right font-mono text-xs font-medium tabular-nums">
 						{total !== null ? signedUsd(total, locale) : (costText(waterfall.total, locale) ?? unknown)}
 					</span>
 				</li>
 			</ol>
+			{/* M4-26: the note on how the parts add up reads as a caption, not inside a narrow table cell. */}
+			<p className="text-muted-foreground mt-2 text-xs">{t("migration.cost.legend")}</p>
 		</div>
 	);
 }
@@ -219,7 +246,7 @@ export function CostExplainPanel({ expId, a, b, condition }: { expId: string; a?
 	const query = useGetCostExplainQuery({ expId, a, b, condition });
 	return (
 		<section className="flex flex-col gap-3 rounded-md border p-4" data-testid="cost-explain-panel">
-			<h3 className="text-foreground text-base font-semibold">{t("migration.cost.title")}</h3>
+			<h2 className="text-foreground text-base font-semibold">{t("migration.cost.title")}</h2>
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="cost-explain-loading" />
 			) : query.error || !query.data ? (

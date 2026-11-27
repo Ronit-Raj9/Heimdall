@@ -60,9 +60,11 @@ describe("VerdictSummary cost and tokens (D8.cost)", () => {
 
 	it("renders the live payload shape", () => {
 		const html = show({ armMetrics: live });
-		expect(at(html, "verdict-summary-cost-A")).toBe("$0.0035");
+		// Lane 4a phase B (M4-2): the diagnostics cost is a median, so the average reads not known and the median is the second value.
+		expect(at(html, "verdict-summary-cost-A")).toBe("Not known");
+		expect(at(html, "verdict-summary-median-A")).toBe("Median $0.0035");
 		expect(at(html, "verdict-summary-tokens-A")).toBe("23,128");
-		expect(at(html, "verdict-summary-cost-B")).toBe("$0.0017");
+		expect(at(html, "verdict-summary-median-B")).toBe("Median $0.0017");
 	});
 
 	it("says loading and load failure instead of a missing price", () => {
@@ -173,5 +175,52 @@ describe("VerdictSummary setups, guard and running headlines (fix wave 3, N244, 
 		expect(head(html)).toBe("Still running: no result yet");
 		expect(html).not.toContain("Test was broken");
 		expect(html).not.toContain('data-testid="verdict-summary-next-button"');
+	});
+});
+describe("VerdictSummary much cheaper at the same score (M4-1, M4-2, M4-12)", () => {
+	const obs = (v: number) => ({
+		state: "observed" as const,
+		v,
+		evidence: "gateway" as const,
+	});
+	const naive = {
+		A: { num: 7, den: 8, unknown: 0 },
+		B: { num: 7, den: 8, unknown: 0 },
+	};
+	const html = renderToStaticMarkup(
+		<VerdictSummary
+			verdict={verdictWith({ decision: "inconclusive", action: "no_decision" })}
+			arms={["A", "B"]}
+			naive={naive}
+			armMetrics={{ A: { cost_usd: obs(0.095) }, B: { cost_usd: obs(0.0062) } }}
+			armCost={{ A: obs(0.104), B: obs(0.0068) }}
+		/>,
+	);
+	it("says B costs 15 times less and gives both pass counts and costs", () => {
+		expect(html).toContain("No difference in score. B costs 15 times less.");
+		expect(html).toContain("A solved 7 of 8 at $0.10 a run. B solved 7 of 8 at $0.0068 a run.");
+		expect(html).toContain('data-testid="verdict-summary-cheaper-B"');
+		expect(html).not.toContain('data-testid="verdict-summary-cheaper-A"');
+	});
+	it("labels the mean as the average cost and the median as a second value", () => {
+		expect(html).toContain("Average cost per run");
+		expect(html).toContain("Median $0.095");
+	});
+	it("is a grey panel, not a warning", () => {
+		expect(html).not.toContain("chart-warning");
+	});
+	it("keeps no clear winner when the costs are close", () => {
+		const close = renderToStaticMarkup(
+			<VerdictSummary
+				verdict={verdictWith({
+					decision: "inconclusive",
+					action: "no_decision",
+				})}
+				arms={["A", "B"]}
+				naive={naive}
+				armCost={{ A: obs(0.1), B: obs(0.08) }}
+			/>,
+		);
+		expect(close).toContain("No clear winner yet");
 	});
 });

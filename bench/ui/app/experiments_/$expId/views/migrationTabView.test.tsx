@@ -9,11 +9,12 @@ import { MigrationTab } from "./migrationTab";
 // never shows the previous report beside the new controls.
 
 const api = vi.hoisted(() => ({ query: {} as unknown, search: {} as Record<string, string | null> }));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: (key: string) => [api.search[key] ?? null, () => undefined],
 }));
-vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query }));
+vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query, useGetCostExplainQuery: () => ({}) }));
 const gov = vi.hoisted(() => ({ policies: {} as unknown }));
 vi.mock("@/lib/store/apis/governApi", () => ({ useListPoliciesQuery: () => gov.policies }));
 vi.mock("@/components/migration/migrationReport", () => ({ MigrationReportView: () => <div data-testid="migration-report" /> }));
@@ -28,13 +29,14 @@ vi.mock("@/components/modelswitch/applyPanel", () => ({
 }));
 
 describe("MigrationTab effective settings", () => {
-	it("shows the response's alpha and grade source, not the address bar's", () => {
+	// M4-29: the alpha label is gone from the controls; the grade source is still the response's.
+	it("shows the response's grade source and no alpha label", () => {
 		api.search = { alpha: "0.2", grade_source: "reviewed" };
 		const report = { ...MIGRATION_FIXTURE, alpha: 0.05, grade_source: "original" };
 		api.query = { data: report, currentData: report, isLoading: false };
 		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
-		expect(html).toContain("α = 0.05");
-		expect(html).not.toContain("α = 0.2");
+		expect(html).not.toContain("α =");
+		expect(html).toContain('data-testid="migration-source"');
 		expect(html).toContain('data-testid="migration-report"');
 	});
 	it("waits for the current selection's report instead of showing the previous one", () => {
@@ -124,7 +126,10 @@ describe("MigrationTab release rule set (N280)", () => {
 		expect(html).toContain(
 			"A Bifrost routing file is made from an evaluation&#x27;s model comparison. Use Actions &gt; Compare models to make one.",
 		);
-		ms.config = { data: { ready: true, config: { governance: { routing_rules: [{}] } } }, isLoading: false };
+		ms.config = {
+			data: { ready: true, config: { governance: { routing_rules: [{}] } } },
+			isLoading: false,
+		};
 		expect(render(<MigrationTab expId="e1" arms={["A", "B"]} evaluationId="ev_1" />)).not.toContain("migration-routing-note");
 	});
 });

@@ -18,6 +18,31 @@ import { OutcomeBadge } from "./outcomeBadge";
 import { INFRA_OUTCOMES, shortReason } from "./runFailure.utils";
 import { BlockSkeleton, LoadError } from "./screenStates";
 import "@/app/runs/views/w4m4I18n";
+import "@/components/verdict/uf4aI18n";
+
+/** A run row with the task title the server may add (G1, M4-18); optional, today's id stays the fallback. */
+type TitledRow = RunListRow & { task_title?: string };
+
+/** True when every scored run is 0 or 1, so the Score column only repeats the Result (M4-21). Pure. */
+export function passFailOnly(rows: readonly RunListRow[]): boolean {
+	const scored = rows.filter((row) => row.y?.v != null);
+	return scored.length > 0 && scored.every((row) => row.y.v === 0 || row.y.v === 1);
+}
+
+/** The rows of one comparison by task, then setup, so A and B of a task sit together (M4-22). Pure. */
+export function byTaskThenSetup<T extends Pick<RunListRow, "task" | "arm" | "trial">>(rows: readonly T[]): T[] {
+	return [...rows].sort(
+		(x, y) => x.task.localeCompare(y.task, undefined, { numeric: true }) || x.arm.localeCompare(y.arm) || x.trial - y.trial,
+	);
+}
+
+/** True when a filter offers a choice: two or more values, or one already chosen (M4-19). Pure. */
+export function filterHasChoice(options: readonly string[], value: string | null | undefined): boolean {
+	return Boolean(value) || options.length > 1;
+}
+
+/** On a comparison, the filters shown at once (M4-19); the rest go behind More filters. */
+export const MAIN_FILTERS: ReadonlySet<string> = new Set(["arm", "outcome"]);
 
 /** A start time as month, day and time; the year is left out to keep the column narrow. */
 export function formatShortTime(iso: string | undefined, locale: string): string {
@@ -96,7 +121,12 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 	const filters = { ...search, exp: expId ?? search.exp };
 	const request = runListRequest(filters, search.page);
 	const list = useListRunsQuery(request);
+	const { t: tu } = useTranslation("uf4a");
 	const shownFilters = RUN_FILTERS.filter((f) => !(expId && f.param === "exp"));
+	// M4-19: a filter with one value is no choice and is left out; on a comparison only Setup and Result show at once.
+	const choosable = shownFilters.filter((f) => !list.data || filterHasChoice(list.data.facets[f.facet] ?? [], search[f.param]));
+	const mainFilters = expId ? choosable.filter((f) => MAIN_FILTERS.has(f.param)) : choosable;
+	const moreFilters = expId ? choosable.filter((f) => !MAIN_FILTERS.has(f.param)) : [];
 	const active = shownFilters.some((f) => Boolean(search[f.param]));
 	const page = Math.max(1, search.page ?? 1);
 
@@ -106,7 +136,7 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid={testId}>
 			<div className="flex flex-wrap items-end gap-2" role="group" aria-label={t("runs.list.filtersLabel")}>
-				{shownFilters.map((filter) => (
+				{mainFilters.map((filter) => (
 					<FilterSelect
 						key={filter.param}
 						param={filter.param}
@@ -115,6 +145,28 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 						onChange={(value) => setFilter(filter.param, value)}
 					/>
 				))}
+				{moreFilters.length > 0 && (
+					<details
+						className="group"
+						data-testid="run-list-more-filters"
+						open={moreFilters.some((f) => Boolean(search[f.param])) || undefined}
+					>
+						<summary className="text-primary flex h-8 cursor-pointer list-none items-center text-sm font-medium [&::-webkit-details-marker]:hidden">
+							{tu("runs.moreFilters")}
+						</summary>
+						<div className="mt-2 flex flex-wrap items-end gap-2">
+							{moreFilters.map((filter) => (
+								<FilterSelect
+									key={filter.param}
+									param={filter.param}
+									options={list.data?.facets[filter.facet] ?? []}
+									value={search[filter.param]}
+									onChange={(value) => setFilter(filter.param, value)}
+								/>
+							))}
+						</div>
+					</details>
+				)}
 				{active && (
 					<Button variant="ghost" size="sm" onClick={clear} dataTestId="run-list-clear">
 						{t("runs.list.clear")}
@@ -158,9 +210,9 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 			) : (
 				<>
 					<Card className="hidden py-0 shadow-none md:flex">
-						<RunTable rows={list.data.runs} showExperiment={!expId} />
+						<RunTable rows={expId ? byTaskThenSetup(list.data.runs) : list.data.runs} showExperiment={!expId} banded={Boolean(expId)} />
 					</Card>
-					<RunCards rows={list.data.runs} showExperiment={!expId} />
+					<RunCards rows={expId ? byTaskThenSetup(list.data.runs) : list.data.runs} showExperiment={!expId} />
 					<Pager page={page} total={list.data.total} onPage={(next) => void setSearch({ page: next === 1 ? null : next })} />
 				</>
 			)}
@@ -180,12 +232,13 @@ function FilterSelect({
 	onChange: (value: string | null) => void;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4a");
 	const id = `run-filter-${param}`;
 	// A value from the URL the facets do not carry (a typo, an old link) still shows as chosen.
 	const choices = value && !options.includes(value) ? [value, ...options] : options;
 	return (
 		<div className="flex min-w-0 flex-col gap-1">
-			<label htmlFor={id} className="text-muted-foreground text-xs">
+			<label htmlFor={id} className="text-muted-foreground text-xs" title={param === "track" ? tu("runs.trackHint") : undefined}>
 				{t(`runs.list.filter.${param}`)}
 			</label>
 			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)}>
@@ -208,9 +261,21 @@ function FilterSelect({
 }
 
 /** The run table. Every id links to its page; the pair opens the side-by-side comparison. */
-export function RunTable({ rows, showExperiment = true }: { rows: readonly RunListRow[]; showExperiment?: boolean }) {
+export function RunTable({
+	rows,
+	showExperiment = true,
+	banded = false,
+}: {
+	rows: readonly TitledRow[];
+	showExperiment?: boolean;
+	/** Alternate a light band per task, so the setups of one task read as a group (M4-22). */
+	banded?: boolean;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4a");
 	const locale = getLocale();
+	const showScore = !passFailOnly(rows);
+	let band = 0;
 	return (
 		<Table stickyColumns={1} data-testid="run-table" aria-label={t("runs.list.tableLabel")}>
 			<TableHeader>
@@ -221,12 +286,15 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 					<TableHead scope="col">{t("runs.list.col.arm")}</TableHead>
 					<TableHead scope="col">{t("runs.list.col.condition")}</TableHead>
 					<TableHead scope="col">{t("runs.list.col.outcome")}</TableHead>
-					<TableHead scope="col" className="text-right">
-						<span className="inline-flex items-center gap-1.5">
-							{t("runs.list.col.score")}
-							<GradeSourceTag sealedOnly judged={rows.every((row) => row.grading === "judged")} testId="run-table-score-source" />
-						</span>
-					</TableHead>
+					{/* M4-21: a pass or fail benchmark has no Score column; the Result says it all. */}
+					{showScore && (
+						<TableHead scope="col" className="text-right">
+							<span className="inline-flex items-center gap-1.5">
+								{t("runs.list.col.score")}
+								<GradeSourceTag sealedOnly judged={rows.every((row) => row.grading === "judged")} testId="run-table-score-source" />
+							</span>
+						</TableHead>
+					)}
 					<TableHead scope="col" className="text-right">
 						{t("runs.list.col.cost")}
 					</TableHead>
@@ -237,73 +305,94 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{rows.map((row) => (
-					<TableRow key={row.run_id} data-testid={`run-row-${row.run_id}`} data-arm={row.arm}>
-						<TableCell className="text-xs">
-							<EntityLink kind="run" id={row.run_id} testId={`run-row-${row.run_id}-link`} />
-							{!row.counted && <span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.notCounted")}</span>}
-							{row.attempt > 1 && (
-								<span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.attempt", { n: row.attempt })}</span>
-							)}
-						</TableCell>
-						{showExperiment && (
+				{rows.map((row, i) => {
+					if (i > 0 && rows[i - 1].task !== row.task) band += 1;
+					return (
+						<TableRow
+							key={row.run_id}
+							data-testid={`run-row-${row.run_id}`}
+							data-arm={row.arm}
+							className={banded && band % 2 === 1 ? "bg-muted/40" : undefined}
+						>
 							<TableCell className="text-xs">
-								<EntityLink kind="experiment" id={row.exp_id} />
-							</TableCell>
-						)}
-						<TableCell className="text-xs">
-							<EntityLink kind="task" id={row.task} suite={row.suite} />
-						</TableCell>
-						<TableCell className="font-mono text-xs font-semibold">{row.arm}</TableCell>
-						<TableCell className="text-xs">
-							<span className="font-mono">{row.condition}</span>
-							<span className="text-muted-foreground ml-1.5 tabular-nums" title={t("runs.list.trialHint", { trial: row.trial })}>
-								{t("runs.list.trial", { trial: row.trial })}
-							</span>
-						</TableCell>
-						<TableCell>
-							{row.sealed ? <RowOutcome row={row} /> : <span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>}
-						</TableCell>
-						<TableCell className="text-right">
-							<span className="inline-flex items-center gap-1">
-								{row.grading === "judged" && (
-									<Gavel
-										className="text-chart-warning-ink size-3"
-										aria-label={t("verdict.source.kind.judged")}
-										data-testid={`run-row-${row.run_id}-judged`}
-									/>
+								<EntityLink kind="run" id={row.run_id} testId={`run-row-${row.run_id}-link`} />
+								{!row.counted && <span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.notCounted")}</span>}
+								{row.attempt > 1 && (
+									<span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.attempt", { n: row.attempt })}</span>
 								)}
-								<ValueCell value={row.y} kind="count" />
-							</span>
-						</TableCell>
-						<TableCell className="text-right">
-							<ValueCell value={row.cost_usd} kind="usd" />
-						</TableCell>
-						<TableCell className="text-muted-foreground text-xs whitespace-nowrap tabular-nums">
-							{formatShortTime(row.started, locale)}
-						</TableCell>
-						<TableCell className="text-right">
-							{row.pair_id && row.paired && (
-								<Link
-									to="/compare"
-									search={compareSearch(row.pair_id, row.exp_id) as never}
-									className="text-muted-foreground hover:text-primary focus-visible:ring-ring/60 inline-flex items-center gap-1 rounded-sm text-xs focus-visible:ring-2 focus-visible:outline-none"
-									aria-label={t("runs.list.compareAria", { run: row.run_id })}
-									title={t("runs.list.compareAria", { run: row.run_id })}
-									data-testid={`run-row-${row.run_id}-compare`}
-								>
-									<GitCompareArrows className="size-3.5" aria-hidden="true" />
-								</Link>
+							</TableCell>
+							{showExperiment && (
+								<TableCell className="text-xs">
+									<EntityLink kind="experiment" id={row.exp_id} />
+								</TableCell>
 							)}
-						</TableCell>
-					</TableRow>
-				))}
+							<TableCell className="text-xs">
+								<TaskCell row={row} />
+							</TableCell>
+							<TableCell className="font-mono text-xs font-semibold">{row.arm}</TableCell>
+							<TableCell className="text-xs">
+								<span className="font-mono">{row.condition}</span>
+								<span className="text-muted-foreground ml-1.5 tabular-nums" title={t("runs.list.trialHint", { trial: row.trial })}>
+									{t("runs.list.trial", { trial: row.trial })}
+								</span>
+							</TableCell>
+							<TableCell>
+								{row.sealed ? <RowOutcome row={row} /> : <span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>}
+							</TableCell>
+							{showScore && (
+								<TableCell className="text-right">
+									<span className="inline-flex items-center gap-1">
+										{row.grading === "judged" && (
+											<Gavel
+												className="text-chart-warning-ink size-3"
+												aria-label={t("verdict.source.kind.judged")}
+												data-testid={`run-row-${row.run_id}-judged`}
+											/>
+										)}
+										<ValueCell value={row.y} kind="count" />
+									</span>
+								</TableCell>
+							)}
+							<TableCell className="text-right">
+								<ValueCell value={row.cost_usd} kind="usd" />
+							</TableCell>
+							<TableCell className="text-muted-foreground text-xs whitespace-nowrap tabular-nums">
+								{formatShortTime(row.started, locale)}
+							</TableCell>
+							<TableCell className="text-right">
+								{row.pair_id && row.paired && (
+									<Button variant="ghost" size="icon" className="size-8" asChild>
+										<Link
+											to="/compare"
+											search={compareSearch(row.pair_id, row.exp_id) as never}
+											aria-label={tu("runs.compareTask", { task: row.task_title || row.task })}
+											title={tu("runs.compareTask", { task: row.task_title || row.task })}
+											data-testid={`run-row-${row.run_id}-compare`}
+										>
+											<GitCompareArrows className="size-4" aria-hidden="true" />
+										</Link>
+									</Button>
+								)}
+							</TableCell>
+						</TableRow>
+					);
+				})}
 			</TableBody>
 		</Table>
 	);
 }
 
-/** The run list on a phone: one card per run with the same links, in place of the wide table. */
+/** The task: its title when the server sends one (M4-18), with the id as a tooltip; else the id link. */
+function TaskCell({ row }: { row: TitledRow }) {
+	if (!row.task_title) return <EntityLink kind="task" id={row.task} suite={row.suite} />;
+	return (
+		<span className="flex min-w-0 flex-col" title={row.task}>
+			<span className="text-foreground text-sm">{row.task_title}</span>
+			<EntityLink kind="task" id={row.task} suite={row.suite} />
+		</span>
+	);
+}
+
 /** The outcome badge; an infra error also shows its short reason, with the full first line as a tooltip. */
 export function RowOutcome({ row, testId = true }: { row: RunListRow; testId?: boolean }) {
 	const reason =
@@ -320,7 +409,8 @@ export function RowOutcome({ row, testId = true }: { row: RunListRow; testId?: b
 	);
 }
 
-function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showExperiment: boolean }) {
+/** The run list on a phone: one card per run with the same links, in place of the wide table. */
+function RunCards({ rows, showExperiment }: { rows: readonly TitledRow[]; showExperiment: boolean }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	return (
@@ -337,7 +427,7 @@ function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showE
 					</div>
 					<div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
 						<span>
-							{t("runs.list.col.task")} <EntityLink kind="task" id={row.task} suite={row.suite} />
+							{t("runs.list.col.task")} <TaskCell row={row} />
 						</span>
 						<span>
 							{t("runs.list.col.arm")} <span className="text-foreground font-mono font-semibold">{row.arm}</span>

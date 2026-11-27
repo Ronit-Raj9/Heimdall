@@ -7,6 +7,8 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { MatrixPairGrid } from "./matrixPairGrid";
 import { MatrixTable } from "./matrixTable";
+import { Disclosure } from "@/components/verdict/disclosure";
+import "@/components/verdict/uf4aI18n";
 
 export interface MatrixReportProps {
 	matrix: ModelMatrix;
@@ -19,8 +21,15 @@ export interface MatrixReportProps {
  * shown before any number when nothing can be told apart, the arm table, the pairwise grid and the
  * runs left out.
  */
+/** True when some pair differs below alpha, so the pairwise table opens by itself (M4-50). Pure. */
+export function anyPairBelow(pairs: readonly { p_adjusted?: number | null }[], alpha: number | null | undefined): boolean {
+	if (alpha == null) return false;
+	return pairs.some((pair) => pair.p_adjusted != null && pair.p_adjusted < alpha);
+}
+
 export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4a");
 	const id = useId();
 	const rows = matrix.rows ?? [];
 	const pairs = matrix.pairs ?? [];
@@ -30,12 +39,13 @@ export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 	return (
 		<div className="flex flex-col gap-6" data-testid="matrix-report" data-separable={matrix.separable ? "true" : "false"}>
 			<div className="flex flex-wrap items-end gap-4">
-				{conditions.length > 0 && (
+				{/* M4-52: a single fault ("clean") is no choice: the select shows only with two or more. */}
+				{conditions.length > 1 && (
 					<div className="flex flex-col gap-1">
 						<label htmlFor={id} className="text-muted-foreground text-xs">
 							{t("matrix.condition")}
 						</label>
-						<Select value={matrix.condition || undefined} onValueChange={onCondition} disabled={conditions.length < 2}>
+						<Select value={matrix.condition || undefined} onValueChange={onCondition}>
 							<SelectTrigger id={id} className="min-w-40 font-mono text-xs" data-testid="matrix-condition">
 								<SelectValue />
 							</SelectTrigger>
@@ -54,26 +64,25 @@ export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 						</Select>
 					</div>
 				)}
-				<div className="text-muted-foreground flex flex-col gap-0.5 pb-1.5 text-xs">
-					<span data-testid="matrix-facts">{t("matrix.facts", { suite: matrix.suite, tasks: matrix.tasks, alpha: matrix.alpha })}</span>
-					{matrix.grade_source && (
-						<span className="font-mono" data-testid="matrix-grade-source">
-							{t("matrix.gradeSource", { source: matrix.grade_source })}
-						</span>
-					)}
-				</div>
+				<p className="text-muted-foreground pb-1.5 text-xs" data-testid="matrix-facts">
+					{matrix.grade_source
+						? tu("matrix.factsGrades", { count: matrix.tasks, grades: matrix.grade_source })
+						: tu("matrix.facts", { count: matrix.tasks })}
+				</p>
 			</div>
 
 			{!matrix.separable ? (
 				<div
 					role="status"
-					className="border-chart-warning/60 bg-chart-warning/10 flex items-start gap-3 rounded-sm border px-4 py-3"
+					className="border-warning bg-warning-soft flex items-start gap-3 rounded-sm border px-4 py-3"
 					data-testid="matrix-not-separable"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					<div className="flex flex-col gap-0.5">
-						<p className="text-chart-warning-ink text-sm font-semibold">{t("matrix.notSeparable")}</p>
-						<p className="text-foreground text-sm">{matrix.note}</p>
+						<p className="text-warning-ink text-sm font-semibold">{t("matrix.notSeparable")}</p>
+						<p className="text-foreground text-sm" data-testid="matrix-plain-note">
+							{tu("matrix.tooFew", { count: matrix.tasks })}
+						</p>
 					</div>
 				</div>
 			) : (
@@ -86,7 +95,7 @@ export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 			)}
 
 			{matrix.synthetic && (
-				<p role="note" className="text-chart-warning-ink flex items-center gap-1.5 text-xs font-medium" data-testid="matrix-synthetic">
+				<p role="note" className="text-warning-ink flex items-center gap-1.5 text-xs font-medium" data-testid="matrix-synthetic">
 					<AlertTriangle className="size-3.5" aria-hidden="true" />
 					{t("matrix.synthetic")}
 				</p>
@@ -102,16 +111,34 @@ export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 				)}
 			</Section>
 
-			{rows.length > 1 && (
-				<Section
-					title={t("matrix.grid.title")}
-					description={t("matrix.grid.description", { alpha: matrix.alpha })}
-					testId="matrix-grid-section"
+			{/* M4-50, M4-46: the pairwise luck chances and the server's own note are for statisticians; open only when a pair differs. */}
+			{(rows.length > 1 || (!matrix.separable && matrix.note)) && (
+				<Disclosure
+					title={tu("verdict.forStatisticians")}
+					description={tu("matrix.statsHint")}
+					defaultOpen={anyPairBelow(pairs, matrix.alpha)}
+					testId="matrix-statistics"
 				>
-					<Card className="py-0 shadow-none">
-						<MatrixPairGrid rows={rows} pairs={pairs} />
-					</Card>
-				</Section>
+					<div className="flex flex-col gap-4">
+						{!matrix.separable && matrix.note && (
+							<p className="text-muted-foreground text-xs" data-testid="matrix-stat-note">
+								{matrix.note}
+							</p>
+						)}
+						{rows.length > 1 && (
+							<Section
+								as="h4"
+								title={t("matrix.grid.title")}
+								description={t("matrix.grid.description", { alpha: matrix.alpha })}
+								testId="matrix-grid-section"
+							>
+								<div className="w-auto max-w-full overflow-x-auto">
+									<MatrixPairGrid rows={rows} pairs={pairs} />
+								</div>
+							</Section>
+						)}
+					</div>
+				</Disclosure>
 			)}
 
 			{excluded.length > 0 && (

@@ -7,7 +7,7 @@
 		"oneArm": "Why the cost moved compares two setups. This run has one setup."
 	},
 	"page": {
-		"evaluationNote": "This is one benchmark of an evaluation. Result, Model switch and Extra trials appear when two setups run on the same tasks.",
+		"evaluationNote": "This is one benchmark of an evaluation. A comparison of two setups on the same tasks adds Switch decision, and Actions can add more tasks.",
 		"openEvaluation": "Open the evaluation"
 	},
 	"promote": {

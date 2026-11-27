@@ -1,3 +1,4 @@
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { BlameReplay } from "@/components/experiments/blameReplay";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,14 @@ export const ANALYSIS_JOBS: readonly AnalysisJobSpec[] = [
 		refreshes: ["clusters", "verdict"],
 	},
 ];
+
+/** Maintenance jobs (M4-35): re-check the verdict, rebuild clusters and the index. Only admins see them. */
+export const MAINTENANCE_JOBS: ReadonlySet<AnalysisJobSpec["key"]> = new Set(["check", "clusters", "index"]);
+
+/** The analysis jobs a viewer sees: every job for an admin, the rest without the maintenance ones. */
+export function visibleAnalysisJobs(admin: boolean): readonly AnalysisJobSpec[] {
+	return admin ? ANALYSIS_JOBS : ANALYSIS_JOBS.filter((spec) => !MAINTENANCE_JOBS.has(spec.key));
+}
 
 /** The icon of each analysis job card. */
 const JOB_ICONS: Record<AnalysisJobSpec["key"], LucideIcon> = {
@@ -196,6 +205,7 @@ export function AnalysisTab({ expId, gradeSource }: { expId: string; gradeSource
 	// multi_agent comes from the experiment status (fix wave 2, lane G04): blame splits a team run's failure between its agents.
 	const experiment = useGetExperimentQuery(expId);
 	const singleAgent = experiment.data?.multi_agent !== true;
+	const admin = canUse(useSession(), "admin");
 	const notScanned = awareness.data?.not_scanned ?? [];
 	const refresh = (views: AnalysisView[]) => {
 		if (views.includes("verdict")) void verdict.refetch();
@@ -306,7 +316,7 @@ export function AnalysisTab({ expId, gradeSource }: { expId: string; gradeSource
 								})}
 							</span>
 						) : clusters.data && clusters.data.clusters.length > 0 ? (
-							<ClusterBars clusters={clusters.data.clusters.slice(0, 8)} />
+							<ClusterBars clusters={clusters.data.clusters.slice(0, 8)} total={experiment.data?.slots?.total} />
 						) : (
 							<span className="text-muted-foreground">{t("views.clustersNone")}</span>
 						)}
@@ -317,7 +327,7 @@ export function AnalysisTab({ expId, gradeSource }: { expId: string; gradeSource
 			<section className="flex flex-col gap-3" aria-label={t("jobs.title")}>
 				<h2 className="text-base font-semibold tracking-tight">{t("jobs.title")}</h2>
 				<div className="grid items-start gap-3 lg:grid-cols-2">
-					{ANALYSIS_JOBS.map((spec) => (
+					{visibleAnalysisJobs(admin).map((spec) => (
 						<AnalysisJobCard
 							key={spec.kind}
 							spec={spec}
@@ -398,9 +408,12 @@ function ViewCard({
 	);
 }
 
-/** Failure clusters as horizontal bars, largest count as the full width. */
-function ClusterBars({ clusters }: { clusters: readonly { signature: string; count: number; title: string }[] }) {
-	const max = Math.max(1, ...clusters.map((c) => c.count));
+/**
+ * Failure clusters as horizontal bars. M4-37: a bar is the share of all runs (2 of 16 is an eighth),
+ * in a neutral colour; without a run count the largest cluster is the full width.
+ */
+function ClusterBars({ clusters, total }: { clusters: readonly { signature: string; count: number; title: string }[]; total?: number }) {
+	const max = total && total > 0 ? total : Math.max(1, ...clusters.map((c) => c.count));
 	return (
 		<ul className="flex flex-col gap-2.5">
 			{clusters.map((c) => (
@@ -412,9 +425,8 @@ function ClusterBars({ clusters }: { clusters: readonly { signature: string; cou
 						<span className="text-xs font-semibold tabular-nums">{c.count}</span>
 					</span>
 					<span className="bg-muted h-1.5 overflow-hidden rounded-full">
-						<span className="bg-destructive/70 block h-full rounded-full" style={{ width: `${(100 * c.count) / max}%` }} />
+						<span className="bg-chart-neutral block h-full rounded-full" style={{ width: `${Math.min(100, (100 * c.count) / max)}%` }} />
 					</span>
-					<span className="text-muted-foreground font-mono text-[10px]">{c.signature}</span>
 				</li>
 			))}
 		</ul>

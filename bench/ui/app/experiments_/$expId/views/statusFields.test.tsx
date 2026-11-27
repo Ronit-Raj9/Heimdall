@@ -66,7 +66,8 @@ describe("Compute blame reads multi_agent from the experiment status", () => {
 describe("Promote reads arms_differ and setups from the experiment status", () => {
 	it("offers setup B's model on a model-only comparison", () => {
 		api.experiment = okQuery(status({ arms_differ: "model" }));
-		const html = render(<ExperimentVerdictPromote expId="e_x" arms={["A", "B"]} decision="inconclusive" />);
+		// M4-3: "Use model" only when B wins.
+		const html = render(<ExperimentVerdictPromote expId="e_x" arms={["A", "B"]} decision="improved" />);
 		expect(html).not.toContain('data-testid="verdict-promote"');
 		expect(html).toContain("Use model gpt-6-luna");
 	});

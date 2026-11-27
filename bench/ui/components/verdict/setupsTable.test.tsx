@@ -34,6 +34,17 @@ describe("SetupsTable", () => {
 		for (const arm of ["A", "B", "C"]) expect(html).toContain(`data-testid="verdict-setups-row-${arm}"`);
 		expect(html).toContain("Broke a safety rule on t02");
 		expect(html).toContain("codex on gpt-6.2-sol");
+		// M4-48: every setup is tied (none behind), so the group column says nothing and is left out.
+		expect(html).not.toContain(">Top group<");
+	});
+	it("shows the group when a setup is behind", () => {
+		const html = renderToStaticMarkup(
+			<SetupsTable
+				setups={{ ...setups, top_group: ["A", "C"], behind: ["B"] }}
+				arms={["A", "B", "C"]}
+				naive={{ A: { num: 2, den: 2, unknown: 0 }, B: { num: 1, den: 2, unknown: 0 }, C: { num: 2, den: 2, unknown: 0 } }}
+			/>,
+		);
 		expect(html).toContain(">Leader<");
 		expect(html).toContain(">Top group<");
 	});

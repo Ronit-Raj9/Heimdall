@@ -10,6 +10,10 @@ const sentence =
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({
 	useGetExperimentAdaptiveQuery: () => ({ data: { decision: "inconclusive", more_evidence: null, extends: null } }),
 }));
+// M4-34: the Actions tab reads one benchmark (GET /suites/{id}).
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuiteQuery: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...((await orig()) as Record<string, unknown>),
 	useGetSuitesQuery: () => ({ data: { suites: [] }, isLoading: false }),

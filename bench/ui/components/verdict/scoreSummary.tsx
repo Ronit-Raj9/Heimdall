@@ -100,9 +100,14 @@ export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className 
 					</dd>
 				</div>
 				<div>
+					{/* M4-2: one label on every tab, the average (mean). The diagnostics only give a median, so the
+					    average reads not known and the median shows as a labelled second value. */}
 					<dt className="text-muted-foreground">{t("summary.cost")}</dt>
 					<dd className="text-sm font-medium tabular-nums" data-testid="score-summary-cost">
-						{metric("cost_usd", "usd")}
+						{t("summary.unknown")}
+					</dd>
+					<dd className="text-muted-foreground mt-0.5 text-xs tabular-nums" data-testid="score-summary-median">
+						{t("summary.medianSecond", { cost: metric("cost_usd", "usd") })}
 					</dd>
 				</div>
 				<div>

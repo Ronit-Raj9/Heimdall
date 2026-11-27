@@ -1,3 +1,6 @@
+import { skipToken } from "@reduxjs/toolkit/query/react";
+import { Link } from "@tanstack/react-router";
+import "@/components/verdict/uf4aI18n";
 import { MigrationReportView } from "@/components/migration/migrationReport";
 import { ApplyPanel } from "@/components/modelswitch/applyPanel";
 import { ModeBadge } from "@/components/modeBadge";
@@ -6,7 +9,7 @@ import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useListPoliciesQuery } from "@/lib/store/apis/governApi";
-import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
+import { useGetCostExplainQuery, useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
 import { useGetModelSwitchConfigQuery } from "@/lib/store/apis/modelSwitchApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
@@ -40,6 +43,7 @@ export function migrationParams(
 
 export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arms: readonly string[]; evaluationId?: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf4a");
 	const [from, setFrom] = useQueryState("from", parseAsString);
 	const [to, setTo] = useQueryState("to", parseAsString);
 	const [condition] = useQueryState("condition", parseAsString);
@@ -49,6 +53,11 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
 	const [policy, setPolicy] = useQueryState("policy", parseAsString);
 	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource, policy }));
+	// M4-2: the average cost per run of the pair, the same query as the Cost tab (shared cache).
+	const costExplain = useGetCostExplainQuery(arms.length === 2 ? { expId } : skipToken);
+	const meanCost = costExplain.data
+		? { [costExplain.data.a.arm]: costExplain.data.a.cost_per_run, [costExplain.data.b.arm]: costExplain.data.b.cost_per_run }
+		: undefined;
 	// Only the response to the current selection is shown: RTK keeps the previous one in data while a
 	// changed bookmark loads, and its settings would sit beside the new controls (QC2-27-07).
 	const current = report.currentData;
@@ -64,49 +73,53 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 
 	return (
 		<div className="flex flex-col gap-4" data-testid="migration-screen">
-			<div className="flex flex-wrap items-end gap-x-6 gap-y-3 text-sm">
-				<div className="flex flex-col gap-1">
-					<span className="text-muted-foreground text-xs" id="migration-from-label">
-						{t("migration.fromLabel")}
-					</span>
-					<div className="flex flex-wrap gap-1" role="radiogroup" aria-labelledby="migration-from-label">
-						{arms.map((arm) => (
-							<ArmChip
-								key={arm}
-								arm={arm}
-								active={arm === fromArm}
-								role="radio"
-								onClick={() => {
-									void setFrom(arm === arms[0] ? null : arm);
-									void setTo(null);
-								}}
-								testId={`migration-from-${arm}`}
-							/>
-						))}
+			{/* M4-29: the controls fold away under one plain title. */}
+			<details className="group rounded-lg border px-4 py-3" data-testid="migration-controls">
+				<summary className="cursor-pointer text-sm font-medium select-none">{tf("migration.changeCompared")}</summary>
+				<div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3 text-sm">
+					<div className="flex flex-col gap-1">
+						<span className="text-muted-foreground text-xs" id="migration-from-label">
+							{t("migration.fromLabel")}
+						</span>
+						<div className="flex flex-wrap gap-1" role="radiogroup" aria-labelledby="migration-from-label">
+							{arms.map((arm) => (
+								<ArmChip
+									key={arm}
+									arm={arm}
+									active={arm === fromArm}
+									role="radio"
+									onClick={() => {
+										void setFrom(arm === arms[0] ? null : arm);
+										void setTo(null);
+									}}
+									testId={`migration-from-${arm}`}
+								/>
+							))}
+						</div>
 					</div>
-				</div>
-				<div className="flex flex-col gap-1">
-					<span className="text-muted-foreground text-xs" id="migration-to-label">
-						{t("migration.toLabel")}
-					</span>
-					<div className="flex flex-wrap gap-1" role="group" aria-labelledby="migration-to-label">
-						{targets.map((arm) => (
-							<ArmChip key={arm} arm={arm} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
-						))}
+					<div className="flex flex-col gap-1">
+						<span className="text-muted-foreground text-xs" id="migration-to-label">
+							{t("migration.toLabel")}
+						</span>
+						<div className="flex flex-wrap gap-1" role="group" aria-labelledby="migration-to-label">
+							{targets.map((arm) => (
+								<ArmChip key={arm} arm={arm} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
+							))}
+						</div>
 					</div>
+					<RuleSetSelect value={policy ?? ""} onChange={(v) => void setPolicy(v || null)} />
+					{current && <EffectiveSettings report={current} />}
 				</div>
-				<RuleSetSelect value={policy ?? ""} onChange={(v) => void setPolicy(v || null)} />
-				{current && <EffectiveSettings report={current} />}
-			</div>
+			</details>
 			{current && <RuleSetLine applied={current.policy} chosen={policy} />}
 			{pending ? (
 				<BlockSkeleton rows={6} testId="migration-report-loading" />
 			) : report.error || !current ? (
 				<LoadError title={t("migration.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="migration-error" />
 			) : (
-				<MigrationReportView report={current} />
+				<MigrationReportView report={current} meanCost={meanCost} />
 			)}
-			{evaluationId ? arms.length >= 2 && <MigrationApply evaluationId={evaluationId} /> : <RoutingNote />}
+			{evaluationId ? arms.length >= 2 && <MigrationApply evaluationId={evaluationId} /> : <RoutingNote expId={expId} />}
 		</div>
 	);
 }
@@ -158,11 +171,21 @@ function RuleSetLine({ applied, chosen }: { applied: string; chosen: string | nu
 }
 
 /** D23: where a routing file comes from, for a comparison no evaluation made. */
-function RoutingNote() {
+function RoutingNote({ expId }: { expId: string }) {
 	const { t } = useTranslation("hw10");
+	const { t: tf } = useTranslation("uf4a");
 	return (
 		<p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm" role="note" data-testid="migration-routing-note">
-			{t("routingNote")}
+			{t("routingNote")} {/* M4-32: the line leads somewhere: the Actions tab, where a model switch is started. */}
+			<Link
+				to="/experiments/$expId"
+				params={{ expId }}
+				search={{ tab: "actions" } as never}
+				className="text-primary font-medium hover:underline"
+				data-testid="migration-open-actions"
+			>
+				{tf("migration.openActions")}
+			</Link>
 		</p>
 	);
 }
@@ -203,13 +226,11 @@ export function MigrationApply({ evaluationId }: { evaluationId: string }) {
 
 /** The settings the rendered report was built with, read from the response, never from the URL. */
 export function EffectiveSettings({ report }: { report: MigrationResponse }) {
+	// M4-29: no LIVE pill and no alpha label; only a practice report is marked, and the grades read.
 	return (
 		<span className="flex items-center gap-2" data-testid="migration-effective">
-			<ModeBadge mode={report.mode} />
+			{report.mode !== "live" && <ModeBadge mode={report.mode} />}
 			<GradeSourceTag source={report.grade_source || undefined} testId="migration-source" />
-			<span className="text-muted-foreground text-xs tabular-nums" data-testid="migration-alpha">
-				α = {report.alpha}
-			</span>
 		</span>
 	);
 }

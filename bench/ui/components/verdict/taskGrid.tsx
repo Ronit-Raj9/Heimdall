@@ -67,7 +67,7 @@ export function TaskGrid({ grid, onOpenPair, suite, className }: TaskGridProps) 
 					<TableRow>
 						{grid.arms.flatMap((arm) =>
 							trials.map((trial) => (
-								<TableHead key={`${arm}-${trial}`} className="text-muted-foreground h-7 px-1 text-center font-mono text-[10px]">
+								<TableHead key={`${arm}-${trial}`} className="text-muted-foreground h-7 px-1 text-center font-mono text-xs">
 									{t("verdict.grid.trial", { arm, trial })}
 								</TableHead>
 							)),
@@ -127,7 +127,7 @@ function GridRowView({
 				<span className="inline-flex items-center gap-2">
 					{suite ? <EntityLink kind="task" id={row.task} suite={suite} /> : row.task}
 					{row.discordant && (
-						<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1 text-[10px] uppercase">
+						<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1 text-xs uppercase">
 							{t("verdict.grid.discordant")}
 						</span>
 					)}

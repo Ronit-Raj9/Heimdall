@@ -220,7 +220,7 @@ function Stat({ label, hint, testId, children }: { label: string; hint?: ReactNo
 
 function DescriptiveTag({ title, label }: { title: string; label: string }) {
 	return (
-		<span className="rounded-sm border border-dashed px-1 text-[10px] leading-4 uppercase" title={title} aria-label={title}>
+		<span className="rounded-sm border border-dashed px-1 text-xs leading-4 uppercase" title={title} aria-label={title}>
 			{label}
 		</span>
 	);

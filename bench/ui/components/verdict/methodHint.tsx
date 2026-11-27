@@ -23,7 +23,7 @@ export function MethodHint({ topic, className }: MethodHintProps) {
 					aria-label={label}
 					data-testid={`verdict-method-${topic}`}
 					className={cn(
-						"text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-4 cursor-help items-center justify-center rounded-full align-middle focus-visible:ring-[3px]",
+						"text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-6 cursor-help items-center justify-center rounded-full align-middle focus-visible:ring-[3px]",
 						className,
 					)}
 				>

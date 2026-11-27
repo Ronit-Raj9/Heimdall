@@ -1,0 +1,98 @@
+{
+	"promote": {
+		"checkSwitch": "Check switching to {{model}}",
+		"checkSwitchUnknown": "Check switching to the cheaper model"
+	},
+	"extend": {
+		"estimate": "About {{cost}}, up to {{runs}} runs",
+		"estimateNoPrice": "Up to {{runs}} runs, price not known",
+		"estimateUnknown": "Number of runs and price not known",
+		"confirmPriced": "Add {{count}} more {{what}} as a follow-up comparison? This starts up to {{runs}} paid runs, about {{cost}}.",
+		"confirmNoPrice": "Add {{count}} more {{what}} as a follow-up comparison? This starts up to {{runs}} paid runs; the price is not known.",
+		"confirmUnknown": "Add {{count}} more {{what}} as a follow-up comparison? It starts paid runs; the number of runs and the price are not known."
+	},
+	"verdict": {
+		"slow": "Still computing the score. A large benchmark takes a while.",
+		"slowCount_one": "Still computing the score for {{count}} run.",
+		"slowCount_other": "Still computing the score for {{count}} runs.",
+		"stuck": "The score is taking too long to compute. Try again.",
+		"retry": "Retry",
+		"sectionsRead": "Every section below reads:",
+		"forStatisticians": "For statisticians",
+		"forStatisticiansHint": "Measurements per setup and the statistics behind the result.",
+		"loadErrorTitle": "Could not load the result."
+	},
+	"checks": {
+		"flaggedTitle_one": "Runs flagged: {{count}}",
+		"flaggedTitle_other": "Runs flagged: {{count}}",
+		"noneFlagged": "No run was flagged for cheating.",
+		"flaggedWhere": "Cheating detected: {{where}}.",
+		"onAll": "{{task}} on every setup",
+		"onSome": "{{task}} on {{setups}}",
+		"openRuns": "Open these runs",
+		"awarenessWhat": "the eval awareness check",
+		"monitorsEmptyTitle": "No monitor replayed yet",
+		"monitorsEmptyBody": "No safety monitor has replayed these runs.",
+		"monitorsSetUp": "Set up a monitor",
+		"fromTerminal": "From the terminal"
+	},
+	"migration": {
+		"seeCost": "See the cost breakdown",
+		"openActions": "Open Actions",
+		"changeCompared": "Change what is compared"
+	},
+	"export": {
+		"csv": "Download spreadsheet (CSV): {{file}}",
+		"jsonl": "Download run records (JSON lines): {{file}}",
+		"eee": "Download Every Eval Ever file: {{file}}",
+		"csvRuns_one": "Download spreadsheet (CSV): {{file}}, {{count}} run",
+		"csvRuns_other": "Download spreadsheet (CSV): {{file}}, {{count}} runs",
+		"jsonlRuns_one": "Download run records (JSON lines): {{file}}, {{count}} run",
+		"jsonlRuns_other": "Download run records (JSON lines): {{file}}, {{count}} runs",
+		"eeeRuns_one": "Download Every Eval Ever file: {{file}}, {{count}} run",
+		"eeeRuns_other": "Download Every Eval Ever file: {{file}}, {{count}} runs",
+		"classifyError": "Could not check whether the runs are synthetic, so the Every Eval Ever file was not downloaded."
+	},
+	"header": {
+		"rescore": "Re-score",
+		"compare": "Compare runs",
+		"copyId": "Copy id {{id}}",
+		"delete": "Delete comparison",
+		"deleteTitle": "Delete this comparison?",
+		"deleteOk": "Delete comparison",
+		"deleteError": "Could not delete the comparison.",
+		"moreViews": "More",
+		"moreViewsLabel": "More views of this comparison"
+	},
+	"matrix": {
+		"facts_one": "{{count}} shared task",
+		"facts_other": "{{count}} shared tasks",
+		"factsGrades_one": "{{count}} shared task, {{grades}} grades",
+		"factsGrades_other": "{{count}} shared tasks, {{grades}} grades",
+		"tooFew_one": "Only {{count}} shared task, too few to tell these setups apart. Add tasks (more tries per task will not help).",
+		"tooFew_other": "Only {{count}} shared tasks, too few to tell these setups apart. Add tasks (more tries per task will not help).",
+		"statsHint": "The chance of luck for every pair of setups, and the exact rule behind the result.",
+		"notMeasuredNote": "A dash means the setup did not measure that value; it is not zero."
+	},
+	"runs": {
+		"moreFilters": "More filters",
+		"trackHint": "Which part of the benchmark a run belongs to, for example the main tasks or a held-out set.",
+		"compareTask": "Compare the setups on {{task}}"
+	},
+	"noise": {
+		"floor": "Only a difference of {{points}} points or more could be seen.",
+		"floorTasks_one": "With {{count}} task, only a difference of {{points}} points or more could be seen.",
+		"floorTasks_other": "With {{count}} tasks, only a difference of {{points}} points or more could be seen.",
+		"real": "The real difference is {{points}}."
+	},
+	"summary": {
+		"thrown_one": "{{count}} run thrown out for cheating",
+		"thrown_other": "{{count}} runs thrown out for cheating"
+	},
+	"cost": {
+		"perRun": "Average cost per run",
+		"perSuccess": "Cost per solved task",
+		"cacheNeutral": "Cost if nothing were cached",
+		"median": "Median {{cost}}"
+	}
+}
