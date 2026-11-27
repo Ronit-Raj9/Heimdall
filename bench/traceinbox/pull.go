@@ -446,7 +446,7 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 			ID: id, State: StateNew, Source: s.Name, SourceKind: s.Kind, TraceID: traceID, Link: link,
 			Title:     oneLine(firstNonEmpty(sess.FirstRequest(), sess.Name, "(no user request in the trace)"), MaxTitleBytes),
 			Signature: sig, SignatureParts: parts, Occurrences: 1, FirstSeen: at, LastSeen: at, Traces: []TraceRef{ref},
-			SuggestedKind: kind, SuggestedSuite: ib.suggestSuite(s, kind), Tools: toolNames(sess), Model: sess.Model,
+			SuggestedKind: kind, SuggestedSuite: ib.suggestSuite(s, kind), Tools: toolNames(sess), Model: sess.Model, Agent: sess.Agent,
 			Outcome: sess.Outcome.Status, Redacted: map[string]int(r.Report()), Updated: now, Flagged: []string{},
 			Golden: fl.Golden,
 		}

@@ -28,7 +28,11 @@ type InboxItem struct {
 	SuggestedSuite string              `json:"suggested_suite,omitempty"`
 	Tools          []string            `json:"tools,omitempty"`
 	Model          string              `json:"model,omitempty"`
-	Outcome        string              `json:"outcome"`
+	// Agent is the agent the trace names (fix wave M7-12): the OTLP span's
+	// gen_ai.agent.name or the resource's service.name, set at ingest.
+	// Items stored before it, and traces that name none, have no agent.
+	Agent   string `json:"agent,omitempty"`
+	Outcome string `json:"outcome"`
 	// Golden: a passing session sampled to become a regression golden; its
 	// accept form starts from "the recorded session was right".
 	Golden         bool                `json:"golden,omitempty"`

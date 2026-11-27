@@ -46,6 +46,7 @@ type otlpEvent struct {
 // traces first appear, and builds one session per trace.
 func parseOTLP(values []any) ([]*Session, error) {
 	byTrace := map[string][]otlpSpan{}
+	agentOf := map[string]string{} // trace id -> the resource's service.name (fix wave M7-12)
 	var order []string
 	for _, v := range values {
 		obj := asMap(v)
@@ -57,6 +58,7 @@ func parseOTLP(values []any) ([]*Session, error) {
 			return nil, fmt.Errorf("an object without resourceSpans (keys %s)", keys(obj))
 		}
 		for _, r := range asArray(rs) {
+			service := asString(attributes(asMap(asMap(r)["resource"])["attributes"])["service.name"])
 			for _, ss := range asArray(field(asMap(r), "scopeSpans", "scope_spans", "instrumentationLibrarySpans")) {
 				for _, raw := range asArray(asMap(ss)["spans"]) {
 					sp := decodeSpan(asMap(raw))
@@ -67,13 +69,20 @@ func parseOTLP(values []any) ([]*Session, error) {
 						order = append(order, sp.traceID)
 					}
 					byTrace[sp.traceID] = append(byTrace[sp.traceID], sp)
+					if service != "" && agentOf[sp.traceID] == "" {
+						agentOf[sp.traceID] = service
+					}
 				}
 			}
 		}
 	}
 	out := make([]*Session, 0, len(order))
 	for _, id := range order {
-		out = append(out, otlpSession(id, byTrace[id]))
+		sess := otlpSession(id, byTrace[id])
+		if sess.Agent == "" {
+			sess.Agent = oneLine(agentOf[id], MaxAgentBytes)
+		}
+		out = append(out, sess)
 	}
 	return out, nil
 }
@@ -93,6 +102,9 @@ func otlpSession(id string, spans []otlpSpan) *Session {
 		}
 		if sp.end.After(b.s.Ended) {
 			b.s.Ended = sp.end
+		}
+		if a := asString(sp.attrs["gen_ai.agent.name"]); a != "" && b.s.Agent == "" {
+			b.s.Agent = oneLine(a, MaxAgentBytes)
 		}
 		if m := asString(firstOf(sp.attrs, "gen_ai.response.model", "gen_ai.request.model")); m != "" {
 			b.s.Model = m
