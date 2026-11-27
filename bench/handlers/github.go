@@ -67,6 +67,12 @@ type GitHubStatus struct {
 	ConnectedBy string     `json:"connected_by,omitempty"`
 	ConnectedAt *time.Time `json:"connected_at,omitempty"`
 	Hint        string     `json:"hint,omitempty"`
+	// State (round 2, Q-RG1) is one plain word: "connected" (the saved token
+	// can be read, so the repository routes can use it), "not_connected",
+	// "needs_reconnect" (a token is saved but cannot be read; Hint says why)
+	// or "unavailable" (no OAuth app or no key store; Hint says what to set).
+	// Connected is true only in state "connected".
+	State string `json:"state,omitempty"`
 	// Hosted is set on a hosted server (fix wave 2, N67): a hosted project has
 	// no git history of its own, so Compare two git refs offers GitHub
 	// repositories only. These routes are served by the hosted platform
@@ -140,11 +146,48 @@ func (h *GitHubHandler) ready(ctx *fasthttp.RequestCtx) (*tenancy.Org, bool) {
 	return o, true
 }
 
-// token returns the org's stored token, answering 409 when not connected.
+// GitHub connection states of GET /github/status (GitHubStatus.State).
+const (
+	GitHubStateConnected      = "connected"
+	GitHubStateNotConnected   = "not_connected"
+	GitHubStateNeedsReconnect = "needs_reconnect"
+	GitHubStateUnavailable    = "unavailable"
+)
+
+// gitHubUnreadableHint is the reason given when a token is saved but cannot
+// be read (for example the server's master key changed). It never carries
+// the key store's error text.
+const gitHubUnreadableHint = "reconnect GitHub: the saved token cannot be read; an admin can reconnect it in Settings > GitHub"
+
+// errRepoTokenUnreadable: the org has a saved repo token whose secret cannot
+// be read back.
+var errRepoTokenUnreadable = errors.New("saved GitHub token cannot be read")
+
+// repoToken reads the org's repo token the way every repository route uses
+// it. keystore.ErrNotFound: not connected; errRepoTokenUnreadable: saved but
+// not readable; any other error: the key list failed.
+func (h *GitHubHandler) repoToken(wctx context.Context, orgID string) (string, *keystore.Key, error) {
+	k, err := auth.RepoKey(wctx, h.keys, orgID)
+	if err != nil {
+		return "", nil, err
+	}
+	tok, err := h.keys.Reveal(wctx, orgID, k.ID)
+	if err != nil || tok == "" {
+		return "", k, errRepoTokenUnreadable
+	}
+	return tok, k, nil
+}
+
+// token returns the org's stored token, answering 409 when not connected or
+// when the saved token cannot be read (both need a connect in Settings).
 func (h *GitHubHandler) token(ctx *fasthttp.RequestCtx, wctx context.Context, orgID string) (string, bool) {
-	tok, _, err := auth.FindRepoToken(wctx, h.keys, orgID)
+	tok, _, err := h.repoToken(wctx, orgID)
 	if errors.Is(err, keystore.ErrNotFound) {
 		h.fail(ctx, http.StatusConflict, "GitHub is not connected for this organization; an admin can connect it in Settings > GitHub")
+		return "", false
+	}
+	if errors.Is(err, errRepoTokenUnreadable) {
+		h.fail(ctx, http.StatusConflict, "GitHub needs to be reconnected for this organization: the saved token cannot be read; an admin can reconnect it in Settings > GitHub")
 		return "", false
 	}
 	if err != nil {
@@ -193,19 +236,28 @@ func (h *GitHubHandler) getStatus(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, http.StatusForbidden, "request not resolved to an organization")
 		return
 	}
-	st := GitHubStatus{Configured: h.conn.Configured(), Hosted: true}
+	st := GitHubStatus{Configured: h.conn.Configured(), Hosted: true, State: GitHubStateNotConnected}
 	switch {
 	case !st.Configured:
-		st.Hint = auth.ErrGitHubRepoDisabled.Error()
+		st.Hint, st.State = auth.ErrGitHubRepoDisabled.Error(), GitHubStateUnavailable
 	case h.keys == nil:
-		st.Hint = "the key store is not available: " + h.keysErr
+		st.Hint, st.State = "the key store is not available: "+h.keysErr, GitHubStateUnavailable
 	default:
 		wctx, cancel := workContext(ctx, readTimeout)
 		defer cancel()
-		if k, err := auth.RepoKey(wctx, h.keys, o.ID); err == nil {
-			st.Connected, st.Login, st.ConnectedBy = true, k.Label, k.CreatedBy
+		// Connected only when the token itself can be read, as the
+		// repository routes need it (round 2, Q-RG1). The token is dropped
+		// here: never answered, never logged.
+		_, k, err := h.repoToken(wctx, o.ID)
+		switch {
+		case err == nil:
+			st.Connected, st.State, st.Login, st.ConnectedBy = true, GitHubStateConnected, k.Label, k.CreatedBy
 			at := k.CreatedAt
 			st.ConnectedAt = &at
+		case errors.Is(err, errRepoTokenUnreadable):
+			st.State, st.Hint, st.Login = GitHubStateNeedsReconnect, gitHubUnreadableHint, k.Label
+		case !errors.Is(err, keystore.ErrNotFound):
+			st.State, st.Hint = GitHubStateUnavailable, "the saved GitHub connection could not be read; try again later"
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, st)

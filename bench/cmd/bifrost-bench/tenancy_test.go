@@ -114,6 +114,13 @@ func newHostedFixture(t *testing.T) *hostedFixture { return newHostedFixtureWith
 // recording test launcher.
 func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	t.Helper()
+	return newHostedFixtureTweak(t, realLauncher, nil)
+}
+
+// newHostedFixtureTweak builds the fixture; tweak (when set) changes the
+// app's settings before the hosted server is built.
+func newHostedFixtureTweak(t *testing.T, realLauncher bool, tweak func(*app)) *hostedFixture {
+	t.Helper()
 	// The fixture makes many requests per credential in a tight loop; the
 	// per-credential API rate limit (X16) is tested on its own.
 	if _, set := os.LookupEnv(RateLimitsEnv); !set {
@@ -142,6 +149,9 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	a.cfg.Auth = lib.AuthConfig{Mode: lib.AuthModeHosted, PublicURL: "https://heimdall.test"}
 	a.cfg.Demo.Org = "demo" // retired setting: must have no effect
 	a.logger = schemas.NoopLogger{}
+	if tweak != nil {
+		tweak(a)
+	}
 	d := dbtest.Open(t)
 
 	f := &hostedFixture{t: t, d: d, starts: &startLog{}, users: map[string]*db.User{}}

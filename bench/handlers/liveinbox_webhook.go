@@ -86,7 +86,7 @@ func (h inboxWebhookHandler) info(ctx *fasthttp.RequestCtx) InboxWebhookInfo {
 		out.Configured, out.Enabled, out.IngestTokens = true, true, true
 		out.TokenEnv = DefaultInboxTokenEnv
 		out.RatePerMinute, out.MaxBytes = traceinbox.DefaultRate, traceinbox.DefaultMaxBody
-		out.Next = "generate an ingest token below (org admins), export it as " + DefaultInboxTokenEnv + " where your tool runs and push with the curl line"
+		out.Next = "generate an inbox token below (org admins), export it as " + DefaultInboxTokenEnv + " where your tool runs and push with the curl line"
 		return out
 	}
 	if h.env.Mode != schemas.ModeLive {

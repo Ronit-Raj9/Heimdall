@@ -76,6 +76,10 @@ func TestInboxWebhookInfo(t *testing.T) {
 	if got = h.info(ctx); got.Problem != "" || !got.IngestTokens || !got.Enabled || got.URL != "http://heimdall.example/api/bench/orgs/org_a/inbox/ingest" || !strings.Contains(got.Example, got.URL) {
 		t.Fatalf("hosted org: %+v", got)
 	}
+	// Round 2, Q-44: the token is the inbox token, the name the screen uses.
+	if !strings.Contains(got.Next, "inbox token") || strings.Contains(got.Next, "ingest token") {
+		t.Fatalf("hosted next %q", got.Next)
+	}
 	// A crafted host header falls back to localhost.
 	if got = webhookInfo(t, root, schemas.ModeLive, false, nil, "evil.com<script>"); !strings.HasPrefix(got.URL, "http://localhost/") {
 		t.Fatalf("crafted host url %q", got.URL)

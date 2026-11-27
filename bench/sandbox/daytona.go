@@ -37,7 +37,7 @@ var daytonaPollEvery = 2 * time.Second
 func init() {
 	Register(Info{
 		Name: PlatformDaytona, Title: "Daytona",
-		TokenHint:           "An API key from the Daytona dashboard (Keys), with sandbox write and delete permissions.",
+		TokenHint:           "A Daytona access token (Keys page), with sandbox write and delete permissions.",
 		EndpointLabel:       "API URL (only for a self-hosted Daytona)",
 		EndpointPlaceholder: "https://daytona.your-company.com/api",
 		DocsURL:             "https://www.daytona.io/docs/en/api-keys",
