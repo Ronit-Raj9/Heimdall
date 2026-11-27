@@ -1,4 +1,10 @@
 {
+	"listCount": {
+		"allShownHidden_one": "{{total}} {{noun}}, {{count}} test item hidden",
+		"allShownHidden_other": "{{total}} {{noun}}, {{count}} test items hidden",
+		"allShownHiddenNoNoun_one": "{{total}} shown, {{count}} test item hidden",
+		"allShownHiddenNoNoun_other": "{{total}} shown, {{count}} test items hidden"
+	},
 	"confirmDialog": {
 		"title": "Please confirm",
 		"ok": "Confirm",
@@ -163,7 +169,7 @@
 		},
 		"invite": {
 			"title": "Invite someone",
-			"description": "They get a link that is valid for a limited time. Copy it and send it yourself.",
+			"description": "They get a link that works for 7 days, unless your server sets another limit. Copy it and send it yourself.",
 			"email": "Email address",
 			"emailPlaceholder": "teammate@example.com",
 			"role": "Role",

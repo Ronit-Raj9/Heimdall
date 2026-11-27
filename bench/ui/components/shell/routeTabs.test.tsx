@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { render, tagOf } from "@/lib/testing/render";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it } from "vitest";
-import { aliasTarget, RouteTabs, resolveTab, unknownTab, type RouteTab } from "./routeTabs";
+import { aliasTarget, centeredScrollLeft, RouteTabs, resolveTab, unknownTab, type RouteTab } from "./routeTabs";
 
 const tabs: RouteTab[] = [
 	{ id: "report-card", label: "Report card" },
@@ -95,5 +95,13 @@ describe("tab aliases (N271)", () => {
 		expect(resolveTab(aliased, "files")).toBe("edit");
 		expect(unknownTab(aliased, "files")).toBeNull();
 		expect(unknownTab(aliased, "bogus")).toBe("bogus");
+	});
+});
+describe("centeredScrollLeft (Q-105)", () => {
+	it("centres the active tab and clamps to the scroll range", () => {
+		// Strip 300 wide at x 0, tab 100 wide at x 350: scroll so it sits at 100..200.
+		expect(centeredScrollLeft(0, 0, 300, 350, 100, 1000)).toBe(250);
+		expect(centeredScrollLeft(0, 0, 300, 10, 100, 1000)).toBe(0);
+		expect(centeredScrollLeft(0, 0, 300, 950, 100, 1000)).toBe(700);
 	});
 });
