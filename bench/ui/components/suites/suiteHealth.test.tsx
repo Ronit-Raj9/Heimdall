@@ -106,7 +106,7 @@ describe("held-out rows", () => {
 		expect(p09).toContain(">p09<");
 		expect(p09).toMatch(/data-testid="suites-task-held-out-p09"[^>]*>.*Private/);
 		expect(p09).not.toContain("<button");
-		expect(p09).toContain("Title, files and checks are withheld for a held-out task.");
+		expect(p09).toContain("Withheld for a held-out task.");
 		expect(p09).toContain("suites-task-admission-p09");
 		expect(p09).toContain("suites-task-health-p09-no-runs");
 	});
@@ -130,7 +130,7 @@ describe("SuiteHealthSummary", () => {
 		expect(html).toMatch(/data-testid="suites-health-canary".*?>set</);
 		expect(html).toMatch(/data-testid="suites-health-count-flaky_verifier" data-tone="bad">.*Unreliable grader: 1/);
 		expect(html).toContain("from 74 saved runs across 4 comparisons");
-		expect(html).toContain("easy at or above a 80% pass rate, hard at or below 20%");
+		expect(html).toContain("Easy at or above 80%, hard at or below 20%");
 		expect(html).toContain("Synthetic runs count toward infra and verifier checks only");
 	});
 
@@ -138,7 +138,7 @@ describe("SuiteHealthSummary", () => {
 		const html = renderToStaticMarkup(<SuiteHealthSummary suite={acme} health={noStore} />);
 		expect(html).toMatch(/data-testid="suites-health-unavailable" data-reason="no_store"/);
 		expect(html).toContain("Health unavailable.");
-		expect(html).toContain("no run store");
+		expect(html).toContain("No run store");
 		expect(html).toMatch(/data-testid="suites-health-held-out".*?>0</);
 		expect(html).toMatch(/data-testid="suites-health-canary".*?>none</);
 	});
@@ -195,7 +195,7 @@ describe("TaskHealthBlock", () => {
 		const html = block("p01");
 		const variance = html.match(/data-testid="suites-task-health-variance"[\s\S]*$/)?.[0] ?? "";
 		expect(variance).toContain("Agent variance (normal)");
-		expect(variance).toContain("ordinary agent behavior, not a defect");
+		expect(variance).toContain("Normal agent behavior");
 		expect(variance).toContain("2 of 3 configs mixed; mean variance 0.17.");
 		expect(variance).toContain("6/8 passed (75%)");
 		expect(variance).not.toContain("chart-error");
@@ -218,7 +218,7 @@ describe("TaskHealthBlock", () => {
 	});
 
 	it("says why health is unavailable, and that a task has no runs yet", () => {
-		expect(block("p02", noStore)).toContain("The server has no run store");
-		expect(block("p99")).toContain("No saved run of this task was found");
+		expect(block("p02", noStore)).toContain("No run store on this server");
+		expect(block("p99")).toContain("No saved run of this task yet");
 	});
 });

@@ -49,7 +49,7 @@ describe("My benchmarks list", () => {
 		expect(one).not.toContain("suites-row-hd-swe-verified");
 		const none = render(<NuqsTestingAdapter searchParams={{ q: "no such thing" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(none).toContain('data-testid="suites-no-match"');
-		expect(none).toContain("No benchmarks match. Clear the search or filters.");
+		expect(none).toContain("No benchmarks match.");
 	});
 
 	it("keeps the search in the URL, sorts, counts and offers the six ways to add", () => {

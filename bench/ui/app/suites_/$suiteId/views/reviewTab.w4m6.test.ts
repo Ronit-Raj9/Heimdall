@@ -15,7 +15,7 @@ describe("held-out split state (p11-5)", () => {
 
 	it("blocks Preview for a share outside 1 to 90", () => {
 		for (const raw of ["0", "100", "", "2.5"])
-			expect(splitState(raw, null, undefined).problem).toBe("Hold out a whole number from 1 to 90 percent of the tasks.");
+			expect(splitState(raw, null, undefined).problem).toBe("Use a whole number from 1 to 90.");
 		expect(splitState("25", result, undefined)).toEqual({ problem: null, result, canApply: true });
 	});
 });

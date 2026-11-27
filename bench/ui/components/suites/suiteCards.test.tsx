@@ -119,8 +119,8 @@ describe("scenario facts", () => {
 		const html = renderToStaticMarkup(<SuiteFacts suite={suite("memory-recall")} />);
 		expect(html).toMatch(/data-testid="suites-fact-grading"[^>]*>.*?>Judged</);
 		expect(html).toMatch(/data-testid="suites-judged-note"/);
-		expect(html).toContain("a judge model decides whether each answer is correct");
-		expect(html).toContain("never ranked against, or compared with, a verified benchmark");
+		expect(html).toContain("A judge model decides each answer");
+		expect(html).toContain("Never compared with verified benchmarks");
 		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
 	});
 });

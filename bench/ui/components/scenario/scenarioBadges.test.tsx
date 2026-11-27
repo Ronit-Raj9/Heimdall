@@ -8,19 +8,19 @@ describe("TrackBadge", () => {
 	it("names the artifact track with what it means", () => {
 		const html = renderToStaticMarkup(<TrackBadge track="artifact" />);
 		expect(html).toContain(">Artifacts<");
-		expect(html).toContain("graded on their content");
+		expect(html).toContain("graded on content");
 	});
 
 	it("names a known track with what it means", () => {
 		const html = renderToStaticMarkup(<TrackBadge track="tool_use" testId="t" />);
 		expect(html).toContain(">Tool use<");
-		expect(html).toContain('title="Call tools against a service; a script checks the calls or the state they left."');
+		expect(html).toContain('title="Call tools on a service. Calls or state are checked."');
 	});
 
 	it("shows a track this UI does not know as sent", () => {
 		const html = renderToStaticMarkup(<TrackBadge track="robotics" />);
 		expect(html).toContain(">robotics<");
-		expect(html).toContain("A track this version of the UI does not know.");
+		expect(html).toContain("Unknown track.");
 	});
 });
 
@@ -29,8 +29,8 @@ describe("GradingBadge", () => {
 		const html = renderToStaticMarkup(<GradingBadge grading="judged" testId="g" />);
 		expect(html).toMatch(/data-testid="g" data-tone="warn"/);
 		expect(html).toContain(">Judged<");
-		expect(html).toContain("A pinned judge model decides each outcome");
-		expect(html).toContain("never compared with verified ones");
+		expect(html).toContain("A pinned judge model decides");
+		expect(html).toContain("Never compared with verified");
 	});
 
 	it("marks a verified suite as a deterministic check", () => {
@@ -50,7 +50,7 @@ describe("OutputBadge", () => {
 	it("names the artifact kind with what the verifier reads", () => {
 		const html = renderToStaticMarkup(<OutputBadge output="artifact" />);
 		expect(html).toContain(">Artifacts<");
-		expect(html).toContain("files the agent left in the workspace");
+		expect(html).toContain("files the agent left");
 	});
 });
 
@@ -58,9 +58,9 @@ describe("JudgedNotice", () => {
 	it("explains a judged suite in plain words as a note", () => {
 		const html = renderToStaticMarkup(<JudgedNotice testId="n" />);
 		expect(html).toContain('role="note"');
-		expect(html).toContain("Judged, not verified");
-		expect(html).toContain("pinned in the benchmark file");
-		expect(html).toContain("never ranked against, or compared with, a verified benchmark");
+		expect(html).toContain("Judged");
+		expect(html).toContain("Model, prompt and votes are pinned");
+		expect(html).toContain("Never compared with verified benchmarks");
 	});
 
 	it("takes its own title and body", () => {

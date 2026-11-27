@@ -66,7 +66,7 @@ describe("CalibrationCard", () => {
 		expect(html).toContain("40 human-labelled, 6 seeds, 0 disputed (46 rows)");
 		expect(html).toContain("2026-11-17 (cr_7k2m9q4w1z)");
 		expect(tag(html, "calibration-reminders")).toBeTruthy();
-		expect(html).toContain("Use Run the check below. It shows the cost first.");
+		expect(html).toContain("Shows the cost first.");
 	});
 
 	it("says never and not calibrated without a record", () => {
@@ -102,7 +102,7 @@ describe("LabelForm and LabelsTable", () => {
 		expect(live).not.toContain('data-testid="calibration-label-readonly"');
 		const recorded = renderToStaticMarkup(<LabelForm tasks={["q1"]} mode="recorded" onSubmit={noop} />);
 		expect(tag(recorded, "calibration-label-submit")).toContain('disabled=""');
-		expect(recorded).toContain("Labels are written only on a live server");
+		expect(recorded).toContain("Read only: server runs in");
 	});
 
 	it("lists labels newest first and marks admission-control seeds as weak", () => {

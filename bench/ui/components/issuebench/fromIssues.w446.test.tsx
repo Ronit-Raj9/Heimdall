@@ -25,7 +25,7 @@ describe("FromIssues languages note", () => {
 		const out = render(<FromIssues writable />, hostedSession("member"));
 		expect(tagOf(out, "issuebench-languages")).toBeTruthy();
 		expect(out).toContain(
-			"Works with Python (pytest), JavaScript and TypeScript (jest, vitest) and Go. Other languages are skipped with a reason.",
+			"Python (pytest), JavaScript and TypeScript (jest, vitest), Go. Others are skipped.",
 		);
 		expect(out.indexOf('data-testid="issuebench-languages"')).toBeGreaterThan(out.indexOf('data-testid="issuebench-scan"'));
 	});

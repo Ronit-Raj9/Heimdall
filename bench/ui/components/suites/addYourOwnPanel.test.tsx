@@ -16,7 +16,7 @@ describe("AddYourOwnPanel", () => {
 		expect(html).toContain(">Task from a commit<");
 		expect(html).toContain(">New benchmark in another language<");
 		expect(html).toContain(">Your own agent<");
-		expect(html).toContain("Hidden tests, reference solutions and controls never appear in this UI.");
+		expect(html).toContain("Hidden tests, solutions and controls never appear here.");
 	});
 
 	for (const tab of ADD_TABS) {

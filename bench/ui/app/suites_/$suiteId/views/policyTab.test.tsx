@@ -185,7 +185,7 @@ describe("policy tab", () => {
 		let html = render(<PolicyTab suite={suite} />, hostedSession("member"));
 		expect(html).toContain('data-testid="policy-no-shape"');
 		// M6-17: a neutral note with a link to make a support benchmark.
-		expect(html).toContain("Policy tasks are support conversations, and this benchmark has no task with a simulated customer.");
+		expect(html).toContain("This benchmark has no task with a simulated customer.");
 		expect(html).toMatch(/href="\/suites\/new\?template=support"[^>]*data-testid="policy-no-shape-create"/);
 		expect(html).not.toMatch(/data-testid="policy-no-shape"[^>]*chart-error/);
 		for (const id of ["policy-upload-file", "policy-generate-estimate", "policy-generate-start", "policy-generate-model-model"]) {
@@ -247,7 +247,7 @@ describe("policy tab", () => {
 		html = render(<PolicyTab suite={suite} />, hostedSession("member"));
 		expect(tagOf(html, "policy-drafts-accept-all") ?? "").toContain(' disabled=""');
 		expect(tagOf(html, "policy-draft-accept-t1") ?? "").toContain(' disabled=""');
-		expect(html).toContain("Pick the reply judge first. Policy tasks are graded by a judge model.");
+		expect(html).toContain("Pick the reply judge first.");
 	});
 	it("drafts scenarios with a picked model, a $0.30 default and a question naming both (N275)", () => {
 		const suite = { id: "desk", task_count: 1 } as unknown as SuiteSummary;

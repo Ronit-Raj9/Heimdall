@@ -62,7 +62,7 @@ describe("TaskScenario", () => {
 		expect(html).toContain("workspace reset to the starting state");
 		expect(html).toContain("adds sessions/chat-1 to the workspace");
 		expect(html).toContain("300 s budget");
-		expect(html).toMatch(/data-testid="suites-task-persists"[^>]*>Carried between sessions: the \/memory volume/);
+		expect(html).toMatch(/data-testid="suites-task-persists"[^>]*>Kept between sessions: \/memory/);
 		expect(html).toContain("answer written to answer.txt");
 	});
 
@@ -76,8 +76,8 @@ describe("TaskScenario", () => {
 		const html = render(task("support-desk", "d02"), "state");
 		expect(html).toMatch(/data-testid="suites-task-impossible"[^>]*role="note"|role="note"[^>]*data-testid="suites-task-impossible"/);
 		expect(html).toContain("Impossible task");
-		expect(html).toContain("A pass can only come from cheating");
-		expect(html).toContain("integrity violation");
+		expect(html).toContain("Any pass is cheating");
+		expect(html).toContain("impossible_pass gate records it");
 	});
 
 	it("names the suite's output when the task sets none", () => {
