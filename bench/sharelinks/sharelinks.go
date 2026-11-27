@@ -123,8 +123,9 @@ type NewShare struct {
 	ExpiresInDays *int   `json:"expires_in_days,omitempty"` // nil: DefaultExpiryDays; 0: never
 }
 
-// DefaultExpiryDays is the expiry of a link that names none.
-const DefaultExpiryDays = 30
+// DefaultExpiryDays is the expiry of a link that names none (7 days since
+// the UI fix wave, decision 7; links made before keep their expiry).
+const DefaultExpiryDays = 7
 
 var (
 	targetRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)

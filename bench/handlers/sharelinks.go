@@ -77,6 +77,10 @@ type SharedMeta struct {
 	// item; Badge says whether badge.svg shows a value.
 	Exports []string `json:"exports,omitempty"`
 	Badge   bool     `json:"badge"`
+	// CreatedByName is the display name of the member who made the link,
+	// on a shared comparison (verdict) only; never an email or an id, and
+	// absent when no name is known (UI fix wave D1, decision 7).
+	CreatedByName string `json:"created_by_name,omitempty"`
 }
 
 // SharedItem is GET /shared/{token}: the link and the item's data, keyed by
@@ -221,6 +225,10 @@ func (h *shareHandler) create(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
 		return
 	}
+	if !shareNeverAllowed(ctx, req) { // UI fix wave D1, decision 7 (uifix_d1_shares.go)
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, shareNeverRefusal)
+		return
+	}
 	// The item must exist and be readable now: a link to nothing is refused.
 	q, _ := sharelinks.CleanQuery(req.Kind, strings.TrimSpace(req.Target), req.Query)
 	parts := sharedParts(strings.TrimSpace(req.Kind), strings.TrimSpace(req.Target), q)
@@ -272,15 +280,25 @@ func (h *shareHandler) list(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	args := ctx.QueryArgs()
-	shares, err := st.List(strings.TrimSpace(string(args.Peek("kind"))), strings.TrimSpace(string(args.Peek("target"))))
+	kind, target := strings.TrimSpace(string(args.Peek("kind"))), strings.TrimSpace(string(args.Peek("target")))
+	if kind == "" && target == "" && !shareAdmin(ctx) { // UI fix wave D1, decision 7 (uifix_d1_shares.go)
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, shareListRefusal)
+		return
+	}
+	shares, err := st.List(kind, target)
 	if err != nil {
 		sendDepError(ctx, h.env.Mode, "share links", err)
 		return
 	}
 	out := ShareList{Shares: make([]ShareView, 0, len(shares))}
 	names := callerNames(ctx)
+	secrets := shareSecretsAllowed(ctx)
 	for _, sh := range shares {
-		out.Shares = append(out.Shares, h.viewNamed(ctx, st, sh, names))
+		v := h.viewNamed(ctx, st, sh, names)
+		if !secrets {
+			v.Token, v.Path, v.URL = "", "", "" // a viewer gets the metadata only
+		}
+		out.Shares = append(out.Shares, v)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
@@ -446,6 +464,9 @@ func (h *shareHandler) meta(ctx *fasthttp.RequestCtx, sh *sharelinks.Share) Shar
 		m.Exports, m.Badge = []string{sharelinks.FormatHTML, sharelinks.FormatMarkdown}, true
 	case sharelinks.KindReportCard, sharelinks.KindVerdict:
 		m.Badge = true
+	}
+	if sh.Kind == sharelinks.KindVerdict { // UI fix wave D1, decision 7: who shared it, by name only
+		m.CreatedByName = sharedCreatorName(ctx, sh.CreatedBy)
 	}
 	return m
 }
