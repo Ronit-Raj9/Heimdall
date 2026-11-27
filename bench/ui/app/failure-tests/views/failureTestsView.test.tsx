@@ -6,7 +6,7 @@ import type { AgentSummary } from "@/lib/types/bench";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 
 const fx = vi.hoisted(() => {
 	const ok = (data: unknown) => ({

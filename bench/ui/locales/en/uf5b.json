@@ -1,5 +1,6 @@
 {
 	"ft": {
+		"runVerb": "Run failure test",
 		"confirmTitle": "Start this failure test?",
 		"confirmKnown": "Start {{runs}} runs for up to {{cost}}?",
 		"confirmCap": "Start {{runs}} runs? The price is not known. Spending stops at {{cap}}.",

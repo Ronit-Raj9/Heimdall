@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import type { AgentCompatibility, Estimate } from "@/lib/store/apis/evaluationsApi";
 import { describe, expect, it } from "vitest";
-import { FAILURE_FAULTS, faultsNotApplicable, isDefaultFaults, launchConfirm, plannedRuns, visibleSuites } from "./failureTestsView";
+import { EMPTY_FAILURE_TEST, FAILURE_FAULTS, failureTestDirty, faultsNotApplicable, isDefaultFaults, launchConfirm, launchCost, plannedRuns, visibleSuites } from "./failureTestsView";
 import { ftFaultName } from "./gw07I18n";
 
 describe("failure test launch (M5-44, M2-111)", () => {
@@ -52,5 +52,19 @@ describe("failure test form helpers", () => {
 	it("names faults in the form's words", () => {
 		expect(ftFaultName("x-y", [{ id: "x-y", label: "Catalog name" }])).toBe("Catalog name");
 		expect(ftFaultName("some-new-fault")).toMatch(/^Some new fault$/);
+	});
+});
+
+describe("failure test PaidButton and draft (phase B)", () => {
+	it("gives the cap, the high estimate and the run count", () => {
+		const e = { runs: 12, est_cost_usd: { known: true, low: 0.4, high: 0.9 }, budget: { budget_usd: 10 } } as unknown as Estimate;
+		expect(launchCost(e, 99)).toEqual({ capUsd: 10, estimateUsd: 0.9, runs: 12 });
+		expect(launchCost(e, 99, "2.5").capUsd).toBe(2.5);
+		expect(launchCost(undefined, 8)).toEqual({ capUsd: null, estimateUsd: null, runs: 8 });
+	});
+	it("is dirty only after a change from the empty form", () => {
+		expect(failureTestDirty(EMPTY_FAILURE_TEST)).toBe(false);
+		expect(failureTestDirty({ ...EMPTY_FAILURE_TEST, agent: "a1" })).toBe(true);
+		expect(failureTestDirty({ ...EMPTY_FAILURE_TEST, tasks: 5 })).toBe(true);
 	});
 });

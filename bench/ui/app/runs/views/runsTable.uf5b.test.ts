@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { benchmarkAlias, isBaselineRun, runTone } from "./runsTable";
+import { benchmarkAlias, isBaselineRun, runSuiteLabel, runTaskLabel, runTone } from "./runsTable";
 
 describe("runs list (lane 5b)", () => {
 	it("marks oracle and noop runs as not measured (M5-31)", () => {
@@ -19,5 +19,16 @@ describe("runs list (lane 5b)", () => {
 	it("reads ?benchmark= as the suite filter (M5-40)", () => {
 		expect(benchmarkAlias({ benchmark: "hd-harbor-bfcl" })).toEqual({ suite: "hd-harbor-bfcl", benchmark: null });
 		expect(benchmarkAlias({ suite: "a", benchmark: "b" })).toEqual({ suite: "a", benchmark: null });
+	});
+});
+
+describe("runs list names from the server (M5-33, M5-34)", () => {
+	const row = { task: "t1", suite: "hd-harbor-tb2@3" } as Parameters<typeof runTaskLabel>[0];
+	it("shows task_title and suite_title when sent, else the ids", () => {
+		expect(runTaskLabel({ ...row, task_title: "Fix the parser" })).toBe("Fix the parser");
+		expect(runTaskLabel({ ...row, task_title: "  " })).toBe("t1");
+		expect(runTaskLabel(row)).toBe("t1");
+		expect(runSuiteLabel({ ...row, suite_title: "Terminal-Bench 2.0" })).toBe("Terminal-Bench 2.0");
+		expect(runSuiteLabel(row)).not.toContain("@");
 	});
 });

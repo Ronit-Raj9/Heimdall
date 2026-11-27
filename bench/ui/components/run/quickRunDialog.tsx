@@ -304,7 +304,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={tasksT}
 										onChange={(e) => setTasks(e.target.value)}
 										aria-invalid={!!problems.tasks}
-										className="w-24"
+										size="number"
 										data-testid="quickrun-tasks"
 									/>
 								</label>
@@ -317,7 +317,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={trialsT}
 										onChange={(e) => setTrials(e.target.value)}
 										aria-invalid={!!problems.trials}
-										className="w-24"
+										size="number"
 										data-testid="quickrun-trials"
 									/>
 								</label>
@@ -331,7 +331,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={budgetT}
 										onChange={(e) => setBudget(e.target.value)}
 										aria-invalid={!!problems.budget}
-										className="w-24"
+										size="number"
 										data-testid="quickrun-budget"
 									/>
 								</label>

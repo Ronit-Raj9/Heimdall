@@ -70,7 +70,7 @@
 		"evaluateWith": "Evaluate with {{agent}}",
 		"evaluateWithTwo": "Evaluate with {{a}} and {{b}}",
 		"noKeyedAgent": "None of the reference agents (claude-code, codex, opencode) has a model key in this organization. Add an OpenAI or Anthropic key first.",
-		"modelsKeys": "Models & keys",
+		"modelsKeys": "Settings > Model keys",
 		"next": "Next: run the readiness check on the benchmark page, review each task, then evaluate."
 	}
 }

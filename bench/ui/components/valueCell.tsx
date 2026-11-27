@@ -13,6 +13,11 @@ export interface ValueCellProps {
 	className?: string;
 	/** Overrides the default data-testid ("value-cell-<state>"). */
 	testId?: string;
+	/**
+	 * False keeps an observed cell out of the tab order (a list row whose link is the focus stop);
+	 * its source stays readable through the screen-reader text. Default true.
+	 */
+	focusable?: boolean;
 }
 
 /**
@@ -20,7 +25,7 @@ export interface ValueCellProps {
  * Observed: the formatted number. Unknown: hatched, never zero, with the reason and the bounds
  * in a tooltip and the accessible name. Not applicable: "n/a".
  */
-export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
+export function ValueCell({ value, kind, className, testId, focusable = true }: ValueCellProps) {
 	const { t } = useTranslation("bench");
 	const view = describeValue(value, kind, getLocale());
 
@@ -38,7 +43,7 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 				title={provenance}
 				// A focus stop and a tap target too, so sighted keyboard and touch users can reveal the
 				// source, as the unknown cell's trigger does (QC2-29-08).
-				tabIndex={provenance ? 0 : undefined}
+				tabIndex={provenance ? (focusable ? 0 : -1) : undefined}
 				className={cn(
 					"tabular-nums",
 					provenance && "focus-visible:ring-ring/50 cursor-help rounded-[2px] focus-visible:ring-[3px] focus-visible:outline-none",

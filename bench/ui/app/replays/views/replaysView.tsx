@@ -1,4 +1,6 @@
-import { EmptyNote, LoadError, BlockSkeleton } from "@/components/runs/screenStates";
+import { LoadError, BlockSkeleton } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
+import { PaidButton } from "@/components/ui/paidButton";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -336,7 +338,7 @@ export function ReplayFormFields({
 						min={1}
 						max={MAX_REPLAY_SESSIONS}
 						step={1}
-						className="w-24"
+						size="number"
 						value={form.sessions}
 						onChange={(e) => set("sessions", e.target.value)}
 						data-testid="replays-sessions"
@@ -394,7 +396,8 @@ export function ReplayFormFields({
 							type="number"
 							min={0}
 							step="0.5"
-							className="w-24 pl-5"
+							size="number"
+							className="pl-5"
 							value={form.cap}
 							onChange={(e) => set("cap", e.target.value)}
 							data-testid="replays-cap"
@@ -445,15 +448,22 @@ function NewReplay() {
 				</p>
 			)}
 			<div className="flex flex-wrap items-center gap-3">
-				<Button
+				{/* Start spends money: the shared PaidButton names the cap and asks first (M1-51). */}
+				<PaidButton
 					size="sm"
-					disabled={problems.length > 0 || job.isLoading || active}
+					verb={t("form.start")}
+					capUsd={Number(form.cap) > 0 ? Number(form.cap) : null}
+					estimateRuns={Number(form.sessions) > 0 ? Number(form.sessions) : undefined}
+					estimateAt="title"
+					confirm="always"
+					disabled={problems.length > 0 || active}
+					isLoading={job.isLoading}
 					aria-describedby={problems.length > 0 ? "replays-why" : undefined}
-					onClick={() => params && void create({ kind: "replay.run", params })}
-					data-testid="replays-start"
-				>
-					{t("form.start")}
-				</Button>
+					onConfirm={async () => {
+						if (params) await create({ kind: "replay.run", params });
+					}}
+					testId="replays-start"
+				/>
 				{problems.length > 0 && (
 					<span id="replays-why" className="text-muted-foreground text-xs" data-testid="replays-why">
 						{t5("replays.why", { list: why.join(", ") })}
@@ -504,7 +514,7 @@ function ReplayList({ onOpen }: { onOpen: (id: string) => void }) {
 		<section className="flex flex-col gap-3">
 			<h2 className="text-base font-semibold tracking-tight">{t("list.title")}</h2>
 			{rows.length === 0 ? (
-				<EmptyNote testId="replays-empty">{t("list.empty")}</EmptyNote>
+				<EmptyState compact body={t("list.empty")} testId="replays-empty" />
 			) : (
 				<ul className="flex flex-col gap-2" data-testid="replays-list">
 					{rows.map((r) => (

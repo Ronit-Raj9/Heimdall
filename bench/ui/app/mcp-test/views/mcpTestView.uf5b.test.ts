@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCheck, hostedMcpAddress, validUrl, type McpCheck } from "./mcpTestView";
+import { addCheck, EMPTY_FORM, hostedMcpAddress, mcpFormDirty, validUrl, type McpCheck } from "./mcpTestView";
 
 describe("MCP test page (lane 5b)", () => {
 	it("accepts only full http and https addresses (M5-50)", () => {
@@ -19,5 +19,13 @@ describe("MCP test page (lane 5b)", () => {
 		for (let i = 0; i < 4; i++) h = addCheck(h, { url: "a", at: String(i), reached: true, overall: i }, 3);
 		h = addCheck(h, { url: "b", at: "9", reached: false }, 3);
 		expect(h.map((c) => `${c.url}${c.at}`)).toEqual(["b9", "a3", "a2", "a1"]);
+	});
+});
+
+describe("MCP test form draft (X-82)", () => {
+	it("is dirty once an address, secret or header is typed", () => {
+		expect(mcpFormDirty(EMPTY_FORM)).toBe(false);
+		expect(mcpFormDirty({ ...EMPTY_FORM, url: "https://x" })).toBe(true);
+		expect(mcpFormDirty({ ...EMPTY_FORM, header: "X-Key" })).toBe(true);
 	});
 });

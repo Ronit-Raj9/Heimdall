@@ -1,5 +1,7 @@
 import "@/components/platform/fw23I18n";
 import { PageHeader } from "@/components/shell";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +30,7 @@ import { CopyId } from "@/components/ui/copyId";
 import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, Minus, Plug, X } from "lucide-react";
+import { ArrowUpRight, Check, Minus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -52,6 +54,11 @@ export function requestFromForm(f: McpForm): McpInspectRequest {
 	if (f.mode === "bearer") req.auth_scheme = "Bearer";
 	if (f.mode === "header" && f.header.trim()) req.auth_header = f.header.trim();
 	return req;
+}
+
+/** True when something was typed that a check has not used yet. */
+export function mcpFormDirty(f: McpForm): boolean {
+	return f.url.trim() !== "" || f.secret !== "" || f.header.trim() !== "";
 }
 
 /**
@@ -450,7 +457,8 @@ export function McpTestView() {
 	const { t } = useTranslation("mcptest");
 	const { t: tf } = useTranslation("fw23");
 	const { t: tw } = useTranslation("w4m4");
-	const [form, setForm] = useState<McpForm>(EMPTY_FORM);
+	// The address and options are kept as a draft; the secret stays in memory only (X-82).
+	const [form, setForm] = useFormDraft<McpForm>("mcpTest", EMPTY_FORM);
 	const session = useSession();
 	// Secret names are for members and above (J9.secrets); a viewer types a name instead.
 	const listSecrets = canUse(session, "member");
@@ -466,7 +474,7 @@ export function McpTestView() {
 			writeHistory(next);
 			return next;
 		});
-	const set = (p: Partial<McpForm>) => setForm((f) => ({ ...f, ...p }));
+	const set = (p: Partial<McpForm>) => setForm(p);
 	const problem = formProblem(form);
 	const { t: t5 } = useTranslation("uf5b");
 	const [pressed, setPressed] = useState(false);
@@ -474,6 +482,7 @@ export function McpTestView() {
 	const urlBad = pressed && !validUrl(form.url);
 	const inspectWhy = problem === "header" ? tw("mcp.headerNeeded") : null;
 	const address = hostedMcpAddress(typeof window !== "undefined" ? window.location.origin : undefined);
+	useLeaveGuard(mcpFormDirty(form) && report === null);
 	const run = async () => {
 		setPressed(true);
 		if (!validUrl(form.url) || problem !== null) return;
@@ -492,7 +501,6 @@ export function McpTestView() {
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
-				icon={Plug}
 				actions={
 					<Button asChild variant="outline" size="sm">
 						<Link to={"/gateway" as never} data-testid="mcp-gateway-link">

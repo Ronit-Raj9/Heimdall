@@ -3,6 +3,8 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { outcomeTone } from "@/components/runs/runs.utils";
 import { Button } from "@/components/ui/button";
+import { Pager, pageWindow } from "@/components/ui/pager";
+import { StatusPill } from "@/components/ui/statusPill";
 import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
@@ -12,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { suiteDisplayName } from "@/components/suites/suiteDisplay";
 import "@/components/runs/uf5bI18n";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ListX, SlidersHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ListX, SlidersHorizontal } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { TraceMatches, TraceSearchInput } from "./traceMatches";
@@ -212,39 +214,46 @@ export function runTone(row: Pick<RunListRow, "sealed" | "outcome">): RunTone {
 	return outcomeTone(row.outcome);
 }
 
-// The list shows a small dot and plain text, no tinted fill, so a page of failures does not read red (X-37).
-const DOT: Record<RunTone, string> = {
-	pass: "bg-chart-success",
-	zero: "bg-chart-error",
-	unknown: "bg-muted-foreground/60",
-	live: "bg-chart-info",
-	warn: "bg-chart-warning",
+// The shared status pill, with the run list's own outcome words (M5-63).
+const PILL_TONE: Record<RunTone, "ok" | "bad" | "neutral" | "running" | "warn"> = {
+	pass: "ok",
+	zero: "bad",
+	unknown: "neutral",
+	live: "running",
+	warn: "warn",
 };
 
-/** Outcome as a coloured dot and plain text; a running run pulses. */
+/** Outcome as the shared status pill; a running run shows the running icon. */
 export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome" | "run_id"> }) {
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
 	const { t: t5 } = useTranslation("uf5b");
 	const tone = runTone(row);
 	return (
-		<span
-			className={cn(
-				"inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap",
-				tone === "warn" ? "text-chart-warning-ink" : tone === "live" ? "text-chart-info-ink" : "text-foreground",
-			)}
+		<StatusPill
+			raw={row.sealed ? row.outcome : "running"}
+			tone={PILL_TONE[tone]}
 			title={tone === "warn" ? t5("runs.graderBroken") : undefined}
-			data-testid={`runs-outcome-${row.run_id}`}
+			testId={`runs-outcome-${row.run_id}`}
 			data-outcome={row.sealed ? row.outcome : "running"}
-			data-tone={tone}
+			data-run-tone={tone}
 		>
-			<span className="relative flex size-2 shrink-0" aria-hidden="true">
-				{tone === "live" && <span className={cn("absolute inline-flex size-full animate-ping rounded-full opacity-75", DOT.live)} />}
-				<span className={cn("relative inline-flex size-2 rounded-full", DOT[tone])} />
-			</span>
 			{row.sealed ? tb(`runs.outcome.${row.outcome}`, { defaultValue: row.outcome }) : tu("runs.live")}
-		</span>
+		</StatusPill>
 	);
+}
+
+/** Server fields the runs list may send (G1); read as optional, older servers omit them. */
+export type RunListRowNamed = RunListRow & { task_title?: string; suite_title?: string; exp_id?: string; exp_name?: string };
+
+/** The task's readable title when the server sends one, else its id. */
+export function runTaskLabel(row: RunListRowNamed): string {
+	return row.task_title?.trim() || row.task;
+}
+
+/** The benchmark line: the server's title, else the known display name of the slug. */
+export function runSuiteLabel(row: RunListRowNamed): string {
+	return row.suite_title?.trim() || suiteDisplayName(row.suite.replace(/@.*$/, ""));
 }
 
 /** /runs: live runs on top, toolbar filters in the URL, a search box, and one click to open a run. */
@@ -319,7 +328,17 @@ export function RunsTable() {
 		open(row);
 	};
 	const filterCount = [search.outcome, search.suite, search.agent, search.fault, search.tq].filter(Boolean).length;
-	const pager = list.data ? <Pager page={page} total={list.data.total} onPage={(n) => void setSearch({ page: n === 1 ? null : n })} /> : null;
+	const win = list.data ? pageWindow(list.data.total, page, RUNS_PAGE) : null;
+	const pager =
+		list.data && win ? (
+			<Pager
+				page={win.page}
+				pageCount={win.pageCount}
+				onPage={(n) => void setSearch({ page: n === 1 ? null : n })}
+				rangeText={tu("runs.showing", { first: win.first, last: win.last, total: list.data.total })}
+				testId="runs-pager"
+			/>
+		) : null;
 
 	const sel = "h-10 w-full md:h-8 md:w-auto";
 	const runLink = (row: RunListRow, className?: string) => (
@@ -328,10 +347,10 @@ export function RunsTable() {
 			params={{ runId: row.run_id }}
 			className={cn("focus-visible:outline-ring rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2", className)}
 			title={row.task}
-			aria-label={t5("runs.openRun", { task: row.task })}
+			aria-label={t5("runs.openRun", { task: runTaskLabel(row) })}
 			data-testid={`runs-link-${row.run_id}`}
 		>
-			{row.task}
+			{runTaskLabel(row)}
 		</Link>
 	);
 	const tokensCell = (row: RunListRow) =>
@@ -343,7 +362,7 @@ export function RunsTable() {
 			formatNumber(row.tokens, locale)
 		);
 	const costCell = (row: RunListRow) =>
-		isBaselineRun(row) ? <span title={tu("runs.notRecorded")}>-</span> : <ValueCell value={row.cost_usd} kind="usd" />;
+		isBaselineRun(row) ? <span title={tu("runs.notRecorded")}>-</span> : <ValueCell value={row.cost_usd} kind="usd" focusable={false} />;
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="runs-table-screen">
@@ -468,8 +487,9 @@ export function RunsTable() {
 			) : rows.length === 0 ? (
 				<EmptyState
 					icon={ListX}
-					message={active ? tu("runs.noMatch") : tu("runs.empty")}
-					action={active ? { label: tu("runs.clear"), onClick: clear } : { label: tu("runs.newExperiment"), to: "/experiments/new" }}
+					kind={active ? "filtered" : "first"}
+					body={active ? tu("runs.noMatch") : tu("runs.empty")}
+					action={active ? { label: tu("runs.clear"), onClick: clear } : { label: tu("runs.newExperiment"), to: "/evaluate" }}
 					testId="runs-empty"
 				/>
 			) : (
@@ -557,7 +577,10 @@ export function RunsTable() {
 										<td className="max-w-64 px-4 py-2">
 											<div className="truncate font-medium">{runLink(row)}</div>
 											<div className="text-muted-foreground truncate text-xs" title={row.suite}>
-												{suiteDisplayName(row.suite.replace(/@.*$/, ""))}
+												{runSuiteLabel(row)}
+												{(row as RunListRowNamed).exp_name && (
+													<span data-testid={`runs-exp-${row.run_id}`}> · {(row as RunListRowNamed).exp_name}</span>
+												)}
 											</div>
 										</td>
 										<td className="px-3 py-2">
@@ -637,44 +660,5 @@ function SortHeader({
 				<Icon aria-hidden="true" className={cn("size-3", state === "none" && "opacity-40")} />
 			</button>
 		</th>
-	);
-}
-
-function Pager({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
-	const { t } = useTranslation("u12");
-	const pages = Math.max(1, Math.ceil(total / RUNS_PAGE));
-	const first = (page - 1) * RUNS_PAGE + 1;
-	const last = Math.min(total, page * RUNS_PAGE);
-	return (
-		<nav className="flex items-center justify-between gap-2 text-xs" data-testid="runs-pager">
-			<span className="text-muted-foreground tabular-nums">{t("runs.showing", { first, last, total })}</span>
-			{pages > 1 && (
-				<span className="flex items-center gap-1">
-					<Button
-						variant="ghost"
-						size="sm"
-						disabled={page <= 1}
-						onClick={() => onPage(page - 1)}
-						aria-label={t("runs.prev")}
-						dataTestId="runs-prev"
-					>
-						<ChevronLeft aria-hidden="true" />
-					</Button>
-					<span className="text-muted-foreground px-1 tabular-nums">
-						{page} / {pages}
-					</span>
-					<Button
-						variant="ghost"
-						size="sm"
-						disabled={page >= pages}
-						onClick={() => onPage(page + 1)}
-						aria-label={t("runs.next")}
-						dataTestId="runs-next"
-					>
-						<ChevronRight aria-hidden="true" />
-					</Button>
-				</span>
-			)}
-		</nav>
 	);
 }

@@ -28,7 +28,7 @@
 		"open": "Open run {{run}}",
 		"empty": "No runs yet. Start a comparison to see runs here.",
 		"noMatch": "No runs match these filters.",
-		"newExperiment": "New comparison",
+		"newExperiment": "Evaluate an agent",
 		"loadError": "Could not load runs",
 		"showing": "{{first}}-{{last}} of {{total}}",
 		"prev": "Previous",

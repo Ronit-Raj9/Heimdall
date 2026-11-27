@@ -2,7 +2,9 @@ import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step
 import { budgetLine } from "@/app/evaluate/views/budgetAdvice";
 import { compatFor, compatibilityMap, incompatibleReason, keepRunnable } from "@/app/evaluate/views/step3Benchmarks";
 import { suiteDisplayName } from "@/components/suites/suiteDisplay";
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import "@/components/runs/uf5bI18n";
 import { ftFaultName } from "./gw07I18n";
 import { ESTIMATE_DEBOUNCE_MS, FAULTS, estimateText, groupFaults } from "@/app/evaluate/views/step4Setup";
@@ -13,9 +15,9 @@ import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultChange } from "@/components/reportcard/reportCard.utils";
 import "@/app/evaluations/views/gw08I18n";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
-import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell";
-import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetAgentsQuery } from "@/lib/store";
@@ -38,7 +40,6 @@ import "@/lib/types/agentFirstI18n";
 import type { AgentSummary } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ShieldAlert } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -144,6 +145,38 @@ export function launchConfirm(
 	const cap = typed ?? estimate?.budget?.budget_usd;
 	if (cap !== undefined && cap > 0) return { key: "ft.confirmCap", values: { runs, cap: usd(cap) } };
 	return { key: "ft.confirmUnknown", values: { runs } };
+}
+
+/**
+ * What the shared PaidButton shows for Run: the spending cap (typed budget, else the server's),
+ * the high estimate when the price is known, and the run count.
+ */
+export function launchCost(
+	estimate: Pick<Estimate, "runs" | "est_cost_usd" | "budget"> | undefined,
+	planned: number,
+	budgetText?: string,
+): { capUsd: number | null; estimateUsd: number | null; runs: number } {
+	const runs = estimate ? Number(estimate.runs) || 0 : planned;
+	const c = estimate?.est_cost_usd;
+	const cap = parseBudget(budgetText ?? "") ?? estimate?.budget?.budget_usd;
+	return { capUsd: cap !== undefined && cap > 0 ? cap : null, estimateUsd: c?.known ? Math.max(c.high, c.low) : null, runs };
+}
+
+/** The empty form of a new failure test. */
+export const EMPTY_FAILURE_TEST: FailureTestForm = {
+	agent: "",
+	version: 0,
+	provider: "",
+	model: "",
+	benchmarks: [],
+	faults: [...FAILURE_FAULTS],
+	tasks: 3,
+	trials: 1,
+};
+
+/** True when the form differs from the empty one (the leave guard asks only then). */
+export function failureTestDirty(f: FailureTestForm, start: FailureTestForm = EMPTY_FAILURE_TEST): boolean {
+	return JSON.stringify({ ...start, ...f }) !== JSON.stringify(start);
 }
 
 /** The benchmarks the checklist shows: matching the search, and only runnable ones when asked (once compatibility is known). */
@@ -299,16 +332,23 @@ export default function FailureTestsView() {
 	const suites = useGetSuitesLightQuery();
 	const evals = useListEvaluationsQuery();
 	const catalog = useGetBenchFaultsQuery();
-	const [form, setForm] = useState<FailureTestForm>({
-		agent: agentParam ?? "",
-		version: 0,
-		provider: "",
-		model: "",
-		benchmarks: [],
-		faults: [...FAILURE_FAULTS],
-		tasks: 3,
-		trials: 1,
-	});
+	// The form is kept as a draft, so a reload, Back or a sign-in does not lose it (X-82).
+	const start = { ...EMPTY_FAILURE_TEST, agent: agentParam ?? "" };
+	const [draft, updateDraft, clearDraft] = useFormDraft<FailureTestForm>("failureTest", start);
+	const form = draft;
+	const setForm = (fn: (f: FailureTestForm) => FailureTestForm) => updateDraft(fn(form));
+	const [createdId, setCreatedId] = useState<string | null>(null);
+	useLeaveGuard(failureTestDirty(form, start) && createdId === null);
+	useEffect(() => {
+		// An agent named in the link wins over the agent of a kept draft.
+		if (agentParam && agentParam !== form.agent) setForm((f) => pickAgentForm(f, agentParam));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+	useEffect(() => {
+		// Navigate only after the draft is cleared, so the leave guard does not ask.
+		if (createdId && !failureTestDirty(form, start)) void navigate({ href: `/evaluations/${encodeURIComponent(createdId)}` });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [createdId, form]);
 	// The agent from the link is trusted only once the agent list has loaded and contains it.
 	const known = agentKnown(agents.data?.agents, form.agent);
 	const [unknownAgent, setUnknownAgent] = useState<string | null>(null);
@@ -349,21 +389,17 @@ export default function FailureTestsView() {
 	};
 	const toggle = <T,>(list: T[], item: T, on: boolean) => (on ? [...list, item] : list.filter((x) => x !== item));
 	const { t: tu } = useTranslation("uf5b");
-	const confirm = useConfirm();
 	const planned = plannedRuns(form);
 	const [query, setQuery] = useState("");
 	const [onlyRunnable, setOnlyRunnable] = useState(true);
-	// Run starts paid work: it always asks first, with the run count and the price or the cap (M5-44, M2-111).
+	// Run starts paid work: the shared PaidButton names the cap and always asks first (M5-44, M2-111).
+	const cost = launchCost(problem === null && !estimate.isError ? estimate.currentData : undefined, planned, form.budgetText);
 	const launch = async () => {
-		const ask = launchConfirm(problem === null && !estimate.isError ? estimate.currentData : undefined, planned, form.budgetText);
-		const ok = await confirm(tu(ask.key, ask.values), {
-			title: tu("ft.confirmTitle"),
-			confirmLabel: tu("ft.confirmOk"),
-			cancelLabel: tu("ft.confirmCancel"),
-		});
-		if (!ok) return;
 		const res = await create(spec);
-		if ("data" in res && res.data) void navigate({ href: `/evaluations/${encodeURIComponent(res.data.id)}` });
+		if ("data" in res && res.data) {
+			clearDraft();
+			setCreatedId(res.data.id);
+		}
 	};
 	const versionList = [...(versions.data?.versions ?? [])].sort((a, b) => b.version - a.version);
 	const suiteList = suites.data?.suites ?? [];
@@ -618,10 +654,18 @@ export default function FailureTestsView() {
 							budgetTyped={budgetTyped}
 						/>
 						{mayRun && (
-							<Button onClick={() => void launch()} disabled={problem !== null || createState.isLoading} dataTestId="ft-launch">
-								<ShieldAlert aria-hidden="true" />
-								{createState.isLoading ? t("ft.launching") : t("ft.launch")}
-							</Button>
+							<PaidButton
+								verb={tu("ft.runVerb")}
+								capUsd={cost.capUsd}
+								estimateUsd={cost.estimateUsd}
+								estimateRuns={cost.runs}
+								confirm="always"
+								estimateAt="title"
+								onConfirm={launch}
+								disabled={problem !== null}
+								isLoading={createState.isLoading}
+								testId="ft-launch"
+							/>
 						)}
 					</div>
 				</div>
@@ -633,7 +677,7 @@ export default function FailureTestsView() {
 				) : evals.isError ? (
 					<LoadError title={t("ft.pastError")} error={evals.error} onRetry={() => void evals.refetch()} testId="ft-past-error" />
 				) : past.length === 0 ? (
-					<EmptyNote testId="ft-past-empty">{t("ft.pastEmpty")}</EmptyNote>
+					<EmptyState compact body={t("ft.pastEmpty")} testId="ft-past-empty" />
 				) : (
 					<PastTestList evs={past} />
 				)}
