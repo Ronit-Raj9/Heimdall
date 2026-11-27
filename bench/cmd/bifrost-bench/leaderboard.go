@@ -69,7 +69,8 @@ func runLeaderboard(args []string) int {
 		return fail("index runs: %v", err)
 	}
 	src := handlers.LeaderboardSource(indexAdapter{ix: ix, root: a.store.Root()})
-	lb, err := leaderboard.Build(ctx, src, q)
+	sess := leaderboard.NewSession(src) // both boards from one collect
+	lb, err := sess.Build(ctx, q)
 	if errors.Is(err, leaderboard.ErrBadQuery) {
 		fmt.Fprintf(os.Stderr, "%v\n%s\n", err, leaderboardUsage)
 		return exitUsage
@@ -81,7 +82,7 @@ func runLeaderboard(args []string) int {
 	if len(lb.Entries) == 0 && q.Synthetic != leaderboard.SyntheticOnly {
 		sq := q
 		sq.Synthetic = leaderboard.SyntheticOnly
-		if synth, err = leaderboard.Build(ctx, src, sq); err != nil {
+		if synth, err = sess.Build(ctx, sq); err != nil {
 			return fail("leaderboard: %v", err)
 		}
 	}
