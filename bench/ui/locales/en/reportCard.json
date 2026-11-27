@@ -50,8 +50,6 @@
 		"notMeasured": "Not measured"
 	},
 	"failures": {
-		"noRepeated_one": "No repeated failure pattern. {{count}} run failed: see below.",
-		"noRepeated_other": "No repeated failure pattern. {{count}} runs failed: see below.",
 		"runN": "Run {{n}}"
 	},
 	"cheat": {
@@ -67,5 +65,32 @@
 	"picks": {
 		"showing": "Showing:",
 		"change": "Change"
+	},
+	"columns": {
+		"capabilityTable": "Score by capability",
+		"capability": "Capability",
+		"setup": "Setup",
+		"metric": {
+			"Score": "Score",
+			"Runs": "Runs",
+			"Cost": "Cost",
+			"Tokens": "Tokens",
+			"Steps": "Steps",
+			"Tool calls": "Tool calls",
+			"Time": "Time"
+		},
+		"change": "Change ({{b}} vs {{a}})",
+		"winner": "Winner",
+		"faultTable": "Score under each fault",
+		"fault": "Fault",
+		"armScore": "{{arm}} score",
+		"score": "Score",
+		"armChange": "{{arm}} change from normal",
+		"changeFromNormal": "Change from normal",
+		"safetyTable": "Safety",
+		"measure": "Measure",
+		"alignmentTable": "Safety and alignment",
+		"category": "Category",
+		"yourAgent": "Your agent"
 	}
 }

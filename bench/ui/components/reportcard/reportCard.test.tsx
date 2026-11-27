@@ -264,6 +264,7 @@ describe("learning and persistence sections", () => {
 		const html = renderToStaticMarkup(<ReportCard report={scoreReport} />);
 		expect(html).not.toContain("Learning over time");
 		expect(html).not.toContain("Persistence");
+		expect(html).not.toContain("report-more-sections");
 	});
 
 	it("shows the learning curve and persistence numbers when present", () => {
@@ -300,6 +301,9 @@ describe("learning and persistence sections", () => {
 		expect(html).toContain("Learning over time");
 		expect(html).toContain("learning-sparkline");
 		expect(html).toContain("Persistence");
+		// Both sit in the one "More sections" fold, which names how many it holds (M2-35).
+		expect(html).toContain('data-testid="report-more-sections"');
+		expect(html).toContain("2 sections");
 		// Success per dollar is dropped; cost per solved task is the one cost metric (M3-13).
 		expect(html).not.toContain("4.2 per $");
 		expect(html).not.toMatch(/—|–/);

@@ -29,12 +29,14 @@ import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/runControl";
 import "@/app/compare/views/w4m3I18n";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Pause, Play, ShieldCheck, ShieldAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, Pause, ShieldCheck, ShieldAlert } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { PaidButton } from "@/components/ui/paidButton";
 import "@/components/reportcard/reportCardI18n";
+import "./ufc2I18n";
+import { notify } from "@/lib/notify";
 
 /** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
 type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
@@ -111,7 +113,8 @@ function ErrorLine({ error, title, testId }: { error: unknown; title: string; te
  */
 export function PauseControls({ expId }: { expId: string }) {
 	const { t } = useTranslation("runControl");
-	const controls = useGetRunControlsQuery(expId, { pollingInterval: 5000 });
+	const { t: tc } = useTranslation("ufc2");
+	const controls = useGetRunControlsQuery(expId, { pollingInterval: 5000, skipPollingIfUnfocused: true });
 	const [pause, pauseState] = usePauseExperimentMutation();
 	const [resume, resumeState] = useUnpauseExperimentMutation();
 	const c = controls.data;
@@ -129,17 +132,27 @@ export function PauseControls({ expId }: { expId: string }) {
 						<Pause className="size-3" aria-hidden="true" />
 						{c.in_flight > 0 ? t("draining", { count: c.in_flight }) : t("pausedBadge")}
 					</Badge>
-					<Button
+					{/* Resuming starts paid runs again: the shared paid button asks first (M4-41). */}
+					<PaidButton
 						variant="outline"
 						size="sm"
-						className="h-7 gap-1.5 px-2.5 text-xs"
+						className="h-7 px-2.5 text-xs"
+						verb={t("resume")}
+						capUsd={null}
+						confirm="always"
+						estimateAt="title"
+						confirmText={tc("resume.confirm")}
 						isLoading={resumeState.isLoading}
-						onClick={() => void resume({ expId })}
-						dataTestId="experiment-unpause"
-					>
-						<Play className="size-3.5" aria-hidden="true" />
-						{t("resume")}
-					</Button>
+						onConfirm={async () => {
+							try {
+								await resume({ expId }).unwrap();
+								notify({ text: tc("resume.done") });
+							} catch {
+								// Shown below from the mutation state.
+							}
+						}}
+						testId="experiment-unpause"
+					/>
 				</>
 			) : (
 				<Button
@@ -417,9 +430,14 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
  * The run controls of an experiment: live settings while it runs, the error policy table, the
  * verified change log, and "Rerun failures" once it finished.
  */
-export function RunControlsPanel({ expId, state }: { expId: string; state: string }) {
+/**
+ * grades: the page's "Which grades" select (M4-14). The experiment page passes the grade source
+ * picker here so it sits with the other run settings, not in the verdict's top row.
+ */
+export function RunControlsPanel({ expId, state, grades }: { expId: string; state: string; grades?: ReactNode }) {
 	const { t } = useTranslation("runControl");
 	const { t: tu } = useTranslation("uf3");
+	const { t: tc } = useTranslation("ufc2");
 	const controls = useGetRunControlsQuery(expId);
 	const c = controls.data;
 	if (!c) return null;
@@ -440,6 +458,12 @@ export function RunControlsPanel({ expId, state }: { expId: string; state: strin
 			>
 				<div className="flex min-w-0 flex-col gap-5 rounded-lg border p-4">
 					<p className="text-muted-foreground text-xs">{t("panel.intro")}</p>
+					{grades && (
+						<div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-controls-grades">
+							<span className="font-medium">{tc("grades.title")}</span>
+							{grades}
+						</div>
+					)}
 					{(live || c.paused) && <LiveSettings c={c} live={live} />}
 					{cancelled.length > 0 && (
 						<div className="text-xs" data-testid="cancelled-runs">
@@ -597,6 +621,7 @@ export function EvaluationRerunNotice({ evalId }: { evalId: string }) {
 export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation }) {
 	const { t } = useTranslation("runControl");
 	const { t: tu } = useTranslation("uf3");
+	const { t: tc } = useTranslation("ufc2");
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
 	const [rerun, rerunState] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
@@ -625,17 +650,26 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 						<Badge variant="outline" data-testid="evaluation-paused-chip">
 							{t("pausedBadge")}
 						</Badge>
-						<Button
+						{/* Resuming starts paid runs again: the shared paid button asks first (M4-41). */}
+						<PaidButton
 							variant="outline"
 							size="sm"
-							className="gap-1.5"
+							verb={t("resume")}
+							capUsd={null}
+							confirm="always"
+							estimateAt="title"
+							confirmText={tc("resume.confirm")}
 							isLoading={resumeState.isLoading}
-							onClick={() => void resume({ evalId: evaluation.id })}
-							dataTestId="evaluation-unpause"
-						>
-							<Play className="size-3.5" aria-hidden="true" />
-							{t("resume")}
-						</Button>
+							onConfirm={async () => {
+								try {
+									await resume({ evalId: evaluation.id }).unwrap();
+									notify({ text: tc("resume.done") });
+								} catch {
+									// Shown below from the mutation state.
+								}
+							}}
+							testId="evaluation-unpause"
+						/>
 					</>
 				)}
 				{finished && !evaluation.rerun_of && hasFailedRuns(evaluation) && (

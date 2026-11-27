@@ -16,6 +16,7 @@ import { CheatRateRow } from "./cheatRateRow";
 import "./fw09I18n";
 import "./hw08I18n";
 import "./reportCardI18n";
+import "@/components/experiments/ufc2I18n";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import { hasVoice, VoiceTable } from "./voiceSection";
 import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
@@ -98,6 +99,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 	const checkName = useCheckName();
 	const { t: t08 } = useTranslation("hw08");
 	const { t: tr } = useTranslation("reportCard");
+	const { t: tc } = useTranslation("ufc2");
 	const head = headline(report, checkName, headlineContext);
 	const cost = costLine(report);
 	const brokenChild = (report.thrown_out_runs ?? 0) > 0 ? thrownOutBenchmarks(report)[0] : undefined;
@@ -154,18 +156,18 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			<ReportFilterBar where={report.where} onClear={onWhere && (() => onWhere(undefined))} />
 
-			<Section title={tr("sections.capability")} description={tr("sections.capabilityHelp")}>
+			<Section as="h3" title={tr("sections.capability")} description={tr("sections.capabilityHelp")}>
 				<CapabilityTable report={report} />
 			</Section>
 
-			<Section title={tr("sections.benchmark")} description={tr("sections.benchmarkHelp")}>
+			<Section as="h3" title={tr("sections.benchmark")} description={tr("sections.benchmarkHelp")}>
 				<BenchmarkList report={report} readOnly={readOnly} />
 			</Section>
 
 			<ReportSlices report={report} onShowOnly={onWhere && ((key, value) => onWhere({ ...report.where, [key]: value }))} />
 
 			{reliabilityCards(report).length > 0 && (
-				<Section
+				<Section as="h3"
 					title={tr("sections.reliability")}
 					description={tr("sections.reliabilityHelp")}
 				>
@@ -174,7 +176,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 
 			{(report.resilience?.length ?? 0) > 0 && (
-				<Section
+				<Section as="h3"
 					title={tr("sections.resilience")}
 					description={tr("sections.resilienceHelp")}
 				>
@@ -187,59 +189,70 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			{report.failover && <FailoverSection report={report.failover} />}
 
 			{report.reliability.length > 0 && (
-				<Section title={tr("sections.faults")} description={tr("sections.faultsHelp")}>
+				<Section as="h3" title={tr("sections.faults")} description={tr("sections.faultsHelp")}>
 					<ReliabilityTable report={report} />
 				</Section>
 			)}
 
-			{hasLearning(report) && (
-				<Section
-					title={tr("sections.learning")}
-					description={tr("sections.learningHelp")}
+			{/* The specialised sections fold into one "More sections" line so the card stays short (M2-35). */}
+			{moreSections(report) > 0 && (
+				<DetailsDisclosure
+					label={tc("report.moreSections")}
+					meta={tc("report.moreSectionsCount", { count: moreSections(report) })}
+					testId="report-more-sections"
 				>
-					<LearningTable report={report} />
-				</Section>
-			)}
+					<div className="mt-3 flex min-w-0 flex-col gap-6">
+					{hasLearning(report) && (
+						<Section as="h3"
+							title={tr("sections.learning")}
+							description={tr("sections.learningHelp")}
+						>
+							<LearningTable report={report} />
+						</Section>
+					)}
 
-			{hasVoice(report) && (
-				<Section title={tr("sections.voice")} description={tr("sections.voiceHelp")}>
-					<VoiceTable report={report} />
-				</Section>
-			)}
+					{hasVoice(report) && (
+						<Section as="h3" title={tr("sections.voice")} description={tr("sections.voiceHelp")}>
+							<VoiceTable report={report} />
+						</Section>
+					)}
 
-			{hasPersistence(report) && (
-				<Section title={tr("sections.persistence")} description={tr("sections.persistenceHelp")}>
-					<PersistenceTable report={report} />
-				</Section>
-			)}
+					{hasPersistence(report) && (
+						<Section as="h3" title={tr("sections.persistence")} description={tr("sections.persistenceHelp")}>
+							<PersistenceTable report={report} />
+						</Section>
+					)}
 
-			{hasVoiceCalls(report) && (
-				<Section
-					title={tr("sections.voiceCalls")}
-					description={tr("sections.voiceCallsHelp")}
-				>
-					<VoiceCallsTable report={report} />
-				</Section>
-			)}
+					{hasVoiceCalls(report) && (
+						<Section as="h3"
+							title={tr("sections.voiceCalls")}
+							description={tr("sections.voiceCallsHelp")}
+						>
+							<VoiceCallsTable report={report} />
+						</Section>
+					)}
 
-			{hasBifrost(report) && (
-				<Section
-					title={tr("sections.bifrost")}
-					description={tr("sections.bifrostHelp")}
-				>
-					<BifrostTable report={report} />
-				</Section>
+					{hasBifrost(report) && (
+						<Section as="h3"
+							title={tr("sections.bifrost")}
+							description={tr("sections.bifrostHelp")}
+						>
+							<BifrostTable report={report} />
+						</Section>
+					)}
+					</div>
+				</DetailsDisclosure>
 			)}
 
 			{report.safety && (Object.keys(report.safety.attack_resisted).length > 0 || Object.keys(report.safety.cheat_rate).length > 0) && (
-				<Section title={tr("sections.safety")} description={tr("sections.safetyHelp")}>
+				<Section as="h3" title={tr("sections.safety")} description={tr("sections.safetyHelp")}>
 					<SafetyTable report={report} />
 				</Section>
 			)}
 			<CheatRateRow report={report} />
 
 			{hasRedTeam(report) && (
-				<Section
+				<Section as="h3"
 					title={tr("sections.redTeam")}
 					description={tr("sections.redTeamHelp")}
 				>
@@ -248,7 +261,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 
 			{report.alignment && report.alignment.categories.length > 0 && (
-				<Section
+				<Section as="h3"
 					title={tr("sections.alignment")}
 					description={tr("sections.alignmentHelp")}
 				>
@@ -257,6 +270,11 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 		</article>
 	);
+}
+
+/** How many of the specialised sections (learning, voice, persistence, voice calls, Bifrost) have data. */
+export function moreSections(report: Report): number {
+	return [hasLearning(report), hasVoice(report), hasPersistence(report), hasVoiceCalls(report), hasBifrost(report)].filter(Boolean).length;
 }
 
 function ArmLegend({ arms }: { arms: EvaluationArm[] }) {
@@ -308,7 +326,7 @@ export function WinnerMark({ result, name }: { result?: ComparisonResult; name?:
 		return (
 			<span
 				data-testid="winner-mark"
-				className="text-muted-foreground inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap"
+				className="text-muted-foreground inline-flex items-center gap-1 text-sm font-medium whitespace-nowrap"
 			>
 				<Equal className="size-3.5" aria-hidden="true" />
 				No clear winner
@@ -316,7 +334,7 @@ export function WinnerMark({ result, name }: { result?: ComparisonResult; name?:
 		);
 	}
 	return (
-		<span data-testid="winner-mark" className="text-foreground inline-flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
+		<span data-testid="winner-mark" className="text-foreground inline-flex items-center gap-1 text-sm font-semibold whitespace-nowrap">
 			<Check className="text-chart-success-ink size-3.5" aria-hidden="true" />
 			{name || result.winner} better
 		</span>
@@ -390,18 +408,18 @@ function CapabilityTable({ report }: { report: Report }) {
 	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
-		<Table data-testid="report-capabilities" aria-label="Score by capability">
+		<Table data-testid="report-capabilities" aria-label={tr("columns.capabilityTable")}>
 			<TableHeader>
 				<TableRow>
-					<TableHead scope="col">Capability</TableHead>
-					{ab && <TableHead scope="col">Setup</TableHead>}
+					<TableHead scope="col">{tr("columns.capability")}</TableHead>
+					{ab && <TableHead scope="col">{tr("columns.setup")}</TableHead>}
 					{METRIC_HEADS.map((h) => (
 						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={h === "Score" ? undefined : "text-right"}>
-							{h}
+							{tr(`columns.metric.${h}`)}
 						</TableHead>
 					))}
-					{ab && <TableHead scope="col" className="text-right">{`Change (${b.label} vs ${a.label})`}</TableHead>}
-					{ab && <TableHead scope="col">Winner</TableHead>}
+					{ab && <TableHead scope="col" className="text-right">{tr("columns.change", { b: b.label, a: a.label })}</TableHead>}
+					{ab && <TableHead scope="col">{tr("columns.winner")}</TableHead>}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -504,7 +522,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				<span className="flex items-center gap-3 tabular-nums">
 					{report.arms.map((arm) => (
 						<span key={arm.label} className="text-foreground">
-							{ab && <span className="text-muted-foreground mr-1 text-xs">{arm.label}</span>}
+							{ab && <span className="text-muted-foreground mr-1 text-sm">{arm.label}</span>}
 							{row.arms[arm.label]?.runs ? pct(row.arms[arm.label]?.score) : "-"}
 						</span>
 					))}
@@ -630,21 +648,22 @@ function MetricPair({ label, value }: { label: string; value: string }) {
 }
 
 function ReliabilityTable({ report }: { report: Report }) {
+	const { t: tr } = useTranslation("reportCard");
 	// Fault runs whose task has no finished normal run are left out of both columns (paired by task).
 	const unpaired = report.reliability.reduce((n, row) => n + Object.values(row.arms ?? {}).reduce((m, a) => m + (a?.unpaired ?? 0), 0), 0);
 	return (
 		<>
-			<Table data-testid="report-reliability" aria-label="Score under each fault">
+			<Table data-testid="report-reliability" aria-label={tr("columns.faultTable")}>
 				<TableHeader>
 					<TableRow>
-						<TableHead scope="col">Fault</TableHead>
+						<TableHead scope="col">{tr("columns.fault")}</TableHead>
 						{report.arms.map((arm) => (
 							<React.Fragment key={arm.label}>
 								<TableHead scope="col" className="text-right">
-									{isAB(report) ? `${arm.label} score` : "Score"}
+									{isAB(report) ? tr("columns.armScore", { arm: arm.label }) : tr("columns.score")}
 								</TableHead>
 								<TableHead scope="col" className="text-right">
-									{isAB(report) ? `${arm.label} change from normal` : "Change from normal"}
+									{isAB(report) ? tr("columns.armChange", { arm: arm.label }) : tr("columns.changeFromNormal")}
 								</TableHead>
 							</React.Fragment>
 						))}
@@ -681,15 +700,16 @@ function ReliabilityTable({ report }: { report: Report }) {
 }
 
 function SafetyTable({ report }: { report: Report }) {
+	const { t: tr } = useTranslation("reportCard");
 	const safety = report.safety!;
 	return (
-		<Table data-testid="report-safety" aria-label="Safety">
+		<Table data-testid="report-safety" aria-label={tr("columns.safetyTable")}>
 			<TableHeader>
 				<TableRow>
-					<TableHead scope="col">Measure</TableHead>
+					<TableHead scope="col">{tr("columns.measure")}</TableHead>
 					{report.arms.map((arm) => (
 						<TableHead key={arm.label} scope="col" className="text-right">
-							{isAB(report) ? arm.label : "Your agent"}
+							{isAB(report) ? arm.label : tr("columns.yourAgent")}
 						</TableHead>
 					))}
 				</TableRow>
@@ -743,13 +763,13 @@ function AlignmentSection({ report }: { report: Report }) {
 	const untestedCategories = alignment.categories.filter((c) => !report.arms.some((a) => c.arms[a.label]));
 	return (
 		<div className="flex flex-col gap-4">
-			<Table data-testid="report-alignment" aria-label="Safety and alignment">
+			<Table data-testid="report-alignment" aria-label={tr("columns.alignmentTable")}>
 				<TableHeader>
 					<TableRow>
-						<TableHead scope="col">Category</TableHead>
+						<TableHead scope="col">{tr("columns.category")}</TableHead>
 						{report.arms.map((arm) => (
 							<TableHead key={arm.label} scope="col" className="text-right">
-								{isAB(report) ? arm.label : "Your agent"}
+								{isAB(report) ? arm.label : tr("columns.yourAgent")}
 							</TableHead>
 						))}
 					</TableRow>

@@ -1,5 +1,7 @@
 import { ReportCard } from "@/components/reportcard/reportCard";
 import { ReportFailures } from "@/components/reportcard/reportFailures";
+import { ReportPicks } from "@/components/reportcard/reportPicks";
+import "@/components/experiments/ufc2I18n";
 import { ShareButton, shareQuery } from "@/components/share/shareDialog";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -52,11 +54,18 @@ export function cardRuns(card: AgentCard): number {
 	return Object.values(card.totals ?? {}).reduce((sum, row) => sum + (row?.runs ?? 0), 0);
 }
 
+/** The "Showing:" summary of the card (M2-34): "<evaluation>, <date> (n runs)". */
+export function cardSummary(card: AgentCard, locale: string, runsText: (count: number) => string): string {
+	const name = card.evaluation_name || card.evaluation_id || "";
+	const date = formatWhen(card.evaluation_created_at, locale) ?? "";
+	return [name, date].filter(Boolean).join(", ") + ` (${runsText(cardRuns(card))})`;
+}
+
 /**
- * The line above the card that names the one evaluation it shows and how many other done evaluations
+ * The line that names the one evaluation the card shows and how many other done evaluations
  * match (N206): the card never mixes evaluations, so "Any model" is not all of the agent's runs.
  */
-function CardSource({ card, onPick }: { card: AgentCard; onPick: (id: string) => void }) {
+function CardSource({ card }: { card: AgentCard }) {
 	const { t } = useTranslation("gw17");
 	const locale = getLocale();
 	if (!card.evaluation_id) return null;
@@ -73,28 +82,36 @@ function CardSource({ card, onPick }: { card: AgentCard; onPick: (id: string) =>
 	const others = matching - 1;
 	const tail = others < 1 ? "" : newest ? t("reportCard.olderMatch", { count: others }) : t("reportCard.otherMatch", { count: others });
 	return (
-		<div className="flex flex-col gap-2" data-testid="agent-report-card-source">
-			<p className="text-muted-foreground text-xs">{tail ? `${head} ${tail}` : head}</p>
-			{list.length > 1 && (
-				<label className="flex flex-col gap-1 text-xs font-medium">
-					{t("reportCard.evaluation")}
-					<select
-						className="border-input bg-background h-9 max-w-md rounded-md border px-2 text-sm"
-						value={card.evaluation_id}
-						onChange={(e) => onPick(e.target.value === list[0].id ? "" : e.target.value)}
-						aria-label={t("reportCard.evaluation")}
-						data-testid="agent-report-card-evaluation"
-					>
-						{list.map((ev) => (
-							<option key={ev.id} value={ev.id}>
-								{ev.name || ev.id}
-								{ev.created_at ? ` · ${formatWhen(ev.created_at, locale) ?? ""}` : ""}
-							</option>
-						))}
-					</select>
-				</label>
-			)}
-		</div>
+		<p className="text-muted-foreground basis-full text-xs" data-testid="agent-report-card-source">
+			{tail ? `${head} ${tail}` : head}
+		</p>
+	);
+}
+
+/** The Evaluation select of the picks: one of the evaluations that match the version and model. */
+function EvaluationSelect({ card, onPick }: { card: AgentCard; onPick: (id: string) => void }) {
+	const { t } = useTranslation("gw17");
+	const locale = getLocale();
+	const list = card.evaluations ?? [];
+	if (!card.evaluation_id || list.length <= 1) return null;
+	return (
+		<label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
+			{t("reportCard.evaluation")}
+			<select
+				className="border-input bg-background h-9 w-full max-w-md min-w-0 rounded-md border px-2 text-sm"
+				value={card.evaluation_id}
+				onChange={(e) => onPick(e.target.value === list[0].id ? "" : e.target.value)}
+				aria-label={t("reportCard.evaluation")}
+				data-testid="agent-report-card-evaluation"
+			>
+				{list.map((ev) => (
+					<option key={ev.id} value={ev.id}>
+						{ev.name || ev.id}
+						{ev.created_at ? ` · ${formatWhen(ev.created_at, locale) ?? ""}` : ""}
+					</option>
+				))}
+			</select>
+		</label>
 	);
 }
 
@@ -106,6 +123,7 @@ function CardSource({ card, onPick }: { card: AgentCard; onPick: (id: string) =>
 export default function ReportCardTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tg } = useTranslation("gw17");
+	const { t: tc } = useTranslation("ufc2");
 	const search = useSearch({ strict: false }) as { version?: unknown; model?: unknown; evaluation?: unknown };
 	const navigate = useNavigate();
 	const versions = useGetAgentVersionsQuery(agentId);
@@ -143,10 +161,16 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 	}, [preferred]);
 	const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const empty = isEmptyReport(report.data, report.error);
+	const filterSummary = `${version ? `v${version}` : t("reportCard.latest")}, ${model || t("reportCard.anyModel")}`;
+	const picksSummary =
+		report.data && !empty && report.data.evaluation_id
+			? cardSummary(report.data, getLocale(), (count) => tc("picks.runs", { count }))
+			: filterSummary;
 
 	return (
 		<div className="flex min-w-0 flex-col gap-5" data-testid="agent-report-card-tab">
-			<div className="flex flex-wrap items-end gap-3">
+			{/* One "Showing: ... Change" line; the Version, Model and Evaluation selects open under Change (M2-34). */}
+			<ReportPicks summary={picksSummary} testId="agent-report-card-picks">
 				<label className="flex flex-col gap-1 text-xs font-medium">
 					{t("reportCard.version")}
 					<select
@@ -183,7 +207,9 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 						))}
 					</select>
 				</label>
-			</div>
+				{report.data && !empty && <EvaluationSelect card={report.data} onPick={(id) => setFilter({ evaluation: id })} />}
+				{report.data && !empty && <CardSource card={report.data} />}
+			</ReportPicks>
 			{versionMissing && (
 				<p className="text-muted-foreground text-xs" data-testid="agent-report-card-version-missing">
 					{tg("reportCard.versionMissing", { version: urlVersion })}
@@ -212,7 +238,6 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 				/>
 			) : (
 				<>
-					<CardSource card={report.data} onPick={(id) => setFilter({ evaluation: id })} />
 					<ReportCard
 						report={report.data}
 						actions={

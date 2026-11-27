@@ -66,7 +66,7 @@ export default function EvaluationView({ evalId }: { evalId: string }) {
 	const first = useGetEvaluationQuery(evalId);
 	const active = first.data ? isActiveStatus(first.data.status) : false;
 	// Poll every 3 s while the evaluation is still moving; RTK Query shares the cache entry.
-	useGetEvaluationQuery(evalId, { pollingInterval: active ? EVALUATION_POLL_MS : 0, skip: !active });
+	useGetEvaluationQuery(evalId, { pollingInterval: active ? EVALUATION_POLL_MS : 0, skipPollingIfUnfocused: true, skip: !active });
 	if (first.isLoading) return <BlockSkeleton rows={6} testId="evaluation-loading" />;
 	if ((first.error as { status?: unknown } | undefined)?.status === 404) {
 		// A wrong id is not a load failure: no Retry, a way back to the list (M3-20).
@@ -453,7 +453,7 @@ function SkillScanProblems({ items }: { items: readonly EvaluationChild[] }) {
 export function ChildRow({ child, score = false }: { child: EvaluationChild; score?: boolean }) {
 	const { t } = useTranslation("evaluations");
 	const active = isActiveStatus(child.status);
-	const exp = useGetExperimentQuery(child.experiment_id, { pollingInterval: active ? EVALUATION_POLL_MS : 0 });
+	const exp = useGetExperimentQuery(child.experiment_id, { pollingInterval: active ? EVALUATION_POLL_MS : 0, skipPollingIfUnfocused: true });
 	const slots = exp.data?.slots;
 	// N180, N216: the worker refused the runs (for example an image it could not build) and none was counted.
 	const problem = exp.data?.problem && !(slots && slots.done > 0) ? exp.data.problem : undefined;

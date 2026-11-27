@@ -7,6 +7,8 @@ import {
 	useEstimateEvaluationQuery,
 	useGetBenchFaultsQuery,
 } from "@/lib/store/apis/evaluationsApi";
+import { KeyMissingNote } from "@/components/models/keyMissingNote";
+import { providerName } from "@/components/models/providerCatalog";
 import { PaidButton } from "@/components/ui/paidButton";
 import { formatUsd } from "@/lib/money";
 import { notify } from "@/lib/notify";
@@ -325,17 +327,25 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />
 
 			{state.error ? (
-				<p className="text-chart-error-ink text-sm" role="alert" data-testid="step5-error">
-					{errorMessage(state.error, t("launch.error"))}
+				<div className="text-chart-error-ink space-y-2 text-sm" role="alert" data-testid="step5-error">
+					<p>{errorMessage(state.error, t("launch.error"))}</p>
 					{errorLink(state.error) === "/models" ? (
-						<>
-							{" "}
-							<Link to={addKeyHref(spec.arms[0]?.provider) as never} className="underline underline-offset-2" data-testid="step5-error-link">
-								{spec.arms[0]?.provider ? t("launch.addKey", { provider: spec.arms[0].provider }) : t("launch.addKeyPlain")}
+						spec.arms[0]?.provider ? (
+							// The missing key is said here, with a way back to this step (M8-12, M3-27).
+							<span data-testid="step5-error-link">
+								<KeyMissingNote
+									provider={spec.arms[0].provider}
+									providerName={providerName(spec.arms[0].provider, [])}
+									returnTo="/evaluate?step=5"
+								/>
+							</span>
+						) : (
+							<Link to={addKeyHref(undefined) as never} className="underline underline-offset-2" data-testid="step5-error-link">
+								{t("launch.addKeyPlain")}
 							</Link>
-						</>
+						)
 					) : null}
-				</p>
+				</div>
 			) : null}
 
 			{(() => {

@@ -215,7 +215,12 @@
 			"launchWhen": "Launch when at least one task is ready.",
 			"added": "{{id}} is selected for this evaluation with {{count}} ready tasks.",
 			"noneReady": "No task is ready yet. Fix the tasks listed above, import again, and rerun the checks."
-		}
+		},
+		"rowChecking": "Checking whether your agent can run it...",
+		"rowNeedsGpu": "Needs a GPU worker",
+		"rowReady_one": "{{count}} ready task",
+		"rowReady_other": "{{count}} ready tasks",
+		"rowNoReady": "No ready tasks"
 	},
 	"skill": {
 		"terminal": "Terminal",

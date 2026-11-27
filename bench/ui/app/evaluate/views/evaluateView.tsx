@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { failoverProblem } from "@/components/evaluations/failoverSettings";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { parseAsInteger, parseAsString, useQueryState, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -335,6 +336,8 @@ function EvaluateWizard() {
 	const nothingRuns = wanted >= 4 && !step4Estimate.pending ? nothingRunsReason(step4Estimate.main.data) : null;
 	const reach = maxReachable(draft, owns, nothingRuns, ctx);
 	const step = (wanted > reach ? reach : wanted) as EvaluateStep;
+	// Load the benchmark list while the person picks an agent, so step 3 opens filled (M3-35).
+	useGetSuitesLightQuery();
 	const go = (s: EvaluateStep) => void setStepRaw(s === 1 ? null : s, { history: stepHistoryMode("user") });
 	// Resume (M3-44): opened without ?step= on a draft that has an agent, the wizard goes to the furthest step it can.
 	const resumed = useRef(false);

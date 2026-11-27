@@ -204,6 +204,11 @@ vi.mock("@/lib/store/apis/modelsApi", async (importOriginal) => fx.safeOriginal(
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 vi.mock("@/lib/store/apis/agentBuilderApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 vi.mock("@/lib/store/apis/suitesLightApi", async (importOriginal) => fx.safeOriginal(importOriginal));
+// The jobs indicator asks for a running count (X-108); the wizard smoke test needs none.
+vi.mock("@/lib/store/apis/jobCountApi", async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	useCountRunningJobsQuery: () => ({ data: undefined }),
+}));
 
 // The wizard: the first of these that exists (a views/ file named like the wizard, else the page).
 const candidates = {

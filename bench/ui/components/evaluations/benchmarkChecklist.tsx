@@ -28,10 +28,6 @@ export interface BenchmarkChecklistProps {
 	extra?: (id: string) => ReactNode;
 }
 
-function plural(n: number, word: string): string {
-	return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 const NEEDS: Record<string, string> = {
 	browser: "benchmarks.needsBrowser",
 	voice: "benchmarks.needsVoice",
@@ -97,8 +93,8 @@ export function BenchmarkChecklist({
 		const n = s.admitted_count ?? 0;
 		const note =
 			(reason ? plainReason(reason, t as never) : "") ||
-			(checking ? "Checking whether your agent can run it..." : "") ||
-			(isGpuBenchmark(s.id) ? "Needs a GPU worker" : "") ||
+			(checking ? t("benchmarks.rowChecking") : "") ||
+			(isGpuBenchmark(s.id) ? t("benchmarks.rowNeedsGpu") : "") ||
 			(c?.ok ? (c.note ?? "") : "");
 		return (
 			<li key={s.id}>
@@ -123,7 +119,7 @@ export function BenchmarkChecklist({
 						<span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
 							<span className="truncate font-medium">{suiteDisplayName(s.id)}</span>
 							<span className={cn("shrink-0 text-xs tabular-nums", n ? "text-muted-foreground" : "text-warning-ink")}>
-								{n ? `${plural(n, "ready task")}` : "No ready tasks"}
+								{n ? t("benchmarks.rowReady", { count: n }) : t("benchmarks.rowNoReady")}
 							</span>
 						</span>
 						<span className="text-muted-foreground line-clamp-2 block text-sm" title={note || undefined}>

@@ -24,6 +24,8 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { useEvaluateDraft } from "./evaluateDraft";
+import "@/components/experiments/ufc2I18n";
+import { Link } from "@tanstack/react-router";
 import { OwnTasksCard } from "./ownTasks";
 import { fw05 } from "./fw05I18n";
 
@@ -170,6 +172,14 @@ export interface BenchmarkGroup {
 	suites: SuiteRow[];
 }
 
+/**
+ * The org's own benchmarks with no ready task (M3-37): the checklist offers only ready ones, so these
+ * are listed apart, greyed, with a way to the readiness check. Library packs are left out.
+ */
+export function ownNotReady<T extends Pick<SuiteSummary, "id" | "builtin" | "source" | "admitted_count"> & { task_count?: number }>(suites: readonly T[]): T[] {
+	return suites.filter((s) => !s.builtin && s.source !== "library" && (s.admitted_count ?? 0) === 0);
+}
+
 /** Whether a benchmark has at least one ready (admitted) task: only those are offered for an evaluation. */
 export function hasReadyTasks(s: Pick<SuiteRow, "admitted_count">): boolean {
 	return (s.admitted_count ?? 0) > 0;
@@ -299,6 +309,7 @@ export function Step3BenchmarksView({
 }: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
 	const { t: te } = useTranslation("evaluate");
+	const { t: tc } = useTranslation("ufc2");
 	const compat = compatibilityMap(compatibility);
 	const known = entriesByBenchmark(reference ?? []);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
@@ -400,6 +411,34 @@ export function Step3BenchmarksView({
 					extra={hintLine}
 				/>
 			</section>
+
+			{ownNotReady(suites).length > 0 && (
+				<section className="flex flex-col gap-2" data-testid="step3-own-not-ready">
+					<h2 className="text-sm font-medium">{tc("step3.ownTitle")}</h2>
+					<ul className="flex flex-col rounded-lg border">
+						{ownNotReady(suites).map((s) => (
+							<li
+								key={s.id}
+								className="text-muted-foreground flex min-w-0 flex-col gap-0.5 border-b px-3 py-2 text-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+								data-testid={`step3-own-not-ready-${s.id}`}
+							>
+								<span className="min-w-0 truncate font-medium">{s.id}</span>
+								<span className="text-xs">
+									{(s as { task_count?: number }).task_count ? tc("step3.notReady", { count: (s as { task_count?: number }).task_count }) : tc("step3.noneReady")}{" "}
+									<Link
+										to="/suites/$suiteId"
+										params={{ suiteId: s.id }}
+										search={{ tab: "ops" } as never}
+										className="text-primary underline underline-offset-2"
+									>
+										{tc("step3.runCheck")}
+									</Link>
+								</span>
+							</li>
+						))}
+					</ul>
+				</section>
+			)}
 
 			{/* Your own tasks come after the catalog, not first (M3-32). */}
 			{ownTasks}

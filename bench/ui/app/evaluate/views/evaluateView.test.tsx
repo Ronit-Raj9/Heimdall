@@ -158,9 +158,9 @@ describe("EvaluateView", () => {
 		const html = render();
 		expect(html).toContain('data-testid="evaluate-stepper"');
 		expect(html).toContain("Your agent");
-		expect(html).toContain('data-testid="evaluate-agent-codex"');
-		expect(html).toContain('data-testid="evaluate-agent-my-bot"');
-		expect(html).not.toContain('data-testid="evaluate-agent-oracle"');
+		expect(html).toContain('data-testid="evaluate-agents-builtin-option-codex"');
+		expect(html).toContain('data-testid="evaluate-agents-own-option-my-bot"');
+		expect(html).not.toContain('data-testid="evaluate-agents-builtin-option-oracle"');
 		expect(html).toContain('data-testid="cap-mcp"');
 		expect(html).toContain("Register your agent");
 		expect(html).toContain("Pick an agent to continue.");
