@@ -13,3 +13,9 @@ export function formatUsd(v: number | null | undefined): string {
 	if (a < 10) return `${sign}$${a.toFixed(2)}`;
 	return `${sign}$${Math.round(a).toLocaleString("en-US")}`;
 }
+/** How many times one cost is another: "15x" (whole from 10, one decimal under 10); "-" when it cannot be said. */
+export function formatUsdRatio(a: number | null | undefined, b: number | null | undefined): string {
+	if (a === null || a === undefined || b === null || b === undefined || !Number.isFinite(a) || !Number.isFinite(b) || b === 0) return "-";
+	const r = a / b;
+	return r >= 10 ? `${Math.round(r).toLocaleString("en-US")}x` : `${r.toFixed(1).replace(/\.0$/, "")}x`;
+}

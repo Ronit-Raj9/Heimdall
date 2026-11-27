@@ -49,5 +49,23 @@
 		"resolved": "Resolved {{time}}",
 		"auto": "Found automatically",
 		"autoHint": "A platform check opened this incident on its own; it closes when the check passes again."
+	},
+	"waiting": "Waiting",
+	"running": "Running",
+	"needsYou": "Needs you",
+	"finished": "Finished",
+	"failed": "Failed",
+	"stopped": "Stopped",
+	"broken": "Test was broken",
+	"noAnswer": "No clear result yet",
+	"readiness": {
+		"ready": "Ready",
+		"notReady": "Not ready"
+	},
+	"verdict": {
+		"better": "Better",
+		"worse": "Worse",
+		"same": "Same score",
+		"tooFew": "Too few tasks to call"
 	}
 }

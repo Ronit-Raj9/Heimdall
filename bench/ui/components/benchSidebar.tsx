@@ -1,10 +1,11 @@
 import { HeimdallMark } from "@/components/heimdallMark";
 import { OrgSwitcher } from "@/components/platform/orgSwitcher";
-import { BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, isNavActive, navHintKey, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
-import { useSession, type SessionInfo } from "@/lib/session/sessionContext";
+import { BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, activeNavItem, navHintKey, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
+import { canUse, useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -48,9 +49,12 @@ function writeClosedGroups(ids: readonly BenchNavGroupId[]) {
 	}
 }
 
-/** The groups and entries this session may see. Every entry is open to everyone; pages gate their own panels. */
-export function visibleNavGroups(_session: SessionInfo) {
-	return BENCH_NAV_GROUPS.filter((group) => group.items.length > 0);
+/** The groups and entries this session may see: admin-only entries (Improvements) only for admins; pages gate their own panels. */
+export function visibleNavGroups(session: SessionInfo) {
+	const admin = canUse(session, "admin");
+	return BENCH_NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => admin || !item.adminOnly) })).filter(
+		(group) => group.items.length > 0,
+	);
 }
 
 /**
@@ -66,7 +70,7 @@ export interface BenchSidebarProps {
 }
 
 /**
- * Left navigation: Home, then six collapsible groups. From md it is a sidebar (an icon rail up to xl,
+ * Left navigation: Home, then four collapsible groups and a bottom group (Spec 1). From md it is a sidebar (an icon rail up to xl,
  * labels from xl, either pinned by the toggle); below md it is a drawer over the page.
  */
 export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebarProps) {
@@ -120,8 +124,8 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 					"bg-sidebar hidden shrink-0 flex-col gap-2 px-2.5 py-3 md:flex md:min-h-0",
 					"transition-[width] duration-200 ease-(--ease-out)",
 					form === "rail" && "md:w-[3.75rem]",
-					form === "auto" && "md:w-[3.75rem] xl:w-60",
-					form === "full" && "md:w-60",
+					form === "auto" && "md:w-[3.75rem] xl:w-52",
+					form === "full" && "md:w-52",
 				)}
 				data-testid="bench-sidebar"
 				data-state={form === "auto" ? "auto" : form === "rail" ? "collapsed" : "expanded"}
@@ -133,8 +137,8 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 					type="button"
 					onClick={toggle}
 					className={cn(
-						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
-						"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
+						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-7 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
+						"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 						form === "rail" && "justify-center px-0",
 						form === "auto" && "justify-center px-0 xl:justify-start xl:px-2.5",
 					)}
@@ -169,7 +173,7 @@ function Brand({ form }: { form: NavForm }) {
 		<Link
 			to="/"
 			className={cn(
-				"focus-visible:ring-ring/60 flex h-10 items-center gap-2.5 rounded-lg px-1.5 focus-visible:ring-2 focus-visible:outline-none",
+				"focus-visible:ring-(--focus) flex h-10 items-center gap-2.5 rounded-lg px-1.5 focus-visible:ring-2 focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-1.5",
 			)}
@@ -219,7 +223,9 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 	const { t } = useTranslation("bench");
 	const session = useSession();
 	const groups = visibleNavGroups(session);
-	const current = activeNavGroup(pathname);
+	const search = useSafeSearch();
+	const activeItem = activeNavItem(pathname, search);
+	const current = activeItem ? (BENCH_NAV_GROUPS.find((group) => group.items.includes(activeItem))?.id ?? activeNavGroup(pathname)) : null;
 	const labelClass = cn(form === "rail" && "md:sr-only", form === "auto" && "md:sr-only xl:not-sr-only");
 	// Where group headers show: everywhere but the rail.
 	const headerClass = cn(form === "rail" && "md:hidden", form === "auto" && "md:hidden xl:flex");
@@ -233,18 +239,28 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 				const label = group.labelKey ? t(group.labelKey) : null;
 				const closed = label !== null && closedGroups.includes(group.id);
 				const listId = `${idPrefix}-group-${group.id}`;
+				// The group toggles are one tab stop (the first); ArrowUp and ArrowDown move between them.
+				const firstToggle = groups.find((candidate) => candidate.labelKey)?.id === group.id;
 				return (
-					<div key={group.id} className="flex flex-col gap-0.5" data-testid={`nav-group-${group.id}`} data-closed={closed || undefined}>
+					<div
+						key={group.id}
+						className={cn("flex flex-col gap-0.5", group.id === "bottom" && "mt-auto pt-2")}
+						data-testid={`nav-group-${group.id}`}
+						data-closed={closed || undefined}
+					>
 						{label !== null && (
 						<button
 							type="button"
+							tabIndex={firstToggle ? 0 : -1}
+							data-nav-group-toggle
+							onKeyDown={moveBetweenToggles}
 							onClick={() => onToggleGroup(group.id)}
 							aria-expanded={!closed}
 							aria-controls={listId}
 							title={t("shell.groupToggle", { group: label })}
 							className={cn(
-								"text-muted-foreground/80 hover:text-foreground flex h-6 items-center gap-1 rounded-sm px-2.5 text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors",
-								"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
+								"text-muted-foreground hover:text-foreground flex h-6 items-center gap-1 rounded-sm px-2.5 text-[11px] font-semibold transition-colors",
+								"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 								headerClass,
 							)}
 							data-testid={`nav-group-toggle-${group.id}`}
@@ -261,7 +277,7 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 						<ul id={listId} aria-label={label ?? undefined} className={cn("flex flex-col gap-0.5", closed && closedItemsClass)}>
 							{group.items.map((item) => (
 								<li key={item.to}>
-									<NavLink item={item} active={isNavActive(item, pathname)} form={form} labelClass={labelClass} onNavigate={onNavigate} />
+									<NavLink item={item} active={activeItem === item} form={form} labelClass={labelClass} onNavigate={onNavigate} />
 								</li>
 							))}
 						</ul>
@@ -299,8 +315,8 @@ function NavLink({
 			aria-current={active ? "page" : undefined}
 			onClick={onNavigate}
 			className={cn(
-				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
-				"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
+				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-7 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
+				"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-2.5",
 				active && "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20",
@@ -312,7 +328,27 @@ function NavLink({
 	);
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** ArrowUp or ArrowDown on a group toggle moves focus to the previous or next toggle in the same nav. */
+function moveBetweenToggles(event: ReactKeyboardEvent<HTMLButtonElement>) {
+	if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+	const nav = event.currentTarget.closest("nav");
+	if (!nav) return;
+	const toggles = Array.from(nav.querySelectorAll<HTMLButtonElement>("[data-nav-group-toggle]")).filter((el) => el.offsetParent !== null);
+	const index = toggles.indexOf(event.currentTarget);
+	const next = toggles[(index + (event.key === "ArrowDown" ? 1 : -1) + toggles.length) % toggles.length];
+	if (!next) return;
+	event.preventDefault();
+	next.focus();
+}
+
+function useSafeSearch(): Readonly<Record<string, unknown>> | undefined {
+	try {
+		return useRouterState({ select: (state) => state.location.search as Record<string, unknown> });
+	} catch {
+		// Rendered without a router (an isolated component test).
+		return undefined;
+	}
+}
 
 /**
  * The navigation as a modal drawer below md. Focus moves to the close button and stays inside
@@ -359,20 +395,7 @@ function NavDrawer({
 	}, []);
 
 	// Keep Tab inside the drawer.
-	const trap = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-		if (event.key !== "Tab" || !panel.current) return;
-		const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null);
-		if (items.length === 0) return;
-		const first = items[0];
-		const last = items[items.length - 1];
-		if (event.shiftKey && document.activeElement === first) {
-			event.preventDefault();
-			last.focus();
-		} else if (!event.shiftKey && document.activeElement === last) {
-			event.preventDefault();
-			first.focus();
-		}
-	};
+	useFocusTrap(panel);
 
 	return (
 		<div className="fixed inset-0 z-50 md:hidden" data-testid="nav-drawer">
@@ -387,7 +410,6 @@ function NavDrawer({
 				role="dialog"
 				aria-modal="true"
 				aria-label={t("nav.label")}
-				onKeyDown={trap}
 				className="bg-sidebar animate-in slide-in-from-left absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-2 border-r px-2.5 py-3 shadow-2xl duration-200 ease-(--ease-out)"
 			>
 				<div className="flex items-center gap-1">
@@ -399,7 +421,7 @@ function NavDrawer({
 						type="button"
 						onClick={onClose}
 						aria-label={t("shell.closeMenu")}
-						className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-ring/60 flex size-8 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+						className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-(--focus) flex size-8 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
 						data-testid="nav-drawer-close"
 					>
 						<X className="size-4" aria-hidden="true" />

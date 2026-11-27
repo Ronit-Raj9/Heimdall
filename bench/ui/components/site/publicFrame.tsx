@@ -17,7 +17,14 @@ export const SITE_LINKS = [
 	{ to: "/pricing", key: "pricing" },
 	{ to: "/downloads", key: "downloads" },
 	{ to: "/security", key: "security" },
+	{ to: "/reference", key: "reference" },
 ] as const;
+
+/** A site link's label; the API reference link's text lives in the ufs1 namespace. */
+function siteLinkLabel(t: (key: never, opts?: never) => string, key: (typeof SITE_LINKS)[number]["key"]): string {
+	if (key === "reference") return t("siteNav.reference" as never, { ns: "ufs1" } as never);
+	return t(`nav.${key}` as never);
+}
 
 /**
  * The frame of the public site (lane Y08): the landing page, docs, benchmark library, pricing,
@@ -61,7 +68,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 								)}
 								data-testid={`public-nav-${l.key}`}
 							>
-								{t(`nav.${l.key}`)}
+								{siteLinkLabel(t, l.key)}
 							</Link>
 						))}
 					</nav>
@@ -96,7 +103,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 								active(l.to) ? "bg-accent text-foreground font-medium" : "text-muted-foreground",
 							)}
 						>
-							{t(`nav.${l.key}`)}
+							{siteLinkLabel(t, l.key)}
 						</Link>
 					))}
 				</nav>
@@ -123,7 +130,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 						<p className="text-foreground text-xs font-medium tracking-wide uppercase">{t("footer.product")}</p>
 						{SITE_LINKS.slice(1).map((l) => (
 							<Link key={l.to} to={l.to} className="hover:text-foreground w-fit">
-								{t(`nav.${l.key}`)}
+								{siteLinkLabel(t, l.key)}
 							</Link>
 						))}
 					</div>
