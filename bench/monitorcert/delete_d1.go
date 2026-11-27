@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -36,3 +37,8 @@ func (s *CertStore) Delete(ctx context.Context, certID string) error {
 	}
 	return nil
 }
+
+// SharedRoot reports whether RootEnv names one certificates folder for the
+// whole server. On a hosted server every organization then reads and
+// writes the same folder, so certificates are not stored per organization.
+func SharedRoot() bool { return strings.TrimSpace(os.Getenv(RootEnv)) != "" }

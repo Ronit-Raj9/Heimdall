@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -168,5 +169,38 @@ func TestHostedMonitorTestDelete(t *testing.T) {
 	page, err := f.d.ListAudit(context.Background(), db.AuditFilter{OrgID: f.acme.ID, Action: "monitors.certifications.delete"})
 	if err != nil || len(page.Entries) != 1 || page.Entries[0].TargetID != "mc_d1" {
 		t.Fatalf("audit %+v %v", page.Entries, err)
+	}
+}
+
+// TestHostedMonitorDeleteSharedRoot: with BENCH_MONITOR_CERTS_ROOT set,
+// every organization shares one certificate folder, so the delete is
+// refused (409 with the reason) for every admin and the test stays. Reads
+// are left as they are: they cross organizations in this mode (bob of
+// beta reads acme's test), which this test records.
+func TestHostedMonitorDeleteSharedRoot(t *testing.T) {
+	shared := t.TempDir()
+	t.Setenv(monitorcert.RootEnv, shared)
+	f := newHostedFixture(t)
+	certs, err := monitorcert.NewCertStore(shared, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := certs.Write(&schemas.MonitorCertificate{CertID: "mc_shared", CreatedAt: time.Now()}, []byte("# shared\n")); err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/bench/monitors/certifications/mc_shared"
+	if r := f.do("GET", path, "alice", nil, nil); r.status != 200 {
+		t.Fatalf("read: %d %s", r.status, trim(r.body))
+	}
+	if r := f.do("GET", path, "bob", nil, nil); r.status != 200 {
+		t.Logf("reads no longer cross organizations in shared mode: %d", r.status)
+	}
+	for _, who := range []string{"alice", "bob"} {
+		if r := f.do("DELETE", path, who, nil, nil); r.status != 409 || !strings.Contains(r.body, monitorcert.RootEnv) {
+			t.Fatalf("%s delete in shared mode: %d %s", who, r.status, trim(r.body))
+		}
+	}
+	if _, err := os.Stat(filepath.Join(shared, "mc_shared")); err != nil {
+		t.Fatalf("the shared test was deleted: %v", err)
 	}
 }
