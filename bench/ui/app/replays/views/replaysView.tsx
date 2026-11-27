@@ -27,7 +27,7 @@ import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "./w447I18n";
 
@@ -132,10 +132,47 @@ const emptyForm: ReplayForm = {
 	yes: false,
 };
 
+/** What a replay still needs before its form can be used (FR-13): the org switch and a session source. Pure. */
+export function replaySetupMissing(enabled: boolean | undefined, sources: readonly string[] | undefined): { off: boolean; noSource: boolean } {
+	return { off: enabled !== true, noSource: sources !== undefined && sources.length === 0 };
+}
+
+/** The first thing on /replays while a replay cannot run: one sentence and the two steps, with their actions. */
+export function ReplaySetupSteps({ off, noSource }: { off: boolean; noSource: boolean }) {
+	const { t } = useTranslation("w447");
+	const step = (done: boolean, text: string, action?: ReactNode) => (
+		<li className="flex flex-wrap items-center gap-2">
+			<span className={done ? "text-success-ink" : "text-foreground"}>{done ? `${t("setup.done")}:` : "-"}</span>
+			<span>{text}</span>
+			{!done && action}
+		</li>
+	);
+	return (
+		<section className="flex flex-col gap-2 rounded-lg border p-4 text-sm" data-testid="replays-setup">
+			<p>{t("setup.what")}</p>
+			<ol className="flex flex-col gap-1">
+				{step(!off, t("setup.turnOn"))}
+				{step(
+					!noSource,
+					t("setup.connect"),
+					<Link to={"/failures" as never} search={{ tab: "connect" } as never} className="text-primary underline-offset-4 hover:underline">
+						{t("setup.connectAction")}
+					</Link>,
+				)}
+			</ol>
+		</section>
+	);
+}
+
 /** Shadow replay (/replays?id=): the opt-in, the form, the replays and one replay's report. */
 export default function ReplaysView() {
 	const { t } = useTranslation("w447");
 	const [id, setId] = useQueryState("id", parseAsString.withOptions({ history: "push" }));
+	const settings = useGetReplaySettingsQuery();
+	const inbox = useGetInboxQuery();
+	const missing = replaySetupMissing(settings.data?.enabled, inbox.data ? bifrostSourceNames(inbox.data.sources) : undefined);
+	// FR-13: until a replay can run, the setup steps come first and the form stays folded.
+	const blocked = settings.data !== undefined && (missing.off || missing.noSource);
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="replays-screen">
 			<PageHeader title={t("page.title")} subtitle={t("page.intro")} />
@@ -143,8 +180,18 @@ export default function ReplaysView() {
 				<ReplayRun id={id} onBack={() => void setId(null)} />
 			) : (
 				<>
+					{blocked && <ReplaySetupSteps {...missing} />}
 					<SettingsPanel />
-					<NewReplay />
+					{blocked ? (
+						<details className="rounded-lg border" data-testid="replays-form-folded">
+							<summary className="text-muted-foreground cursor-pointer px-4 py-3 text-sm font-medium">{t("setup.formFolded")}</summary>
+							<div className="p-2">
+								<NewReplay />
+							</div>
+						</details>
+					) : (
+						<NewReplay />
+					)}
 					<ReplayList onOpen={(r) => void setId(r)} />
 				</>
 			)}

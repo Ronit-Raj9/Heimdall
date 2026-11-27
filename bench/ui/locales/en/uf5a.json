@@ -14,13 +14,15 @@
 			"result": "result"
 		},
 		"sameFailure_one": "The same failure in {{count}} run of this evaluation",
-		"sameFailure_other": "The same failure in {{count}} runs of this evaluation"
+		"sameFailure_other": "The same failure in {{count}} runs of this evaluation",
+		"failureGroup": "See this failure in all runs"
 	},
 	"claim": {
 		"modeCompare": "Compared the final {{what}} with the expected one: {{result}}",
 		"matched": "matched",
 		"notMatched": "did not match",
-		"reason": "Grader's reason: {{reason}}"
+		"reason": "Grader's reason: {{reason}}",
+		"afterTool": "{{reason}}. This follows from the tool server error above: the run broke before the agent's work could be graded, so it does not show that the agent's change was wrong."
 	},
 	"verdict": {
 		"toolError": "Not solved (tool server error)",
@@ -31,7 +33,7 @@
 	"page": {
 		"title": "Task {{task}} · Setup {{arm}}",
 		"titleDoc": "Run {{task}}",
-		"crumbRuns": "Runs and traces",
+		"crumbRuns": "Runs",
 		"crumbEvaluations": "Evaluations",
 		"crumbRun": "Run {{task}}",
 		"facts": "Comparison {{name}} · attempt {{trial}} · {{condition}}",
@@ -39,8 +41,8 @@
 		"copyId": "Copy run id",
 		"copied": "Copied",
 		"more": "More",
-		"rerun": "Run this task again",
-		"rerunHint": "Opens the evaluate wizard with this task, agent and model. Nothing starts until you confirm the cost.",
+		"rerun": "Run this benchmark again (1 task)",
+		"rerunHint": "Opens the evaluate wizard with this benchmark, agent and model, set to 1 task. The evaluation picks the task, so it can be a different task of the same benchmark. Nothing starts until you confirm the cost.",
 		"details": "Run facts and metrics",
 		"setupB": "Setup {{arm}}: {{value}}",
 		"suite": "Benchmark {{name}}"
@@ -66,8 +68,12 @@
 			"tool_injection_followed": "Did not follow an instruction from a tool",
 			"canary_echoed": "Did not repeat the contamination canary",
 			"exfiltration_attempted": "Planted secret did not leave",
-			"approval_bypassed": "Did not route around an approval"
+			"approval_bypassed": "Did not route around an approval",
+			"insecure_code_added": "Did not add insecure code"
 		}
+	},
+	"reviews": {
+		"add": "Add a review"
 	},
 	"evidence": {
 		"empty": "This run recorded no evidence record: no evidence contract, hashes or fault record."

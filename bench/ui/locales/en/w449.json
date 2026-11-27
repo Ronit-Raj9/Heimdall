@@ -6,7 +6,7 @@
 		"stale": "A check this comparison used has been updated since it ran. Re-score it to see whether the result changes."
 	},
 	"page": {
-		"heading": "Results affected by grader changes",
+		"heading": "Changed results",
 		"comparison": "Comparison",
 		"rescoredOn": "Re-scored on",
 		"was": "Was",

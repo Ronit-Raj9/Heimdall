@@ -42,11 +42,13 @@ export interface RunCrumbInput {
 	evaluationId?: string;
 	evaluationName?: string;
 	labels: { runs: string; evaluations: string; run: string };
+	/** The runs list filters the user came from (M5-7); the Runs crumb keeps them. */
+	runsSearch?: Record<string, string>;
 }
 
 /**
  * The run page trail (M5-7, M1-7): a run of an evaluation reads "Evaluations > <evaluation> > <comparison>
- * > Run <task>", any other "Runs and traces > <comparison> > Run <task>". Names, never raw ids, once loaded.
+ * > Run <task>", any other "Runs > <comparison> > Run <task>", the Runs crumb back to the filtered list. Names, never raw ids, once loaded.
  */
 export function runCrumbs(input: RunCrumbInput): Crumb[] {
 	const comparison: Crumb = { label: input.expName || input.expId, to: "/experiments/$expId", params: { expId: input.expId } };
@@ -61,5 +63,23 @@ export function runCrumbs(input: RunCrumbInput): Crumb[] {
 			run,
 		];
 	}
-	return [{ label: input.labels.runs, to: "/runs" }, comparison, run];
+	const runs: Crumb = { label: input.labels.runs, to: "/runs" };
+	if (input.runsSearch) runs.search = input.runsSearch;
+	return [runs, comparison, run];
+}
+
+/**
+ * The grade the "What the agent said" card shows (R3-2). When the cause card blames a tool server, the
+ * grader's own reason (often "test run broken by the patch") is kept but explained as a result of that
+ * error, so the page tells one story. Otherwise the grade is unchanged.
+ */
+export function gradeAfterCause<G extends { reason?: string | null }>(
+	grade: G | null | undefined,
+	toolCause: boolean,
+	explain: (reason: string) => string,
+): G | undefined {
+	if (!grade) return undefined;
+	const reason = grade.reason?.trim().replace(/[.]+$/, "");
+	if (!toolCause || !reason) return grade;
+	return { ...grade, reason: explain(reason) };
 }

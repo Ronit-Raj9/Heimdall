@@ -1,8 +1,16 @@
 {
 	"nav": { "replays": "Shadow replay" },
 	"jobs": { "kinds": { "replay.run": "Shadow replay" } },
+	"setup": {
+		"what": "A replay sends recorded production sessions to another model and compares its answers with the recorded ones. Two things are needed first:",
+		"turnOn": "Turn on shadow replay for this organization (the switch below).",
+		"connect": "Connect a recorded session source.",
+		"connectAction": "Connect a source",
+		"done": "Done",
+		"formFolded": "New replay (usable once both are done)"
+	},
 	"page": {
-		"title": "Shadow replay",
+		"title": "Replay on a new model",
 		"intro": "Replay recorded sessions against another model. Tools are answered from the recording and never run. This is a comparison, not a benchmark result."
 	},
 	"settings": {

@@ -20,7 +20,7 @@ import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenState
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
 import type { RunFailureFields } from "@/lib/types/serverFields";
-import { failedToolCall } from "@/components/runs/runFailure.utils";
+import { failedToolCall, runReason } from "@/components/runs/runFailure.utils";
 import "@/components/runs/uf5aI18n";
 import { RunTraceView } from "@/components/runs/traceView";
 import { RunBehaviourChecks } from "@/components/runs/behaviourChecks"; // I28 behaviour checks
@@ -47,7 +47,6 @@ import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 visio
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
 import i18n, { getLocale } from "@/lib/i18n";
 import {
-	useGetCatalogQuery,
 	useGetExperimentQuery,
 	useGetPairQuery,
 	useGetRunEventsQuery,
@@ -59,13 +58,14 @@ import { cn } from "@/lib/utils";
 import { useGetRunAgentsQuery } from "@/lib/store/apis/runAgentsApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
-import type { GateResult, PairRun, RunDetail, Value } from "@/lib/types/bench";
+import type { GateResult, Mode, PairRun, RunDetail, Value } from "@/lib/types/bench";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, Check, Coins, Copy, Ellipsis, Footprints, GitCompareArrows, RotateCcw, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RUN_TABS, hiddenRunTabs, runHasVoice, runTabFlags, type RunTabId } from "./runTabs";
-import { gateName, orderRunTabs, rerunSearch, runCrumbs } from "./runView.uf5a";
+import { gateName, gradeAfterCause, orderRunTabs, rerunSearch, runCrumbs } from "./runView.uf5a";
+import { savedRunsSearch } from "@/components/runs/runsListSearch";
 import { MaximRunButton } from "./maximRunButton";
 
 /**
@@ -102,7 +102,8 @@ export default function RunView({ runId }: { runId: string }) {
 			: undefined,
 	);
 
-	if (detail.isLoading) return <BlockSkeleton rows={8} testId="run-loading" />;
+	// M5-18: the loading block holds about the height of the header and first panel.
+	if (detail.isLoading) return <div className="min-h-[70vh]"><BlockSkeleton rows={8} testId="run-loading" /></div>;
 	if (detail.error || !detail.data) {
 		if (errorStatus(detail.error) === 404) {
 			return (
@@ -150,6 +151,7 @@ export default function RunView({ runId }: { runId: string }) {
 		evaluationId,
 		evaluationName: evaluation.data?.spec.name,
 		labels: { runs: tu("page.crumbRuns"), evaluations: tu("page.crumbEvaluations"), run: tu("page.crumbRun", { task: taskName }) },
+		runsSearch: savedRunsSearch(),
 	});
 
 	return (
@@ -252,15 +254,18 @@ export default function RunView({ runId }: { runId: string }) {
 			{run.debug && <DebugBanner debug={run.debug} />}
 
 			<RouteTabs tabs={orderedTabs} defaultTab="overview" label={t("runs.page.tabsLabel")} testId="run-tabs">
-				{(active) =>
-					active === "replay" ? (
-						<ScreenReplay runId={runId} live={!d.sealed} />
-					) : active === "recording" ? (
-						<RecordingTab runId={runId} />
-					) : (
-						<RunTab tab={active as RunTabId} detail={d} agents={agents} />
-					)
-				}
+				{(active) => (
+					// M5-18: the panel keeps its height while a tab's own data loads, so the page below does not jump.
+					<div className="min-h-[60vh]" data-testid="run-tab-panel">
+						{active === "replay" ? (
+							<ScreenReplay runId={runId} live={!d.sealed} />
+						) : active === "recording" ? (
+							<RecordingTab runId={runId} />
+						) : (
+							<RunTab tab={active as RunTabId} detail={d} agents={agents} />
+						)}
+					</div>
+				)}
 			</RouteTabs>
 		</div>
 	);
@@ -323,7 +328,6 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 	const { t: tt } = useTranslation("runTrace");
 	const { t: tu } = useTranslation("uf5a");
 	const locale = getLocale();
-	const catalog = useGetCatalogQuery();
 	const { run, slot, grade } = detail;
 	const exp = useGetExperimentQuery(slot.exp_id);
 	const paired = Boolean(slot.pair_id) && !run.debug && (exp.data?.arms ?? []).length >= 2;
@@ -375,7 +379,8 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 						{
 							arm: slot.arm,
 							run,
-							grade: grade ?? undefined,
+							// R3-2: with a tool server cause, the grader's reason reads as its result, not a second cause.
+							grade: gradeAfterCause(grade, runReason(detail)?.kind === "tool", (reason) => tu("claim.afterTool", { reason })),
 							gradeState: "ready",
 						},
 					]}
@@ -424,7 +429,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					<div className="flex flex-col gap-2" data-testid="run-metrics">
 						<span className="text-sm font-medium">{tt("overview.allMetrics")}</span>
 						<Card className="py-0 shadow-none">
-							<MetricStrip lanes={[{ arm: slot.arm, metrics: detail.metrics }]} kinds={stripMetricKinds(catalog.data?.metrics)} />
+							<MetricStrip lanes={[{ arm: slot.arm, metrics: detail.metrics }]} kinds={stripMetricKinds(undefined)} />
 						</Card>
 					</div>
 				</div>
@@ -456,7 +461,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 			)}
 
 			<Section title={t("review.runs.title")} description={t("review.runs.description")} testId="run-reviews-section">
-				<RunReviewsBlock runId={run.run_id} testId="run-reviews" />
+				<RunReviewsBlock runId={run.run_id} testId="run-reviews" add={{ expId: slot.exp_id, mode: (detail as { mode?: Mode }).mode }} />
 			</Section>
 		</div>
 	);

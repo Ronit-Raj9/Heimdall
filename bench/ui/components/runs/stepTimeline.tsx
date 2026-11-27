@@ -471,14 +471,25 @@ const COLLECTOR_STATES = ["on", "off", "missing"] as const;
  * agent-reported like the reported rows. Channel and type keys and the reason are agent-influenced:
  * clipped React text, never a translation key.
  */
-export function AgentEventsLine({ status, arm, locale }: { status: AgentEventStatus; arm: string; locale: string }) {
+export function AgentEventsLine({
+	status,
+	arm,
+	locale,
+	blocking = false,
+}: {
+	status: AgentEventStatus;
+	arm: string;
+	locale: string;
+	/** True only when the run failed because the collector was missing; otherwise a missing collector is a quiet note (M4-56). */
+	blocking?: boolean;
+}) {
 	const { t } = useTranslation("bench");
 	const kept = safeCount(status.kept);
 	const dropped = safeCount(status.dropped);
 	const channels = eventEntries(status.channels);
 	const kinds = eventEntries(status.kinds);
 	const collector = (COLLECTOR_STATES as readonly string[]).includes(status.collector) ? status.collector : undefined;
-	const missing = collector === "missing";
+	const missing = collector === "missing" && blocking;
 	const reason = clipText(status.reason, 160);
 	return (
 		<p

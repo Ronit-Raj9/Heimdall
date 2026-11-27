@@ -359,9 +359,10 @@ export function RunTable({
 							<TableCell className="text-muted-foreground text-xs whitespace-nowrap tabular-nums">
 								{formatShortTime(row.started, locale)}
 							</TableCell>
-							<TableCell className="text-right">
+							{/* M4-20: the icon column never clips; a 40 px target on touch screens. */}
+							<TableCell className="w-12 min-w-12 text-right">
 								{row.pair_id && row.paired && (
-									<Button variant="ghost" size="icon" className="size-8" asChild>
+									<Button variant="ghost" size="icon" className="size-10 sm:size-8" asChild>
 										<Link
 											to="/compare"
 											search={compareSearch(row.pair_id, row.exp_id) as never}
