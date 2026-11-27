@@ -79,6 +79,14 @@ describe("defaultName (N161)", () => {
 		expect(defaultName({ ...d, benchmarks: [] })).toBe("codex score");
 	});
 
+	it("adds the model, and names a pack run after its pack (M3-52)", () => {
+		const arms = [{ label: "A", agent: "codex", model: "gpt-5.6-terra" }];
+		expect(defaultName({ ...d, version: 1, arms, benchmarks: ["hd-harbor-tb2", "b2", "b3"] })).toBe(
+			"codex v1 on gpt-5.6-terra: hd-harbor-tb2 and 2 more",
+		);
+		expect(defaultName({ ...d, arms, benchmarks: [], pack: "coding" })).toBe("codex on gpt-5.6-terra: coding pack");
+	});
+
 	it("names a score evaluation with faults a failure test", () => {
 		expect(defaultName({ ...d, version: 3, benchmarks: ["hd-harbor-bfcl", "b2"], faults: ["clean", "model-down"] })).toBe(
 			"codex v3 failure test on hd-harbor-bfcl and 1 more",

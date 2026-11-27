@@ -249,6 +249,21 @@ describe("deep links (N154, N112, N86, N85)", () => {
 		expect(plan.step).toBe(3);
 	});
 
+	it("Run this task again: reads model and task, one task one try, and opens on the cost step (M5-5)", () => {
+		const p = link({ agent: "claude-code", suite: "zz-test-mcp", model: "gpt-x", task: "t-7" });
+		const plan = planLink(p, stored, listed, null);
+		if (plan.kind !== "replace") throw new Error(`plan ${plan.kind}`);
+		expect(plan.draft.arms).toEqual([{ label: "A", agent: "claude-code", model: "gpt-x" }]);
+		expect(plan.draft.benchmarks).toEqual(["zz-test-mcp"]);
+		expect(plan.draft.tasksPerBenchmark).toBe(1);
+		expect(plan.draft.trials).toBe(1);
+		expect(plan.step).toBe(4);
+		// With its own ?step=4 the wizard reads that step as it is.
+		const withStep = planLink(p, stored, listed, 4);
+		expect(withStep.kind === "replace" && withStep.step).toBeNull();
+		expect(planLink(link({ model: "gpt-x" }), stored, listed, null).kind).toBe("replace");
+	});
+
 	it("keep=1 (back from Register your agent) patches only the agent", () => {
 		const plan = planLink(link({ agent: "codex", keep: "1" }), stored, listed, null);
 		if (plan.kind !== "patch") throw new Error(`plan ${plan.kind}`);

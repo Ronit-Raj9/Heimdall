@@ -215,10 +215,11 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-model-A-open"');
 		expect(tagOf(html, "step4-tasks-10")).toContain('aria-checked="true"');
 		expect(tagOf(html, "step4-trials-1")).toContain('aria-checked="true"');
-		expect(tagOf(html, "step4-concurrency-4")).toContain('aria-checked="true"');
+		// Runs at once defaults to the worker slots, 2 when the estimate does not say (M3-31).
+		expect(tagOf(html, "step4-concurrency-2")).toContain('aria-checked="true"');
 		expect(html).toContain('data-testid="step4-tasks-50"');
-		expect(html).toMatch(/data-testid="step4-fault-broken-tool"><input type="checkbox" class="mt-1" checked=""/);
-		expect(html).not.toMatch(/data-testid="step4-fault-model-down"><input type="checkbox" class="mt-1" checked=""/);
+		expect(html).toMatch(/data-testid="step4-fault-broken-tool"><input type="checkbox" class="mt-1 size-4" checked=""/);
+		expect(html).not.toMatch(/data-testid="step4-fault-model-down"><input type="checkbox" class="mt-1 size-4" checked=""/);
 		expect(html).toContain("Some tool calls return errors");
 		expect(html).toContain("20 runs");
 		expect(html).toContain("$1.20 to $3.40");
@@ -280,8 +281,8 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
 		// N189: each setup's model select is named for its setup (the label element of the select).
-		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Setup A \(codex\) model<\/label>/);
-		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Setup B \(codex\) model<\/label>/);
+		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Model for codex<\/label>/);
+		expect(html.match(/<label[^>]*for="[^"]+-model"[^>]*>Model for codex<\/label>/g)?.length).toBe(2);
 		expect(html).toContain("Pick at least one benchmark.");
 		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
 		expect(q.estimateArgs[1]).toEqual([presetsRequest(two), { skip: true }]);
@@ -328,7 +329,8 @@ describe("Step4Setup", () => {
 		expect(html).toContain("32 runs");
 		expect(html).toContain("price not known");
 		expect(html).toContain("time not known");
-		expect(html).not.toContain("<details");
+		// The estimate stays in plain view; only the settings above it fold (M3-29).
+		expect(html.slice(html.indexOf('data-testid="step4-estimate"'))).not.toContain("<details");
 		expect(html).toContain('data-testid="step4-est-notes"');
 		expect(html).toContain("no history for this benchmark yet");
 		expect(html).toContain("skipped, agent codex cannot run benchmark voicebench: needs voice");
@@ -426,7 +428,7 @@ describe("Step4Setup", () => {
 		]);
 		html = render(<Step4Setup spec={spec({ faults: ["clean", "tool-rate-limit"] })} onChange={() => undefined} />);
 		expect(html).not.toContain('data-testid="step4-fault-broken-tool"');
-		expect(html).toMatch(/data-testid="step4-fault-tool-rate-limit"><input type="checkbox" class="mt-1" checked=""/);
+		expect(html).toMatch(/data-testid="step4-fault-tool-rate-limit"><input type="checkbox" class="mt-1 size-4" checked=""/);
 		expect(html.indexOf("step4-fault-group-Model")).toBeLessThan(html.indexOf("step4-fault-group-Tools"));
 		expect(html.indexOf("step4-fault-group-Tools")).toBeLessThan(html.indexOf("step4-fault-group-Combined"));
 		expect(groupFaults([{ id: "clean", label: "", help: "", layer: "", group: "Model" }])).toEqual([]);
@@ -578,7 +580,8 @@ describe("Step4Setup fix wave F26", () => {
 		expect(html).toContain("These faults do not apply to the chosen benchmarks and add no runs: Broken tool.");
 		expect(html.indexOf("step4-faults-na")).toBeLessThan(html.indexOf('data-testid="step4-fault-group-'));
 		expect(html).toContain("MCP route: benchmark hd-harbor-bfcl has no MCP server");
-		expect(html).not.toContain("<details");
+		// The estimate stays in plain view; only the settings above it fold (M3-29).
+		expect(html.slice(html.indexOf('data-testid="step4-estimate"'))).not.toContain("<details");
 	});
 
 	it("only flags a fault skipped on every chosen benchmark", () => {
@@ -616,7 +619,8 @@ describe("Step4Setup fix wave F26", () => {
 		expect(html).toContain('data-testid="step4-nothing-runs"');
 		expect(html).toContain("hd-harbor-bfcl: ");
 		expect(html).toContain("register a container agent");
-		expect(html).not.toContain("<details");
+		// The estimate stays in plain view; only the settings above it fold (M3-29).
+		expect(html.slice(html.indexOf('data-testid="step4-estimate"'))).not.toContain("<details");
 		expect(nothingRunsReason(q.estimate.data as never)).toBe(`hd-harbor-bfcl: ${reason}`);
 		expect(nothingRunsReason({ runs: 3, per_benchmark: [] })).toBeNull();
 		expect(nothingRunsReason(undefined)).toBeNull();

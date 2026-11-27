@@ -63,9 +63,10 @@ export function budgetLine(b: EstimateBudget, cost: EstimateCost | undefined, is
  * cost the first run can pass the budget. `perRunLow` is the highest per-run low cost of a benchmark
  * (undefined when no cost is known) and `benchmarks` how many benchmarks share the budget.
  */
-export function runWarning(b: EstimateBudget, perRunLow: number | undefined, benchmarks: number, costKnown = false): string | undefined {
+export function runWarning(b: EstimateBudget, perRunLow: number | undefined, benchmarks: number, _costKnown = false): string | undefined {
 	if (b.default) return undefined;
-	if (perRunLow === undefined || !(perRunLow > 0)) return b.budget_usd > 0 && !costKnown ? fw05("budget.unknownRunCost") : undefined;
+	// An unknown price is said once, in the budget line (M3-28); no second "not known" line here.
+	if (perRunLow === undefined || !(perRunLow > 0)) return undefined;
 	if (b.per_benchmark_usd >= perRunLow) return undefined;
 	return fw05("budget.belowOneRun", { run: usd(perRunLow), min: usd(Math.ceil(perRunLow * Math.max(1, benchmarks) * 100) / 100) });
 }

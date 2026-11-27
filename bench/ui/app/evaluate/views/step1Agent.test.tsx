@@ -62,9 +62,10 @@ describe("Step1Agent", () => {
 		expect(html).toContain("Pick an agent to continue.");
 	});
 
-	it("hides test agents and says so (N97)", () => {
+	it("hides test agents without an unasked note (N97, M3-49)", () => {
 		const html = render({});
 		expect(html).not.toContain('data-testid="evaluate-agent-storm"');
-		expect(html).toContain("Test agents such as oracle and noop are not listed: they only check benchmarks.");
+		expect(html).not.toContain("Test agents such as oracle and noop are not listed");
+		expect(html).toContain('role="radiogroup"');
 	});
 });

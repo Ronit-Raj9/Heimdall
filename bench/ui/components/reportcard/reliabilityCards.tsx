@@ -1,5 +1,7 @@
 import type { Report, ReportCurvePoint, ReportReliabilityCard, ReportResilienceArm } from "@/lib/store/apis/evaluationsApi";
 import { useContext } from "react";
+import { useTranslation } from "react-i18next";
+import "./reportCardI18n";
 import { ReactReduxContext } from "react-redux";
 import { DroppedFaults } from "./droppedFaults";
 import { duration, faultName, isAB, pct, ratio, reliabilityCards, usd } from "./reportCard.utils";
@@ -84,6 +86,7 @@ function Pair({ label, value, testId }: { label: string; value: string; testId?:
 }
 
 function OneReliability({ benchmark, arm, card, ab }: { benchmark: string; arm: string; card: ReportReliabilityCard; ab: boolean }) {
+	const { t: tr } = useTranslation("reportCard");
 	const id = `${benchmark}-${arm}`;
 	const curve = card.curve ?? [];
 	return (
@@ -95,7 +98,7 @@ function OneReliability({ benchmark, arm, card, ab }: { benchmark: string; arm: 
 			{curve.length > 1 ? (
 				<PassCurveChart curve={curve} testId={`reliability-chart-${id}`} />
 			) : (
-				<p className="text-muted-foreground text-xs">One try per task: run two or more trials to see how steady the agent is.</p>
+				<p className="text-muted-foreground text-xs">{tr("reliability.oneTry")}</p>
 			)}
 			{curve.length > 1 && (
 				<ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -114,12 +117,17 @@ function OneReliability({ benchmark, arm, card, ab }: { benchmark: string; arm: 
 				</ul>
 			)}
 			<dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-				<Pair label="Solved first try" value={pct(card.pass1)} />
-				<Pair label={`Solved in any of ${card.k} tries`} value={pct(card.pass_at_k)} />
-				<Pair label={`Solved in all ${card.k} tries`} value={pct(card.pass_hat_k)} />
-				<Pair label="Consistency" value={pct(card.consistency)} testId={`reliability-consistency-${id}`} />
-				<Pair label="Tasks that flip" value={pct(card.flip_rate)} testId={`reliability-flip-${id}`} />
-				<Pair label="Cost per solved task" value={usd(card.cost_per_solved)} testId={`reliability-cost-${id}`} />
+				<Pair label={tr("reliability.firstTry")} value={pct(card.pass1)} />
+				{/* One try per task measures no flakiness: only first try and cost are shown (M3-7). */}
+				{card.k >= 2 && (
+					<>
+						<Pair label={`Solved in any of ${card.k} tries`} value={pct(card.pass_at_k)} />
+						<Pair label={`Solved in all ${card.k} tries`} value={pct(card.pass_hat_k)} />
+						<Pair label={tr("reliability.sameEveryTry")} value={pct(card.consistency)} testId={`reliability-consistency-${id}`} />
+						<Pair label="Tasks that flip" value={pct(card.flip_rate)} testId={`reliability-flip-${id}`} />
+					</>
+				)}
+				<Pair label={tr("reliability.costPerSolved")} value={usd(card.cost_per_solved)} testId={`reliability-cost-${id}`} />
 			</dl>
 		</figure>
 	);
@@ -203,7 +211,7 @@ function ResilienceRows({ report }: { report: Report }) {
 								className="flex flex-col gap-2 px-4 py-3 text-sm"
 								data-testid={`resilience-${row.fault}-${arm.label}`}
 							>
-								<div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+								<div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 									<span className="text-foreground min-w-0 flex-1 font-medium">
 										{faultName(row.fault)}
 										{ab && <span className="text-muted-foreground ml-2 text-xs">{arm.label}</span>}
@@ -215,10 +223,17 @@ function ResilienceRows({ report }: { report: Report }) {
 									</span>
 								</div>
 								<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
-									<Pair label="Recovery rate" value={pct(m.recovery_rate)} />
-									<Pair label="Cost change" value={ratio(m.cost_inflation)} />
-									<Pair label="Time to recover" value={duration(m.time_to_recover_s)} />
-									<Pair label="Waited when asked" value={pct(m.retry_after_respected)} />
+									{/* A measure with no data is left out instead of a bare "-" (M3-13). */}
+									{[
+										{ label: "Recovery rate", value: pct(m.recovery_rate) },
+										{ label: "Cost change", value: ratio(m.cost_inflation) },
+										{ label: "Time to recover", value: duration(m.time_to_recover_s) },
+										{ label: "Waited when asked", value: pct(m.retry_after_respected) },
+									]
+										.filter((p) => p.value !== "-")
+										.map((p) => (
+											<Pair key={p.label} label={p.label} value={p.value} />
+										))}
 								</dl>
 							</li>
 						);

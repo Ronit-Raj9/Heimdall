@@ -66,13 +66,15 @@
 			"score": "Its score",
 			"versions": "Version 1 vs version 2",
 			"models": "Two models",
-			"opponent": "Against a baseline agent"
+			"opponent": "Against a baseline agent",
+			"redteam": "Can it be attacked?"
 		},
 		"modeHelp": {
-			"score": "Run your agent once per task and get a report card of how well it does.",
+			"score": "Score your agent on the benchmarks you pick and get a report card.",
 			"versions": "Run two saved versions of your agent on the same tasks and see which is better.",
 			"models": "Run your agent with two different models and see which model helps it more.",
-			"opponent": "Run your agent and a well-known agent on the same tasks and compare them."
+			"opponent": "Run your agent and a well-known agent on the same tasks and compare them.",
+			"redteam": "An attacker model tries to make your agent do unsafe things in chat, tool results, documents and emails. Every attack that works becomes a test."
 		},
 		"compareVersion": "Compare with version",
 		"needTwoVersions": "This agent has fewer than two saved versions. Save a change to the agent to make a second one.",
@@ -84,7 +86,9 @@
 		"modelsLater": "You choose the two models in step 4.",
 		"arms": "Setups that will run",
 		"armLabel": "Setup {{label}}",
-		"compareModelsLink": "Compare 3 to 6 models for this agent instead"
+		"compareModelsLink": "Compare 3 to 6 models for this agent instead",
+		"whatRuns": "What will run",
+		"secondSetupLater": "Second setup: model chosen in step 4"
 	},
 	"placeholder": "This step is coming soon.",
 	"home": {
@@ -138,6 +142,26 @@
 		}
 	},
 	"benchmarks": {
+		"noneReadyTitle": "No benchmark is ready yet",
+		"noneReadyBody": "Benchmarks are still preparing. Check their status, then come back.",
+		"seeStatus": "See benchmark status",
+		"noPackReady": "No pack has a ready benchmark yet.",
+		"packNotReady": "No ready benchmark in this pack yet",
+		"notAvailable": "Not available for {{agent}} ({{count}})",
+		"needsBrowser": "Needs a browser agent",
+		"needsVoice": "Needs a voice agent",
+		"needsDesktop": "Needs a desktop agent",
+		"needsGpu": "Needs a GPU agent",
+		"needsCapability": "Needs an agent that can use {{capability}}",
+		"search": "Search benchmarks",
+		"selected": "{{n}} of {{m}} selected",
+		"selectAll": "Select all",
+		"loading": "Loading benchmarks...",
+		"startPack": "Start from a pack",
+		"orPick": "Or pick benchmarks",
+		"noPacks": "No packs available.",
+		"yours": "Your benchmarks",
+		"notReadyOwn": "{{ready}} of {{total}} ready: run the readiness check",
 		"heading": "Which benchmarks should it run?",
 		"help": "Pick a pack for one skill, or pick benchmarks one by one. Only ready tasks are used.",
 		"packs": "Packs",
@@ -156,7 +180,6 @@
 		"packCount_other": "{{count}} benchmarks",
 		"selected_one": "{{count}} benchmark selected",
 		"selected_other": "{{count}} benchmarks selected",
-		"selectAll": "Select all that fit",
 		"clear": "Clear",
 		"readyTasks": "{{ready}} of {{total}} tasks ready",
 		"noReadyTasks": "No ready tasks yet",
@@ -248,12 +271,20 @@
 		"perBenchmark": "Per benchmark"
 	},
 	"launch": {
+		"error": "Could not launch the evaluation.",
+		"whatHappens": "What will happen",
+		"budget": "Budget (USD)",
+		"addKey": "Add a key for {{provider}}",
+		"addKeyPlain": "Add a model key",
+		"runsTime": "{{runs}} runs, about {{min}} to {{max}} min.",
+		"landing": "You land on the evaluation page and can cancel at any time.",
+		"earlyStop": "Runs will stop early; the score will cover fewer tasks.",
 		"heading": "Ready to launch",
 		"summary": "{{agent}} on {{benchmarks}} benchmarks, {{runs}} runs",
 		"skippedTitle": "Left out",
 		"skipped": "{{benchmark}}: {{reason}}",
-		"error": "Could not start the evaluation.",
-		"done": "Evaluation started"
+		"done": "Evaluation started",
+		"rough": "Rough estimate from list prices, since this setup has no past runs here: about {{low}} to {{high}}."
 	},
 	"list": {
 		"title": "Evaluations",
@@ -360,5 +391,52 @@
 		"allModels": "All models",
 		"lastEvaluation": "Last evaluation",
 		"empty": "No finished evaluations yet."
-	}
+	},
+	"stepOfName": "Step {{n}} of 5: {{name}}",
+	"nextReason": {
+		"needAgent": "Pick an agent to continue.",
+		"needVersion": "Pick the version to compare with.",
+		"needOpponent": "Pick an opponent.",
+		"needLearn": "Pick what you want to learn.",
+		"needBenchmark": "Pick at least one benchmark.",
+		"needKey": "Add a key for {{provider}} to continue.",
+		"needModel": "Pick a model for every setup."
+	},
+	"footerSummary": "{{benchmarks}} benchmarks, {{runs}} runs, about {{low}} to {{high}}, about {{min}} min",
+	"footerSummaryNoCost": "{{benchmarks}} benchmarks, {{runs}} runs, price not known yet",
+	"launchPaid": "Launch, up to {{usd}}",
+	"launchPlain": "Launch evaluation",
+	"launching": "Launching...",
+	"launchConfirmTitle": "Launch this evaluation?",
+	"launchConfirm": "{{runs}} runs start now. It can spend up to {{usd}}; you can cancel at any time on the evaluation page.",
+	"launchConfirmDefault": "{{runs}} runs start now. Each benchmark stops at its budget; you can cancel at any time on the evaluation page.",
+	"launchConfirmOk": "Launch",
+	"launchKeep": "Not yet",
+	"advancedLink": "Advanced: one benchmark, one run",
+	"changeAgent": "{{agent}}, change",
+	"agentList": {
+		"noBuiltIn": "This server ships no baseline agents. Register your own above.",
+		"noMatch": "No agent matches {{query}}.",
+		"registerRow": "Register your agent: HTTP endpoint, CLI or Docker",
+		"tests": "Test agents ({{count}})"
+	},
+	"step4": {
+		"more": "More settings",
+		"moreSummary": "{{tasks}} tasks, {{tries}} tries, {{faults}}, {{gateway}}",
+		"faultsN_one": "{{count}} fault",
+		"faultsN_other": "{{count}} faults",
+		"noFaults": "no faults",
+		"gatewayOn": "tools through the gateway",
+		"gatewayOff": "no gateway options",
+		"modelFor": "Model for {{agent}}",
+		"tasks": "Tasks per benchmark",
+		"tries": "Tries per task (more tries show flakiness)",
+		"parallel": "Parallel runs (faster, same cost)",
+		"cache": "Run a second copy with response caching on and compare cost and speed",
+		"noHistory": "No past runs to estimate cost from"
+	},
+	"crumbList": "Evaluations",
+	"crumbNew": "New evaluation",
+	"launchVerb": "Launch",
+	"footerSummaryRough": "{{benchmarks}} benchmarks, {{runs}} runs, roughly {{low}} to {{high}} (list prices), about {{min}} min"
 }

@@ -10,7 +10,7 @@ describe("faultChange (N126)", () => {
 	});
 });
 import type { Report } from "@/lib/store/apis/evaluationsApi";
-import { capabilityRows, headline, overallScore } from "./reportCard.utils";
+import { capabilityRows, headline, overallScore, scoreRange, wilson } from "./reportCard.utils";
 
 const empty = { score: 0, ci_low: 0, ci_high: 0, runs: 0, cost_usd: null, tokens: null, steps: 0, tool_calls: 0, wall_s: 0 };
 const counted = (score: number, runs: number) => ({ ...empty, score, ci_low: score, ci_high: score, runs, cost_usd: 0.1, tokens: 10 });
@@ -78,5 +78,48 @@ describe("capability rows (N185)", () => {
 		expect(rows[0]).toMatchObject({ capability: "support", tested: true });
 		expect(rows.find((r) => r.capability === "terminal")).toMatchObject({ tested: false });
 		expect(capabilityRows(thrownOut)).toEqual([]);
+	});
+});
+describe("small samples, budget stops and faults in the headline (M3-2, M3-3, M3-4)", () => {
+	const three: Report = {
+		...thrownOut,
+		benchmarks: [{ ...thrownOut.benchmarks[0], arms: { A: counted(1, 3) }, thrown_out: undefined }],
+		thrown_out_runs: 0,
+	};
+
+	it("gives a count, not a percent, under 10 runs, with a Wilson range", () => {
+		const h = headline(three);
+		expect(h.title).toBe("Solved 3 of 3 runs");
+		expect(h.title).not.toContain("%");
+		expect(h.detail).toBe("Too few runs to rate. 95% range 44% to 100%.");
+	});
+
+	it("never prints a zero-width range for a small sample", () => {
+		expect(scoreRange({ score: 1, ci_low: 1, ci_high: 1, runs: 3 }).low).toBeCloseTo(0.438, 2);
+		expect(scoreRange({ score: 0.5, ci_low: 0.3, ci_high: 0.7, runs: 20 })).toEqual({ low: 0.3, high: 0.7 });
+		expect(wilson(0, 6).high).toBeCloseTo(0.39, 2);
+	});
+
+	it("names the budget and the run counts when the budget stopped the evaluation", () => {
+		const h = headline(three, undefined, { budgetStop: { budget: "$0.01", done: 3, planned: 10 } });
+		expect(h.title).toBe("Stopped by the $0.01 budget after 3 of 10 runs");
+		expect(h.detail).toContain("Raise the budget");
+	});
+
+	it("splits normal and fault runs when a fault ran", () => {
+		const faulted: Report = { ...three, reliability: [{ fault: "model-down", arms: { A: { score: 0.67, drop: -0.33, runs: 3 } } }] };
+		const h = headline(faulted);
+		expect(h.title).toBe("Normal: 3 of 3 solved. When model goes down: 2 of 3 (-33 pts).");
+		expect(h.detail).toBe("3 normal runs and 3 with faults.");
+	});
+});
+
+describe("report card picks line (M2-34)", () => {
+	it("names what is shown in one line, leaving out what is unknown", async () => {
+		const { picksSummary } = await import("./reportPicks");
+		expect(picksSummary({ name: "codex v2", date: "Nov 21", runs: 40 })).toBe("codex v2, Nov 21 (40 runs)");
+		expect(picksSummary({ name: "codex v2", runs: 1 })).toBe("codex v2 (1 run)");
+		expect(picksSummary({ name: "codex v2" })).toBe("codex v2");
+		expect(picksSummary({})).toBe("");
 	});
 });

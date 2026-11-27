@@ -7,8 +7,8 @@
 	},
 	"scheduled": {
 		"label": "Scheduled check views",
-		"drift": "Drift checks",
-		"schedules": "Schedules",
+		"drift": "Drift monitors",
+		"schedules": "Repeat runs",
 		"live": "Live monitors"
 	},
 	"releases": {
@@ -18,7 +18,7 @@
 		"rules": "Rules"
 	},
 	"quickRun": {
-		"link": "Quick single run (advanced)",
+		"link": "Advanced: one benchmark, one run",
 		"hint": "One benchmark, one agent and one model, without a report card."
 	}
 }

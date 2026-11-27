@@ -2,8 +2,8 @@ import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetAgentVersionsQuery, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/evaluateI18n";
 import { cn } from "@/lib/utils";
-import { BarChart3, Check, Cpu, GitCompare, Swords } from "lucide-react";
-import type { ComponentType } from "react";
+import { BarChart3, Check, Cpu, GitCompare, ShieldAlert, Swords } from "lucide-react";
+import type { ComponentType, KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import { BARE_MODEL_AGENT, useEvaluateDraft } from "./evaluateDraft";
@@ -18,6 +18,33 @@ const MODE_ICON: Record<EvaluationMode, ComponentType<{ className?: string }>> =
 	opponent: Swords,
 };
 
+/** A step 2 goal: one of the modes, or the red-team goal, a score evaluation with the red-team writer first (M3-48). */
+export type LearnGoal = EvaluationMode | "redteam";
+
+export const LEARN_GOALS: LearnGoal[] = [...LEARN_MODES, "redteam"];
+
+/** The goal the draft is on. */
+export function goalOf(d: { mode: EvaluationMode; redTeam?: boolean }): LearnGoal {
+	return d.mode === "score" && d.redTeam ? "redteam" : d.mode;
+}
+
+/** The draft patch for a goal. */
+export function goalPatch(g: LearnGoal): { mode: EvaluationMode; redTeam: boolean } {
+	return g === "redteam" ? { mode: "score", redTeam: true } : { mode: g, redTeam: false };
+}
+
+/** Arrow keys move between the goal rows of the radio group; the focused row is picked, as native radios do (M3-42). */
+function goalKeys(e: KeyboardEvent<HTMLElement>): void {
+	if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(e.key)) return;
+	const rows = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[data-goal-row]:not([disabled])"));
+	const i = rows.indexOf(document.activeElement as HTMLButtonElement);
+	if (rows.length === 0) return;
+	e.preventDefault();
+	const next = rows[(i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : rows.length - 1)) % rows.length];
+	next?.focus();
+	next?.click();
+}
+
 /** Step 2: what the user wants to learn; sets spec.mode and the arms. */
 export function Step2Learn() {
 	const { t } = useTranslation("evaluate");
@@ -29,6 +56,8 @@ export function Step2Learn() {
 	// "Latest" (version null) runs the highest saved version: Setup A's effective version (N95).
 	const latest = latestVersion(versions.data?.versions);
 	const versionA = draft.version ?? latest ?? null;
+	const goal = goalOf(draft);
+	// With nothing picked yet the first row takes the tab stop.
 	const opponents = opponentChoices((agents.data?.agents ?? []) as AgentWithCaps[], draft.agent).filter((a) => a.id !== BARE_MODEL_AGENT);
 
 	return (
@@ -38,32 +67,36 @@ export function Step2Learn() {
 				<p className="text-muted-foreground text-sm">{t("learn.hint")}</p>
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-2" role="radiogroup">
-				{LEARN_MODES.map((m) => {
-					const Icon = MODE_ICON[m];
-					const on = draft.mode === m;
+			<div className="flex flex-col rounded-lg border" role="radiogroup" aria-label={t("learn.heading")} onKeyDown={goalKeys}>
+				{LEARN_GOALS.map((m) => {
+					const Icon = m === "redteam" ? ShieldAlert : MODE_ICON[m];
+					const on = goal === m;
+					// One saved version cannot be compared: the row says why before any click (M3-42).
+					const blocked = m === "versions" && !versions.isLoading && Boolean(draft.agent) && versionCount < 2;
 					return (
 						<button
 							key={m}
 							type="button"
 							role="radio"
 							aria-checked={on}
-							onClick={() => update({ mode: m })}
+							tabIndex={on ? 0 : -1}
+							disabled={blocked}
+							onClick={() => update(goalPatch(m))}
 							data-testid={`evaluate-mode-${m}`}
+							data-goal-row
 							className={cn(
-								"bg-card relative flex items-start gap-3 rounded-xl border p-4 text-left transition-[border-color,box-shadow] duration-150",
-								"hover:border-border focus-visible:ring-ring/50 outline-none focus-visible:ring-2",
-								on ? "border-primary ring-primary/30 ring-2" : "border-border/70",
+								"flex min-h-11 items-start gap-3 border-b px-3 py-2.5 text-left last:border-b-0",
+								"hover:bg-muted focus-visible:ring-ring outline-none focus-visible:ring-2 focus-visible:ring-inset",
+								"disabled:hover:bg-transparent disabled:cursor-not-allowed",
+								on && "bg-primary/5",
 							)}
 						>
-							{on && <Check className="text-primary absolute top-3 right-3 size-4" aria-hidden />}
-							<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-								<Icon className="size-4" />
+							<Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+							<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span className={cn("text-sm font-medium", blocked && "text-muted-foreground")}>{t(`learn.mode.${m}`)}</span>
+								<span className="text-muted-foreground text-sm">{blocked ? t("learn.needTwoVersions") : t(`learn.modeHelp.${m}`)}</span>
 							</span>
-							<span className="flex flex-col gap-1 pr-6">
-								<span className="text-sm font-semibold">{t(`learn.mode.${m}`)}</span>
-								<span className="text-muted-foreground text-sm">{t(`learn.modeHelp.${m}`)}</span>
-							</span>
+							{on && <Check className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />}
 						</button>
 					);
 				})}
@@ -127,17 +160,24 @@ export function Step2Learn() {
 
 			{draft.arms.length > 0 && (
 				<div className="flex flex-col gap-2" data-testid="evaluate-arms">
-					<h3 className="text-sm font-semibold">{t("learn.arms")}</h3>
-					<ul className="flex flex-wrap gap-2">
-						{draft.arms.map((a) => (
-							<li key={a.label} className="bg-muted rounded-lg px-3 py-1.5 font-mono text-xs">
-								{t("learn.armLabel", { label: a.label })}: {a.agent || "?"}
-								{a.version != null
-									? ` v${a.version}`
-									: latest !== undefined && a.agent === draft.agent
-										? tg("learn.latest", { n: latest })
-										: ""}
-								{a.model ? ` / ${a.model}` : ""}
+					<h3 className="text-sm font-semibold">{t("learn.whatRuns")}</h3>
+					{/* Plain words, not mono ids: "codex v1 on gpt-5.6-terra" (M3-43). */}
+					<ul className="flex flex-col gap-1 text-sm">
+						{draft.arms.map((a, i) => (
+							<li key={a.label}>
+								{draft.mode === "models" && i > 0 && !a.model ? (
+									t("learn.secondSetupLater")
+								) : (
+									<>
+										{a.agent || "?"}
+										{a.version != null
+											? ` v${a.version}`
+											: latest !== undefined && a.agent === draft.agent
+												? tg("learn.latest", { n: latest })
+												: ""}
+										{a.model ? ` on ${a.model}` : ""}
+									</>
+								)}
 							</li>
 						))}
 					</ul>

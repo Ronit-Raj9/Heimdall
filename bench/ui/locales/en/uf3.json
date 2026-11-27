@@ -1,0 +1,22 @@
+{
+	"home": {
+		"recentFailures": "Recent failures"
+	},
+	"runControls": {
+		"hint": "Cancel, concurrency, budget"
+	},
+	"rerun": {
+		"title": "Rerun the failed runs?",
+		"confirmN_one": "Rerun the {{count}} failed run? It is charged like a new run.",
+		"confirmN_other": "Rerun the {{count}} failed runs? They are charged like new runs.",
+		"confirm": "Rerun the failed runs? They are charged like new runs.",
+		"ok": "Rerun",
+		"keep": "Not now"
+	},
+	"picker": {
+		"keyOk": "Key: {{label}} ...{{last4}}"
+	},
+	"link": {
+		"task": "Running {{task}} again: one task of {{suite}}, one try. The evaluation picks the task itself, so it can be a different task of the same benchmark."
+	}
+}

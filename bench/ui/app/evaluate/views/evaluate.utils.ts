@@ -69,3 +69,10 @@ export function opponentChoices(agents: readonly AgentWithCaps[], self: string |
 
 /** Where /agents/new sends the user back after creating an agent. */
 export const REGISTER_RETURN = "/evaluate";
+/**
+ * True when the server says some benchmark's cost is only a rough guess from list prices (G1 `estimate_basis:
+ * "list_price"`, M3-28): the setup has no past runs here. An older server never sends it.
+ */
+export function isRoughEstimate(est: { per_benchmark?: readonly object[] | null } | undefined): boolean {
+	return (est?.per_benchmark ?? []).some((b) => (b as { estimate_basis?: unknown } | null)?.estimate_basis === "list_price");
+}

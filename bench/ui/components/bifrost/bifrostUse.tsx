@@ -25,8 +25,8 @@ export function bifrostUseStatus(u: BifrostUse | undefined): { tone: "ok" | "war
 	return { tone: u.reachable ? "ok" : "warn", count };
 }
 
-/** One row per feature: name, state, what Heimdall does with it, docs link. Pure. */
-export function BifrostFeatureList({ features, testId }: { features: BifrostFeature[]; testId: string }) {
+/** One row per feature: name, state, what Heimdall does with it, docs link. Pure. The evaluation view hides source paths (M3-1). */
+export function BifrostFeatureList({ features, testId, showCode = true }: { features: BifrostFeature[]; testId: string; showCode?: boolean }) {
 	const { t } = useTranslation("bifrostUse");
 	return (
 		<ul className="flex flex-col divide-y rounded-xl border" data-testid={testId}>
@@ -36,8 +36,14 @@ export function BifrostFeatureList({ features, testId }: { features: BifrostFeat
 						<span className="font-medium">{f.name}</span>
 						<span className={cn("rounded-full px-2 py-0.5 text-xs", STATE_TONE[f.state] ?? STATE_TONE.off)}>{t(`state.${f.state}`)}</span>
 						<span className="ml-auto flex gap-3 text-xs">
-							{f.code && <code className="text-muted-foreground">{f.code}</code>}
-							<a className="text-primary underline-offset-2 hover:underline" href={f.docs} target="_blank" rel="noreferrer">
+							{showCode && f.code && <code className="text-muted-foreground">{f.code}</code>}
+							<a
+								className="text-primary underline-offset-2 hover:underline"
+								href={f.docs}
+								target="_blank"
+								rel="noreferrer"
+								aria-label={`${t("docs")}: ${f.name}`}
+							>
 								{t("docs")}
 							</a>
 						</span>
@@ -99,22 +105,39 @@ export function BifrostUsePanel() {
 	);
 }
 
-/** Evaluation page: what this evaluation uses. Hidden while loading or on error. */
-export function EvaluationBifrostSection({ evaluationId }: { evaluationId: string }) {
+/**
+ * Evaluation page: what this evaluation uses. Hidden while loading or on error. With `summary` it is a closed disclosure
+ * under the result (M3-1, M7-90), and it never names source files there.
+ */
+export function EvaluationBifrostSection({ evaluationId, summary }: { evaluationId: string; summary?: string }) {
 	const { t } = useTranslation("bifrostUse");
 	const q = useGetEvaluationBifrostUseQuery(evaluationId);
 	if (!q.data) return null;
+	const body = (
+		<div className="flex flex-col gap-4">
+			<BifrostGatewayLine use={q.data} />
+			{q.data.uses.length ? (
+				<BifrostFeatureList features={q.data.uses} testId="evaluation-bifrost-features" showCode={false} />
+			) : (
+				<p className="text-muted-foreground text-sm">{t("nothing")}</p>
+			)}
+			{q.data.uses.some((f) => f.id === "semantic_cache") && <EvaluationCacheABBlock evaluationId={evaluationId} />}
+		</div>
+	);
+	if (summary) {
+		return (
+			<details className="group rounded-xl border" data-testid="evaluation-bifrost">
+				<summary className="hover:bg-muted/50 cursor-pointer rounded-xl px-4 py-3 text-sm font-medium">{summary}</summary>
+				<div className="flex flex-col gap-2 border-t px-4 py-4">
+					<p className="text-muted-foreground text-sm">{t("evalDesc")}</p>
+					{body}
+				</div>
+			</details>
+		);
+	}
 	return (
 		<Section title={t("evalTitle")} description={t("evalDesc")} testId="evaluation-bifrost">
-			<div className="flex flex-col gap-4">
-				<BifrostGatewayLine use={q.data} />
-				{q.data.uses.length ? (
-					<BifrostFeatureList features={q.data.uses} testId="evaluation-bifrost-features" />
-				) : (
-					<p className="text-muted-foreground text-sm">{t("nothing")}</p>
-				)}
-				{q.data.uses.some((f) => f.id === "semantic_cache") && <EvaluationCacheABBlock evaluationId={evaluationId} />}
-			</div>
+			{body}
 		</Section>
 	);
 }

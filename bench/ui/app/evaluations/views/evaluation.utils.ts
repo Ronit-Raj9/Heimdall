@@ -1,3 +1,4 @@
+import { isTestObject } from "@/lib/testObjects";
 import type { StatusTone } from "@/components/ui/statusPill";
 import type { Evaluation, EvaluationArm, EvaluationChild } from "@/lib/store/apis/evaluationsApi";
 
@@ -5,7 +6,7 @@ import type { Evaluation, EvaluationArm, EvaluationChild } from "@/lib/store/api
 export const EVALUATION_POLL_MS = 3000;
 
 const KNOWN_MODES = ["score", "versions", "models", "opponent", "model_switch"] as const;
-const KNOWN_STATUSES = ["queued", "created", "running", "analyzing", "done", "failed", "cancelled", "skipped"] as const;
+const KNOWN_STATUSES = ["queued", "created", "running", "analyzing", "done", "failed", "cancelled", "skipped", "notStarted"] as const;
 
 /** The i18n key (evaluations namespace) of a mode in plain words. */
 export function modeKey(mode: string): `mode.${(typeof KNOWN_MODES)[number]}` | null {
@@ -29,8 +30,11 @@ export function statusTone(status: string): StatusTone {
 		case "done":
 			return "ok";
 		case "failed":
+		case "notStarted":
 			return "bad";
+		// Cancelled is a stop the user chose, not a warning: neutral like everywhere else (M3-25).
 		case "cancelled":
+			return "neutral";
 		case "skipped":
 			return "warn";
 		case "running":
@@ -92,9 +96,58 @@ export function displayStatus(evaluation: Evaluation): string {
 	return evaluation.status === "running" && evaluation.paused ? "paused" : evaluation.status;
 }
 
+/**
+ * A failed evaluation where nothing started (M3-10): no stored result and no benchmark spent anything or ran, so the
+ * page and list say "Did not start" instead of "Failed".
+ */
+export function didNotStart(evaluation: Evaluation): boolean {
+	if (evaluation.status !== "failed" || evaluation.result) return false;
+	const kids = evaluation.children ?? [];
+	return kids.every((c) => !!c.skipped || !c.experiment_id || !((c.spent_usd ?? 0) > 0));
+}
+
+/** The status word for an evaluation's pill: "notStarted" for a failure where nothing ran, else its status. */
+export function evaluationStatusWord(evaluation: Evaluation): string {
+	return didNotStart(evaluation) ? "notStarted" : evaluation.status;
+}
+
+/** A known cause of a benchmark that could not run, from the worker's raw message (M3-9). */
+export type FailureCause = "imageMissing" | "workerRefused" | "noWorker";
+
+const FAILURE_CAUSES: { cause: FailureCause; test: RegExp }[] = [
+	{ cause: "imageMissing", test: /image[^.]{0,80}(missing|not found|not on|no such|never built|not built|pull)|registry-sync|manifest unknown/i },
+	{ cause: "noWorker", test: /no (online |available )?worker|worker[^.]{0,40}offline|no runner/i },
+	{ cause: "workerRefused", test: /refus|rejected|denied/i },
+];
+
+/** The cause codes a newer server sends on each child (G1, `cause`); an older server sends none. */
+const CAUSE_CODES: Record<string, FailureCause> = {
+	image_missing: "imageMissing",
+	worker_refused: "workerRefused",
+	no_worker: "noWorker",
+};
+
+/** A child with the server's cause code (G1); absent on an older server. */
+export type ChildWithCause = EvaluationChild & { cause?: string };
+
+/**
+ * The cause of a raw run problem: the server's cause code when it sends a known one (M3-9), else the raw text
+ * matched against the known messages; undefined when neither says.
+ */
+export function failureCause(raw: string | undefined | null, code?: string | null): FailureCause | undefined {
+	if (code && CAUSE_CODES[code]) return CAUSE_CODES[code];
+	if (!raw) return undefined;
+	return FAILURE_CAUSES.find((c) => c.test.test(raw))?.cause;
+}
+
 /** Why each benchmark did not run: its skip reason, else its status. */
-export function childReasons(children: readonly EvaluationChild[] | null | undefined): { benchmark: string; reason: string }[] {
-	return (children ?? []).map((c) => ({ benchmark: c.benchmark, reason: c.skipped || c.status }));
+export function childReasons(
+	children: readonly EvaluationChild[] | null | undefined,
+): { benchmark: string; reason: string; cause?: string }[] {
+	return (children ?? []).map((c) => {
+		const cause = (c as ChildWithCause).cause;
+		return { benchmark: c.benchmark, reason: c.skipped || c.status, ...(cause ? { cause } : {}) };
+	});
 }
 
 /** The evaluation's budget: the sum of its launched benchmarks' caps (raised anywhere), else the spec's. */
@@ -237,4 +290,8 @@ export function filterEvaluations(list: readonly Evaluation[], f: EvaluationFilt
 		default:
 			return sortNewestFirst(out);
 	}
+}
+/** An evaluation the project's own checks made: a test name or id, or a test agent in an arm (M1-18). Pure. */
+export function isTestEvaluation(ev: Pick<Evaluation, "id" | "spec">): boolean {
+	return isTestObject(ev.spec?.name) || isTestObject(ev.id) || (ev.spec?.arms ?? []).some((a) => isTestObject(a.agent));
 }

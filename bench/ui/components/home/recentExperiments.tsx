@@ -3,11 +3,13 @@ import { StatusBadge, suiteIdOf } from "@/components/shell";
 import { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage, useGetVerdictQuery } from "@/lib/store";
 import "@/lib/types/homeI18n";
+import "@/components/reportcard/reportCardI18n";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { TrackBadge } from "./homeBits";
 import { humanExperimentName, type ExperimentListItem } from "./home.utils";
+import { isTestObject } from "@/lib/testObjects";
 
 /** The newest experiments that are not running: suite icon, name, verdict and when it started. */
 export function RecentExperiments({
@@ -17,12 +19,26 @@ export function RecentExperiments({
 	experiments: readonly ExperimentListItem[];
 	trackOf?: (suite: string | undefined) => string | undefined;
 }) {
+	const { t } = useTranslation("uf3");
+	// Home hides the project's own test comparisons (M1-18); the comparisons list has the switch to show them.
+	const shown = experiments.filter((exp) => !isTestObject(exp.exp_id) && !isTestObject(exp.name));
 	return (
-		<ul className="divide-border/70 flex flex-col divide-y" data-testid="home-recent-list">
-			{experiments.map((exp) => (
-				<RecentRow key={exp.exp_id} exp={exp} trackOf={trackOf} />
-			))}
-		</ul>
+		<>
+			<ul className="divide-border flex flex-col divide-y" data-testid="home-recent-list">
+				{shown.map((exp) => (
+					<RecentRow key={exp.exp_id} exp={exp} trackOf={trackOf} />
+				))}
+			</ul>
+			{/* A path from Home to the runs that failed (M5-36). */}
+			<Link
+				to={"/runs" as never}
+				search={{ outcome: "fail" } as never}
+				className="text-primary block px-4 py-2 text-sm font-medium hover:underline sm:px-5"
+				data-testid="home-recent-failures"
+			>
+				{t("home.recentFailures")}
+			</Link>
+		</>
 	);
 }
 
@@ -41,13 +57,16 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 			<Link
 				to="/experiments/$expId"
 				params={{ expId: exp.exp_id }}
-				className="group hover:bg-accent/50 focus-visible:bg-accent/50 flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-none sm:px-5"
+				className="group hover:bg-muted focus-visible:outline-ring flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5"
 				title={exp.exp_id}
 			>
 				<TrackBadge track={trackOf?.(suite)} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground line-clamp-2 text-sm font-medium break-words">{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}</span>
-					<span className="text-muted-foreground truncate text-xs" data-testid={`home-recent-suite-${exp.exp_id}`}>
+					{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
+					<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
+						{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}
+					</span>
+					<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1" data-testid={`home-recent-suite-${exp.exp_id}`}>
 						{suite ? suiteIdOf(suite) : "-"}
 						<span className="sm:hidden">
 							{" · "}

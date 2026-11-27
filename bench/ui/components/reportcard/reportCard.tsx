@@ -1,5 +1,6 @@
 import { printExport } from "@/components/share/shareDialog";
 import { Badge } from "@/components/ui/badge";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +15,7 @@ import { BifrostTable, hasBifrost } from "./bifrostSection";
 import { CheatRateRow } from "./cheatRateRow";
 import "./fw09I18n";
 import "./hw08I18n";
+import "./reportCardI18n";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import { hasVoice, VoiceTable } from "./voiceSection";
 import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
@@ -41,6 +43,8 @@ import {
 	visibleReport,
 	pct,
 	points,
+	scoreRange,
+	type HeadlineContext,
 	reliabilityCards,
 	downloadReportJSON,
 	faultChange,
@@ -65,6 +69,19 @@ export interface ReportCardProps {
 	readOnly?: boolean;
 	/** Narrows the report to tasks with this metadata (undefined clears it); enables segment filters. */
 	onWhere?: (where: Record<string, string> | undefined) => void;
+	/** What the page knows besides the report, such as a budget stop (M3-4). */
+	headlineContext?: HeadlineContext;
+	/** Rendered right under the headline: the raise budget panel and the links to example runs. */
+	belowHeadline?: React.ReactNode;
+}
+
+/** "$0.0090 for 6 runs" from the per arm totals of a one-arm report (M7-89); undefined when the cost is not known. */
+export function costLine(report: Report): string | undefined {
+	if (isAB(report)) return undefined;
+	const arm = report.arms[0];
+	const total = arm ? report.totals?.[arm.label] : undefined;
+	if (!total || !(total.runs > 0) || typeof total.cost_usd !== "number") return undefined;
+	return `${costDisplay({ runs: total.runs, cost_usd: total.cost_usd }).text} for ${total.runs} ${total.runs === 1 ? "run" : "runs"}`;
 }
 
 /** A gate id in plain words for a sentence, from the hw08 locale (fix wave 3, N215). */
@@ -75,18 +92,19 @@ function useCheckName(): (gate: string) => string {
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere }: ReportCardProps) {
+export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere, headlineContext, belowHeadline }: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const checkName = useCheckName();
 	const { t: t08 } = useTranslation("hw08");
-	const head = headline(report, checkName);
+	const { t: tr } = useTranslation("reportCard");
+	const head = headline(report, checkName, headlineContext);
+	const cost = costLine(report);
 	const brokenChild = (report.thrown_out_runs ?? 0) > 0 ? thrownOutBenchmarks(report)[0] : undefined;
 	return (
 		<article data-testid="report-card" aria-labelledby="report-card-title" className={cn("flex min-w-0 flex-col gap-8", className)}>
 			<header className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 flex-col gap-1">
-					<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Report card</p>
 					<h2
 						id="report-card-title"
 						data-testid="report-card-headline"
@@ -97,6 +115,11 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					<p data-testid="report-card-verdict" className="text-muted-foreground max-w-prose text-sm">
 						{head.detail}
 					</p>
+					{cost && (
+						<p data-testid="report-card-cost" className="text-muted-foreground text-sm tabular-nums">
+							{cost}
+						</p>
+					)}
 					{brokenChild?.experiment_id && !readOnly && (
 						<Link
 							to="/experiments/$expId"
@@ -127,14 +150,15 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 				</div>
 				{actions ?? (readOnly ? null : <ExportButtons report={report} />)}
 			</header>
+			{belowHeadline}
 
 			<ReportFilterBar where={report.where} onClear={onWhere && (() => onWhere(undefined))} />
 
-			<Section title="By capability" description="Score is the share of runs solved. The bar shows the 95% confidence range.">
+			<Section title={tr("sections.capability")} description={tr("sections.capabilityHelp")}>
 				<CapabilityTable report={report} />
 			</Section>
 
-			<Section title="By benchmark" description="Open a row for the verdict and a link to the experiment.">
+			<Section title={tr("sections.benchmark")} description={tr("sections.benchmarkHelp")}>
 				<BenchmarkList report={report} readOnly={readOnly} />
 			</Section>
 
@@ -142,8 +166,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			{reliabilityCards(report).length > 0 && (
 				<Section
-					title="Reliability"
-					description="How steady the agent is across repeat tries. The gap between the two lines is flakiness: tasks it solves sometimes but not every time."
+					title={tr("sections.reliability")}
+					description={tr("sections.reliabilityHelp")}
 				>
 					<ReliabilityCards report={report} />
 				</Section>
@@ -151,8 +175,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			{(report.resilience?.length ?? 0) > 0 && (
 				<Section
-					title="Resilience"
-					description="Under each fault, the share of clean success kept (x1.00 is no loss, with its 95% range when the runs allow one), how often clean successes still succeed, the change in cost and the time to recover."
+					title={tr("sections.resilience")}
+					description={tr("sections.resilienceHelp")}
 				>
 					<ResilienceCard report={report} />
 				</Section>
@@ -163,36 +187,36 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			{report.failover && <FailoverSection report={report.failover} />}
 
 			{report.reliability.length > 0 && (
-				<Section title="Faults" description="Score when something goes wrong, and how it changed from a normal run of the same tasks.">
+				<Section title={tr("sections.faults")} description={tr("sections.faultsHelp")}>
 					<ReliabilityTable report={report} />
 				</Section>
 			)}
 
 			{hasLearning(report) && (
 				<Section
-					title="Learning over time"
-					description="Tasks run one after another with the agent's memory kept. Change is in percentage points."
+					title={tr("sections.learning")}
+					description={tr("sections.learningHelp")}
 				>
 					<LearningTable report={report} />
 				</Section>
 			)}
 
 			{hasVoice(report) && (
-				<Section title="Voice" description="Call quality, measured by Heimdall's simulated caller on the audio it heard.">
+				<Section title={tr("sections.voice")} description={tr("sections.voiceHelp")}>
 					<VoiceTable report={report} />
 				</Section>
 			)}
 
 			{hasPersistence(report) && (
-				<Section title="Persistence" description="Picking up after a crash, finishing when the budget runs out, and success per dollar.">
+				<Section title={tr("sections.persistence")} description={tr("sections.persistenceHelp")}>
 					<PersistenceTable report={report} />
 				</Section>
 			)}
 
 			{hasVoiceCalls(report) && (
 				<Section
-					title="Voice calls by caller"
-					description="Task success, graded on the call transcript, and call quality with each simulated caller: accents, pace, interruptions, noise and phone lines."
+					title={tr("sections.voiceCalls")}
+					description={tr("sections.voiceCallsHelp")}
 				>
 					<VoiceCallsTable report={report} />
 				</Section>
@@ -200,15 +224,15 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			{hasBifrost(report) && (
 				<Section
-					title="Through Bifrost"
-					description="What the Bifrost gateway did for each agent's model calls: fallbacks, cache hits, retries, tokens and cost."
+					title={tr("sections.bifrost")}
+					description={tr("sections.bifrostHelp")}
 				>
 					<BifrostTable report={report} />
 				</Section>
 			)}
 
 			{report.safety && (Object.keys(report.safety.attack_resisted).length > 0 || Object.keys(report.safety.cheat_rate).length > 0) && (
-				<Section title="Safety" description="Attacks resisted (higher is better) and cheat rate (lower is better).">
+				<Section title={tr("sections.safety")} description={tr("sections.safetyHelp")}>
 					<SafetyTable report={report} />
 				</Section>
 			)}
@@ -216,8 +240,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			{hasRedTeam(report) && (
 				<Section
-					title="Red team"
-					description="Adaptive attacks (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents and emails. Share of attacks that got through (lower is better), with the 95% range."
+					title={tr("sections.redTeam")}
+					description={tr("sections.redTeamHelp")}
 				>
 					<RedTeamSection report={report} />
 				</Section>
@@ -225,8 +249,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			{report.alignment && report.alignment.categories.length > 0 && (
 				<Section
-					title="Safety and alignment"
-					description="Share of tested runs where the agent did the unsafe thing (lower is better), with the 95% confidence range. Not tested means no run in this evaluation checked it."
+					title={tr("sections.alignment")}
+					description={tr("sections.alignmentHelp")}
 				>
 					<AlignmentSection report={report} />
 				</Section>
@@ -251,8 +275,9 @@ function ArmLegend({ arms }: { arms: EvaluationArm[] }) {
 /** Visual CI range plus score tick. Decorative: the numbers are always printed next to it. */
 export function CiBar({ metrics }: { metrics: ReportArmMetrics }) {
 	const clamp = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0)) * 100;
-	const low = clamp(metrics.ci_low);
-	const high = clamp(metrics.ci_high);
+	const range = scoreRange(metrics);
+	const low = clamp(range.low);
+	const high = clamp(range.high);
 	return (
 		<span aria-hidden="true" className="bg-muted relative block h-1.5 w-20 shrink-0 rounded-full">
 			<span className="bg-primary/30 absolute inset-y-0 rounded-full" style={{ left: `${low}%`, width: `${Math.max(high - low, 1)}%` }} />
@@ -263,13 +288,14 @@ export function CiBar({ metrics }: { metrics: ReportArmMetrics }) {
 
 function ScoreCell({ metrics }: { metrics?: ReportArmMetrics }) {
 	if (!metrics || !metrics.runs) return <span className="text-muted-foreground">-</span>; // no runs is no score, never 0%
+	const range = scoreRange(metrics);
 	return (
 		<span className="flex items-center gap-2">
 			<span className="text-foreground w-10 font-medium tabular-nums">{pct(metrics.score)}</span>
 			<CiBar metrics={metrics} />
-			<span className="text-muted-foreground text-xs tabular-nums">
+			<span className="text-muted-foreground text-sm tabular-nums">
 				<span className="sr-only">95% range </span>
-				{pct(metrics.ci_low)}-{pct(metrics.ci_high)}
+				{pct(range.low)}-{pct(range.high)}
 			</span>
 		</span>
 	);
@@ -299,23 +325,45 @@ export function WinnerMark({ result, name }: { result?: ComparisonResult; name?:
 
 const METRIC_HEADS = ["Score", "Runs", "Cost", "Tokens", "Steps", "Tool calls", "Time"] as const;
 
+/**
+ * Which metric columns a phone keeps (M2-37, M1-57): the score and the cost; runs, tokens, steps, tool calls and time
+ * hide below sm, so the table fits 390 px without sideways scrolling.
+ */
+export const METRIC_PRIORITY: Record<(typeof METRIC_HEADS)[number], "metric" | "secondary"> = {
+	Score: "metric",
+	Runs: "secondary",
+	Cost: "metric",
+	Tokens: "secondary",
+	Steps: "secondary",
+	"Tool calls": "secondary",
+	Time: "secondary",
+};
+
 function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
 	const num = "text-right tabular-nums";
 	return (
 		<>
-			<TableCell>
+			<TableCell priority="metric">
 				<ScoreCell metrics={metrics} />
 			</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.runs) : "-"}</TableCell>
-			<TableCell className={num}>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.runs) : "-"}
+			</TableCell>
+			<TableCell priority="metric" className={num}>
 				<CostValue metrics={metrics} />
 			</TableCell>
-			<TableCell className={num}>
+			<TableCell priority="secondary" className={num}>
 				{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}
 			</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.steps) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.tool_calls) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? duration(metrics.wall_s) : "-"}</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.steps) : "-"}
+			</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.tool_calls) : "-"}
+			</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? duration(metrics.wall_s) : "-"}
+			</TableCell>
 		</>
 	);
 }
@@ -327,7 +375,7 @@ export function CostValue({ metrics }: { metrics?: ReportArmMetrics }) {
 	return (
 		<span data-testid="cost-not-known" title={c.reason} className="inline-flex flex-col items-end leading-tight">
 			<span className="text-muted-foreground">{c.text}</span>
-			<span className="text-muted-foreground text-[11px]">{c.detail}</span>
+			<span className="text-muted-foreground text-xs">{c.detail}</span>
 		</span>
 	);
 }
@@ -337,16 +385,18 @@ function CapabilityTable({ report }: { report: Report }) {
 	const [a, b] = report.arms;
 	const rows = capabilityRows(report);
 	const { t } = useTranslation("hw08");
-	const firstUntested = rows.findIndex((r) => !r.tested);
+	const { t: tr } = useTranslation("reportCard");
+	const untested = rows.filter((r) => !r.tested).map((r) => capabilityName(r.capability));
 	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
+		<div className="flex min-w-0 flex-col gap-2">
 		<Table data-testid="report-capabilities" aria-label="Score by capability">
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">Capability</TableHead>
 					{ab && <TableHead scope="col">Setup</TableHead>}
 					{METRIC_HEADS.map((h) => (
-						<TableHead key={h} scope="col" className={h === "Score" ? undefined : "text-right"}>
+						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={h === "Score" ? undefined : "text-right"}>
 							{h}
 						</TableHead>
 					))}
@@ -357,31 +407,7 @@ function CapabilityTable({ report }: { report: Report }) {
 			<TableBody>
 				{rows.map(({ capability, data, tested }, i) => {
 					const name = capabilityName(capability);
-					if (!data || !tested) {
-						return (
-							<React.Fragment key={capability}>
-								{i === firstUntested && firstUntested > 0 && (
-									<TableRow data-testid="capabilities-not-tested">
-										<TableHead
-											scope="rowgroup"
-											colSpan={1 + METRIC_HEADS.length + (ab ? 3 : 0)}
-											className="text-muted-foreground text-xs font-medium"
-										>
-											{t("notTested")}
-										</TableHead>
-									</TableRow>
-								)}
-								<TableRow data-testid={`capability-${capability}`}>
-									<TableHead scope="row" className="text-muted-foreground font-normal">
-										{name}
-									</TableHead>
-									<TableCell colSpan={METRIC_HEADS.length + (ab ? 3 : 0)} className="text-muted-foreground text-xs">
-										Not tested
-									</TableCell>
-								</TableRow>
-							</React.Fragment>
-						);
-					}
+					if (!data || !tested) return null; // listed once under the table (M3-12)
 					if (!ab) {
 						return (
 							<TableRow key={capability} data-testid={`capability-${capability}`}>
@@ -421,6 +447,12 @@ function CapabilityTable({ report }: { report: Report }) {
 				})}
 			</TableBody>
 		</Table>
+		{untested.length > 0 && (
+			<p className="text-muted-foreground text-xs" data-testid="capabilities-not-tested">
+				{tr("sections.notTested", { list: untested.join(", ") })}
+			</p>
+		)}
+		</div>
 	);
 }
 
@@ -503,7 +535,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 						{row.suite_version ? ` Benchmark version ${row.suite_version}.` : ""}
 					</p>
 				)}
-				<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
+				<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
 					{report.arms.map((arm) => {
 						const m = row.arms[arm.label];
 						const prefix = ab ? `${arm.label} ` : "";
@@ -530,7 +562,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					);
 				})}
 				{hasProcess(row.arms) && (
-					<div className="flex flex-col gap-1 text-xs" data-testid={`benchmark-process-${row.benchmark}`}>
+					<div className="flex flex-col gap-1 text-sm" data-testid={`benchmark-process-${row.benchmark}`}>
 						<span className="text-muted-foreground font-medium" title={PROCESS_NOTE}>
 							Process (report only)
 						</span>
@@ -705,6 +737,10 @@ function AlignmentSection({ report }: { report: Report }) {
 	const flagged = alignment.impossible_flagged ?? {};
 	const coverage = alignment.owasp_agentic ?? [];
 	const tested = coverage.filter((c) => c.tested).length;
+	const { t: tr } = useTranslation("reportCard");
+	// Only tested rows; the untested ones are named once under the table (M3-12).
+	const testedCategories = alignment.categories.filter((c) => report.arms.some((a) => c.arms[a.label]));
+	const untestedCategories = alignment.categories.filter((c) => !report.arms.some((a) => c.arms[a.label]));
 	return (
 		<div className="flex flex-col gap-4">
 			<Table data-testid="report-alignment" aria-label="Safety and alignment">
@@ -719,11 +755,16 @@ function AlignmentSection({ report }: { report: Report }) {
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{alignment.categories.map((c) => (
+					{testedCategories.map((c) => (
 						<TableRow key={c.id} data-testid={`alignment-${c.id}`}>
 							<TableHead scope="row" className="font-medium whitespace-normal">
 								<span className="block">{c.label}</span>
-								{c.description && <span className="text-muted-foreground block text-xs font-normal">{c.description}</span>}
+								{c.description && (
+									<span className="text-muted-foreground block text-xs font-normal">
+										{/* The server's "heuristic phrase scan" help in plain words (M3-12). */}
+										{/heuristic phrase scan/i.test(c.description) ? tr("alignment.awareness") : c.description}
+									</span>
+								)}
 							</TableHead>
 							{report.arms.map((arm) => (
 								<TableCell key={arm.label} className="text-right tabular-nums">
@@ -749,11 +790,23 @@ function AlignmentSection({ report }: { report: Report }) {
 					)}
 				</TableBody>
 			</Table>
+			{untestedCategories.length > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid="alignment-not-tested">
+					{tr("sections.notTested", { list: untestedCategories.map((c) => c.label).join(", ") })}
+				</p>
+			)}
 			{coverage.length > 0 && (
 				<div data-testid="alignment-owasp" className="flex flex-col gap-2">
 					<p className="text-muted-foreground text-xs">
-						OWASP Top 10 for Agentic Applications: {tested} of {coverage.length} risks tested in this evaluation.
+						{tr("redTeam.owaspCovers", {
+							tested: `${tested} of ${coverage.length}`,
+							names: coverage
+								.filter((c) => c.tested)
+								.map((c) => `${c.id} ${c.name}`)
+								.join(", "),
+						})}
 					</p>
+					<DetailsDisclosure label={tr("redTeam.owaspAll")} className="text-xs">
 					<ul className="flex flex-wrap gap-1.5">
 						{coverage.map((c) => (
 							<li key={c.id}>
@@ -764,6 +817,7 @@ function AlignmentSection({ report }: { report: Report }) {
 							</li>
 						))}
 					</ul>
+					</DetailsDisclosure>
 				</div>
 			)}
 		</div>

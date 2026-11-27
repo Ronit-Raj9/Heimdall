@@ -121,8 +121,10 @@ describe("Step3BenchmarksView", () => {
 		const html = render();
 		const voice = block(html, "step3-benchmark-voicebench");
 		expect(voice).toContain('data-disabled="true"');
-		expect(voice).toContain("needs voice");
-		expect(block(html, "step3-benchmark-kernelbench-l2")).toContain("Needs gpu");
+		// The raw refusal reads as a plain need (M3-33).
+		expect(voice).toContain("Needs a voice agent");
+		expect(voice).not.toContain("cannot run benchmark");
+		expect(block(html, "step3-benchmark-kernelbench-l2")).toContain("Needs a GPU agent");
 		const ok = block(html, "step3-benchmark-hd-harbor-tb2");
 		expect(ok).not.toContain("data-disabled");
 		expect(ok).toContain("Terminal-Bench 2");
@@ -247,12 +249,12 @@ describe("reference hint (G4-03)", () => {
 });
 
 describe("your own tasks card", () => {
-	it("comes first in step 3", () => {
+	it("comes after the catalog in step 3 (M3-32)", () => {
 		const html = renderToStaticMarkup(
 			<Step3BenchmarksView suites={suites} packs={packs} selected={[]} onChange={() => {}} ownTasks={<OwnTasksCard onAdd={() => {}} />} />,
 		);
 		expect(html.indexOf('data-testid="step3-own"')).toBeGreaterThan(-1);
-		expect(html.indexOf('data-testid="step3-own"')).toBeLessThan(html.indexOf("Start from a pack"));
+		expect(html.indexOf('data-testid="step3-own"')).toBeGreaterThan(html.indexOf("Start from a pack"));
 		expect(html).toContain("Your own tasks");
 		expect(html).toContain('data-testid="step3-own-open"');
 	});
@@ -336,7 +338,7 @@ describe("every setup's compatibility (D2.baseline)", () => {
 		expect(swe).toContain("claude-code (setup B) cannot run this: Runs inside each task&#x27;s own environment");
 		expect(block(html, "step3-benchmark-hd-harbor-tb2")).not.toContain("data-disabled");
 		// arm A's own reason wins over the opponent's
-		expect(block(html, "step3-benchmark-voicebench")).toContain("needs voice");
+		expect(block(html, "step3-benchmark-voicebench")).toContain("Needs a voice agent");
 		expect(keepRunnable(["hd-swe-verified", "hd-harbor-tb2"], merged)).toEqual(["hd-harbor-tb2"]);
 	});
 

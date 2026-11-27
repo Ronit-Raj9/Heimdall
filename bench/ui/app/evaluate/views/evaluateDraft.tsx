@@ -7,6 +7,7 @@ import type {
 	EvaluationPresetId,
 	EvaluationSpec,
 } from "@/lib/store/apis/evaluationsApi";
+import { DRAFT_PREFIX, readDraft, storableDraft } from "@/lib/hooks/useFormDraft";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { evalArmLabel } from "@/lib/evaluationArms";
 
@@ -58,6 +59,8 @@ export interface EvaluateDraft {
 	disclose_budget?: boolean;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
+	/** Step 2 goal "Can it be attacked?" (M3-48): a score evaluation whose step 3 opens with the red-team benchmark writer. */
+	redTeam?: boolean;
 }
 
 /** The Quick look preset: 10 tasks once each (the server's defaults too). */
@@ -148,6 +151,10 @@ export interface DraftLink {
 	mode?: string | null;
 	suite?: string | null;
 	opponent?: string | null;
+	/** A model for arm A (the run page's "Run this task again"); unset keeps the agent's own model. */
+	model?: string | null;
+	/** One task to run again: the evaluation then runs one task, one try (M5-5). */
+	task?: string | null;
 }
 
 /**
@@ -164,8 +171,10 @@ export function draftFromLink(p: DraftLink, agentRow?: { model?: string } | null
 		opponent: mode === "opponent" ? p.opponent || null : null,
 		benchmarks: p.suite ? [p.suite] : [],
 		pack: null,
+		// One task again (M5-5): the smallest evaluation, one task and one try.
+		...(p.task ? { tasksPerBenchmark: 1, trials: 1, preset: null } : {}),
 	};
-	const draft = { ...base, arms: armsFor({ ...base, arms: [], stashedArms: [] }, agentRow?.model ?? "") };
+	const draft = { ...base, arms: armsFor({ ...base, arms: [], stashedArms: [] }, p.model || agentRow?.model || "") };
 	return p.mode && !isEvaluationMode(p.mode) ? { draft, badMode: p.mode } : { draft };
 }
 
@@ -255,12 +264,16 @@ export function defaultName(d: EvaluateDraft): string {
 		case "opponent":
 			return d.opponent === BARE_MODEL_AGENT ? `${who} vs the bare model` : `${who} vs ${d.opponent ?? "baseline"}`;
 		default: {
-			// Score: named after the benchmarks so evaluations left unnamed still differ (N161).
+			// Score: named after the model and the benchmarks (or the pack) so evaluations left unnamed still differ (N161, M3-52).
+			const model = d.arms[0]?.model;
+			const setup = model ? `${who} on ${model}` : who;
 			const first = d.benchmarks[0]?.replace(/@.*$/, "");
-			if (!first) return `${who} score`;
-			const more = d.benchmarks.length > 1 ? ` and ${d.benchmarks.length - 1} more` : "";
 			const faulted = d.faults.some((f) => f !== "clean");
-			return `${who}${faulted ? " failure test" : ""} on ${first}${more}`;
+			const kind = faulted ? " failure test" : "";
+			const sep = model ? ": " : " on ";
+			if (!first) return d.pack ? `${setup}${kind}${sep}${d.pack} pack` : `${setup} score`;
+			const more = d.benchmarks.length > 1 ? ` and ${d.benchmarks.length - 1} more` : "";
+			return `${setup}${kind}${sep}${first}${more}`;
 		}
 	}
 }
@@ -280,16 +293,23 @@ export function applyPatch(d: EvaluateDraft, patch: Partial<EvaluateDraft>): Eva
 	return next;
 }
 
-const STORAGE_KEY = "heimdall.evaluateDraft";
+/**
+ * The wizard draft is a shared form draft (M4-88): stored like every other form under `heimdall.draft.evaluate` by the
+ * shared helpers, so it survives a reload, Back and a sign-in. The wizard keeps its own provider because a patch goes
+ * through applyPatch (arms follow the agent and mode), not a plain merge.
+ */
+export const EVALUATE_DRAFT_KEY = "evaluate";
+
+function session(): Storage | null {
+	try {
+		return typeof sessionStorage !== "undefined" ? sessionStorage : null;
+	} catch {
+		return null;
+	}
+}
 
 function load(): EvaluateDraft {
-	try {
-		const raw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(STORAGE_KEY) : null;
-		if (raw) return { ...EMPTY_DRAFT, ...(JSON.parse(raw) as Partial<EvaluateDraft>) };
-	} catch {
-		/* private window or bad JSON: start fresh */
-	}
-	return EMPTY_DRAFT;
+	return readDraft(session(), EVALUATE_DRAFT_KEY, EMPTY_DRAFT);
 }
 
 export interface EvaluateDraftContextValue {
@@ -307,7 +327,7 @@ export function EvaluateDraftProvider({ children, initial }: { children: ReactNo
 	const [draft, setDraft] = useState<EvaluateDraft>(() => ({ ...load(), ...initial }));
 	useEffect(() => {
 		try {
-			sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+			session()?.setItem(DRAFT_PREFIX + EVALUATE_DRAFT_KEY, JSON.stringify(storableDraft(draft)));
 		} catch {
 			/* storage blocked: the draft still works for this page */
 		}

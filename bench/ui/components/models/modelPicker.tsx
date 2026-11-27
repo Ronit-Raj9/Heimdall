@@ -12,6 +12,7 @@ import type { ModelKey, ModelProviderInfo, ModelPurpose } from "@/lib/types/mode
 import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/reportcard/reportCardI18n";
 
 /** Providers the UI knew before the server listed every Bifrost provider. */
 export type KnownProviderId = "openai" | "anthropic" | "gemini" | "openrouter" | "groq" | "sarvam" | "openai-compatible";
@@ -193,6 +194,7 @@ export function ModelPicker({
 	testId,
 }: ModelPickerProps) {
 	const { t } = useTranslation("models");
+	const { t: tu } = useTranslation("uf3");
 	const id = useId();
 	const tid = testId ?? "model-picker";
 	const models = useGetModelsQuery();
@@ -387,8 +389,20 @@ export function ModelPicker({
 						))}
 					</select>
 				)}
+				{/* The key status is always shown, not only when it is missing (M3-27). */}
+				{showAddKeyLink && keyed.has(provider) && loaded && providerKeys[0] && (
+					<span className="text-muted-foreground text-xs" data-testid={`${tid}-key-ok`}>
+						{tu("picker.keyOk", { label: providerKeys[0].label || providerKeys[0].provider, last4: providerKeys[0].last4 ?? "" })}
+					</span>
+				)}
 				{showAddKeyLink && !keyed.has(provider) && loaded && (
-					<Link to="/models" search={{ add: provider } as never} className="text-primary text-xs underline" data-testid={`${tid}-add-key`}>
+					// Settings, Model keys, with the provider set and a way back to this page (M8-12).
+					<Link
+						to={"/settings" as never}
+						search={{ tab: "keys", add: provider, return: typeof window === "undefined" ? undefined : window.location.pathname + window.location.search } as never}
+						className="text-primary text-xs underline"
+						data-testid={`${tid}-add-key`}
+					>
 						{providerKeys.length === 0 ? t("picker.noKey") : t("picker.keyInvalidLong")}: {t("picker.addKey")}
 					</Link>
 				)}

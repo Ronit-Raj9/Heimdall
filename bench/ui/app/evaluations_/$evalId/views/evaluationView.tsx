@@ -1,13 +1,22 @@
 import { EvaluationRerunNotice, EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import "./fw08I18n";
 import { EvaluationKindLabel, EvaluationStatusPill } from "@/app/evaluations/views/evaluationWords";
+import "@/components/reportcard/reportCardI18n";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { usePageTitle } from "@/lib/routing/pageTitle";
+import { ServerCrash } from "lucide-react";
 import { EvaluationLivePill } from "@/app/evaluations/views/evaluationLivePill";
 import {
 	EVALUATION_POLL_MS,
 	armAgentLabel,
 	childReasons,
 	childRunsText,
+	didNotStart,
 	evaluationBudget,
+	evaluationSpend,
+	failureCause,
+	type ChildWithCause,
 	formatCreated,
 	isActiveStatus,
 	splitChildren,
@@ -33,7 +42,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
-import { childSpendText, childStoppedText, RaiseBudgetPanel } from "./raiseBudget";
+import { childSpendText, childStoppedText, RAISE_BUDGET_ANCHOR, RaiseBudgetPanel } from "./raiseBudget";
 import { useTranslation } from "react-i18next";
 import { FirstLookNote } from "@/app/connect/views/firstLookLauncher"; // lane Z01: first look is too small for a verdict
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +68,17 @@ export default function EvaluationView({ evalId }: { evalId: string }) {
 	// Poll every 3 s while the evaluation is still moving; RTK Query shares the cache entry.
 	useGetEvaluationQuery(evalId, { pollingInterval: active ? EVALUATION_POLL_MS : 0, skip: !active });
 	if (first.isLoading) return <BlockSkeleton rows={6} testId="evaluation-loading" />;
+	if ((first.error as { status?: unknown } | undefined)?.status === 404) {
+		// A wrong id is not a load failure: no Retry, a way back to the list (M3-20).
+		return (
+			<div className="flex flex-col items-start gap-3 rounded-xl border p-6" data-testid="evaluation-not-found">
+				<p className="text-sm font-medium">{t("detail.notFound", { id: evalId })}</p>
+				<Link to="/evaluations" className="text-primary text-sm font-medium hover:underline">
+					{t("detail.allEvaluations")}
+				</Link>
+			</div>
+		);
+	}
 	if (first.error || !first.data) {
 		return (
 			<LoadError
@@ -88,6 +108,84 @@ export function setupLine(t: (key: string, opts?: Record<string, unknown>) => st
 	return [t("setupTasks", { ns: "w4m2", count: tasks }), t("setupTrials", { ns: "w4m2", count: trials })].join(", ");
 }
 
+/** Queue facts the server may add to a queued evaluation (M3-21); absent on the current server. */
+type QueueFacts = { queue?: { workers_online?: number; image_preparing?: boolean; ahead?: number } };
+
+/** Why a queued evaluation waits, from the server's queue facts, or null when it does not say (M3-21). */
+export function queuedReason(evaluation: Evaluation): { key: "noWorker" | "image" | "queue"; opts?: Record<string, unknown> } | null {
+	const q = (evaluation as Evaluation & QueueFacts).queue;
+	if (!q) return null;
+	if (q.workers_online === 0) return { key: "noWorker" };
+	if (q.image_preparing) return { key: "image" };
+	if (typeof q.ahead === "number" && q.ahead > 0) return { key: "queue", opts: { n: q.ahead } };
+	return null;
+}
+
+/** The subtitle by status (M3-5): progress while running, date, runs and spend once finished. */
+export function evaluationSubtitle(
+	t: (key: string, opts?: Record<string, unknown>) => string,
+	evaluation: Evaluation,
+	locale?: string,
+): string {
+	const date = formatCreated(evaluation.result?.at || evaluation.created_at, locale);
+	if (isActiveStatus(evaluation.status)) return t("detail.subtitleRunning");
+	if (didNotStart(evaluation)) return t("detail.subtitleFailed");
+	if (evaluation.status === "cancelled") return t("detail.subtitleCancelled", { date });
+	if (evaluation.status === "done") {
+		const arms = evaluation.result?.arms ?? [];
+		const runs = arms.length ? arms.reduce((n, a) => n + (a.runs ?? 0), 0) : undefined;
+		const budget = evaluationBudget(evaluation);
+		const spent = formatCost(evaluationSpend(evaluation) ?? 0);
+		const runsText = typeof runs === "number" ? runs : "-";
+		return budget > 0
+			? t("detail.subtitleDone", { date, runs: runsText, spent, budget: formatCost(budget) })
+			: t("detail.subtitleDoneNoBudget", { date, runs: runsText });
+	}
+	return t("detail.subtitleRunning");
+}
+
+/** The wizard link that starts the same evaluation again (M3-9): agent, mode and first benchmark in the URL. */
+export function runAgainSearch(evaluation: Evaluation): Record<string, string> {
+	const arm = evaluation.spec.arms?.[0];
+	const out: Record<string, string> = {};
+	if (arm?.agent) out.agent = arm.agent;
+	if (evaluation.spec.mode) out.mode = String(evaluation.spec.mode);
+	const suite = evaluation.spec.benchmarks?.[0];
+	if (suite) out.suite = suite;
+	return out;
+}
+
+/** A raw worker message as one plain sentence when its cause is known, the raw text inside "Technical details" (M3-9). */
+function ProblemText({ raw, benchmark, testId, code }: { raw: string; benchmark: string; testId?: string; code?: string }) {
+	const { t } = useTranslation("evaluations");
+	const cause = failureCause(raw, code);
+	const [copied, setCopied] = useState(false);
+	if (!cause) return <>{testId ? <span data-testid={testId}>{t("detail.childProblem", { problem: raw })}</span> : raw}</>;
+	return (
+		<span className="flex min-w-0 flex-col gap-1" data-testid={testId}>
+			<span className="min-w-0 break-words">
+				{cause ? t(`failure.${cause}` as never, { benchmark }) : t("detail.childProblem", { problem: raw })}
+			</span>
+			{cause && (
+				<DetailsDisclosure label={t("detail.technical")} className="text-xs">
+					<span className="flex flex-col items-start gap-2">
+						<code className="text-muted-foreground font-mono text-xs break-all whitespace-pre-wrap">{raw}</code>
+						<button
+							type="button"
+							className="text-primary text-xs font-medium hover:underline"
+							onClick={() => {
+								void navigator.clipboard?.writeText(raw).then(() => setCopied(true));
+							}}
+						>
+							{copied ? t("detail.copied") : t("detail.copy")}
+						</button>
+					</span>
+				</DetailsDisclosure>
+			)}
+		</span>
+	);
+}
+
 export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
@@ -100,15 +198,33 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const problem = (evaluation as EvaluationLaunchFacts).problem;
 	const { t: tw } = useTranslation("w4m2");
 	const note = benchmarksNote(run.length, skipped.length, active);
+	const notStarted = didNotStart(evaluation);
+	const done = evaluation.status === "done";
+	// The gateway block only means something once a run started (M3-1).
+	const anyRunStarted = !notStarted && run.length > 0;
+	const name = spec.name || evaluation.id;
+	usePageTitle(`${name} \u00b7 ${t("detail.crumb")} \u00b7 Heimdall`);
+	const report = done && (
+		<>
+			{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
+			<EvaluationReportCard evaluationId={evaluation.id} evaluation={evaluation} />
+			{(spec.mode === "versions" || spec.mode === "score") && <PromoteEvaluation evaluationId={evaluation.id} />}
+			{(spec.mode as string) === "model_switch" && <ModelSwitchReportView evaluationId={evaluation.id} />}
+		</>
+	);
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluation-screen" data-status={evaluation.status}>
 			<PageHeader
 				title={spec.name || evaluation.id}
-				subtitle={t("detail.subtitle")}
+				subtitle={evaluationSubtitle(t as never, evaluation, i18n.language)}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={
 					<span className="flex flex-wrap items-center gap-2">
-						<EvaluationLivePill evaluation={evaluation} testId="evaluation-status" />
+						{notStarted ? (
+							<EvaluationStatusPill status="notStarted" testId="evaluation-status" />
+						) : (
+							<EvaluationLivePill evaluation={evaluation} testId="evaluation-status" />
+						)}
 						{evaluation.schedule && (
 							<Badge variant="outline" data-testid="evaluation-scheduled">
 								{t("detail.scheduled")}
@@ -119,9 +235,26 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
-						<EvaluationRunActions evaluation={evaluation} />
-						{active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
-						<DeleteEvaluationAction id={evaluation.id} active={active} />
+						{notStarted ? (
+							<Button asChild size="sm" data-testid="evaluation-run-again">
+								<Link to={"/evaluate" as never} search={runAgainSearch(evaluation) as never}>
+									{t("detail.runAgain")}
+								</Link>
+							</Button>
+						) : (
+							<EvaluationRunActions evaluation={evaluation} />
+						)}
+						{active && <CancelButton id={evaluation.id} spent={formatCost(evaluationSpend(evaluation) ?? 0)} />}
+						{/* Schedules and Delete live in one More menu, schedules only on a finished evaluation (M3-11). */}
+						<details className="relative" data-testid="evaluation-more">
+							<summary className="border-input hover:bg-muted inline-flex h-8 cursor-pointer list-none items-center rounded-md border px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+								{t("detail.more")}
+							</summary>
+							<div className="bg-popover absolute right-0 z-20 mt-1 flex min-w-56 flex-col items-stretch gap-2 rounded-lg border p-2 shadow-md">
+								{done && <RepeatEvaluation evaluationId={evaluation.id} />}
+								<DeleteEvaluationAction id={evaluation.id} active={active} />
+							</div>
+						</details>
 					</div>
 				}
 			/>
@@ -132,7 +265,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					role="alert"
 					data-testid="evaluation-problem"
 				>
-					{problem}
+					<ProblemText raw={problem} benchmark={spec.benchmarks?.[0] ?? name} />
+				</p>
+			)}
+			{evaluation.status === "queued" && queuedReason(evaluation) && (
+				<p className="text-muted-foreground text-sm" role="status" data-testid="evaluation-queued-reason">
+					{t(`status.queuedReason.${queuedReason(evaluation)!.key}` as never, queuedReason(evaluation)!.opts)}
 				</p>
 			)}
 			{starting && !problem && (
@@ -142,24 +280,43 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						: t("detail.startingNoName", { n: starting.n, m: starting.m })}
 				</p>
 			)}
+			{/* The result of a finished evaluation comes first, before setup and progress (M3-1). */}
+			{report}
+			{!done && <RaiseBudgetPanel evaluation={evaluation} />}
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
-				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-					<span className="font-medium" data-testid="evaluation-mode">
-						<EvaluationKindLabel evaluation={evaluation} />
-					</span>
-					<span className="text-muted-foreground">{setupLine(tw as never, spec.tasks_per_benchmark, spec.trials)}</span>
-					<span className="text-muted-foreground">
-						{faults.length > 0
-							? t("detail.faults", { faults: faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ") })
-							: t("detail.noFaults")}
-					</span>
+				{/* Setup as a definition list (M3-17). */}
+				<dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+					<div className="flex flex-col">
+						<dt className="text-muted-foreground text-xs">{t("list.col.mode")}</dt>
+						<dd className="font-medium" data-testid="evaluation-mode">
+							<EvaluationKindLabel evaluation={evaluation} />
+						</dd>
+					</div>
+					<div className="flex flex-col">
+						<dt className="text-muted-foreground text-xs">{t("detail.faultLabel")}</dt>
+						<dd>
+							{faults.length > 0
+								? faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ")
+								: t("detail.noFaults")}
+						</dd>
+					</div>
+					<div className="flex flex-col">
+						<dt className="text-muted-foreground text-xs">{t("detail.setupLabel")}</dt>
+						<dd>{setupLine(tw as never, spec.tasks_per_benchmark, spec.trials)}</dd>
+					</div>
 					{budget > 0 && (
-						<span className="text-muted-foreground tabular-nums" data-testid="evaluation-budget">
-							{tf("budget", { amount: formatCost(budget) })}
-						</span>
+						<div className="flex flex-col">
+							<dt className="text-muted-foreground text-xs">{t("detail.budgetLabel")}</dt>
+							<dd className="tabular-nums" data-testid="evaluation-budget">
+								{tf("budget", { amount: formatCost(budget) })}
+							</dd>
+						</div>
 					)}
-					<span className="text-muted-foreground ml-auto text-xs tabular-nums">{formatCreated(evaluation.created_at, i18n.language)}</span>
-				</div>
+					<div className="flex flex-col">
+						<dt className="text-muted-foreground text-xs">{t("list.col.created")}</dt>
+						<dd className="tabular-nums">{formatCreated(evaluation.created_at, i18n.language)}</dd>
+					</div>
+				</dl>
 				{evaluation.schedule && (
 					<p className="text-muted-foreground text-sm" data-testid="evaluation-schedule-line">
 						{t("detail.scheduledLine", {
@@ -193,7 +350,11 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							<span className="mt-2 flex flex-col gap-1" data-testid="evaluation-no-benchmarks-reasons">
 								{childReasons(skipped).map((r) => (
 									<span key={r.benchmark} className="block break-words" data-testid={`evaluation-no-benchmarks-reason-${r.benchmark}`}>
-										{tf("childReason", { benchmark: r.benchmark, reason: r.reason })}
+										{failureCause(r.reason, r.cause) ? (
+											<ProblemText raw={r.reason} benchmark={r.benchmark} code={r.cause} />
+										) : (
+											tf("childReason", { benchmark: r.benchmark, reason: r.reason })
+										)}
 									</span>
 								))}
 							</span>
@@ -217,7 +378,14 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							return (
 								<li key={child.benchmark} data-testid={`evaluation-skipped-${child.benchmark}`}>
 									<span className="font-medium">{child.benchmark}</span>
-									{child.skipped && <span className="text-muted-foreground">: {child.skipped}</span>}
+									{child.skipped &&
+										(failureCause(child.skipped, (child as ChildWithCause).cause) ? (
+											<span className="text-muted-foreground block">
+												<ProblemText raw={child.skipped} benchmark={child.benchmark} code={(child as ChildWithCause).cause} />
+											</span>
+										) : (
+											<span className="text-muted-foreground">: {child.skipped}</span>
+										))}
 									{refusal && <SkillScanProblem refusal={refusal} testId={`evaluation-skill-scan-${child.benchmark}`} />}
 								</li>
 							);
@@ -225,22 +393,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</ul>
 				</Section>
 			)}
-			<RaiseBudgetPanel evaluation={evaluation} />
-			<EvaluationBifrostSection evaluationId={evaluation.id} />
-			{evaluation.status === "done" ? (
-				<>
-					{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
-					<EvaluationReportCard evaluationId={evaluation.id} />
-					{(spec.mode as string) === "model_switch" && <ModelSwitchReportView evaluationId={evaluation.id} />}
-					{(spec.mode === "versions" || spec.mode === "score") && <PromoteEvaluation evaluationId={evaluation.id} />}
-				</>
-			) : (
-				active && (
-					<p className="text-muted-foreground text-sm" data-testid="evaluation-report-waiting">
-						{t("detail.reportWaiting")}
-					</p>
-				)
+			{!done && active && (
+				<p className="text-muted-foreground text-sm" data-testid="evaluation-report-waiting">
+					{t("detail.reportWaiting")}
+				</p>
 			)}
+			{anyRunStarted && <EvaluationBifrostSection evaluationId={evaluation.id} summary={t("detail.gateway")} />}
 		</div>
 	);
 }
@@ -304,11 +462,19 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 			<span className="min-w-40 font-medium">{child.benchmark}</span>
 			{problem ? (
 				<span
-					className="text-chart-error-ink flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"
+					className="text-chart-warning-ink flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"
 					role="status"
 					data-testid={`evaluation-child-problem-${child.benchmark}`}
 				>
-					<span className="min-w-0 break-words">{t("detail.childProblem", { problem })}</span>
+					{/* Infrastructure, not the agent: warning tone and an icon, the raw text folded away (M1-26, M3-9). */}
+					<ServerCrash className="size-4 shrink-0 self-center" aria-hidden="true" />
+					<span className="font-medium">{t("failure.infraTitle")}</span>
+					<ProblemText
+						raw={problem}
+						benchmark={child.benchmark}
+						code={(child as ChildWithCause).cause}
+						testId={`evaluation-child-problem-text-${child.benchmark}`}
+					/>
 					{exp.data?.run_job_id && (
 						<Link
 							to="/jobs/$jobId"
@@ -330,14 +496,17 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 			)}
 			{childStoppedText(child) ? (
 				<span className="text-chart-warning-ink text-xs font-medium" data-testid={`evaluation-child-budget-stopped-${child.benchmark}`}>
-					{childStoppedText(child)}
+					{childStoppedText(child)}{" "}
+					<a href={`#${RAISE_BUDGET_ANCHOR}`} className="text-primary hover:underline">
+						{t("detail.budgetStopLine")}
+					</a>
 				</span>
 			) : childSpendText(child) ? (
 				<span className="text-muted-foreground text-xs tabular-nums" data-testid={`evaluation-child-spend-${child.benchmark}`}>
 					{childSpendText(child)}
 				</span>
 			) : null}
-			<span className="ml-auto flex gap-3">
+			{!(problem || (slots && slots.done === 0 && !active)) && <span className="ml-auto flex gap-3">
 				<Link
 					to="/experiments/$expId"
 					params={{ expId: child.experiment_id }}
@@ -355,7 +524,7 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 				>
 					{t("detail.watchRuns")}
 				</Link>
-			</span>
+			</span>}
 		</li>
 	);
 }
@@ -382,7 +551,7 @@ function DeleteEvaluationAction({ id, active }: { id: string; active: boolean })
 	);
 }
 
-function CancelButton({ id }: { id: string }) {
+function CancelButton({ id, spent }: { id: string; spent: string }) {
 	const { t } = useTranslation("evaluations");
 	const confirm = useConfirm();
 	const [cancel, state] = useCancelEvaluationMutation();
@@ -396,7 +565,7 @@ function CancelButton({ id }: { id: string }) {
 				disabled={state.isLoading}
 				data-testid="evaluation-cancel"
 				onClick={async () => {
-					const ok = await confirm(t("detail.cancelConfirm"), {
+					const ok = await confirm(t("detail.cancelConfirm", { spent }), {
 						title: t("detail.cancelConfirmTitle"),
 						confirmLabel: t("detail.cancelConfirmOk"),
 						cancelLabel: t("detail.cancelKeep"),
@@ -407,8 +576,7 @@ function CancelButton({ id }: { id: string }) {
 					try {
 						await cancel(id).unwrap();
 					} catch (e) {
-						const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message;
-						setError(msg ?? String((e as { status?: unknown })?.status ?? "error"));
+						setError(getBenchErrorMessage(e));
 					}
 				}}
 			>

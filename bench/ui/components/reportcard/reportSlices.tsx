@@ -8,7 +8,7 @@ import type { Report, ReportMetrics, ReportSlice } from "@/lib/store/apis/evalua
 import { cn } from "@/lib/utils";
 import { Filter, X } from "lucide-react";
 import * as React from "react";
-import { armName, isAB, pct, points } from "./reportCard.utils";
+import { armName, isAB, pct, points, scoreRange } from "./reportCard.utils";
 
 /** The server narrows by at most this many key:value filters. */
 export const MAX_WHERE = 4;
@@ -58,12 +58,13 @@ export function ReportFilterBar({ where, onClear }: { where?: Record<string, str
 
 function SliceScore({ metrics }: { metrics?: ReportMetrics }) {
 	if (!metrics) return <span className="text-muted-foreground">-</span>;
+	const range = scoreRange(metrics);
 	return (
 		<span className="inline-flex items-center gap-2">
 			<span className="text-foreground font-medium tabular-nums">{pct(metrics.score)}</span>
-			<span className="text-muted-foreground text-xs tabular-nums">
+			<span className="text-muted-foreground text-sm tabular-nums">
 				<span className="sr-only">95% range </span>
-				{pct(metrics.ci_low)}-{pct(metrics.ci_high)}
+				{pct(range.low)}-{pct(range.high)}
 			</span>
 		</span>
 	);

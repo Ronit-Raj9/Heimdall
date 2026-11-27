@@ -8,7 +8,7 @@ export function hasLearning(report: Report): boolean {
 }
 
 export function hasPersistence(report: Report): boolean {
-	return (report.persistence?.length ?? 0) > 0;
+	return (report.persistence ?? []).some((r) => r.resumed_without_redo || r.graceful_finish);
 }
 
 /** Success per dollar, "4.2 per $". */
@@ -107,25 +107,31 @@ export function LearningTable({ report }: { report: Report }) {
 	);
 }
 
-/** "Persistence": resume after a crash, finish under a cut budget, success per dollar. */
+/**
+ * "Persistence": resume after a crash and finish under a cut budget (M3-13). A column with no data on any row is left out,
+ * a missing value reads "Not measured", and success per dollar is dropped: the card's cost per solved task is the one cost metric.
+ */
 export function PersistenceTable({ report }: { report: Report }) {
 	const ab = isAB(report);
 	const rows = report.persistence ?? [];
-	const rate = (r?: ReportRate) => (r ? `${pct(r.value)} of ${r.runs}` : "-");
+	const rate = (r?: ReportRate) => (r ? `${pct(r.value)} of ${r.runs}` : "Not measured");
+	const showResumed = rows.some((r) => r.resumed_without_redo);
+	const showGraceful = rows.some((r) => r.graceful_finish);
 	return (
 		<Table data-testid="report-persistence" aria-label="Persistence">
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">Agent</TableHead>
-					<TableHead scope="col" className="text-right">
-						Resumed without redoing work
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Finished cleanly when budget ran out
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Success per dollar
-					</TableHead>
+					{showResumed && (
+						<TableHead scope="col" className="text-right">
+							Resumed without redoing work
+						</TableHead>
+					)}
+					{showGraceful && (
+						<TableHead scope="col" className="text-right">
+							Finished cleanly when budget ran out
+						</TableHead>
+					)}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -134,9 +140,8 @@ export function PersistenceTable({ report }: { report: Report }) {
 						<TableHead scope="row" className="font-medium">
 							{ab ? row.arm : "Your agent"}
 						</TableHead>
-						<TableCell className="text-right tabular-nums">{rate(row.resumed_without_redo)}</TableCell>
-						<TableCell className="text-right tabular-nums">{rate(row.graceful_finish)}</TableCell>
-						<TableCell className="text-right tabular-nums">{perDollar(row.cost_normalized_success)}</TableCell>
+						{showResumed && <TableCell className="text-right tabular-nums">{rate(row.resumed_without_redo)}</TableCell>}
+						{showGraceful && <TableCell className="text-right tabular-nums">{rate(row.graceful_finish)}</TableCell>}
 					</TableRow>
 				))}
 			</TableBody>

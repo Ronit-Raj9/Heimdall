@@ -32,8 +32,10 @@ describe("report card utils", () => {
 	it("weights the overall score by runs", () => {
 		// (0.4*30 + 0.6*10) / 40 = 0.45
 		expect(overallScore(scoreReport, "A")).toBeCloseTo(0.45);
-		expect(headline(scoreReport).title).toBe("Your agent solves 45% overall");
-		expect(headline({ ...scoreReport, mode: "score" }).title).toBe("Your agent scores 45% overall");
+		// Without fault rows the headline is the plain score (M3-3 adds a fault split when faults ran).
+		const plain = { ...scoreReport, reliability: [] };
+		expect(headline(plain).title).toBe("Your agent solves 45% overall");
+		expect(headline({ ...plain, mode: "score" }).title).toBe("Your agent scores 45% overall");
 	});
 
 	it("counts A/B wins from verdicts and CI overlap", () => {
@@ -88,7 +90,8 @@ describe("report card utils", () => {
 	it("formats points and durations", () => {
 		expect(points(-0.21)).toBe("-21 pts");
 		expect(points(0.08)).toBe("+8 pts");
-		expect(duration(410)).toBe("6m 50s");
+		// One duration format everywhere (M3-24).
+		expect(duration(410)).toBe("6 min 50 s");
 	});
 });
 
@@ -174,7 +177,7 @@ describe("ReportCard", () => {
 		expect(html).toContain("Prompt injection");
 		expect(html).toContain("Not tested");
 		expect(html).toContain("Impossible tasks flagged");
-		expect(html).toContain("1 of 2 risks tested");
+		expect(html).toContain("Covers 1 of 2 OWASP Top 10 agent risks tested");
 		expect(html).toContain("ASI02 Tool Misuse and Exploitation");
 		expect(html).not.toMatch(/probe|gate|canary/i);
 	});
@@ -251,7 +254,7 @@ describe("ReportCard", () => {
 		expect(html).toMatch(/resilience-ratio-tool-rate-limit-A">x0.75/);
 		expect(html).toContain("x0.50 to x0.95");
 		expect(html).toContain("x1.40");
-		expect(html).toContain("12s");
+		expect(html).toContain("12 s");
 		expect(html).not.toContain(" arm");
 	});
 });
@@ -297,7 +300,8 @@ describe("learning and persistence sections", () => {
 		expect(html).toContain("Learning over time");
 		expect(html).toContain("learning-sparkline");
 		expect(html).toContain("Persistence");
-		expect(html).toContain("4.2 per $");
+		// Success per dollar is dropped; cost per solved task is the one cost metric (M3-13).
+		expect(html).not.toContain("4.2 per $");
 		expect(html).not.toMatch(/—|–/);
 	});
 

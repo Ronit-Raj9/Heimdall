@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { ShowTestsChip } from "@/components/ui/toolbar";
+import { isTestObject, withoutTests } from "@/lib/testObjects";
 import { Button } from "@/components/ui/button";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { BASELINE_AGENTS, useGetAgentVersionsQuery, type Capability } from "@/lib/store/apis/evaluationsApi";
@@ -6,6 +8,7 @@ import "@/lib/types/evaluateI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { Bot, Check, Plug, Plus } from "lucide-react";
+import { useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { agentPickPatch, useEvaluateDraft } from "./evaluateDraft";
 import { agentCapabilities, latestVersion, REGISTER_RETURN, splitAgents, type AgentWithCaps } from "./evaluate.utils";
@@ -24,44 +27,78 @@ export function CapabilityChips({ caps }: { caps: Capability[] }) {
 	);
 }
 
-function AgentCard({ agent, selected, onPick }: { agent: AgentWithCaps; selected: boolean; onPick(): void }) {
+/**
+ * One agent as a compact radio row (M3-39): name, default model, capability chips. Rows of one list form a radio group with
+ * one tab stop; arrow keys move between them (see agentListKeys).
+ */
+function AgentRow({
+	agent,
+	selected,
+	tabbable,
+	onPick,
+}: {
+	agent: AgentWithCaps;
+	selected: boolean;
+	tabbable: boolean;
+	onPick(): void;
+}) {
 	const { t } = useTranslation("evaluate");
 	return (
 		<button
 			type="button"
+			role="radio"
+			aria-checked={selected}
+			tabIndex={tabbable ? 0 : -1}
 			onClick={onPick}
-			aria-pressed={selected}
 			data-testid={`evaluate-agent-${agent.id}`}
+			data-agent-row
 			className={cn(
-				"bg-card relative flex min-h-[120px] flex-col gap-3 rounded-xl border p-4 text-left transition-[border-color,box-shadow] duration-150",
-				"hover:border-border focus-visible:ring-ring/50 outline-none focus-visible:ring-2",
-				selected ? "border-primary ring-primary/30 ring-2" : "border-border/70",
+				"grid min-h-11 w-full grid-cols-[1fr_auto] items-center gap-3 border-b px-3 py-1.5 text-left last:border-b-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_auto]",
+				"hover:bg-muted focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset",
+				selected && "bg-primary/5",
 			)}
 		>
-			{selected && <Check className="text-primary absolute top-3 right-3 size-4" aria-hidden />}
-			<span className="flex items-center gap-3 pr-6">
-				<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-					<Bot className="size-4" aria-hidden />
-				</span>
+			<span className="flex min-w-0 items-center gap-2">
+				{selected ? <Check className="text-primary size-4 shrink-0" aria-hidden /> : <span className="size-4 shrink-0" aria-hidden />}
 				<span className="flex min-w-0 flex-col">
-					<span className="truncate text-sm font-semibold">{agent.id}</span>
+					<span className="truncate text-sm font-medium">{agent.id}</span>
 					{agent.model && (
-						<span className="text-muted-foreground truncate font-mono text-[11px]" title={t("agent.defaultModel")}>
+						<span className="text-muted-foreground truncate text-xs" title={t("agent.defaultModel")}>
 							{agent.model}
 						</span>
 					)}
 				</span>
 				{BASELINE_AGENTS.includes(agent.id) && (
-					<Badge variant="info" className="ml-auto">
+					<Badge variant="info" className="shrink-0">
 						{t("agent.baseline")}
 					</Badge>
 				)}
 			</span>
-			<span className="mt-auto">
+			<span className="hidden min-w-0 sm:block">
 				<CapabilityChips caps={agentCapabilities(agent)} />
 			</span>
+			<Bot className="text-muted-foreground size-4" aria-hidden />
 		</button>
 	);
+}
+
+/** Arrow keys inside a radio group of agent rows move focus to the next or previous row (M3-39). */
+export function agentListKeys(e: KeyboardEvent<HTMLElement>): void {
+	if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+	const rows = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-agent-row]"));
+	const i = rows.indexOf(document.activeElement as HTMLElement);
+	if (rows.length === 0) return;
+	e.preventDefault();
+	const next =
+		e.key === "Home" ? 0 : e.key === "End" ? rows.length - 1 : e.key === "ArrowDown" || e.key === "ArrowRight" ? (i + 1) % rows.length : (i - 1 + rows.length) % rows.length;
+	rows[next]?.focus();
+}
+
+/** Agents whose id or model contains the query, case blind; all when the query is blank. */
+export function filterAgents(list: readonly AgentWithCaps[], query: string): AgentWithCaps[] {
+	const q = query.trim().toLowerCase();
+	if (!q) return [...list];
+	return list.filter((a) => a.id.toLowerCase().includes(q) || (a.model ?? "").toLowerCase().includes(q));
 }
 
 /** Version picker for the chosen agent, from GET /agents/{id}/versions. */
@@ -129,7 +166,18 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 	const { draft, update } = useEvaluateDraft();
 	const q = useGetAgentsQuery();
 	const all = (q.data?.agents ?? []) as AgentWithCaps[];
-	const { own, builtin } = splitAgents(all);
+	const split = splitAgents(all);
+	// The project's own test agents ("zz-test-...", stub agents) hide behind a chip (M1-18). The wizard keeps its URL
+	// for the draft, so the switch is page state here, not ?tests=1.
+	const [showTests, setShowTests] = useState(false);
+	const ownSplit = withoutTests(
+		split.own,
+		// The picked agent always stays in view, even a test agent a link or a stored draft chose.
+		(a) => a.id !== draft.agent && isTestObject(a.id, { description: (a as { description?: string }).description }),
+		showTests,
+	);
+	const own = ownSplit.shown;
+	const builtin = split.builtin;
 
 	const pick = (a: AgentWithCaps) => {
 		onPicked?.();
@@ -137,13 +185,25 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 		update(agentPickPatch(draft, a));
 	};
 
-	const grid = (list: AgentWithCaps[]) => (
-		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-			{list.map((a) => (
-				<AgentCard key={a.id} agent={a} selected={draft.agent === a.id} onPick={() => pick(a)} />
-			))}
-		</div>
-	);
+	const [query, setQuery] = useState("");
+	const ownShown = filterAgents(own, query);
+	const builtinShown = filterAgents(builtin, query);
+	const grid = (list: AgentWithCaps[], label: string) => {
+		const selectedIn = list.some((a) => a.id === draft.agent);
+		return (
+			<div role="radiogroup" aria-label={label} className="flex flex-col rounded-lg border" onKeyDown={agentListKeys}>
+				{list.map((a, i) => (
+					<AgentRow
+						key={a.id}
+						agent={a}
+						selected={draft.agent === a.id}
+						tabbable={selectedIn ? draft.agent === a.id : i === 0}
+						onPick={() => pick(a)}
+					/>
+				))}
+			</div>
+		);
+	};
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="evaluate-step-1">
@@ -181,15 +241,31 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 				</div>
 			) : (
 				<>
+					{all.length > 6 && (
+						<input
+							type="search"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							placeholder={t("agent.search")}
+							aria-label={t("agent.search")}
+							className="border-input bg-background h-10 w-full max-w-md rounded-md border px-3 text-sm"
+							data-testid="evaluate-agent-search"
+						/>
+					)}
 					<section className="flex flex-col gap-3">
 						<div className="flex flex-wrap items-center justify-between gap-2">
-							<h3 className="text-sm font-semibold">{t("agent.yours")}</h3>
-							<Button asChild variant="outline" size="sm">
-								<Link to="/agents/new" search={{ return: REGISTER_RETURN } as never} data-testid="evaluate-register">
-									<Plus />
-									{t("agent.register")}
-								</Link>
-							</Button>
+							<span className="flex flex-wrap items-center gap-2">
+								<h3 className="text-sm font-semibold">{t("agent.yours")}</h3>
+								<ShowTestsChip count={ownSplit.hidden} on={showTests} onChange={setShowTests} testId="evaluate-show-tests" />
+							</span>
+							{own.length > 0 && (
+								<Button asChild variant="outline" size="sm">
+									<Link to="/agents/new" search={{ return: REGISTER_RETURN } as never} data-testid="evaluate-register">
+										<Plus />
+										{t("agent.register")}
+									</Link>
+								</Button>
+							)}
 						</div>
 						{draft.agent && (
 							<div
@@ -209,36 +285,49 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 								/>
 							</div>
 						)}
-						{own.length ? (
-							grid(own)
+						{own.length === 0 ? (
+							// The main path for a new user is a full-width row, not a small button (X-26).
+							<div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-center" data-testid="evaluate-register-row">
+								<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+									<span className="text-sm font-medium">{t("agentList.registerRow")}</span>
+									<span className="text-muted-foreground text-sm">{t("agent.registerHint")}</span>
+								</span>
+								<Button asChild className="w-full sm:w-auto">
+									<Link to="/agents/new" search={{ return: REGISTER_RETURN } as never} data-testid="evaluate-register">
+										<Plus />
+										{t("agent.register")}
+									</Link>
+								</Button>
+							</div>
+						) : ownShown.length ? (
+							grid(ownShown, t("agent.yours"))
 						) : (
-							<p className="text-muted-foreground text-sm">
-								{t("agent.noneYours")} {t("agent.registerHint")}
-							</p>
+							<p className="text-muted-foreground text-sm">{t("agentList.noMatch", { query })}</p>
 						)}
 					</section>
 					<section className="flex flex-col gap-3">
 						<h3 className="text-sm font-semibold">{t("agent.builtin")}</h3>
-						{builtin.length ? grid(builtin) : <p className="text-muted-foreground text-sm">{t("agent.empty")}</p>}
-						<p className="text-muted-foreground text-xs" data-testid="evaluate-test-agents-hidden">
-							{tg("agent.testAgentsHidden")}
-						</p>
+						{builtinShown.length ? (
+							grid(builtinShown, t("agent.builtin"))
+						) : (
+							<p className="text-muted-foreground text-sm">
+								{builtin.length && query ? t("agentList.noMatch", { query }) : t("agentList.noBuiltIn")}
+							</p>
+						)}
 					</section>
 				</>
 			)}
 
-			<section
-				className="border-border/70 bg-muted/30 flex flex-wrap items-center gap-3 rounded-xl border p-4"
-				data-testid="evaluate-mcp-server"
-			>
-				<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+			{/* A plain row, not a boxed card, so the text keeps its width on phones (M3-41). */}
+			<section className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center" data-testid="evaluate-mcp-server">
+				<span className="bg-muted text-muted-foreground hidden size-9 shrink-0 items-center justify-center rounded-lg sm:flex">
 					<Plug className="size-4" aria-hidden />
 				</span>
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 					<span className="text-sm font-semibold">{t("agent.mcpServer.title")}</span>
 					<span className="text-muted-foreground text-sm">{t("agent.mcpServer.hint")}</span>
 				</span>
-				<Button asChild variant="outline" size="sm">
+				<Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
 					<Link to={"/mcp-test" as never} data-testid="evaluate-mcp-server-link">
 						{t("agent.mcpServer.cta")}
 					</Link>

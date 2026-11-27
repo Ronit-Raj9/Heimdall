@@ -34,7 +34,8 @@ describe("EvaluationTable", () => {
 		expect(html).toContain("Codex nightly");
 		expect(html).toContain("codex v2");
 		expect(html).toContain("Compare two models");
-		expect(html).toContain("2 benchmarks");
+		// No Benchmarks column (M3-51): the benchmarks are listed under the name.
+		expect(html).toContain('data-testid="evaluation-benchmarks-ev_1"');
 		expect(html).toContain("Running");
 		expect(html).toContain('href="/evaluations/ev_1"');
 	});
@@ -110,9 +111,35 @@ describe("EvaluationTable scheduled repeats (fix wave 3, N297)", () => {
 		const html = render(<EvaluationTable evaluations={[first, repeat, other]} />);
 		expect(html).toContain('data-testid="evaluation-scheduled-ev_b"');
 		expect(html).not.toContain('data-testid="evaluation-scheduled-ev_a"');
-		expect(html).toContain('data-testid="evaluation-name-date-ev_a"');
-		expect(html).toContain('data-testid="evaluation-name-date-ev_b"');
-		expect(html).not.toContain('data-testid="evaluation-name-date-ev_c"');
-		expect(html).toContain(">Scheduled<");
+		// No inline date in the name (M3-51): every row has Started; a repeat says Nightly there.
+		expect(html).not.toContain("evaluation-name-date-");
+		// Nightly sits in the repeat's own row, in its Started cell, and in no other row.
+		expect(html).toMatch(/data-testid="evaluation-scheduled-ev_b"[^>]*>(<svg[^]*?<\/svg>)?Nightly<\/span>/);
+		const rowOf = (id: string) => html.slice(html.indexOf(`data-testid="evaluation-row-${id}"`)).split("</tr>")[0];
+		expect(rowOf("ev_b")).toContain("Nightly");
+		expect(rowOf("ev_a")).not.toContain("Nightly");
+		expect(rowOf("ev_c")).not.toContain("Nightly");
+	});
+});
+describe("EvaluationTable lists (M1-18, M1-59, N1-2)", () => {
+	it("marks the project's own test evaluations by name, id or test agent", async () => {
+		const { isTestEvaluation } = await import("./evaluationListView");
+		expect(isTestEvaluation(ev)).toBe(false);
+		expect(isTestEvaluation({ ...ev, spec: { ...ev.spec, name: "zz-test-loop nightly" } } as Evaluation)).toBe(true);
+		expect(isTestEvaluation({ ...ev, spec: { ...ev.spec, arms: [{ label: "A", agent: "zz-test-loop", model: "m" }] } } as Evaluation)).toBe(true);
+	});
+
+	it("pages 50 rows at a time and shows the range", () => {
+		const many = Array.from({ length: 60 }, (_, i) => ({ ...ev, id: `ev_${i}`, status: "done" }) as Evaluation);
+		const html = render(<EvaluationTable evaluations={many} />);
+		expect(html.match(/data-testid="evaluation-row-/g)?.length).toBe(50);
+		expect(html).toContain("1 to 50 of 60 evaluations");
+		expect(html).toContain('data-testid="evaluations-pager"');
+	});
+
+	it("an empty list says so and offers the way in", () => {
+		const empty = render(<EvaluationTable evaluations={[]} />);
+		expect(empty).toContain("No evaluations yet");
+		expect(empty).toContain('href="/evaluate"');
 	});
 });

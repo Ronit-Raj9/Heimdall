@@ -8,6 +8,39 @@ import type {
 	ReportProcess,
 } from "@/lib/store/apis/evaluationsApi";
 import { formatUsd } from "@/lib/money";
+import { formatDuration } from "@/lib/utils";
+import reportCardEn from "@/locales/en/reportCard.json";
+
+/** Fills {{name}} slots of an English report card text (locales/en/reportCard.json); pure, so headline() stays testable. */
+export function fillText(text: string, values: Record<string, string | number>): string {
+	return text.replace(/\{\{(\w+)\}\}/g, (_, k: string) => (k in values ? String(values[k]) : `{{${k}}}`));
+}
+
+const HEADLINE = reportCardEn.headline;
+
+/** Under this many counted runs the headline gives a count, not a percent (owner decision M3-2). */
+export const MIN_RUNS_TO_RATE = 10;
+
+/** Wilson 95% score interval for successes out of n; [0, 1] when n is 0. */
+export function wilson(successes: number, n: number): { low: number; high: number } {
+	if (!(n > 0)) return { low: 0, high: 1 };
+	const z = 1.96;
+	const p = Math.min(1, Math.max(0, successes / n));
+	const z2 = z * z;
+	const denom = 1 + z2 / n;
+	const centre = (p + z2 / (2 * n)) / denom;
+	const half = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denom;
+	return { low: Math.max(0, centre - half), high: Math.min(1, centre + half) };
+}
+
+/**
+ * The 95% range to show for a score: the server range, or the Wilson range when the server range has no width
+ * (ci_low equal to ci_high) on fewer than 30 runs, so a small sample never reads "100%-100%".
+ */
+export function scoreRange(m: { score: number; ci_low: number; ci_high: number; runs: number }): { low: number; high: number } {
+	if (m.runs > 0 && m.runs < 30 && m.ci_low === m.ci_high) return wilson(Math.round(m.score * m.runs), m.runs);
+	return { low: m.ci_low, high: m.ci_high };
+}
 
 /** Capability rows, always shown in this order. Others found in the report follow. */
 export const CAPABILITY_ORDER = ["terminal", "coding", "memory", "support", "research", "voice", "safety"] as const;
@@ -106,9 +139,10 @@ export function visibleReport(report: Report): Report {
 }
 
 /** "12% (5-25%)" for a safety rate; "Not tested" when the arm has none. */
-export function alignmentText(rate: { rate: number; ci_low: number; ci_high: number } | undefined): string {
+export function alignmentText(rate: { rate: number; ci_low: number; ci_high: number; runs?: number } | undefined): string {
 	if (!rate) return "Not tested";
-	return `${pct(rate.rate)} (${Math.round(rate.ci_low * 100)}-${pct(rate.ci_high)})`;
+	const r = scoreRange({ score: rate.rate, ci_low: rate.ci_low, ci_high: rate.ci_high, runs: rate.runs ?? 0 });
+	return `${pct(rate.rate)} (${Math.round(r.low * 100)}-${pct(r.high)})`;
 }
 
 /** "codex v2 on gpt-6.2-sol", "codex v3 (latest at launch) on gpt-6.2-sol". */
@@ -199,12 +233,7 @@ export function compactNumber(x: number | undefined | null): string {
 }
 
 export function duration(seconds: number | undefined | null): string {
-	if (seconds === undefined || seconds === null || !Number.isFinite(seconds)) return "-";
-	const s = Math.round(seconds);
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${s % 60}s`;
-	return `${Math.floor(m / 60)}h ${m % 60}m`;
+	return formatDuration(seconds);
 }
 
 /**
@@ -303,7 +332,34 @@ export interface Headline {
  * The card's headline (fix wave 3, N182 and N215): a running evaluation says how many runs are done; when a safety check threw
  * out every run there is no score; when it threw out some, the detail says so. Otherwise the score or the A/B winner.
  */
-export function headline(report: Report, checkName: CheckName = defaultCheckName): Headline {
+/** What the page knows besides the report: the budget that stopped the evaluation (M3-4). */
+export interface HeadlineContext {
+	budgetStop?: { budget: string; done: number; planned: number };
+}
+
+/** Clean and fault run counts of a one-arm report with fault rows (M3-3); undefined when it ran no fault. */
+export function faultSplit(
+	report: Report,
+	label: string,
+): { cleanSolved: number; cleanRuns: number; fault: string; faultSolved: number; faultRuns: number; delta: number } | undefined {
+	const rows = report.reliability.filter((r) => r.fault !== "clean" && (r.arms[label]?.runs ?? 0) > 0);
+	if (rows.length === 0) return undefined;
+	let cleanRuns = 0;
+	let cleanSolved = 0;
+	for (const b of report.benchmarks) {
+		const m = b.arms[label];
+		if (!m || !(m.runs > 0)) continue;
+		cleanRuns += m.runs;
+		cleanSolved += Math.round(m.score * m.runs);
+	}
+	const row = rows[0];
+	const fm = row.arms[label];
+	const faultRuns = rows.reduce((n, r) => n + (r.arms[label]?.runs ?? 0), 0);
+	const faultSolved = rows.reduce((n, r) => n + Math.round((r.arms[label]?.score ?? 0) * (r.arms[label]?.runs ?? 0)), 0);
+	return { cleanSolved, cleanRuns, fault: faultName(row.fault).toLowerCase(), faultSolved, faultRuns, delta: fm.drop };
+}
+
+export function headline(report: Report, checkName: CheckName = defaultCheckName, ctx: HeadlineContext = {}): Headline {
 	const total = report.benchmarks.length;
 	const runs = countedRuns(report);
 	const benchWord = total === 1 ? "benchmark" : "benchmarks";
@@ -329,16 +385,35 @@ export function headline(report: Report, checkName: CheckName = defaultCheckName
 			? ` ${runsText(thrown)} ${thrown === 1 ? "was" : "were"} thrown out by a safety check and ${thrown === 1 ? "is" : "are"} not in the score.`
 			: "";
 	const withNote = (h: Headline): Headline => ({ ...h, detail: h.detail + thrownNote });
+	if (ctx.budgetStop) {
+		const { budget, done, planned } = ctx.budgetStop;
+		return withNote({ title: fillText(HEADLINE.budget, { budget, done, planned }), detail: fillText(HEADLINE.budgetDetail, { done }) });
+	}
 	if (!isAB(report)) {
 		const arm = report.arms[0];
 		const score = arm ? overallScore(report, arm.label) : undefined;
+		const split = arm ? faultSplit(report, arm.label) : undefined;
+		if (split && score !== undefined) {
+			return withNote({
+				title: fillText(HEADLINE.fault, { ...split, delta: points(split.delta) }),
+				detail: fillText(HEADLINE.faultRuns, split),
+			});
+		}
+		if (score !== undefined && runs < MIN_RUNS_TO_RATE) {
+			const solved = Math.round(score * runs);
+			const r = wilson(solved, runs);
+			return withNote({
+				title: fillText(HEADLINE.small, { solved, runs }),
+				detail: fillText(HEADLINE.smallDetail, { low: pct(r.low), high: pct(r.high) }),
+			});
+		}
 		return withNote({
 			title:
 				score === undefined
 					? "No results yet"
 					: report.mode === "score"
-						? `Your agent scores ${pct(score)} overall`
-						: `Your agent solves ${pct(score)} overall`,
+						? fillText(HEADLINE.score, { pct: pct(score) })
+						: fillText(HEADLINE.solves, { pct: pct(score) }),
 			detail: `${arm ? armDescription(arm) + ", " : ""}${total} ${benchWord}, ${runs.toLocaleString("en-US")} runs${thrownNote ? "." : ""}`,
 		});
 	}

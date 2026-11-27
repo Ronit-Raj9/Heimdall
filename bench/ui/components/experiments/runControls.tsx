@@ -29,10 +29,12 @@ import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/runControl";
 import "@/app/compare/views/w4m3I18n";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowRight, Pause, Play, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { PaidButton } from "@/components/ui/paidButton";
+import "@/components/reportcard/reportCardI18n";
 
 /** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
 type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
@@ -45,9 +47,11 @@ type EvaluationWithFailures = Evaluation & { failed_runs?: number };
  * the field existed) a stored result whose score is below 100% on some arm.
  */
 export function hasFailedRuns(evaluation: Evaluation): boolean {
+	// Normal (clean) runs decide (M3-11): a 100% result does not offer a rerun of the injected outage's runs.
+	const arms = evaluation.result?.arms ?? [];
+	if (arms.length > 0) return arms.some((a) => a.runs > 0 && a.score < 1);
 	const n = (evaluation as EvaluationWithFailures).failed_runs;
-	if (typeof n === "number") return n > 0;
-	return (evaluation.result?.arms ?? []).some((a) => a.runs > 0 && a.score < 1);
+	return typeof n === "number" && n > 0;
 }
 
 type ControlSettings = { mode?: string; concurrency?: number; total_usd?: number; paused_models?: string[] };
@@ -367,18 +371,26 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
 	return (
 		<RoleGate min="member" fallback={null}>
 			<div className="flex min-w-0 flex-col gap-1.5" data-testid="rerun-failures">
-				<Button
+				{/* A rerun starts paid runs: it always asks first (M4-41). */}
+				<PaidButton
 					variant="outline"
 					size="sm"
-					className="w-fit gap-1.5"
-					title={t("rerun.hint")}
+					className="w-fit"
+					verb={t("rerun.button")}
+					capUsd={null}
+					confirm="always"
+					estimateAt="title"
+					confirmText={t("rerun.hint")}
 					isLoading={state.isLoading}
-					onClick={() => void rerun({ expId })}
-					dataTestId="rerun-failures-button"
-				>
-					<RotateCcw className="size-3.5" aria-hidden="true" />
-					{t("rerun.button")}
-				</Button>
+					onConfirm={async () => {
+						try {
+							await rerun({ expId }).unwrap();
+						} catch {
+							// Shown below from the mutation state.
+						}
+					}}
+					testId="rerun-failures-button"
+				/>
 				{res && (
 					<span className="flex flex-wrap items-center gap-2 text-xs" role="status" data-testid="rerun-failures-started">
 						{t("rerun.started", { id: res.experiment_id, tasks: res.tasks })}
@@ -407,6 +419,7 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
  */
 export function RunControlsPanel({ expId, state }: { expId: string; state: string }) {
 	const { t } = useTranslation("runControl");
+	const { t: tu } = useTranslation("uf3");
 	const controls = useGetRunControlsQuery(expId);
 	const c = controls.data;
 	if (!c) return null;
@@ -420,7 +433,11 @@ export function RunControlsPanel({ expId, state }: { expId: string; state: strin
 					{t("panel.exploratory", { parent: c.rerun_of })}
 				</p>
 			)}
-			<DetailsDisclosure label={t("panel.title")} meta={c.paused ? t("pausedBadge") : undefined} testId="run-controls-disclosure">
+			<DetailsDisclosure
+				label={t("panel.title")}
+				meta={c.paused ? t("pausedBadge") : tu("runControls.hint")}
+				testId="run-controls-disclosure"
+			>
 				<div className="flex min-w-0 flex-col gap-5 rounded-lg border p-4">
 					<p className="text-muted-foreground text-xs">{t("panel.intro")}</p>
 					{(live || c.paused) && <LiveSettings c={c} live={live} />}
@@ -504,19 +521,28 @@ export function RunActions({
 					/>
 				)}
 				{canRequeue && (
-					<Button
+					// Running again is paid: it always asks first (M4-41).
+					<PaidButton
 						variant="outline"
 						size="sm"
-						className="h-7 gap-1.5 px-2.5 text-xs"
-						title={t("run.requeueHint")}
+						className="h-7 px-2.5 text-xs"
+						verb={t("run.requeue")}
+						capUsd={null}
+						confirm="always"
+						estimateAt="title"
+						estimateRuns={1}
+						confirmText={t("run.requeueHint")}
 						isLoading={requeueState.isLoading}
 						disabled={requeueState.isSuccess}
-						onClick={() => void requeue({ expId, runId })}
-						dataTestId="run-requeue"
-					>
-						<RotateCcw className="size-3.5" aria-hidden="true" />
-						{t("run.requeue")}
-					</Button>
+						onConfirm={async () => {
+							try {
+								await requeue({ expId, runId }).unwrap();
+							} catch {
+								// Shown below from the mutation state.
+							}
+						}}
+						testId="run-requeue"
+					/>
 				)}
 				{cancelState.error && <ErrorLine error={cancelState.error} title={t("run.cancelError")} testId="run-cancel-error" />}
 				{requeueState.error && <ErrorLine error={requeueState.error} title={t("run.requeueError")} testId="run-requeue-error" />}
@@ -570,6 +596,7 @@ export function EvaluationRerunNotice({ evalId }: { evalId: string }) {
 /** Pause, resume and "Rerun failures" for an evaluation, beside its Cancel. */
 export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation }) {
 	const { t } = useTranslation("runControl");
+	const { t: tu } = useTranslation("uf3");
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
 	const [rerun, rerunState] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
@@ -612,18 +639,31 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 					</>
 				)}
 				{finished && !evaluation.rerun_of && hasFailedRuns(evaluation) && (
-					<Button
+					// Rerunning costs money: the shared paid button always asks first (M3-11, M4-41). The server sets no new
+					// cap for a rerun, so the label says it uses the model key.
+					<PaidButton
 						variant="outline"
 						size="sm"
-						className="gap-1.5"
-						title={t("rerun.hint")}
+						verb={t("rerun.button")}
+						capUsd={null}
+						confirm="always"
+						estimateAt="title"
+						estimateRuns={(evaluation as EvaluationWithFailures).failed_runs}
+						confirmText={
+							typeof (evaluation as EvaluationWithFailures).failed_runs === "number"
+								? tu("rerun.confirmN", { count: (evaluation as EvaluationWithFailures).failed_runs })
+								: tu("rerun.confirm")
+						}
 						isLoading={rerunState.isLoading}
-						onClick={() => void rerun({ evalId: evaluation.id })}
-						dataTestId="evaluation-rerun-failures"
-					>
-						<RotateCcw className="size-3.5" aria-hidden="true" />
-						{t("rerun.button")}
-					</Button>
+						onConfirm={async () => {
+							try {
+								await rerun({ evalId: evaluation.id }).unwrap();
+							} catch {
+								// Shown below from the mutation state.
+							}
+						}}
+						testId="evaluation-rerun-failures"
+					/>
 				)}
 				{pauseState.error && <ErrorLine error={pauseState.error} title={t("pauseError")} testId="evaluation-pause-error" />}
 				{resumeState.error && <ErrorLine error={resumeState.error} title={t("resumeError")} testId="evaluation-unpause-error" />}
