@@ -23,6 +23,7 @@ import { CardGridSkeleton, LoadError, TableSkeleton } from "@/components/runs/sc
 import { EmptyState, suiteIdOf } from "@/components/shell";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useGetUsageQuery } from "@/lib/store/apis/usageApi";
+import { useGetHomeSummaryQuery } from "@/lib/store/apis/homeApi";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -74,7 +75,12 @@ export default function HomeView() {
 	const evals = useListEvaluationsQuery(undefined, poll);
 	const [usageRange] = useState(() => homeUsageRange());
 	// M8-19: "Spent" is the Usage total of this calendar month (UTC), the same number Usage shows.
-	const usage = useGetUsageQuery(usageRange);
+	// Q-112: GET /home/summary answers Spent in one call; Usage is read only when the summary has no spend
+	// (an older server, or the summary failed).
+	const summary = useGetHomeSummaryQuery();
+	const summarySpend = typeof summary.data?.spend_month_usd === "number" ? summary.data.spend_month_usd : null;
+	const usage = useGetUsageQuery(usageRange, { skip: summary.isLoading || summarySpend !== null });
+	const spend = summarySpend ?? usage.data?.total_cost_usd ?? null;
 	const models = useGetModelsQuery();
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const evaluations = evals.data ?? [];
@@ -116,7 +122,7 @@ export default function HomeView() {
 	// M2-8: each tile reads its own query state; a failed load says so, never "No scored runs yet" or $0.00.
 	const runsState = queryState(runs);
 	const evalsState = queryState(evals);
-	const usageState = queryState(usage);
+	const usageState = summarySpend !== null ? "ready" : summary.isLoading ? "loading" : queryState(usage);
 	const agentsState = queryState(agents);
 	const kpiError = (onRetry: () => void) => (
 		<span className="inline-flex flex-wrap items-center gap-1">
@@ -197,7 +203,7 @@ export default function HomeView() {
 					<StatCard
 						icon={Wallet}
 						label={t("kpi.spend")}
-						value={usageState !== "ready" || !usage.data ? "-" : usd(usage.data.total_cost_usd)}
+						value={usageState !== "ready" || spend === null ? "-" : usd(spend)}
 						hint={
 							usageState === "error"
 								? kpiError(() => void usage.refetch())
