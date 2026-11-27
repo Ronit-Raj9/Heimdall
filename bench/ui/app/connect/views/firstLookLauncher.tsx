@@ -93,6 +93,7 @@ export function BareModelCard({
 					verb={t("firstLook.bareStart")}
 					capUsd={null}
 					confirm="auto"
+					kind="form"
 					confirmText={tu("connect.bareConfirm")}
 					onConfirm={onStart}
 					isLoading={loading}
@@ -175,6 +176,7 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 							capUsd={null}
 							estimateUsd={firstLookUsd(rawUsd) ?? null}
 							confirm="auto"
+							kind="form"
 							confirmText={tu("connect.firstLookConfirm")}
 							onConfirm={start}
 							isLoading={createState.isLoading}

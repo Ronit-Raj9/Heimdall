@@ -160,6 +160,7 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 					verb={t("export.apply.run")}
 					capUsd={null}
 					confirm="auto"
+					kind="form"
 					confirmText={t("export.apply.confirm", { count: ruleCount, url })}
 					disabled={!ready || state.isLoading}
 					aria-describedby={why ? "model-switch-apply-why" : undefined}

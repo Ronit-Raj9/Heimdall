@@ -92,6 +92,7 @@ export default function ImprovementView({ id }: { id: string }) {
 							verb={tw("resume.button")}
 							capUsd={null}
 							confirm="auto"
+							kind="form"
 							confirmText={tw("resume.confirm")}
 							estimateAt="title"
 							isLoading={resumeState.isLoading}

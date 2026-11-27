@@ -140,6 +140,7 @@ export function PauseControls({ expId }: { expId: string }) {
 						verb={t("resume")}
 						capUsd={null}
 						confirm="auto"
+						kind="form"
 						estimateAt="title"
 						confirmText={tc("resume.confirm")}
 						isLoading={resumeState.isLoading}
@@ -666,6 +667,7 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 							verb={t("resume")}
 							capUsd={null}
 							confirm="auto"
+							kind="form"
 							estimateAt="title"
 							confirmText={tc("resume.confirm")}
 							isLoading={resumeState.isLoading}

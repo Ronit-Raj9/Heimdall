@@ -562,6 +562,7 @@ export default function ConnectView() {
 								verb={verify ? t("verify.again") : t("verify.start")}
 								capUsd={null}
 								confirm="auto"
+								kind="form"
 								onConfirm={doVerify}
 								isLoading={startState.isLoading || (Boolean(verify) && !verifyDone)}
 								testId="connect-verify-start"

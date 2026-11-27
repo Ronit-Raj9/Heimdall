@@ -374,6 +374,7 @@ export function FeatureTestDialog({
 						capUsd={Number.isFinite(budgetUsd) && budgetUsd > 0 ? budgetUsd : null}
 						estimateUsd={est?.usd ?? null}
 						confirm="auto"
+						kind="form"
 						disabled={estimating || !built.req || !prepared || prepared.plan.errors.length > 0}
 						onConfirm={onStart}
 						testId="feature-test-start"

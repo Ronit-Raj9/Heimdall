@@ -362,6 +362,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 						estimateUsd={cost?.known ? cost.high : null}
 						estimateAt="title"
 						confirm="auto"
+						kind="form"
 						confirmText={typedBudget ? t("launchConfirm", { runs, usd: formatUsd(typedBudget) }) : t("launchConfirmDefault", { runs })}
 						disabled={!ready || budgetIssue !== ""}
 						isLoading={state.isLoading}

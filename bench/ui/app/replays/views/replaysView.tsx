@@ -460,6 +460,7 @@ function NewReplay() {
 					estimateRuns={Number(form.sessions) > 0 ? Number(form.sessions) : undefined}
 					estimateAt="title"
 					confirm="always"
+					kind="form"
 					disabled={problems.length > 0 || active}
 					isLoading={job.isLoading}
 					aria-describedby={problems.length > 0 ? "replays-why" : undefined}

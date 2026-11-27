@@ -197,6 +197,7 @@ export function ServeOpenModel() {
 							verb={t("serve.start")}
 							capUsd={maxCost(choice, limit)}
 							confirm="always"
+							kind="form"
 							confirmText={tu("confirm.serveStart", { hours: limit, max: maxCost(choice, limit).toFixed(2) })}
 							disabled={started.isLoading || !choice || choice.count === 0 || hoursProblem(limit)}
 							isLoading={started.isLoading}

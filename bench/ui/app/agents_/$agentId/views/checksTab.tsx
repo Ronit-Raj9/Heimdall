@@ -378,6 +378,7 @@ function TryRealButton({ params, label }: { params: Record<string, unknown>; lab
 				verb={label}
 				capUsd={null}
 				confirm="auto"
+				kind="form"
 				variant="outline"
 				disabled={!canUse(session, "member")}
 				onConfirm={async () => {

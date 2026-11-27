@@ -436,6 +436,7 @@ export function NewImprovementForm({
 					verb={tu("improve.startVerb")}
 					capUsd={limitUsd(form.limit)}
 					confirm="always"
+					kind="form"
 					confirmText={tu("improve.confirmText")}
 					disabled={block !== undefined || busy}
 					isLoading={busy}

@@ -98,6 +98,7 @@ export function InvestigateDialog({ onDone }: { onDone: () => void }) {
 					verb={t("investigations.verb")}
 					capUsd={cap}
 					confirm="always"
+					kind="form"
 					confirmText={t("investigations.ask", { name, cap: cap.toFixed(2) })}
 					disabled={!expId || state.isLoading || started}
 					onConfirm={start}

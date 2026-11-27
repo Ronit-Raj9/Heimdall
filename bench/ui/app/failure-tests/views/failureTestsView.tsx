@@ -660,6 +660,7 @@ export default function FailureTestsView() {
 								estimateUsd={cost.estimateUsd}
 								estimateRuns={cost.runs}
 								confirm="always"
+								kind="form"
 								estimateAt="title"
 								onConfirm={launch}
 								disabled={problem !== null}

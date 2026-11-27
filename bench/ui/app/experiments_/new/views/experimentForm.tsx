@@ -561,6 +561,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 								capUsd={planned ? planned.experiment.budget.total_usd : null}
 								estimateRuns={planned?.plan.slots}
 								confirm="auto"
+								kind="form"
 								disabled={blockReason !== null || busy}
 								isLoading={busy}
 								onConfirm={onCreateAndStart}

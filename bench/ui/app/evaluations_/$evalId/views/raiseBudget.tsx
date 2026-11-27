@@ -120,6 +120,7 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 					verb={t("raise.button")}
 					capUsd={valid ? value : current}
 					confirm="always"
+					kind="form"
 					confirmText={valid ? t("raise.confirm", { added: dollars(value - current), total: dollars(value) }) : undefined}
 					disabled={!valid || state.isLoading}
 					onConfirm={async () => {
