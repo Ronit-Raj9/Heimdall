@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -87,7 +89,7 @@ export default function QuickstartView() {
 	const { data, error, refetch } = q;
 	const isLoading = light.isLoading || (needFull && full.isLoading) || (!signedOut && !data && !error);
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="quickstart-view">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8")} data-testid="quickstart-view">
 			<PageHeader
 				title={tu("quickstart.title")}
 				subtitle={tu("quickstart.subtitle")}

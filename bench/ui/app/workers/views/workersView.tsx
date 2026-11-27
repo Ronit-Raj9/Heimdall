@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { ModeBadge } from "@/components/modeBadge";
 import { ImageRequestsCard } from "@/components/sharedpool/imageRequests";
 import { ConnectedWorkers } from "@/components/workers/connectedWorkers";
@@ -121,7 +122,7 @@ export default function WorkersView({ tokensLink = true }: { /** The pointer to 
 	const data = query.data;
 	const off = !query.isLoading && isWorkersOff(query.isError ? query.error : undefined, data);
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="workers-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="workers-screen">
 			<PageHeader
 				title={t("workers.title")}
 				subtitle={t("workers.subtitle")}
@@ -149,7 +150,7 @@ export default function WorkersView({ tokensLink = true }: { /** The pointer to 
 				<EmptyNote testId="workers-empty">{t("workers.empty")}</EmptyNote>
 			) : (
 				<div className={cn("min-w-0 transition-opacity", query.isFetching && "opacity-60")} aria-busy={query.isFetching}>
-					<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label={t("workers.label")} data-testid="workers-table">
+					<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label={t("workers.label")} data-testid="workers-table">
 						{data.workers.map((w) => (
 							<li key={w.id} className="min-w-0">
 								<RunnerCard worker={w} />

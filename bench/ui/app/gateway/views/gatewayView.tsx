@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { RESULT_TONE } from "@/components/gateway/gatewayEffectCard";
 import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
 import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
@@ -334,7 +335,7 @@ export default function GatewayView() {
 	const q = useGetGatewayReportCardQuery();
 	const [starting, setStarting] = useState<GwCardLine | null>(null);
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="gateway-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="gateway-screen">
 			<PageHeader title={t("page.title")} subtitle={t("page.subtitle")} />
 			{q.isLoading ? (
 				<BlockSkeleton rows={6} testId="gateway-loading" />

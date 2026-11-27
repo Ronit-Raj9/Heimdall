@@ -5,7 +5,6 @@
 		"heading": "Your server",
 		"url": "MCP endpoint",
 		"urlHint": "The streamable HTTP endpoint of your server.",
-		"inspectNote": "Free: no model is used. Sends a small batch of requests, including some deliberately malformed ones, and takes under a minute.",
 		"secret": "Credential",
 		"secretNone": "No credential",
 		"secretHint": "An org secret. Add one under Settings, Secrets.",

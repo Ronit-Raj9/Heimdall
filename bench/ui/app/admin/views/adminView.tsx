@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -66,7 +67,7 @@ export default function AdminView({
 		);
 	}
 	return (
-		<div className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="admin-view">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="admin-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<Tabs value={tab} onValueChange={(value) => void setTab(adminTab(value) === "overview" ? null : value)} className="gap-6">
 				{/* Q-232: on a phone the strip fades at its right edge, so the tabs past it are hinted. */}

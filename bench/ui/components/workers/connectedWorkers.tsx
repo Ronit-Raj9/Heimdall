@@ -482,7 +482,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 					))}
 				</div>
 			</fieldset>
-			<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+			<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
 				<Field label={t("form.name")} hint={t("form.nameHint")} htmlFor={`${base}-name`}>
 					<input
 						id={`${base}-name`}
@@ -563,7 +563,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 					{draft.kubeMode === "kubeconfig" ? (
 						area("kubeconfig", t("kubernetes.kubeconfig"), t("kubernetes.kubeconfigHint"))
 					) : (
-						<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+						<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
 							{text("server", t("kubernetes.server"))}
 							{text("token", t("kubernetes.saToken"), t("form.secretHint"), "password")}
 							<div className="md:col-span-2">{area("ca", t("kubernetes.ca"))}</div>

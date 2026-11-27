@@ -36,7 +36,7 @@
 		"loading": "Reading the steps of this run.",
 		"error": "Could not run the behaviour checks.",
 		"seen": "Seen",
-		"notSeen": "Not seen",
+		"notSeen": "Not seen in the agent's steps",
 		"cannotTell": "Cannot tell",
 		"witnessed": "witnessed",
 		"none": "No checks yet.",

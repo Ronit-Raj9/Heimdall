@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import "@/components/settings/w4m8I18n";
@@ -300,7 +301,7 @@ export function OperatePanels({
 	return (
 		<div className="flex min-w-0 flex-col gap-6">
 			<OperateTiles status={status} backupCount={backupCount} />
-			<div className="grid min-w-0 gap-6 lg:grid-cols-2">
+			<div className="grid min-w-0 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
 				<Section
 					title={t("health.title")}
 					description={hosted ? t("health.hostedDescription") : t("health.description")}
@@ -501,7 +502,7 @@ export default function OperateView() {
 	// Q-54: inside Settings the frame already pads the page; a second padding shifted the heading 16 px.
 	const embedded = useEmbedded();
 	return (
-		<section className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="operate-loading" />

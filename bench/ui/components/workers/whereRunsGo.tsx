@@ -205,7 +205,8 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 	if (!data || data.choices.length === 0) return null;
 	if (data.choices.length === 1) {
 		const only = data.choices[0];
-		const label = choiceLabel(only, t("target.sandbox"));
+		// Q-250: one plain line, "Runs on: Modal, a fresh sandbox per run".
+		const label = only.kind === "platform" ? `${only.title}, ${t("target.sandbox")}` : only.title;
 		const line = only.slots && only.slots > 0 ? t("target.onlyOneSlots", { label, n: only.slots }) : t("target.onlyOne", { label });
 		return (
 			<section className="flex flex-col gap-1 text-sm" data-testid="eval-worker-only">

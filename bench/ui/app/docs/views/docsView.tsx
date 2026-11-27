@@ -1,3 +1,4 @@
+import { PageWidth } from "@/components/shell/pageWidth";
 import "@/components/share/uf8bI18n";
 import { hostedDocSource, Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
@@ -147,7 +148,7 @@ export default function DocsView() {
 	};
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="docs-view">
+		<PageWidth kind="read" className="flex flex-col gap-6" testId="docs-view">
 			{reading ? (
 				// With a guide open its title is the page's h1, so "Docs" is a small label above it (M8-65).
 				<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase" data-testid="docs-header">
@@ -163,7 +164,7 @@ export default function DocsView() {
 			) : (list.data?.docs.length ?? 0) === 0 ? (
 				<EmptyState icon={BookOpen} message={t("docs.none")} testId="docs-none" />
 			) : (
-				<div className="grid min-w-0 gap-8 md:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_12rem]">
+				<div className="grid min-w-0 gap-8 md:grid-cols-[14rem_minmax(0,1fr)]">
 					<nav className="flex min-w-0 flex-col gap-3 md:sticky md:top-0 md:max-h-[calc(100dvh-10rem)]" aria-label={t("docs.title")}>
 						{reading && (
 							<button
@@ -215,7 +216,8 @@ export default function DocsView() {
 						</div>
 						</div>
 					</nav>
-					<div className={cn("max-w-3xl min-w-0", reading && "order-first md:order-none")}>
+					<div className={cn("min-w-0", reading && "order-first md:order-none")}>
+						{toc.length > 1 && doc.data && <DocToc toc={toc} label={t("docs.onThisPage")} />}
 						{doc.isFetching && !doc.data ? (
 							<BlockSkeleton rows={8} testId="doc-loading" />
 						) : noGuide ? (
@@ -237,36 +239,37 @@ export default function DocsView() {
 							<EmptyState icon={BookOpen} message={t("docs.pick")} testId="doc-pick" />
 						)}
 					</div>
-					{toc.length > 1 && (
-						<aside className="hidden xl:block" aria-label={t("docs.onThisPage")}>
-							<div className="sticky top-0 flex flex-col gap-2 text-[13px]">
-								<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("docs.onThisPage")}</p>
-								<ul className="flex flex-col gap-1 border-l">
-									{toc.map((h) => (
-										<li key={h.id}>
-											<a
-												href={`#${h.id}`}
-												onClick={(e) => {
-													e.preventDefault();
-													document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
-												}}
-												className={cn(
-													"text-muted-foreground hover:text-foreground -ml-px block truncate border-l border-transparent py-1.5 transition-colors hover:border-foreground/40",
-													h.level === 3 ? "pl-6" : "pl-3",
-												)}
-												title={h.text}
-											>
-												{h.text.replace(/[`*_]/g, "")}
-											</a>
-										</li>
-									))}
-								</ul>
-							</div>
-						</aside>
-					)}
 				</div>
 			)}
-		</section>
+		</PageWidth>
+	);
+}
+/** The guide's headings. The read page width has no room for a third column, so it folds above the article. */
+function DocToc({ toc, label }: { toc: { id: string; text: string; level: number }[]; label: string }) {
+	return (
+		<details className="mb-4 rounded-lg border px-3 py-2 text-[13px]" data-testid="docs-toc">
+			<summary className="text-muted-foreground cursor-pointer text-xs font-medium tracking-wide uppercase">{label}</summary>
+			<ul className="mt-2 flex flex-col gap-1 border-l">
+				{toc.map((h) => (
+					<li key={h.id}>
+						<a
+							href={`#${h.id}`}
+							onClick={(e) => {
+								e.preventDefault();
+								document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
+							}}
+							className={cn(
+								"text-muted-foreground hover:text-foreground -ml-px block truncate border-l border-transparent py-1 transition-colors hover:border-foreground/40",
+								h.level === 3 ? "pl-6" : "pl-3",
+							)}
+							title={h.text}
+						>
+							{h.text.replace(/[`*_]/g, "")}
+						</a>
+					</li>
+				))}
+			</ul>
+		</details>
 	);
 }
 /** One list of guide links; the open guide is marked by a filled row, not a side stripe (X-64). */

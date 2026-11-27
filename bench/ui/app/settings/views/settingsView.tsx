@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import "@/components/settings/uf8aI18n";
 import { ApiTokensTab } from "@/components/settings/apiTokensTab";
 import { AuditTab } from "@/components/settings/auditTab";
@@ -184,7 +186,7 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 
 	return (
 		<section
-			className="mx-auto flex w-full max-w-[1280px] min-w-0 flex-col gap-8"
+			className={cn(pageWidthClass("wide"), "flex flex-col gap-8")}
 			data-testid="settings-screen"
 			data-mode={local ? "local" : "hosted"}
 		>
