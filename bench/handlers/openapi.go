@@ -81,7 +81,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: OpenAPIPath, Tag: "meta", Summary: "This OpenAPI 3.1 description", Raw: "application/json"},
 
 	{Method: "GET", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "List experiments with their status", Response: schemas.ExperimentList{}, Query: append(append([]QueryDoc{}, ListQueryDocs...),
-		QueryDoc{Name: "arm_stats", Description: "1: each row gets arm_stats, runs, passed, pass rate and cost per setup from the run index"})},
+		QueryDoc{Name: "arm_stats", Description: "1: each row gets arm_stats, runs, passed, pass rate and cost per setup from the run index"}, ArchivedQueryDoc)},
 	{Method: "POST", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "Plan, freeze and create an experiment; nothing runs until start",
 		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Status: fasthttp.StatusCreated, Response: schemas.ExperimentCreated{}},
 	{Method: "POST", Path: APIPrefix + "/experiments/plan", Tag: "experiments", Summary: "Size an experiment without running anything; planner errors come back in errors with 200",
@@ -155,6 +155,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "dir", Description: "Sort direction: asc or desc (default desc)"},
 		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
 		{Name: "failed", Description: "1 or true: only runs that did not pass"},
+		ArchivedQueryDoc,
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{},
 		Query: []QueryDoc{{Name: "failure", Description: "1: a run that did not pass gets failure, its failure group in its own evaluation (signature, title, text, count)"}}},
@@ -394,7 +395,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/canaries/{name}/run", Tag: "canaries", Summary: "Start one look (and its confirmation after a flag) in the background; 409 while the canary runs; refused under the daily cap",
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: canary.RunAccepted{}},
 	// Improvement runs (improve.go, docs/improvement-runs.md).
-	{Method: "GET", Path: APIPrefix + "/improvements", Tag: "improvements", Summary: "Improvement runs: the agent improving its own prompt, notes and skills over rounds, with status, commits and verdict", Response: improve.List{}},
+	{Method: "GET", Path: APIPrefix + "/improvements", Tag: "improvements", Summary: "Improvement runs: the agent improving its own prompt, notes and skills over rounds, with status, commits and verdict", Response: improve.List{}, Query: []QueryDoc{ArchivedQueryDoc}},
 	{Method: "POST", Path: APIPrefix + "/improvements", Tag: "improvements", Summary: "Create an improvement run from a spec (YAML or JSON) and start it in the background",
 		Auth: AuthWrite, Request: improve.Spec{}, Status: fasthttp.StatusAccepted, Response: improve.Summary{}},
 	{Method: "GET", Path: APIPrefix + "/improvements/{id}", Tag: "improvements", Summary: "The report: learning curves on dev, audit and held-out tasks against the control band, rounds, lineage, integrity and cost", Response: improve.Detail{}},

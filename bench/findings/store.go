@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 const (
@@ -68,6 +70,9 @@ type Finding struct {
 	Arm        string    `json:"arm,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+	// Archived is set while the finding is archived (UI fix wave D1); it is
+	// not a state, so the state rules never see it.
+	schemas.Archived
 }
 
 type TaskRef struct {

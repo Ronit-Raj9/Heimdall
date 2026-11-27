@@ -148,6 +148,9 @@ type RunEvents struct {
 // and receipts. A file the run has not written yet is null or empty, never
 // zeros. SealHash is empty until the run is sealed.
 type RunDetail struct {
+	// Archived is read from the organization's archive sidecar, never from
+	// the sealed run folder (UI fix wave D1).
+	Archived
 	AdapterFault *AdapterFaultEvidence `json:"adapter_fault,omitempty"`
 	Slot         Slot                  `json:"slot"`
 	Run          Run                   `json:"run"`
@@ -284,6 +287,9 @@ type SlotProgress struct {
 
 // ExperimentStatus is GET /experiments/{id} and POST /experiments/{id}/start.
 type ExperimentStatus struct {
+	// Archived is read from the organization's archive sidecar, never from
+	// the sealed folder (UI fix wave D1).
+	Archived
 	ExpID        string          `json:"exp_id"`
 	Name         string          `json:"name"`
 	State        ExperimentState `json:"state"`

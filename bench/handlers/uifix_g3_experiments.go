@@ -65,6 +65,10 @@ func (h *ExperimentsHandler) listExperimentsPaged(ctx *fasthttp.RequestCtx) bool
 	if !p.on && !args.Has("arm_stats") {
 		return false
 	}
+	marks, ok := h.archiveMarks(ctx) // UI fix wave D1: archived= (uifix_d1_archive.go)
+	if !ok {
+		return true
+	}
 	if !p.on {
 		p.limit = max(len(h.index.Experiments()), 1) // arm_stats alone: the whole list
 	}
@@ -74,7 +78,7 @@ func (h *ExperimentsHandler) listExperimentsPaged(ctx *fasthttp.RequestCtx) bool
 		if !found {
 			continue
 		}
-		if p.match(m.ExpID, m.Experiment.Name) {
+		if p.match(m.ExpID, m.Experiment.Name) && marks.keep(m.ExpID) {
 			kept = append(kept, m)
 		}
 	}
@@ -83,6 +87,7 @@ func (h *ExperimentsHandler) listExperimentsPaged(ctx *fasthttp.RequestCtx) bool
 	for _, m := range kept[lo:hi] {
 		runs := h.index.Runs(m.ExpID)
 		row := ExperimentListRow{ExperimentStatus: h.listRow(m, runs)}
+		row.Archived = marks.mark(m.ExpID)
 		if stats {
 			row.ArmStats = armStats(h.index, m, runs)
 		}

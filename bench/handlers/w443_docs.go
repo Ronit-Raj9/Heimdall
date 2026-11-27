@@ -8,7 +8,7 @@ func init() {
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "GET", Path: APIPrefix + "/findings", Tag: tag,
 			Summary:  "The organization's findings, newest change first, with a count per state; fixed findings whose tasks failed again are reopened first",
-			Query:    []QueryDoc{{Name: "state", Description: "open, expected, fixed or reopened"}},
+			Query:    []QueryDoc{{Name: "state", Description: "open, expected, fixed or reopened"}, ArchivedQueryDoc},
 			Response: FindingsList{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/findings/{id}", Tag: tag, Summary: "One finding with its tasks, runs, quotes and history", Response: findings.Finding{}},
 		RouteDoc{Method: "POST", Path: APIPrefix + "/findings", Tag: tag,

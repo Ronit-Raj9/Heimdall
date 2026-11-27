@@ -82,7 +82,7 @@ type RetentionRequest struct {
 // DeletedInfo answers a delete.
 type DeletedInfo struct {
 	Deleted     string   `json:"deleted"`
-	Kind        string   `json:"kind"` // experiment | evaluation
+	Kind        string   `json:"kind"` // experiment | evaluation | monitor_certification
 	Experiments []string `json:"experiments,omitempty"`
 }
 
@@ -174,10 +174,12 @@ func (h *dataOpsHandler) deleteExperiment(ctx *fasthttp.RequestCtx) {
 	}
 	wctx, cancel := workContext(ctx, 2*time.Minute)
 	defer cancel()
+	runs := h.runIDs(id)
 	if err := h.env.Services.Data.EraseExperiment(wctx, id); err != nil {
 		sendDepError(ctx, h.env.Mode, "delete comparison", err)
 		return
 	}
+	dropArchived(h.root(), id, runs) // UI fix wave D1: no stale archive mark
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, DeletedInfo{Deleted: id, Kind: "experiment"})
 }
 
@@ -210,10 +212,12 @@ func (h *dataOpsHandler) deleteEvaluation(ctx *fasthttp.RequestCtx) {
 	wctx, cancel := workContext(ctx, 5*time.Minute)
 	defer cancel()
 	for _, id := range exps {
+		runs := h.runIDs(id)
 		if err := h.env.Services.Data.EraseExperiment(wctx, id); err != nil && !errors.Is(err, schemas.ErrNotFound) {
 			sendDepError(ctx, h.env.Mode, "delete comparison "+id, err)
 			return
 		}
+		dropArchived(h.root(), id, runs) // UI fix wave D1
 	}
 	if err := ev.store().Delete(e.ID); err != nil && !errors.Is(err, evalstore.ErrNotFound) {
 		sendDepError(ctx, h.env.Mode, "delete evaluation", err)

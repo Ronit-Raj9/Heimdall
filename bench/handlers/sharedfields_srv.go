@@ -18,6 +18,7 @@ var sharedHiddenFields = map[string]struct {
 // fields of that part removed; other parts are returned as they are.
 func withoutNewSharedFields(part string, v any) any {
 	v = withoutCGSharedFields(part, v)
+	v = withoutD1SharedFields(v) // UI fix wave D1: archived_at, archived_by (uifix_d1_sharedfields.go)
 	hide, ok := sharedHiddenFields[part]
 	m, isMap := v.(map[string]any)
 	if !ok || !isMap {

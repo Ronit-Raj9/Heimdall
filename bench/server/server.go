@@ -194,7 +194,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 // them a policy entry in tenancy/policy.go (TestPolicyCoversEveryRoute).
 func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.Middleware, common []lib.Middleware) *handlers.ExperimentsHandler {
 	mode := cfg.Server.Mode
-	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
+	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write).WithArchiveRoot(cfg.Root) // UI fix wave D1: archive sidecar
 	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...)            // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewDrainHandler(mode, cfg.Auth.IsHosted(), write, deps.Logger).RegisterRoutes(r, common...) // Z11 drain mode: GET/POST /admin/drain (handlers/drain.go)
@@ -204,7 +204,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// server the platform router serves these routes first (cmd/bifrost-bench/pullagent_hosted.go).
 	handlers.NewPullAgentHandler(mode, pullagent.Shared(), pullagent.DefaultSigner(), false, cfg.PullPublicOrigin(), write).RegisterAgentRoutes(r, common...)
 	// Held-out tasks: a held-out task's run content needs held_out.visible too.
-	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WithBreakpoints(deps.Services.Holds != nil).RegisterRoutes(r, common...)
+	handlers.NewRunsHandler(mode, deps.Index).WithArchiveRoot(cfg.Root).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WithBreakpoints(deps.Services.Holds != nil).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).WithRoot(cfg.Root).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
 	handlers.NewPairsHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
@@ -273,7 +273,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// W5 drift canary: GET /canaries, GET /canaries/{name}, POST /canaries/{name}/run (handlers/canary.go, docs/drift-canary.md).
 	handlers.NewCanaryHandler(mode, deps.Canaries, write).RegisterRoutes(r, common...)
 	// Improvement runs: /improvements (handlers/improve.go, docs/improvement-runs.md).
-	handlers.NewImproveHandler(mode, deps.Improvements, write).RegisterRoutes(r, common...)
+	handlers.NewImproveHandler(mode, deps.Improvements, write).WithArchiveRoot(cfg.Root).RegisterRoutes(r, common...)
 	// W6 migration report, cost explanation and Pareto planes (handlers/migration.go, handlers/costexplain.go, docs/model-migration.md, docs/cost-explain.md).
 	handlers.NewMigrationHandler(mode, deps.Migration).RegisterRoutes(r, common...)
 	// U3: the held-out board's plane needs held_out.visible too.
@@ -285,7 +285,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewAwarenessHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewComplianceHandler(mode, deps.Compliance).RegisterRoutes(r, common...) // Eval integrity area (S2): compliance pack (handlers/compliance.go)
 	// Eval integrity area (S2): monitor certification (handlers/monitorcert.go).
-	handlers.NewMonitorCertHandler(mode, deps.MonitorCerts).RegisterRoutes(r, common...)
+	handlers.NewMonitorCertHandler(mode, deps.MonitorCerts).WithWrite(write).RegisterRoutes(r, common...)
 	// Web parity: every area registered with handlers.RegisterOrgArea (handlers/orgareas.go).
 	env := handlers.OrgEnv{Cfg: cfg, Mode: mode, Services: deps.Services, Write: write, Common: common, Upload: uploadMiddlewares(mode, common)}
 	for _, area := range handlers.OrgAreas() {

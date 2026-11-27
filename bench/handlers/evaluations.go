@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -157,11 +158,16 @@ func (h *evaluationsHandler) list(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
+	archived, ok := readArchiveFilter(ctx, h.env.Mode) // UI fix wave D1: archived= (uifix_d1_archive_store.go)
+	if !ok {
+		return
+	}
 	evs, err := h.store().List()
 	if err != nil {
 		h.fail(ctx, fasthttp.StatusInternalServerError, "list evaluations: "+err.Error())
 		return
 	}
+	evs = slices.DeleteFunc(evs, func(ev *schemas.Evaluation) bool { return !archived.keep(ev.IsArchived()) })
 	if opt.on() {
 		h.listPaged(ctx, opt, evs)
 		return

@@ -398,6 +398,8 @@ type Evaluation struct {
 	// infra_error runs over every child (N183), so a page offers "Rerun
 	// failures" only when there is one.
 	FailedRuns int `json:"failed_runs,omitempty"`
+	// Archived is set while the evaluation is archived (UI fix wave D1).
+	Archived
 	// Problem is the plain reason an evaluation failed before any child
 	// started: the launch failed, or the server restarted while it was
 	// starting.

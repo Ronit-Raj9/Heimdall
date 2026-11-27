@@ -60,6 +60,7 @@ type RunsHandler struct {
 	suites         SuiteSource // optional: the task voice bounds of the Voice tab (runvoice.go)
 	heldOutVisible bool        // server config held_out.visible (WithHeldOutVisible)
 	breakpoints    bool        // this server can hold model calls (WithBreakpoints)
+	archiveRoot    string      // project root of the archive sidecar (UI fix wave D1); "" marks none
 }
 
 // WithBreakpoints sets whether this server can hold a run's model calls
@@ -163,6 +164,7 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, SealHash: rv.SealHash, Superseded: rv.Superseded, GradeSource: GradeSourceOriginal,
 		Gates: []schemas.GateResult{}, Receipts: []schemas.Receipt{},
 	}
+	out.Archived = archiveMarkOf(h.archiveRoot, archiveRuns, id) // UI fix wave D1: an archived run still opens by id
 	if sv, isVerifier := h.index.(SealVerifier); isVerifier && rv.Sealed {
 		if err := sv.VerifySeal(ctx, id); err != nil {
 			out.SealError = err.Error()

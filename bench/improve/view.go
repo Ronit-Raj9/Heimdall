@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 )
 
@@ -29,6 +30,9 @@ type Summary struct {
 	// Teacher is the model the improver ran on when the spec names one
 	// (A3.7); the list shows the run as teacher-assisted.
 	Teacher string `json:"teacher,omitempty"`
+	// Archived is read from the organization's archive sidecar, never from
+	// improvement.json (UI fix wave D1).
+	schemas.Archived
 }
 
 // List is GET /improvements.
