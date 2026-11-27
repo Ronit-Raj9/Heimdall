@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -388,5 +389,40 @@ func TestArchiveRoleInHandler(t *testing.T) {
 	}
 	if res := shareCallAs(r, "POST", APIPrefix+"/experiments/"+testExp+"/archive", nil, auth.RoleAdmin); res.StatusCode() != 200 {
 		t.Fatalf("admin comparison: %d %s", res.StatusCode(), res.Body())
+	}
+}
+
+// TestArchiveSidecarBound: an archive that would grow the sidecar past the
+// size the lists read is refused, and the marks already stored stay
+// readable.
+func TestArchiveSidecarBound(t *testing.T) {
+	root := t.TempDir()
+	var a archiveFile
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	add := func(from, to int) {
+		for i := from; i < to; i++ {
+			a.kind(archiveRuns)[fmt.Sprintf("r_%07d", i)] = schemas.Archived{ArchivedAt: &at, ArchivedBy: "usr_1"}
+		}
+	}
+	add(0, 1000)
+	one, _ := json.MarshalIndent(a, "", "  ")
+	n := (archiveMaxBytes - 4096) / (len(one) / 1000) // just under the bound
+	add(1000, n)
+	data, _ := json.MarshalIndent(a, "", "  ")
+	if len(data) > archiveMaxBytes-1 || len(data) < archiveMaxBytes-64<<10 {
+		t.Fatalf("setup: %d bytes", len(data))
+	}
+	if err := os.MkdirAll(filepath.Dir(archivePath(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archivePath(root), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := setArchive(root, archiveRuns, "r_"+strings.Repeat("x", 8000), true, "usr_1", at); err == nil {
+		t.Fatal("an archive past the bound was written")
+	}
+	got, err := readArchive(root)
+	if err != nil || len(got.Runs) != len(a.Runs) {
+		t.Fatalf("stored marks: %d of %d, %v", len(got.Runs), len(a.Runs), err)
 	}
 }
