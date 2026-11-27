@@ -48,18 +48,18 @@ export function AuthShell({ children }: { children: ReactNode }) {
 	] as const;
 	return (
 		<div className="bg-background grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-testid="auth-shell">
-			<aside className="relative hidden overflow-hidden bg-[oklch(0.2_0.035_272)] text-[oklch(0.96_0.01_272)] lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16 dark:bg-[oklch(0.17_0.03_272)]">
+			<aside className="relative hidden overflow-hidden bg-brand-panel text-brand-ink lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16">
 				<div
 					aria-hidden="true"
 					className="pointer-events-none absolute inset-0 [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_top_left,black,transparent_70%)] [background-size:32px_32px] opacity-[0.07]"
 				/>
 				<div
 					aria-hidden="true"
-					className="pointer-events-none absolute -top-32 -left-24 size-[28rem] rounded-full bg-[oklch(0.55_0.18_272)] opacity-25 blur-3xl"
+					className="pointer-events-none absolute -top-32 -left-24 size-[28rem] rounded-full bg-brand-glow opacity-25 blur-3xl"
 				/>
 				<GateLines />
 				<div className="relative flex items-center gap-3">
-					<span className="flex size-10 items-center justify-center rounded-xl bg-[oklch(0.96_0.01_272)] text-[oklch(0.2_0.035_272)]">
+					<span className="flex size-10 items-center justify-center rounded-xl bg-brand-ink text-brand-panel">
 						<HeimdallMark className="size-6" />
 					</span>
 					<span className="text-lg font-semibold tracking-[-0.01em]">{tb("app.name")}</span>
@@ -67,23 +67,23 @@ export function AuthShell({ children }: { children: ReactNode }) {
 				<div className="relative flex max-w-lg flex-col gap-8" data-testid="auth-pitch">
 					<div className="flex flex-col gap-4">
 						<h2 className="text-[2.5rem] leading-[1.08] font-semibold tracking-[-0.03em] text-balance">{t("pitch.title")}</h2>
-						<p className="text-base leading-relaxed text-[oklch(0.82_0.03_272)]">{t("pitch.body")}</p>
+						<p className="text-base leading-relaxed text-brand-muted">{t("pitch.body")}</p>
 					</div>
 					<ul className="flex flex-col gap-5">
 						{benefits.map(({ icon: Icon, key }) => (
 							<li key={key} className="flex items-start gap-4" data-testid={`auth-benefit-${key}`}>
-								<span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[oklch(1_0_0/0.08)] ring-1 ring-[oklch(1_0_0/0.12)]">
+								<span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/8 ring-1 ring-white/12">
 									<Icon className="size-5" aria-hidden="true" />
 								</span>
 								<span className="flex flex-col gap-0.5">
 									<span className="text-[15px] font-semibold">{t(`pitch.${key}.title`)}</span>
-									<span className="text-sm text-[oklch(0.78_0.03_272)]">{t(`pitch.${key}.body`)}</span>
+									<span className="text-sm text-brand-muted">{t(`pitch.${key}.body`)}</span>
 								</span>
 							</li>
 						))}
 					</ul>
 				</div>
-				<p className="relative font-mono text-[11px] tracking-[0.08em] text-[oklch(0.7_0.03_272)] uppercase">{t("pitch.footer")}</p>
+				<p className="relative font-mono text-[11px] tracking-[0.08em] text-brand-faint uppercase">{t("pitch.footer")}</p>
 			</aside>
 			<div className="bg-muted/30 relative flex min-h-dvh flex-col">
 				<div className="flex items-center justify-between px-5 py-4 lg:justify-end">

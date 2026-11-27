@@ -9,8 +9,8 @@ export interface SectionProps {
 	children?: React.ReactNode;
 	className?: string;
 	testId?: string;
-	/** Heading level; default h2. */
-	as?: "h2" | "h3";
+	/** Heading level; default h2. Pass h3 inside a tab panel that sits under an h2, so levels never skip. */
+	as?: "h2" | "h3" | "h4";
 }
 
 /** A titled block of a page: heading, one-line description, actions on the right, body. */
@@ -22,7 +22,7 @@ export function Section({ title, description, actions, children, className, test
 				<div className="flex flex-wrap items-end justify-between gap-3">
 					<div className="flex min-w-0 flex-col gap-1">
 						{title && <Heading className="text-foreground text-base font-semibold tracking-tight">{title}</Heading>}
-						{description && <p className="text-muted-foreground line-clamp-2 max-w-prose text-sm">{description}</p>}
+						{description && <p className="text-muted-foreground max-w-prose text-sm">{description}</p>}
 					</div>
 					{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
 				</div>
@@ -56,8 +56,8 @@ export function PageHeader({ title, subtitle, icon, actions, eyebrow, className,
 				<div className="flex min-w-0 items-center gap-3">
 					{icon}
 					<div className="flex min-w-0 flex-col gap-1">
-						<h1 className="text-foreground truncate text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-						{subtitle && <p className="text-muted-foreground line-clamp-2 text-sm">{subtitle}</p>}
+						<h1 className="text-foreground text-[22px] leading-7 font-semibold tracking-tight text-balance hyphens-none [overflow-wrap:normal]">{title}</h1>
+						{subtitle && <p className="text-muted-foreground max-w-prose text-sm text-pretty">{subtitle}</p>}
 					</div>
 				</div>
 				{actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

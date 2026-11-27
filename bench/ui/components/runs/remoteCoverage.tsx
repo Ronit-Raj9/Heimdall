@@ -1,6 +1,7 @@
 import { ToneBadge } from "@/components/suites/suiteBadges";
 import { useGetRunRemoteQuery } from "@/lib/store/apis/runRemoteApi";
 import type { RemoteChannelState, RemoteEvidence } from "@/lib/types/bench";
+import { formatUsd } from "@/lib/money";
 import { useTranslation } from "react-i18next";
 import { clipText } from "./stepTimeline.utils";
 
@@ -52,7 +53,7 @@ export function RemoteCoverage({ remote, arm }: { remote: RemoteEvidence; arm: s
 						{t("runs.remote.reportedBadge")}
 					</ToneBadge>
 					{tokens !== undefined ? <span>{t("runs.remote.reportedTokens", { value: tokens })}</span> : null}
-					{rep.cost_usd !== undefined ? <span>{t("runs.remote.reportedCost", { value: rep.cost_usd.toFixed(4) })}</span> : null}
+					{rep.cost_usd !== undefined ? <span className="tabular-nums">{formatUsd(rep.cost_usd)}</span> : null}
 					{rep.version || rep.build ? (
 						<span>{t("runs.remote.version", { version: clipText(rep.version, 60) || "-", build: clipText(rep.build, 60) || "-" })}</span>
 					) : null}

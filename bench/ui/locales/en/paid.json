@@ -1,0 +1,15 @@
+{
+	"label": "{{verb}}, up to {{cap}}",
+	"labelUnknown": "{{verb}} (uses your model key)",
+	"estimate": "About {{runs}} runs, about {{usd}}.",
+	"estimateRuns": "About {{runs}} runs.",
+	"estimateUsd": "About {{usd}}.",
+	"costsMoney": "This costs money.",
+	"confirm": {
+		"title": "{{verb}}?",
+		"body": "This can spend up to {{cap}} on your model keys.",
+		"bodyUnknown": "This spends money on your model key; no cap is set.",
+		"ok": "{{verb}}, up to {{cap}}",
+		"okUnknown": "{{verb}}"
+	}
+}

@@ -108,3 +108,5 @@ export function TableFrame({ children, testId }: { children: ReactNode; testId?:
 		</div>
 	);
 }
+/** Settings forms label their inputs with the shared Field: optional fields say "(optional)", no asterisks (M1-49). */
+export { Field, type FieldProps } from "@/components/ui/field";
