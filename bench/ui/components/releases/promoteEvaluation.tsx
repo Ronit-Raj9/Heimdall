@@ -13,12 +13,14 @@ import {
 import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { browserZone } from "@/lib/utils/cron";
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { InlineError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
 import "@/components/canaries/uf7bI18n";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Lock, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DatasetChange, ReleaseEvidence, releaseTitle, sharedTaskCount, versionName } from "./releaseEvidence";
 import "@/app/experiments_/$expId/views/fw11I18n";
@@ -128,7 +130,8 @@ export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Rec
  */
 export function onlyLiveVersion(p: Pick<EvaluationReleasePreview, "problem" | "version" | "live"> & { problem_code?: string }): boolean {
 	if (!p.problem) return false;
-	if (p.problem_code) return p.problem_code === "same_as_live";
+	// G1: same_as_live and only_one_version are one family: the evaluated version is the live one.
+	if (p.problem_code) return p.problem_code === "same_as_live" || p.problem_code === "only_one_version";
 	return Boolean(p.live.version) && p.live.version === p.version;
 }
 
@@ -313,51 +316,81 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 /** Runs a month of each cadence, for the cost line of the confirm. */
 const RUNS_A_MONTH: Record<EvaluationCadence, number> = { nightly: 30, weekly: 30 / 7 };
 
+/** The daily limit a repeat run starts with: twice the cost of this run, rounded up to cents. */
+export function defaultRepeatLimit(costPerRun: number | undefined): number | undefined {
+	if (costPerRun == null || !(costPerRun > 0)) return undefined;
+	return Math.ceil(costPerRun * 2 * 100) / 100;
+}
+
+/** The typed daily limit as dollars; undefined when empty, NaN when it is not a number above 0. */
+export function parseRepeatLimit(text: string): number | undefined {
+	const v = text.trim().replace(/^\$/, "");
+	if (v === "") return undefined;
+	const n = Number(v);
+	return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : Number.NaN;
+}
+
 /**
  * The confirm text of "Repeat nightly" and "Repeat weekly" (M7-51): when it runs, in which zone,
  * the cost per run and per month (or that the price is not known), and the daily limit sent.
- * Exported for tests.
+ * `limit` is the limit the person typed; left out, it is twice the run cost. Exported for tests.
  */
 export function repeatAsk(
 	cadence: EvaluationCadence,
 	zone: string,
 	costPerRun: number | undefined,
 	t: (k: string, o?: Record<string, unknown>) => string,
+	limit: number | undefined = defaultRepeatLimit(costPerRun),
 ): { message: string; limit?: number } {
 	const when = t(`repeatAsk.when.${cadence}`, { zone });
-	if (costPerRun == null || !(costPerRun > 0)) return { message: `${when} ${t("repeatAsk.priceUnknown")}` };
-	const limit = Math.ceil(costPerRun * 2 * 100) / 100;
 	const money = (n: number) => `$${n.toFixed(2)}`;
+	if (costPerRun == null || !(costPerRun > 0)) {
+		const parts = [when, t("repeatAsk.priceUnknown")];
+		if (limit != null) parts.push(t("repeatAsk.limitOnly", { limit: money(limit) }));
+		return { message: parts.join(" "), ...(limit != null ? { limit } : {}) };
+	}
+	const month = money(costPerRun * RUNS_A_MONTH[cadence]);
+	if (limit == null) return { message: `${when} ${t("repeatAsk.priceNoLimit", { run: money(costPerRun), month })}` };
 	return {
-		message: `${when} ${t("repeatAsk.price", { run: money(costPerRun), month: money(costPerRun * RUNS_A_MONTH[cadence]), limit: money(limit) })}`,
+		message: `${when} ${t("repeatAsk.price", { run: money(costPerRun), month, limit: money(limit) })}`,
 		limit,
 	};
 }
 
-/** "Repeat nightly" and "Repeat weekly": schedule a new evaluation of the same spec, after a confirm. */
+/**
+ * "Repeat nightly" and "Repeat weekly": schedule a new evaluation of the same spec. Both are paid
+ * buttons that always ask first; the daily limit is an editable field beside them (M7-51).
+ */
 export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 	const { t } = useTranslation("u14");
 	const { t: m } = useTranslation("uf7b");
 	const session = useSession();
-	const confirm = useConfirm();
 	const evaluation = useGetEvaluationQuery(evaluationId);
 	const [schedule, state] = useScheduleEvaluationMutation();
 	const [done, setDone] = useState<EvaluationCadence | null>(null);
+	const [limitText, setLimitText] = useState<string | null>(null);
+	const [err, setErr] = useState<unknown>(null);
+	const limitId = useId();
 	if (!canUse(session, "member")) return null;
 	const zone = browserZone();
+	const cost = evaluation.data?.result?.cost_usd;
+	const fallback = defaultRepeatLimit(cost);
+	const typed = limitText ?? (fallback != null ? fallback.toFixed(2) : "");
+	const limit = parseRepeatLimit(typed);
+	const badLimit = limit != null && Number.isNaN(limit);
 	const go = async (cadence: EvaluationCadence) => {
-		const ask = repeatAsk(cadence, zone, evaluation.data?.result?.cost_usd, m as never);
-		const ok = await confirm(ask.message, {
-			title: m(`repeatAsk.title.${cadence}`),
-			confirmLabel: m("repeatAsk.confirm"),
-			cancelLabel: m("repeatAsk.cancel"),
-		});
-		if (!ok) return;
-		const res = await schedule({ id: evaluationId, cadence, timezone: zone, ...(ask.limit ? { max_usd_per_day: ask.limit } : {}) });
-		if ("data" in res && res.data) setDone(cadence);
+		setErr(null);
+		const ask = repeatAsk(cadence, zone, cost, m as never, badLimit ? undefined : limit);
+		try {
+			await schedule({ id: evaluationId, cadence, timezone: zone, ...(ask.limit ? { max_usd_per_day: ask.limit } : {}) }).unwrap();
+			setDone(cadence);
+			notify({ text: m("repeatAsk.created") });
+		} catch (e) {
+			setErr(e);
+		}
 	};
 	return (
-		<span className="flex flex-wrap items-center gap-2" data-testid="evaluation-repeat">
+		<span className="flex flex-wrap items-start gap-2" data-testid="evaluation-repeat">
 			{done ? (
 				<span className="text-muted-foreground text-xs" data-testid="evaluation-repeat-done">
 					{String(t(`promote.repeatDone.${done}` as never, { zone } as never))}{" "}
@@ -367,24 +400,41 @@ export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 				</span>
 			) : (
 				<>
+					<label htmlFor={limitId} className="text-muted-foreground flex flex-col gap-1 text-xs">
+						{m("repeatAsk.limitLabel")}
+						<Input
+							id={limitId}
+							inputMode="decimal"
+							className="h-8 w-28"
+							value={typed}
+							placeholder={m("repeatAsk.limitPlaceholder")}
+							onChange={(e) => setLimitText(e.target.value)}
+							aria-invalid={badLimit || undefined}
+							data-testid="evaluation-repeat-limit"
+						/>
+						{badLimit && (
+							<span className="text-danger-ink" data-testid="evaluation-repeat-limit-error">
+								{m("repeatAsk.limitBad")}
+							</span>
+						)}
+					</label>
 					{(["nightly", "weekly"] as const).map((c) => (
-						<Button
+						<PaidButton
 							key={c}
 							size="sm"
 							variant="outline"
-							disabled={state.isLoading}
-							onClick={() => void go(c)}
-							data-testid={`evaluation-repeat-${c}`}
-						>
-							<CalendarClock className="size-4" aria-hidden="true" />
-							{t(`promote.repeat.${c}` as never)}
-						</Button>
+							verb={t(`promote.repeat.${c}` as never)}
+							capUsd={badLimit ? null : (limit ?? null)}
+							estimateUsd={cost != null && cost > 0 ? cost : undefined}
+							estimateAt="title"
+							confirm="always"
+							confirmText={repeatAsk(c, zone, cost, m as never, badLimit ? undefined : limit).message}
+							disabled={state.isLoading || badLimit}
+							onConfirm={() => go(c)}
+							testId={`evaluation-repeat-${c}`}
+						/>
 					))}
-					{state.isError && (
-						<span role="alert" className="text-chart-error-ink text-xs" data-testid="evaluation-repeat-error">
-							{getBenchErrorMessage(state.error)}
-						</span>
-					)}
+					<InlineError error={err} testId="evaluation-repeat-error" className="basis-full" />
 				</>
 			)}
 		</span>

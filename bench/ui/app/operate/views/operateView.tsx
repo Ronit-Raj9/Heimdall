@@ -1,7 +1,8 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import "@/components/settings/w4m8I18n";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -207,13 +208,18 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 	);
 }
 
-/** Deletes a backup copy only after the person confirms; a copy cannot be brought back. */
-export async function deleteBackup(confirm: ConfirmFn, remove: (name: string) => unknown, name: string): Promise<void> {
+/**
+ * Deletes a backup copy only after the person confirms; a copy cannot be brought back. Waits for
+ * the server, so a failed delete throws to the caller (M1-44). True when it was deleted.
+ */
+export async function deleteBackup(confirm: ConfirmFn, remove: (name: string) => unknown, name: string): Promise<boolean> {
 	const ok = await confirm(i18n.t("operate.deleteConfirm", { ns: "w4m8", name }), {
 		destructive: true,
 		confirmLabel: i18n.t("operate.delete", { ns: "w4m8" }),
 	});
-	if (ok) remove(name);
+	if (!ok) return false;
+	await remove(name);
+	return true;
 }
 
 function BackupsList() {
@@ -221,6 +227,15 @@ function BackupsList() {
 	const query = useGetOperateBackupsQuery();
 	const [remove] = useDeleteOperateBackupMutation();
 	const confirm = useConfirm();
+	const [err, setErr] = useState<unknown>(null);
+	const onDelete = async (name: string) => {
+		setErr(null);
+		try {
+			if (await deleteBackup(confirm, (n) => remove(n).unwrap(), name)) notify({ text: i18n.t("deleted", { ns: "toast", name }) });
+		} catch (e) {
+			setErr(e);
+		}
+	};
 	return (
 		<div className="flex flex-col gap-2" data-testid="operate-backups-section">
 			<p className="flex items-center gap-2 text-sm font-medium">
@@ -235,8 +250,9 @@ function BackupsList() {
 					</Button>
 				</p>
 			) : (
-				<BackupRows backups={query.data?.backups ?? []} onDelete={(name) => void deleteBackup(confirm, remove, name)} />
+				<BackupRows backups={query.data?.backups ?? []} onDelete={(name) => void onDelete(name)} />
 			)}
+			<InlineError error={err} testId="operate-backup-error" />
 		</div>
 	);
 }

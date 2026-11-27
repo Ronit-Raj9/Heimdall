@@ -740,7 +740,7 @@ export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}
 								<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">
 									{state === "retrying" ? when(d.next_attempt_at) : ""}
 								</td>
-								<td className="text-chart-error-ink max-w-[16rem] truncate px-3 text-xs" title={d.error}>
+								<td className="text-danger-ink max-w-48 truncate px-3 text-xs" title={d.error}>
 									{d.error ?? ""}
 								</td>
 								<td className="px-3 py-1.5 text-right">

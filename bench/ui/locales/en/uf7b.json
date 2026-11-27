@@ -111,6 +111,12 @@
 		},
 		"price": "About {{run}} a run (what this run cost), up to {{month}} a month. Daily limit: {{limit}}.",
 		"priceUnknown": "Price per run not known: this run's cost was not recorded. Each run is capped by the evaluation's own budget.",
+		"priceNoLimit": "About {{run}} a run (what this run cost), up to {{month}} a month. No daily limit.",
+		"limitOnly": "Daily limit: {{limit}}.",
+		"limitLabel": "Daily limit ($)",
+		"limitPlaceholder": "No limit",
+		"limitBad": "Type an amount above $0, or leave it empty.",
+		"created": "Repeat run created.",
 		"confirm": "Create repeat run",
 		"cancel": "Cancel"
 	},
@@ -168,5 +174,9 @@
 		"backupLabel": "Saved results, {{date}}, {{size}}",
 		"which": "Which comparison (type to search)",
 		"all": "All comparisons"
+	},
+	"policies": {
+		"edit": "Edit",
+		"noRules": "This rule set has no rules yet."
 	}
 }

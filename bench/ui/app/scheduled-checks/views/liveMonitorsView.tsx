@@ -1,6 +1,8 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { PageHeader } from "@/components/shell";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, InlineError, LoadError, Section } from "@/components/runs/screenStates";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
@@ -113,7 +115,7 @@ export function MonitorTable({
 						{rows.map((r) => (
 							<tr
 								key={r.id}
-								className={`hover:bg-muted/40 focus-visible:ring-ring cursor-pointer border-t outline-none focus-visible:ring-2 ${r.id === selected ? "bg-muted" : ""}`}
+								className={`hover:bg-muted/40 focus-visible:ring-(--focus) cursor-pointer border-t outline-none focus-visible:ring-2 ${r.id === selected ? "bg-muted" : ""}`}
 								onClick={() => onSelect(r.id)}
 								// M7-24: the row opens on Enter or Space too, so keyboard users can reach every monitor.
 								tabIndex={0}
@@ -461,37 +463,54 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 	const { t: m } = useTranslation("uf7b");
 	const confirm = useConfirm();
 	const [act, state] = useMonitorActionMutation();
-	const [badge] = useSetMonitorBadgeMutation();
+	const [badge, badgeState] = useSetMonitorBadgeMutation();
+	const [err, setErr] = useState<unknown>(null);
+	// M1-44: every action waits for the server and shows its error beside the buttons.
+	const run = async (fn: () => Promise<unknown>, done?: string) => {
+		setErr(null);
+		try {
+			await fn();
+			if (done) notify({ text: done });
+		} catch (e) {
+			setErr(e);
+		}
+	};
+	const known = d.check_budget_usd > 0;
 	return (
-		<span className="flex flex-wrap items-center gap-2" data-testid="live-monitor-actions">
+		<span className="flex flex-wrap items-start gap-2" data-testid="live-monitor-actions">
+			{/* M7-53: Run now spends money, so it always asks first and says how much one check can cost. */}
+			<PaidButton
+				size="sm"
+				variant="outline"
+				verb={m("live.runConfirm")}
+				capUsd={known ? d.check_budget_usd : null}
+				estimateAt="title"
+				confirm="always"
+				confirmText={
+					known
+						? m("live.runAsk", { name: d.name, usd: usd2(d.check_budget_usd), left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)) })
+						: m("live.runAskUnknown", { name: d.name })
+				}
+				disabled={state.isLoading}
+				onConfirm={() => run(() => act({ id: d.id, action: "run" }).unwrap(), t("started", { ns: "toast", name: d.name }))}
+				testId="live-monitor-run"
+			/>
 			<Button
 				size="sm"
 				variant="outline"
 				disabled={state.isLoading}
-				onClick={async () => {
-					// M7-53: Run now spends money, so it asks first and says how much one check can cost.
-					const ok = await confirm(
-						d.check_budget_usd > 0
-							? m("live.runAsk", { name: d.name, usd: usd2(d.check_budget_usd), left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)) })
-							: m("live.runAskUnknown", { name: d.name }),
-						{ title: m("live.runTitle"), confirmLabel: m("live.runConfirm") },
-					);
-					if (ok) void act({ id: d.id, action: "run" });
-				}}
-				data-testid="live-monitor-run"
-			>
-				{m("live.runPaid")}
-			</Button>
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={state.isLoading}
-				onClick={() => void act({ id: d.id, action: d.paused ? "resume" : "pause" })}
+				onClick={() => void run(() => act({ id: d.id, action: d.paused ? "resume" : "pause" }).unwrap())}
 				data-testid="live-monitor-pause"
 			>
 				{d.paused ? t("actions.resume") : t("actions.pause")}
 			</Button>
-			<Button size="sm" variant="ghost" onClick={() => void badge({ id: d.id, enabled: !d.badge })} data-testid="live-monitor-badge">
+			<Button
+				size="sm"
+				variant="ghost"
+				disabled={badgeState.isLoading}
+				onClick={() => void run(() => badge({ id: d.id, enabled: !d.badge }).unwrap())}
+				data-testid="live-monitor-badge"
+			>
 				{d.badge ? t("detail.badgeOff") : t("detail.badgeOn")}
 			</Button>
 			<Button
@@ -499,12 +518,14 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 				variant="ghost"
 				disabled={state.isLoading}
 				onClick={async () => {
-					if (await confirm(t("actions.deleteConfirm", { name: d.name }))) void act({ id: d.id, action: "delete" });
+					if (await confirm(t("actions.deleteConfirm", { name: d.name })))
+						void run(() => act({ id: d.id, action: "delete" }).unwrap(), t("deleted", { ns: "toast", name: d.name }));
 				}}
 				data-testid="live-monitor-delete"
 			>
 				{t("actions.delete")}
 			</Button>
+			<InlineError error={err} testId="live-monitor-action-error" className="basis-full" />
 		</span>
 	);
 }

@@ -4,6 +4,19 @@ import type { ReleaseRecord } from "@/lib/types/bench";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CompliancePacks } from "./compliancePacks";
+import { versionName } from "@/components/releases/releaseEvidence";
+
+/**
+ * A release as a select option: "codex v1, 21 Nov 2026" (M7-85). Falls back to the release id
+ * when the record names no agent. Exported for tests.
+ */
+export function releaseOptionLabel(r: Pick<ReleaseRecord, "release_id" | "agent_id" | "version" | "created_at">): string {
+	const day = r.created_at ? new Date(r.created_at) : null;
+	const date =
+		day && !Number.isNaN(day.getTime()) ? day.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+	const name = r.agent_id ? versionName(r.agent_id, r.version) : r.release_id;
+	return date ? `${name}, ${date}` : name;
+}
 
 /** Release log actions as background jobs: verify the hash chain and evidence, write a release's compliance pack. */
 export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]; onDone?(): void }) {
@@ -28,14 +41,14 @@ export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]
 					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
 						{t("releases.pickRelease")}
 						<select
-							className="border-input bg-background text-foreground h-9 rounded-md border px-2 font-mono text-xs"
+							className="border-input bg-background text-foreground h-9 rounded-md border px-2 text-xs"
 							value={releaseId}
 							onChange={(e) => setPicked(e.target.value)}
 							data-testid="release-actions-pick"
 						>
 							{[...releases].reverse().map((r) => (
 								<option key={r.release_id} value={r.release_id}>
-									{r.release_id} ({r.exp_id})
+									{releaseOptionLabel(r)}
 								</option>
 							))}
 						</select>
