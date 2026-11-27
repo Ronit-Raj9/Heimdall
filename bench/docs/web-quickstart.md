@@ -27,10 +27,10 @@ To check that your agent runs at all for free, use Check agent on the agent's
 page: one task with a practice model, no API key, no model cost.
 
 1. Open [Settings > Model keys](/settings?tab=keys) from the sidebar.
-2. Press **Add key** on your provider's card.
+2. Press **Add API key** on your provider's card.
 3. Paste the API key; optionally set **Allowed models** and a monthly spending limit in USD (0 means no limit).
 4. Press **Save key**.
-5. Press **Test** on the saved key: it asks your provider for its model list (free; Sarvam has no list call, so it sends one tiny language check), and the status must read `works`.
+5. Press **Test key** in the panel right after saving (or **Test** on the saved key later): it asks your provider for its model list (free; Sarvam has no list call, so it sends one tiny language check), and the status must read `works`.
 
 The key is stored encrypted on the server. After saving, only its label is
 shown, and nobody can read the value back. A worker gets it only for the

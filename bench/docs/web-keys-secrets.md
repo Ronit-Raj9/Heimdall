@@ -5,7 +5,7 @@ never shown again after saving.
 
 ## Model keys
 
-[Settings > Model keys](/settings?tab=keys), then **Add key** on your provider's card:
+[Settings > Model keys](/settings?tab=keys), then **Add API key** on your provider's card:
 
 - Provider, label, API key. Optional base URL (needed for some providers).
 - **Allowed models**: comma separated; empty allows any model.
