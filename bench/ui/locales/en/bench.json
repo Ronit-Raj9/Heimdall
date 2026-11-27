@@ -2361,8 +2361,8 @@
 			},
 			"never": "never",
 			"ok": "no error",
-			"none": "Nothing connected yet. Add a tool with Pull failures from your tools below, then press Pull now. (Terminal: heimdall inbox pull)",
-			"ingestOff": "This server does not accept failures sent in by other tools, so they only arrive by pulling (heimdall inbox pull). docs/failure-inbox.md says how to turn it on."
+			"none": "Nothing connected yet. Add a tool with Pull failures from your tools below, then press Pull now.",
+			"ingestOff": "This server does not accept failures sent in by other tools, so they arrive only when Heimdall pulls them: press Pull now on a connected tool. docs/failure-inbox.md says how to turn it on."
 		},
 		"detail": {
 			"select": "Pick a failure to read what happened and decide what to do with it.",

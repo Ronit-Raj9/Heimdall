@@ -11,8 +11,6 @@ const ALLOWED = new Set<string>([
 	"bench:releases.timeline.chainBrokenHint", // terminal hint, stays
 	"bench:policy.none", // terminal hint, stays
 	"bench:canaries.empty", // terminal hint, stays
-	"bench:inbox.sources.none", // I18 fixes the inbox texts
-	"bench:inbox.sources.ingestOff", // I18 fixes the inbox texts
 	"bench:suites.broken.hint", // terminal hint, stays
 	"bench:suites.add.task.taskInit", // terminal hint, stays
 	"bench:agents.empty", // terminal hint, stays
