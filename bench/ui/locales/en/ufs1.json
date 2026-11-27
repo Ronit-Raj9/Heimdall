@@ -1,0 +1,23 @@
+{
+	"optionList": {
+		"search": "Search",
+		"selected": "{{count}} of {{total}} selected",
+		"noMatch": "Nothing matches the search.",
+		"selectAll": "Select all",
+		"clearAll": "Clear all"
+	},
+	"testObjects": {
+		"show": "Show test items ({{count}})",
+		"hide": "Hide test items ({{count}})"
+	},
+	"advancedStatistics": "Advanced statistics",
+	"siteNav": {
+		"reference": "API reference"
+	},
+	"improveExample": {
+		"title": "Example, not your data",
+		"rounds": "Round 1 41%, round 2 48%, round 3 48%, round 4 55%",
+		"kept": "Kept: added a retry rule to the prompt (+7 on unseen tasks)",
+		"rejected": "Rejected: longer system prompt (-2)"
+	}
+}

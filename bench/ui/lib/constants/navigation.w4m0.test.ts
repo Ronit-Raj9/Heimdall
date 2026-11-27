@@ -6,8 +6,8 @@ import { ownPageTitle, pageTitle } from "./navigation";
 // Wave 4, p16-1 and p02-8: pages under another sidebar entry have a title of their own.
 describe("ownPageTitle", () => {
 	it("names the job, jobs and connect pages", () => {
-		expect(ownPageTitle("/jobs/job_x")).toBe("Job");
-		expect(ownPageTitle("/jobs")).toBe("Jobs");
+		expect(ownPageTitle("/jobs/job_x")).toBe("Background job");
+		expect(ownPageTitle("/jobs")).toBe("Background jobs");
 		expect(ownPageTitle("/connect")).toBe("Connect an agent");
 		expect(ownPageTitle("/agents/new")).toBe("New agent");
 		expect(ownPageTitle("/agents/from-traces/")).toBe("Agent from traces");
