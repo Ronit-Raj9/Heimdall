@@ -97,7 +97,7 @@ describe("summaryLines", () => {
 		expect(
 			summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25, tasks_per_benchmark: 8, trials: 2 })),
 		).toEqual([
-			"Score codex v2 on openai/gpt-4o-mini.",
+			"Score codex v2 on gpt-4o-mini.",
 			"Run 2 benchmarks: hd-harbor-tb2, tau2.",
 			"Use 8 tasks from each benchmark and try each task 2 times.",
 			"Run clean, then again with: model down, broken tool.",
@@ -112,12 +112,12 @@ describe("summaryLines", () => {
 		];
 		const lines = summaryLines(spec({ mode: "models", arms, benchmarks: [], pack: "coding", trials: 1 }));
 		expect(lines[0]).toBe(
-			"Compare two models: codex latest version on gpt-4o-mini against codex latest version on deepseek/deepseek-chat.",
+			"Compare two models: codex latest version on gpt-4o-mini against codex latest version on deepseek-chat.",
 		);
 		expect(lines[1]).toBe("Run the coding pack of benchmarks.");
 		expect(lines[2]).toContain("try each task once");
 		expect(lines[3]).toBe("Run clean only, with no faults.");
-		expect(lines[4]).toBe("Stop each benchmark when its spending reaches $5 (the default budget).");
+		expect(lines[4]).toBe("Stop each benchmark when its spending reaches $5.00 (the default budget).");
 		expect(summaryLines(spec({ mode: "opponent", arms }))[0]).toContain("against the baseline");
 	});
 });
@@ -134,7 +134,7 @@ describe("parseBudget", () => {
 describe("Step5Launch", () => {
 	it("shows the summary, budget field and an enabled Launch button", () => {
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
-		expect(html).toContain("Score codex v2 on openai/gpt-4o-mini.");
+		expect(html).toContain("Score codex v2 on gpt-4o-mini.");
 		expect(html).toContain('data-testid="step5-budget"');
 		// The "$" is a leading adornment now (M3-47), so the placeholder has none.
 		expect(html).toContain('placeholder="5 per benchmark"');
@@ -373,6 +373,6 @@ describe("step 5 fix wave 2 (G10)", () => {
 				],
 			}),
 		);
-		expect(lines[0]).toBe("Compare two versions: codex latest version on openai/gpt-4o-mini against codex v1 on openai/gpt-4o-mini.");
+		expect(lines[0]).toBe("Compare two versions: codex latest version on gpt-4o-mini against codex v1 on gpt-4o-mini.");
 	});
 });

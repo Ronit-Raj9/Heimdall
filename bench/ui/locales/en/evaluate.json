@@ -220,7 +220,8 @@
 		"rowNeedsGpu": "Needs a GPU worker",
 		"rowReady_one": "{{count}} ready task",
 		"rowReady_other": "{{count}} ready tasks",
-		"rowNoReady": "No ready tasks"
+		"rowNoReady": "No ready tasks",
+		"linkedNotOffered": "The link named {{id}}, which is not offered here: it has no ready task yet or this agent cannot run it."
 	},
 	"skill": {
 		"terminal": "Terminal",
@@ -253,11 +254,11 @@
 		"fault": {
 			"clean": "Normal run",
 			"cleanHint": "Always included.",
-			"model-down": "Model goes down",
+			"model-down": "Model down",
 			"model-downHint": "The model provider stops answering for part of the run.",
 			"broken-tool": "A tool breaks",
 			"broken-toolHint": "Some tool calls return errors.",
-			"misleading-instruction": "Misleading instructions",
+			"misleading-instruction": "Misleading instruction",
 			"misleading-instructionHint": "Only on benchmarks that have this test. Others skip it."
 		},
 		"budget": "Spending cap (USD)",
@@ -289,7 +290,8 @@
 		"skippedTitle": "Left out",
 		"skipped": "{{benchmark}}: {{reason}}",
 		"done": "Evaluation started",
-		"rough": "Rough estimate from list prices, since this setup has no past runs here: about {{low}} to {{high}}."
+		"rough": "Rough estimate from list prices, since this setup has no past runs here: about {{low}} to {{high}}.",
+		"runsTimeOne": "{{runs}} runs, about {{min}} min."
 	},
 	"list": {
 		"title": "Evaluations",
@@ -407,8 +409,6 @@
 		"needKey": "Add a key for {{provider}} to continue.",
 		"needModel": "Pick a model for every setup."
 	},
-	"footerSummary": "{{benchmarks}} benchmarks, {{runs}} runs, about {{low}} to {{high}}, about {{min}} min",
-	"footerSummaryNoCost": "{{benchmarks}} benchmarks, {{runs}} runs, price not known yet",
 	"launchPaid": "Launch, up to {{usd}}",
 	"launchPlain": "Launch evaluation",
 	"launching": "Launching...",
@@ -427,7 +427,7 @@
 	},
 	"step4": {
 		"more": "More settings",
-		"moreSummary": "{{tasks}} tasks, {{tries}} tries, {{faults}}, {{gateway}}",
+		"moreSummary": "{{tasks}}, {{tries}}, {{faults}}, {{gateway}}",
 		"faultsN_one": "{{count}} fault",
 		"faultsN_other": "{{count}} faults",
 		"noFaults": "no faults",
@@ -438,10 +438,34 @@
 		"tries": "Tries per task (more tries show flakiness)",
 		"parallel": "Parallel runs (faster, same cost)",
 		"cache": "Run a second copy with response caching on and compare cost and speed",
-		"noHistory": "No past runs to estimate cost from"
+		"noHistory": "No past runs to estimate cost from",
+		"tasksN_one": "{{count}} task",
+		"tasksN_other": "{{count}} tasks",
+		"tasksReady": "{{ready}} ready of {{n}} tasks",
+		"triesN_one": "{{count}} try",
+		"triesN_other": "{{count}} tries",
+		"model": "Model",
+		"armUses": "{{label}}{{agent}}{{version}} uses",
+		"yourAgent": "Your agent",
+		"yourAgentLower": "your agent",
+		"ownModel": "Its own model.",
+		"ownModelHelp": "This agent picks its model itself; cost is what the agent reports.",
+		"pickModelInstead": "Pick a model instead",
+		"useOwnModel": "Use the agent's own model",
+		"estimating": "Estimating...",
+		"estimateFailed": "Could not estimate this evaluation right now.",
+		"noEstimate": "No estimate yet."
 	},
 	"crumbList": "Evaluations",
 	"crumbNew": "New evaluation",
 	"launchVerb": "Launch",
-	"footerSummaryRough": "{{benchmarks}} benchmarks, {{runs}} runs, roughly {{low}} to {{high}} (list prices), about {{min}} min"
+	"keyLine": {
+		"uses": "Uses your {{provider}} key."
+	},
+	"footerSummary_one": "{{count}} benchmark, {{runs}} runs, about {{low}} to {{high}}, about {{min}} min",
+	"footerSummary_other": "{{count}} benchmarks, {{runs}} runs, about {{low}} to {{high}}, about {{min}} min",
+	"footerSummaryNoCost_one": "{{count}} benchmark, {{runs}} runs, price not known yet",
+	"footerSummaryNoCost_other": "{{count}} benchmarks, {{runs}} runs, price not known yet",
+	"footerSummaryRough_one": "{{count}} benchmark, {{runs}} runs, roughly {{low}} to {{high}} (list prices), about {{min}} min",
+	"footerSummaryRough_other": "{{count}} benchmarks, {{runs}} runs, roughly {{low}} to {{high}} (list prices), about {{min}} min"
 }

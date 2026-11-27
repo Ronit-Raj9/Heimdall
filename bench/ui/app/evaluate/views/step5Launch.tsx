@@ -1,6 +1,7 @@
 import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
 import {
 	type EvaluationArm,
+	type EvaluationEstimate,
 	type EvaluationSpec,
 	type FaultCatalogItem,
 	useCreateEvaluationMutation,
@@ -21,17 +22,21 @@ import { BudgetAdvice, perRunLowCost } from "./budgetAdvice";
 import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from "./evaluateDraft";
 import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
-import { FAULTS, specProblem } from "./step4Setup";
-import { FreeCheck } from "./freeCheck";
+import { estimateBasis, FAULTS, readyTasks, specProblem } from "./step4Setup";
+import { FreeCheck, freeCheckPlan } from "./freeCheck";
+import { firstMissingKey, KeyLines, useArmKeys } from "./armKeys";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import type { AgentWithCaps } from "./evaluate.utils";
 import { isRoughEstimate } from "./evaluate.utils";
 
 /** Wizard step 5: a plain summary of the evaluation, an optional budget and the Launch button. */
 
-function armText(a: EvaluationArm): string {
-	const agent = a.agent || "your agent";
+export function armText(a: EvaluationArm): string {
+	const agent = a.agent || fw05("summary.yourAgent");
 	// No version means the latest one; the number is not known here without asking the server.
 	const version = a.version ? ` v${a.version}` : a.agent ? fw05("launch.latestVersion") : "";
-	const model = a.model ? ` on ${a.provider ? `${a.provider}/` : ""}${a.model}` : a.agent ? ` on ${OWN_MODEL_LABEL}` : "";
+	// The model by its own name, as every other screen shows it (Q-256): no provider prefix.
+	const model = a.model ? fw05("summary.onModel", { model: a.model }) : a.agent ? fw05("summary.onModel", { model: OWN_MODEL_LABEL }) : "";
 	return `${agent}${version}${model}`;
 }
 
@@ -45,23 +50,33 @@ function faultText(id: string, catalog: readonly FaultCatalogItem[]): string {
  * One sentence per fact, in plain English, describing what the evaluation will do. `catalog` is
  * GET /faults; while it loads (or when it fails) the static list names the common faults.
  */
-export function summaryLines(spec: EvaluationSpec, catalog: readonly FaultCatalogItem[] = FAULTS): string[] {
+export function summaryLines(
+	spec: EvaluationSpec,
+	catalog: readonly FaultCatalogItem[] = FAULTS,
+	est?: Pick<EvaluationEstimate, "power">,
+): string[] {
 	const [a, b] = spec.arms;
 	const lines: string[] = [];
-	if (spec.mode === "score" || !b) lines.push(`Score ${a ? armText(a) : "your agent"}.`);
-	else if (spec.mode === "versions") lines.push(`Compare two versions: ${armText(a)} against ${armText(b)}.`);
-	else if (spec.mode === "models") lines.push(`Compare two models: ${armText(a)} against ${armText(b)}.`);
-	else lines.push(`Compare ${armText(a)} against the baseline ${armText(b)}.`);
+	if (spec.mode === "score" || !b) lines.push(fw05("summary.score", { arm: a ? armText(a) : fw05("summary.yourAgent") }));
+	else if (spec.mode === "versions") lines.push(fw05("summary.versions", { a: armText(a), b: armText(b) }));
+	else if (spec.mode === "models") lines.push(fw05("summary.models", { a: armText(a), b: armText(b) }));
+	else lines.push(fw05("summary.opponent", { a: armText(a), b: armText(b) }));
 
 	const n = spec.benchmarks.length;
-	if (n > 0) lines.push(`Run ${n} ${n === 1 ? "benchmark" : "benchmarks"}: ${spec.benchmarks.join(", ")}.`);
-	else if (spec.pack) lines.push(`Run the ${spec.pack} pack of benchmarks.`);
+	if (n > 0) lines.push(fw05(n === 1 ? "summary.benchmarks_one" : "summary.benchmarks_other", { n: String(n), list: spec.benchmarks.join(", ") }));
+	else if (spec.pack) lines.push(fw05("summary.pack", { pack: spec.pack }));
 
-	const trials = spec.trials === 1 ? "once" : `${spec.trials} times`;
-	lines.push(`Use ${spec.tasks_per_benchmark} tasks from each benchmark and try each task ${trials}.`);
+	const trials = spec.trials === 1 ? fw05("summary.once") : fw05("summary.times", { n: String(spec.trials) });
+	// The task count agrees with the runs (Q-8): a benchmark with fewer ready tasks than asked says how many it has.
+	const ready = readyTasks(spec, est);
+	lines.push(
+		ready === null
+			? fw05("summary.tasks", { n: String(spec.tasks_per_benchmark), trials })
+			: fw05("summary.tasksReady", { n: String(spec.tasks_per_benchmark), ready: String(ready), trials }),
+	);
 
 	const faults = spec.faults.filter((id) => id !== "clean").map((id) => faultText(id, catalog));
-	lines.push(faults.length ? fw05("summary.faults", { faults: faults.join(", ") }) : "Run clean only, with no faults.");
+	lines.push(faults.length ? fw05("summary.faults", { faults: faults.join(", ") }) : fw05("summary.clean"));
 
 	if (spec.mcp_route === "bifrost") lines.push(fw05("summary.mcpGateway"));
 	else if (spec.mcp_route === "bifrost_code_mode") lines.push(fw05("summary.mcpCodeMode"));
@@ -72,9 +87,24 @@ export function summaryLines(spec: EvaluationSpec, catalog: readonly FaultCatalo
 	}
 	if (spec.gate) lines.push(fw05("summary.gate"));
 
-	if (spec.budget_usd && spec.budget_usd > 0) lines.push(`Stop when spending reaches $${spec.budget_usd}.`);
-	else lines.push(`Stop each benchmark when its spending reaches $${DEFAULT_BENCHMARK_BUDGET} (the default budget).`);
+	// Rounded as the Launch label rounds it, so the two never differ (round 2 rules: one number, one rounding).
+	if (spec.budget_usd && spec.budget_usd > 0) lines.push(fw05("summary.budget", { usd: formatUsd(spec.budget_usd) }));
+	else lines.push(fw05("summary.defaultBudget", { usd: formatUsd(DEFAULT_BENCHMARK_BUDGET) }));
 	return lines;
+}
+
+/**
+ * The budget to start the box from (Q-12): the server's suggestion, once, when none is set and the estimate has
+ * settled with a known cost; undefined otherwise (never while it loads, never from an unknown price).
+ */
+export function seedBudget(p: {
+	seeded: boolean;
+	fetching: boolean;
+	advice: { suggested_usd: number } | undefined;
+	costKnown: boolean;
+}): number | undefined {
+	if (p.seeded || p.fetching || !p.costKnown || !p.advice || !(p.advice.suggested_usd > 0)) return undefined;
+	return p.advice.suggested_usd;
 }
 
 /** The server's spend cap per benchmark when an evaluation sets no budget (EvaluationDefaultBenchmarkBudget). */
@@ -146,7 +176,10 @@ export function estimateLines(
 ): string[] {
 	const out: string[] = [];
 	if (est && est.runs > 0 && est.est_minutes) {
-		out.push(t("launch.runsTime", { runs: est.runs, min: Math.max(1, Math.round(est.est_minutes.low)), max: Math.max(1, Math.round(est.est_minutes.high)) }));
+		const min = Math.max(1, Math.round(est.est_minutes.low));
+		const max = Math.max(1, Math.round(est.est_minutes.high));
+		// "1 min", never "1 to 1 min" (Q-11): the same rounding as step 4.
+		out.push(min === max ? t("launch.runsTimeOne", { runs: est.runs, min }) : t("launch.runsTime", { runs: est.runs, min, max }));
 	}
 	// A rough list price guess is labelled as rough (G1 estimate_basis, M3-28).
 	if (est?.est_cost_usd && isRoughEstimate(est)) {
@@ -213,7 +246,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 	const catalog = useGetBenchFaultsQuery();
 	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
 	// A bad budget is not the default budget: the summary leaves the budget line out until it is fixed.
-	const summary = budgetIssue ? summaryLines(spec, faultCatalog).slice(0, -1) : summaryLines(spec, faultCatalog);
+	const summary = budgetIssue ? summaryLines(spec, faultCatalog, estimate.data).slice(0, -1) : summaryLines(spec, faultCatalog, estimate.data);
 	const draft = useDraftOrNull();
 	const [ownName, setOwnName] = useState("");
 	const nameValue = draft ? draft.draft.name : ownName;
@@ -225,24 +258,42 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 	const aboveSuggested =
 		!budgetIssue && typedBudget !== undefined && advice && advice.max_usd > 0 && typedBudget > advice.max_usd ? advice.max_usd : 0;
 	const fetching = Boolean(estimate.isFetching);
-	const basis =
-		estimate.data && !fetching && (cost?.known || estimate.data.from_library) ? (estimate.data.from_library ? "library" : "own") : null;
+	// "Estimated from past runs" only with real history; a rough list price guess has its own line (Q-10).
+	const basisKind = estimate.data && !fetching ? estimateBasis(estimate.data) : null;
+	const basis = basisKind === "rough" ? null : basisKind;
 	const setBudgetUsd = (n: number | undefined) => {
 		setBudget(n ? String(n) : "");
 		onChange({ ...spec, budget_usd: n });
 	};
-	// Start the budget box from the suggestion (it covers the expected cost), once, when none is set.
-	const [seeded, setSeeded] = useState(Boolean(spec.budget_usd));
+	// The box follows the spec when the budget changes from outside (the seed, the draft): the Launch label and the
+	// box always show the same amount (Q-12).
 	useEffect(() => {
-		if (seeded || !advice || !(advice.suggested_usd > 0)) return;
-		setSeeded(true);
-		setBudgetUsd(advice.suggested_usd);
+		if (parseBudget(budget) !== spec.budget_usd) setBudget(spec.budget_usd ? String(spec.budget_usd) : "");
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [seeded, advice]);
+	}, [spec.budget_usd]);
+	// Start the budget box from the suggestion, once, when none is set, and only from a settled estimate with a
+	// known cost: never while it loads or when the price is not known (Q-12).
+	const [seeded, setSeeded] = useState(Boolean(spec.budget_usd));
+	const seed = seedBudget({ seeded, fetching, advice, costKnown: Boolean(cost?.known) });
+	useEffect(() => {
+		if (seed === undefined) return;
+		setSeeded(true);
+		setBudgetUsd(seed);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [seed]);
 
 	const runs = estimate.data?.runs ?? 0;
-	// The most the launch can spend: the typed budget, else the default cap of each benchmark.
-	const capUsd = typedBudget ?? DEFAULT_BENCHMARK_BUDGET * Math.max(1, spec.benchmarks.length);
+	const defaultCap = DEFAULT_BENCHMARK_BUDGET * Math.max(1, spec.benchmarks.length);
+	// The most the launch can spend: the spec's budget (what the box shows), else the default cap of each benchmark.
+	const capUsd = spec.budget_usd && spec.budget_usd > 0 ? spec.budget_usd : defaultCap;
+	const suggestedShown = Boolean(advice && advice.suggested_usd > 0 && spec.budget_usd === advice.suggested_usd);
+	// Each setup's model key (Q-11): "Uses your ... key", or the missing note; a missing key blocks Launch.
+	const keys = useArmKeys(spec.arms);
+	const missingKey = firstMissingKey(keys.rows);
+	const agentsQ = useGetAgentsQuery();
+	// The free check panel only shows when a check can run for this agent (Q-38).
+	const freeCheckOk = freeCheckPlan(spec, ((agentsQ.data?.agents ?? []) as AgentWithCaps[])).ok;
+	const blocked = !ready ? problem : missingKey ? t("nextReason.needKey", { provider: missingKey.providerName }) : "";
 	const launch = async () => {
 		const typed = nameValue.trim();
 		const body: EvaluationSpec = { ...spec, name: typed || spec.name.trim() || summaryLines(spec, faultCatalog)[0].replace(/\.$/, "") };
@@ -266,6 +317,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 						<li key={line}>{line}</li>
 					))}
 				</ul>
+				<KeyLines rows={keys.rows} returnTo="/evaluate?step=5" testId="step5-key" />
 			</section>
 
 			<section className="flex flex-col gap-1.5">
@@ -283,7 +335,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 					aria-invalid={budgetIssue ? true : undefined}
 					aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
 					className="border-input bg-background h-10 w-40 rounded-md border pr-2 pl-6 text-sm"
-					placeholder={`${DEFAULT_BENCHMARK_BUDGET} per benchmark`}
+					placeholder={fw05("launch.budgetPlaceholder", { cap: String(DEFAULT_BENCHMARK_BUDGET) })}
 					value={budget}
 					onChange={(e) => {
 						setSeeded(true);
@@ -303,10 +355,22 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 						{fw05("launch.budgetAboveSuggested", { max: `$${aboveSuggested}` })}
 					</span>
 				)}
+				{suggestedShown && (
+					// Why the box holds this amount, right at the box (Q-12), and the default cap one click away.
+					<span className="flex flex-wrap items-center gap-x-2 text-xs" data-testid="step5-budget-why">
+						<span>{fw05("launch.suggestedWhy", { runs: String(runs) })}</span>
+						<button
+							type="button"
+							className="text-primary underline-offset-2 hover:underline"
+							onClick={() => (setSeeded(true), setBudgetUsd(undefined))}
+							data-testid="step5-budget-default"
+						>
+							{fw05("launch.useDefaultCap", { cap: formatUsd(DEFAULT_BENCHMARK_BUDGET), total: formatUsd(defaultCap) })}
+						</button>
+					</span>
+				)}
 				<span className="text-muted-foreground text-xs" data-testid="step5-budget-help">
-					{spec.budget_usd
-						? "Split evenly over the benchmarks; each one stops starting runs when its share is spent."
-						: `Empty means the default: each benchmark stops at $${DEFAULT_BENCHMARK_BUDGET}.`}
+					{spec.budget_usd ? fw05("launch.budgetSplit") : fw05("launch.budgetEmpty", { cap: formatUsd(DEFAULT_BENCHMARK_BUDGET) })}
 				</span>
 				{advice && (
 					<BudgetAdvice
@@ -328,7 +392,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />
 
 			{/* Decision 2: the free agent check, offered where a new user decides to pay. */}
-			<FreeCheck spec={spec} />
+			{freeCheckOk && <FreeCheck spec={spec} />}
 
 			{state.error ? (
 				<div className="text-chart-error-ink space-y-2 text-sm" role="alert" data-testid="step5-error">
@@ -363,16 +427,16 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 						estimateAt="title"
 						confirm="auto"
 						kind="form"
-						confirmText={typedBudget ? t("launchConfirm", { runs, usd: formatUsd(typedBudget) }) : t("launchConfirmDefault", { runs })}
-						disabled={!ready || budgetIssue !== ""}
+						confirmText={spec.budget_usd ? t("launchConfirm", { runs, usd: formatUsd(capUsd) }) : t("launchConfirmDefault", { runs })}
+						disabled={blocked !== "" || budgetIssue !== ""}
 						isLoading={state.isLoading}
 						onConfirm={launch}
 						testId="step5-launch-button"
 					/>
 				);
-				const reason = !ready ? (
+				const reason = blocked ? (
 					<p className="text-muted-foreground text-xs" data-testid="step5-not-ready">
-						{problem}
+						{blocked}
 					</p>
 				) : null;
 				// In the wizard the button and its reason sit in the sticky footer (M3-26).

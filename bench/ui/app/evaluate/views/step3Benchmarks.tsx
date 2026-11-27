@@ -1,3 +1,4 @@
+import { READINESS_CHECKLIST_ID } from "@/components/suites/readinessChecklist";
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
 import { hw11 } from "@/components/runs/debug/hw11I18n";
@@ -276,6 +277,8 @@ function plural(n: number, word: string): string {
 }
 
 export interface Step3BenchmarksViewProps {
+	/** The suite a link named (?suite=): its not-ready row is marked, so the link is never dropped in silence (Q-266). */
+	linkedSuite?: string | null;
 	suites: readonly SuiteRow[];
 	packs: readonly EvaluationPack[];
 	compatibility?: AgentCompatibility;
@@ -306,6 +309,7 @@ export function Step3BenchmarksView({
 	reference,
 	ownTasks,
 	leftOut,
+	linkedSuite,
 }: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
 	const { t: te } = useTranslation("evaluate");
@@ -379,16 +383,14 @@ export function Step3BenchmarksView({
 									onClick={() => choosePack(p)}
 									title={PACK_DESCRIPTION[p.id] ?? `${CAPABILITY_LABEL[p.capability as BenchmarkCapability] ?? p.capability} benchmarks.`}
 									className={cn(
-										// Packs as chips (M3-32); a disabled chip stays readable (X-27).
-										"flex min-h-9 max-w-full flex-col justify-center rounded-2xl border px-3 py-1.5 text-left transition-colors disabled:cursor-not-allowed",
+										// Packs as one row of round chips (Q-65): name and counts on one line, the description in the
+										// tooltip, so the benchmark list starts near the top. A disabled chip stays readable (X-27).
+										"inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border px-3 py-1 text-left transition-colors disabled:cursor-not-allowed",
 										active ? "border-primary bg-primary/5" : "hover:bg-muted/50",
 									)}
 								>
-									<span className={cn("block text-sm font-medium", runnable.length === 0 && "text-muted-foreground")}>{p.name}</span>
-									<span className="text-muted-foreground line-clamp-2 block text-sm">
-										{PACK_DESCRIPTION[p.id] ?? `${CAPABILITY_LABEL[p.capability as BenchmarkCapability] ?? p.capability} benchmarks.`}
-									</span>
-									<span className="text-foreground/70 block text-xs tabular-nums" data-testid={`step3-pack-${p.id}-counts`}>
+									<span className={cn("text-sm font-medium whitespace-nowrap", runnable.length === 0 && "text-muted-foreground")}>{p.name}</span>
+									<span className="text-foreground/70 min-w-0 truncate text-xs tabular-nums" data-testid={`step3-pack-${p.id}-counts`}>
 										{members.length === 0 ? te("benchmarks.packNotReady") : countText}
 									</span>
 								</button>
@@ -419,17 +421,25 @@ export function Step3BenchmarksView({
 						{ownNotReady(suites).map((s) => (
 							<li
 								key={s.id}
-								className="text-muted-foreground flex min-w-0 flex-col gap-0.5 border-b px-3 py-2 text-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+								className={cn(
+									"text-muted-foreground flex min-w-0 flex-col gap-0.5 border-b px-3 py-2 text-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3",
+									linkedSuite === s.id && "bg-chart-warning/10 text-foreground",
+								)}
 								data-testid={`step3-own-not-ready-${s.id}`}
+								data-linked={linkedSuite === s.id ? "true" : undefined}
+								aria-current={linkedSuite === s.id ? "true" : undefined}
 							>
 								<span className="min-w-0 truncate font-medium">{s.id}</span>
 								<span className="text-xs">
 									{(s as { task_count?: number }).task_count ? tc("step3.notReady", { count: (s as { task_count?: number }).task_count }) : tc("step3.noneReady")}{" "}
+									{/* The readiness checklist itself, on the Tasks tab (Q-270), not the top of Build. */}
 									<Link
 										to="/suites/$suiteId"
 										params={{ suiteId: s.id }}
-										search={{ tab: "ops" } as never}
+										search={{ tab: "tasks" } as never}
+										hash={READINESS_CHECKLIST_ID}
 										className="text-primary underline underline-offset-2"
+										data-testid={`step3-own-not-ready-${s.id}-check`}
 									>
 										{tc("step3.runCheck")}
 									</Link>
@@ -440,6 +450,11 @@ export function Step3BenchmarksView({
 				</section>
 			)}
 
+			{linkedSuite && !chosen.has(linkedSuite) && !ownNotReady(suites).some((s) => s.id === linkedSuite) && !loading && (
+				<p role="status" className="text-muted-foreground text-sm" data-testid="step3-linked-not-offered">
+					{te("benchmarks.linkedNotOffered", { id: linkedSuite })}
+				</p>
+			)}
 			{/* Your own tasks come after the catalog, not first (M3-32). */}
 			{ownTasks}
 			{leftOut}
@@ -459,7 +474,7 @@ export function Step3BenchmarksView({
 }
 
 /** Wizard step 3 on the shared wizard draft (useEvaluateDraft from ./evaluateDraft). */
-export function Step3Benchmarks() {
+export function Step3Benchmarks({ linkedSuite }: { linkedSuite?: string | null } = {}) {
 	const { draft, update } = useEvaluateDraft();
 	const redTeam = Boolean(draft.redTeam);
 	const slice: EvaluateDraftBenchmarks = {
@@ -474,7 +489,7 @@ export function Step3Benchmarks() {
 			...("pack" in patch ? { pack: patch.pack ?? null } : {}),
 		});
 	// The red-team writer shows only for the step 2 goal "Can it be attacked?", first on the step (M3-48).
-	return <Step3BenchmarksWith draft={slice} onChange={onChange} redTeam={redTeam ? "first" : "hidden"} />;
+	return <Step3BenchmarksWith draft={slice} onChange={onChange} redTeam={redTeam ? "first" : "hidden"} linkedSuite={linkedSuite} />;
 }
 
 export default Step3Benchmarks;
@@ -484,7 +499,8 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({
 	draft,
 	onChange,
 	redTeam = "last",
-}: Step3BenchmarksProps<D> & { redTeam?: "first" | "last" | "hidden" }) {
+	linkedSuite,
+}: Step3BenchmarksProps<D> & { redTeam?: "first" | "last" | "hidden"; linkedSuite?: string | null }) {
 	const suites = useGetSuitesLightQuery();
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
@@ -551,6 +567,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({
 					checking={checking}
 					reference={reference.data?.entries}
 					leftOut={<LeftOutNote items={leftOut} />}
+					linkedSuite={linkedSuite}
 					ownTasks={
 						<OwnTasksCard
 							onAdd={(id) =>

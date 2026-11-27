@@ -29,7 +29,8 @@ import { Step1Agent } from "./step1Agent";
 import { Step2Learn } from "./step2Learn";
 import { Step3Benchmarks } from "./step3Benchmarks";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
-import { nothingRunsReason, specReady, Step4Setup, useStep4Estimate } from "./step4Setup";
+import { estimateBusy, nothingRunsReason, specReady, Step4Setup, useStep4Estimate } from "./step4Setup";
+import { firstMissingKey, useArmKeys } from "./armKeys";
 import "./fw26I18n";
 import { Step5Launch } from "./step5Launch";
 
@@ -114,10 +115,11 @@ export function footerSummary(
 ): string {
 	if (!est || !(est.runs > 0)) return "";
 	const usd = (n: number) => `$${n < 1 ? n.toFixed(2) : n.toFixed(0)}`;
-	if (!est.est_cost_usd?.known) return t("footerSummaryNoCost", { benchmarks, runs: est.runs });
+	// count picks "1 benchmark" or "2 benchmarks" (Q-8).
+	if (!est.est_cost_usd?.known) return t("footerSummaryNoCost", { count: benchmarks, runs: est.runs });
 	// A list price guess says so: "roughly ... (list prices)" (G1 estimate_basis, M3-28).
 	return t(isRoughEstimate(est) ? "footerSummaryRough" : "footerSummary", {
-		benchmarks,
+		count: benchmarks,
 		runs: est.runs,
 		low: usd(est.est_cost_usd.low),
 		high: usd(est.est_cost_usd.high),
@@ -222,6 +224,55 @@ export function LinkNotice({ putAside, badMode, onBack }: { putAside: boolean; b
 	);
 }
 
+/** The link params that stay in the URL after they are applied (Q-13): they follow the draft, so a refresh keeps the picks. */
+export interface KeptLink {
+	agent: string | null;
+	mode: string | null;
+	suite: string | null;
+}
+
+/** The kept params for a draft: its agent, its mode unless "score", and the linked suite while it still fits. */
+export function keptLink(draft: Pick<EvaluateDraft, "agent" | "mode" | "benchmarks">, current: KeptLink): KeptLink {
+	const suite =
+		// A suite the link named stays while nothing else is picked, even one step 3 cannot run yet (Q-266).
+		draft.benchmarks.length === 0
+			? current.suite
+			: draft.benchmarks.length === 1
+				? draft.benchmarks[0]
+				: current.suite && draft.benchmarks.includes(current.suite)
+					? current.suite
+					: null;
+	return { agent: draft.agent ?? null, mode: draft.mode && draft.mode !== "score" ? draft.mode : null, suite };
+}
+
+/** Whether a link carries more than the kept params (it still has to be applied). */
+export function linkHasOneShot(p: LinkParams): boolean {
+	return Boolean(p.opponent || p.keep || p.model || p.task);
+}
+
+/** Key of the kept params that were last applied or written, so a refresh does not apply them again. */
+export const APPLIED_LINK_KEY = "heimdall.evaluate.appliedLink";
+
+export function keptKey(p: Pick<LinkParams, "agent" | "mode" | "suite">): string {
+	return JSON.stringify({ agent: p.agent ?? null, mode: p.mode ?? null, suite: p.suite ?? null });
+}
+
+function readApplied(): string | null {
+	try {
+		return window.sessionStorage.getItem(APPLIED_LINK_KEY);
+	} catch {
+		return null;
+	}
+}
+
+function writeApplied(key: string) {
+	try {
+		window.sessionStorage.setItem(APPLIED_LINK_KEY, key);
+	} catch {
+		// Private windows may refuse storage: a refresh then applies the link again, as before.
+	}
+}
+
 const LINK_PARSERS = {
 	agent: parseAsString,
 	mode: parseAsString,
@@ -291,7 +342,10 @@ function EvaluateWizard() {
 	const agentsQ = useGetAgentsQuery();
 	const agentList = (agentsQ.data as { agents?: AgentWithCaps[] } | undefined)?.agents;
 	const known = useMemo(() => (agentList ? new Set(agentList.map((a) => a.id)) : null), [agentList]);
-	const linkPending = Boolean(link.agent || link.mode || link.suite || link.opponent || link.keep || link.model || link.task);
+	// Kept params (agent, mode, suite) that this tab already applied or wrote are not a new link (Q-13).
+	const [applied, setApplied] = useState<string | null>(() => readApplied());
+	const keptApplied = applied !== null && applied === keptKey(link);
+	const linkPending = linkHasOneShot(link) || (Boolean(link.agent || link.mode || link.suite) && !keptApplied);
 	// The task a "Run this task again" link named (M5-5): shown as a note while the draft still runs one task of its benchmark.
 	const [linkTask, setLinkTask] = useState<{ task: string; suite: string } | null>(null);
 
@@ -299,7 +353,7 @@ function EvaluateWizard() {
 	// return from Register your agent with keep=1). It runs once per set of link params.
 	const linkDone = useRef<string | null>(null);
 	useEffect(() => {
-		const plan = planLink(link, draft, agentList, stepRaw);
+		const plan = linkPending ? planLink(link, draft, agentList, stepRaw) : ({ kind: "none" } as const);
 		if (plan.kind === "none") {
 			linkDone.current = null;
 			return;
@@ -321,8 +375,31 @@ function EvaluateWizard() {
 			replace(plan.draft);
 			if (plan.step) void setStepRaw(plan.step, { history: stepHistoryMode("fix") });
 		}
-		void setLink({ agent: null, mode: null, suite: null, opponent: null, keep: null, model: null, task: null }, { history: "replace" });
-	}, [link, draft, agentList, stepRaw, update, replace, setLink, setStepRaw]);
+		// Only the one-shot params leave the URL; agent, mode and suite stay and follow the draft (Q-13, Q-266).
+		// An agent this organization does not have leaves the URL with the rest of the link, as before.
+		const kept: KeptLink =
+			plan.kind === "missing"
+				? { agent: null, mode: null, suite: null }
+				: keptLink(plan.kind === "replace" ? plan.draft : { ...draft, ...plan.patch }, { agent: link.agent, mode: link.mode, suite: link.suite });
+		const key = keptKey(kept);
+		writeApplied(key);
+		setApplied(key);
+		void setLink({ ...kept, opponent: null, keep: null, model: null, task: null }, { history: "replace" });
+	}, [link, draft, agentList, stepRaw, update, replace, setLink, setStepRaw, linkPending]);
+
+	// The kept params follow the draft once no link waits: a new agent, mode or benchmark shows in the URL (Q-13).
+	useEffect(() => {
+		if (linkPending || missingAgent) return;
+		const kept = keptLink(draft, { agent: link.agent, mode: link.mode, suite: link.suite });
+		const key = keptKey(kept);
+		if (key === keptKey(link)) {
+			if (applied !== key) (writeApplied(key), setApplied(key));
+			return;
+		}
+		writeApplied(key);
+		setApplied(key);
+		void setLink(kept, { history: "replace" });
+	}, [draft, link, linkPending, missingAgent, applied, setLink]);
 
 	const owns = useOwnModelAgents();
 	const versionsQ = useGetAgentVersionsQuery(draft.agent ?? "", { skip: !draft.agent });
@@ -334,6 +411,10 @@ function EvaluateWizard() {
 	const estimateSkipped = wanted < 4 || !specReady(spec, owns);
 	const step4Estimate = useStep4Estimate(spec, estimateSkipped);
 	const nothingRuns = wanted >= 4 && !step4Estimate.pending ? nothingRunsReason(step4Estimate.main.data) : null;
+	// Next waits on step 4 while the estimate is worked out (Q-7) and while a setup's provider has no key (Q-11).
+	const estimating = estimateBusy(step4Estimate, estimateSkipped);
+	const armKeyRows = useArmKeys(spec.arms).rows;
+	const missingKey = wanted >= 4 ? firstMissingKey(armKeyRows) : undefined;
 	const reach = maxReachable(draft, owns, nothingRuns, ctx);
 	const step = (wanted > reach ? reach : wanted) as EvaluateStep;
 	// Load the benchmark list while the person picks an agent, so step 3 opens filled (M3-35).
@@ -348,7 +429,14 @@ function EvaluateWizard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [linkPending, agentsQ.isLoading]);
 	const [launchSlot, setLaunchSlot] = useState<HTMLElement | null>(null);
-	const reason = nextReason(step, draft, owns, nothingRuns, ctx);
+	const baseReason = nextReason(step, draft, owns, nothingRuns, ctx);
+	const keyBlocks = step === 4 && !baseReason && Boolean(missingKey);
+	const reasonText = baseReason
+		? t(`nextReason.${baseReason}`)
+		: keyBlocks && missingKey
+			? t("nextReason.needKey", { provider: missingKey.providerName })
+			: "";
+	const reason = Boolean(reasonText);
 	const summaryText = step >= 4 ? footerSummary(t as never, spec.benchmarks.length, step4Estimate.main.data) : "";
 	const failoverHint = step === 4 && !nothingRuns ? failoverNextProblem(draft) : "";
 
@@ -362,7 +450,8 @@ function EvaluateWizard() {
 	}, [writeBack, setStepRaw]);
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-6" data-testid="evaluate-screen">
+		// gap-4, not 6: the first agent row sits high enough on a 900 px screen (Q-89).
+		<section className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-4" data-testid="evaluate-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
@@ -372,7 +461,15 @@ function EvaluateWizard() {
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => (reset(), setReplaced(null), setBadMode(null), setMissingAgent(null), setLinkTask(null), go(1))}
+						onClick={() => (
+							reset(),
+							setReplaced(null),
+							setBadMode(null),
+							setMissingAgent(null),
+							setLinkTask(null),
+							void setLink({ agent: null, mode: null, suite: null }, { history: "replace" }),
+							go(1)
+						)}
 						data-testid="evaluate-reset"
 					>
 						{t("startOver")}
@@ -418,9 +515,29 @@ function EvaluateWizard() {
 			</div>
 
 			<div className="min-w-0">
-				{step === 1 && <Step1Agent missingAgent={missingAgent} onPicked={() => setMissingAgent(null)} />}
+				{/* A click on an agent moves on to step 2 (Q-129); the version stays on step 1 for a way back. */}
+				{step === 1 && (
+					<Step1Agent
+						missingAgent={missingAgent}
+						onPicked={() => {
+							setMissingAgent(null);
+							go(2);
+						}}
+					/>
+				)}
 				{step === 2 && <Step2Learn />}
-				{step === 3 && <Step3Benchmarks />}
+				{step === 3 && draft.agent && (
+					// The agent under test, one click from a change (Q-65).
+					<button
+						type="button"
+						onClick={() => go(1)}
+						className="border-border/70 hover:bg-accent mb-3 inline-flex min-h-9 items-center rounded-full border px-3 text-sm"
+						data-testid="evaluate-agent-chip"
+					>
+						{t("changeAgent", { agent: draft.agent })}
+					</button>
+				)}
+				{step === 3 && <Step3Benchmarks linkedSuite={link.suite} />}
 				{step === 4 && <Step4Setup spec={spec} onChange={(s) => update(specToPatch(s, draft))} />}
 				{step === 5 && <Step5Launch spec={draftToSpec(draft)} onChange={(s) => update(specToPatch(s))} launchSlot={launchSlot} />}
 			</div>
@@ -436,7 +553,7 @@ function EvaluateWizard() {
 						className="text-muted-foreground min-w-0 flex-1 text-xs sm:text-center"
 						data-testid={reason ? "evaluate-next-reason" : "evaluate-footer-summary"}
 					>
-						{reason ? t(`nextReason.${reason}`) : summaryText}
+						{reason ? reasonText : summaryText}
 					</span>
 				)}
 				{step === 5 && <span ref={setLaunchSlot} className="ml-auto flex items-center" data-testid="evaluate-launch-slot" />}
@@ -453,7 +570,7 @@ function EvaluateWizard() {
 							</span>
 						)}
 						<Button
-							disabled={!stepReady(step, draft, owns, nothingRuns, ctx)}
+							disabled={!stepReady(step, draft, owns, nothingRuns, ctx) || (step === 4 && (estimating || keyBlocks))}
 							onClick={() => go((step + 1) as EvaluateStep)}
 							data-testid="evaluate-next"
 						>

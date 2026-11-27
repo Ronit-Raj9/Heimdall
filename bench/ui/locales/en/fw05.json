@@ -14,11 +14,28 @@
 		"mcpCodeMode": "MCP tool calls go through Bifrost's MCP gateway, with Code Mode.",
 		"cache": "Also runs a second setup with Bifrost's cache on.",
 		"failover": "Also runs a second setup with Bifrost fallbacks ({{models}}) while the main model is down.",
-		"gate": "Checks the release rules when it finishes."
+		"gate": "Checks the release rules when it finishes.",
+		"yourAgent": "your agent",
+		"onModel": " on {{model}}",
+		"score": "Score {{arm}}.",
+		"versions": "Compare two versions: {{a}} against {{b}}.",
+		"models": "Compare two models: {{a}} against {{b}}.",
+		"opponent": "Compare {{a}} against the baseline {{b}}.",
+		"benchmarks_one": "Run {{n}} benchmark: {{list}}.",
+		"benchmarks_other": "Run {{n}} benchmarks: {{list}}.",
+		"pack": "Run the {{pack}} pack of benchmarks.",
+		"once": "once",
+		"times": "{{n}} times",
+		"tasks": "Use {{n}} tasks from each benchmark and try each task {{trials}}.",
+		"tasksReady": "Use up to {{n}} tasks from each benchmark ({{ready}} ready in all) and try each task {{trials}}.",
+		"clean": "Run clean only, with no faults.",
+		"budget": "Stop when spending reaches {{usd}}.",
+		"defaultBudget": "Stop each benchmark when its spending reaches {{usd}} (the default budget)."
 	},
 	"basis": {
 		"library": "Estimated from other agents' runs of these benchmarks. Your own runs will make it more exact.",
-		"own": "Estimated from past runs of this agent and model."
+		"own": "Estimated from past runs of this agent and model.",
+		"rough": "Rough estimate from list prices: this setup has no past runs here yet."
 	},
 	"name": {
 		"label": "Name"
@@ -36,7 +53,12 @@
 		"budgetTooHigh": "The most one evaluation can spend is ${{max}}.",
 		"budgetAboveSuggested": "This is above the suggested maximum of {{max}} for your organization.",
 		"latestVersion": " latest version",
-		"budgetBelowFloor": "The budget must be at least $0.01 per benchmark: at least {{min}} for {{count}}."
+		"budgetBelowFloor": "The budget must be at least $0.01 per benchmark: at least {{min}} for {{count}}.",
+		"suggestedWhy": "Suggested: covers the expected cost of {{runs}} runs. You can lower it; the evaluation stops when it is reached.",
+		"useDefaultCap": "Use the default cap instead ({{cap}} per benchmark, {{total}} in all)",
+		"budgetSplit": "Split evenly over the benchmarks; each one stops starting runs when its share is spent.",
+		"budgetEmpty": "Empty means the default: each benchmark stops at {{cap}}.",
+		"budgetPlaceholder": "{{cap}} per benchmark"
 	},
 	"own": {
 		"noLetters": "Use letters or digits in the name.",
@@ -48,5 +70,15 @@
 		"all": "{{benchmarks}} · {{tasks}}",
 		"some": "{{benchmarks}}, {{runnable}} your agent can run · {{tasks}} it can run",
 		"none": "{{benchmarks}}, none your agent can run: {{reason}}"
+	},
+	"power": {
+		"line": "These settings can detect a change of about {{n}} points overall{{per}}.",
+		"per": " ({{n}} per benchmark)",
+		"perTooFew": " (too few tasks to decide per benchmark)",
+		"tooFew": "These settings have too few tasks to detect a change.",
+		"tooFewChange": "Too few tasks to see any change."
+	},
+	"note": {
+		"sameConfig": "Pick a second model to see the price."
 	}
 }
