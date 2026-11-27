@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ChainBadge, ReleaseCards, initials, releaseLink } from "./releaseCards";
+import { ChainBadge, ReleaseCards, initials, printOneRelease, releaseLink } from "./releaseCards";
 import { liveNow } from "./releasesView";
 import i18n from "@/lib/i18n";
 
@@ -157,5 +157,27 @@ describe("ReleaseCards: a record always reads Released (N171)", () => {
 		expect(html).toContain(">Released<");
 		expect(html).toContain("The result said no decision");
 		expect(html).not.toContain("Not released");
+	});
+});
+describe("print one release (M7-83)", () => {
+	it("marks the page while printing and clears the mark after the print dialog", () => {
+		const listeners: Record<string, () => void> = {};
+		const root = { dataset: {} as Record<string, string> };
+		const print = vi.fn();
+		const win = {
+			document: { documentElement: root },
+			addEventListener: (ev: string, fn: () => void) => (listeners[ev] = fn),
+			removeEventListener: (ev: string) => delete listeners[ev],
+			setTimeout: (fn: () => void) => fn(),
+			print,
+		} as unknown as Window;
+		const done = vi.fn();
+		printOneRelease("rel_1", done, win);
+		expect(root.dataset.printRelease).toBe("rel_1");
+		expect(print).toHaveBeenCalledOnce();
+		listeners.afterprint();
+		expect(root.dataset.printRelease).toBeUndefined();
+		expect(done).toHaveBeenCalledOnce();
+		expect(listeners.afterprint).toBeUndefined();
 	});
 });

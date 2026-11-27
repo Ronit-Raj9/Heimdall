@@ -52,3 +52,11 @@ describe("ClustersFilters", () => {
 		expect(loading).toMatch(/disabled=""[^>]*data-testid="clusters-synthetic-only"/);
 	});
 });
+describe("benchmark select (M7-38)", () => {
+	it("is a select of the given benchmarks, and keeps a URL value not in the list", () => {
+		const html = renderToStaticMarkup(<ClustersFilters {...props} suiteOptions={["swe-mini@1", "web-tasks"]} />);
+		expect(html).toMatch(/<select[^>]*data-testid="clusters-filter-suite"/);
+		expect(html).toContain('<option value="swe-mini@1">swe-mini@1</option>');
+		expect(html).toContain('<option value="coding-core" selected="">coding-core</option>');
+	});
+});

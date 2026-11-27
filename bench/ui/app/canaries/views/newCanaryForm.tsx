@@ -1,3 +1,4 @@
+import "./ufc6I18n";
 import { SetupCard, Step } from "@/components/inbox/featureHero";
 import { Bird, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
 } from "@/lib/store/apis/schedulesApi";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
-import type { CanaryDefinition, SuiteSummary } from "@/lib/types/bench";
+import type { CanaryDefinition, CanaryNoiseFloor, SuiteSummary } from "@/lib/types/bench";
 import type { AlertConfig, CanaryInitRequest } from "@/lib/types/schedules";
 import { useGetSchedulesQuery } from "@/lib/store/apis/schedulesApi";
 import { checkCost, HowOften, howOftenCron, howOftenOf, howOftenProblem, newHowOften, usd } from "@/components/canaries/howOften";
@@ -77,6 +78,8 @@ export interface CanaryFormFields {
 	sensitivity: string;
 	/** The alert channels (org hooks) told when the monitor drifts. */
 	alerts: AlertConfig[];
+	/** "Drops by more than N points" of success share; "" is the server default. */
+	dropPoints?: string;
 	perRun: string;
 	perDay: string;
 	smoke: boolean;
@@ -154,7 +157,14 @@ export function canaryFieldsFromText(f: CanaryTextFields): CanaryFormFields {
 }
 
 /** The POST /canaries body: the server takes a whole definition, alerts and sensitivity included. */
-export type CanaryRequest = CanaryInitRequest & { alerts?: AlertConfig[]; sensitivity?: string };
+export type CanaryRequest = CanaryInitRequest & { alerts?: AlertConfig[]; sensitivity?: string; noise_floor?: CanaryNoiseFloor };
+
+/** The success drop share (0 to 1) of a "drops by more than N points" text, or null when blank or not a number above 0. Exported for tests. */
+export function dropShare(points: string | undefined): number | null {
+	const n = Number((points ?? "").trim());
+	if (!(points ?? "").trim() || !Number.isFinite(n) || n <= 0 || n > 100) return null;
+	return n / 100;
+}
 
 /** Builds the POST /canaries body from the form (or the older text shape). Exported for tests. */
 export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): CanaryRequest {
@@ -174,6 +184,8 @@ export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): 
 	if (cron !== null) req.schedule = { cron, timezone: f.timezone || "UTC" };
 	if (f.sensitivity) req.sensitivity = f.sensitivity;
 	if (f.alerts.length) req.alerts = f.alerts.map((a) => ({ ...a }));
+	const drop = dropShare(f.dropPoints);
+	if (drop !== null) req.noise_floor = { success: drop };
 	if (f.smoke) req.smoke = true;
 	if (f.force) req.force = true;
 	return req;
@@ -188,6 +200,7 @@ export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
 		weekday: how.weekday,
 		timezone: how.timezone,
 		sensitivity: d.sensitivity ?? "",
+		dropPoints: d.noise_floor?.success ? String(Math.round(d.noise_floor.success * 1000) / 10) : "",
 		alerts: (d.alerts ?? []).map((a) => ({ url_env: a.url_env, ...(a.secret_env ? { secret_env: a.secret_env } : {}), ...(a.events ? { events: a.events } : {}), ...(a.format ? { format: a.format as AlertConfig["format"] } : {}) })),
 		name: d.name,
 		agent: d.agent,
@@ -213,6 +226,11 @@ export function buildCanaryEdit(initial: CanaryDefinition, f: CanaryFormFields):
 	const out: CanaryRequest = { ...(initial as CanaryRequest), ...req, trials: initial.trials || 1 };
 	if (!f.alerts.length) delete out.alerts;
 	if (!f.sensitivity) delete out.sensitivity;
+	// The form owns the success drop; the other noise floors of the file are kept.
+	const floor = { ...initial.noise_floor, ...req.noise_floor };
+	if (!req.noise_floor) delete floor.success;
+	if (Object.keys(floor).length) out.noise_floor = floor;
+	else delete out.noise_floor;
 	if (req.schedule) out.schedule = { ...initial.schedule, ...req.schedule };
 	else delete out.schedule;
 	out.smoke = f.smoke;
@@ -285,6 +303,7 @@ export function NewCanaryForm({
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const { t: c } = useTranslation("uf7b");
+	const { t: d } = useTranslation("ufc6");
 	const [create, createState] = useCreateCanaryMutation();
 	// The org's alert channels (the hooks of the Repeat runs tab) for "Tell me when".
 	const hooks = useGetSchedulesQuery();
@@ -543,6 +562,22 @@ export function NewCanaryForm({
 					<option value="high">{c("canary.sensitivity.high")}</option>
 					<option value="low">{c("canary.sensitivity.low")}</option>
 				</select>
+			</label>
+			<label className="flex max-w-sm min-w-0 flex-col gap-1">
+				<span className="text-foreground text-sm font-medium">{d("canary.dropLabel")}</span>
+				<Input
+					type="number"
+					inputMode="decimal"
+					min="0.1"
+					max="100"
+					step="any"
+					value={f.dropPoints ?? ""}
+					onChange={(e) => patch({ dropPoints: e.target.value })}
+					placeholder={d("canary.dropPlaceholder")}
+					className="w-32"
+					data-testid="canary-new-drop"
+				/>
+				<span className="text-muted-foreground">{d("canary.dropHelp")}</span>
 			</label>
 			<fieldset className="flex flex-col gap-1">
 				<legend className="text-foreground text-sm font-medium mb-1">{c("canary.channel")}</legend>

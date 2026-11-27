@@ -14,6 +14,7 @@ import {
 	useRevokeInboxTokenMutation,
 } from "@/lib/store/apis/liveinboxApi";
 import { roleAtLeast } from "@/lib/store/apis/session";
+import { useListSecretsQuery } from "@/lib/store/apis/secretsApi";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { InboxSourceParams, InboxTokenCreated, InboxTokenList, InboxWebhookInfo, PullCheck } from "@/lib/types/liveinbox";
 import { PullSteps } from "@/components/inbox/pullSteps";
@@ -129,6 +130,11 @@ const SOURCE_DEFAULTS: Record<InboxSourceParams["kind"], InboxSourceParams> = {
 	},
 };
 
+/** The sorted, unique names of the org's stored secrets, for the key field suggestions. Exported for tests. */
+export function secretNameOptions(secrets: readonly { name: string }[] | undefined): string[] {
+	return [...new Set((secrets ?? []).map((x) => x.name.trim()).filter(Boolean))].sort();
+}
+
 /** The pull setup: what is missing (with links to Settings > Secrets) and a form that adds a source to inbox/sources.yaml. */
 export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: boolean }) {
 	const { t } = useTranslation("liveinbox");
@@ -149,6 +155,9 @@ export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: 
 		api_key_env: t("inbox.source.apiKeyEnv"),
 	};
 	const required = new Set(REQUIRED_FIELDS[v.kind]);
+	// On the hosted service the key fields suggest the org's stored secrets by name; typing stays free (M7-6).
+	const secrets = useListSecretsQuery(undefined, { skip: !hosted });
+	const secretNames = secretNameOptions(secrets.data?.secrets);
 	// A secret name the pull check knows and reports as not stored (M7-7).
 	const notStored = (name: string) => Boolean(name.trim()) && (check?.secrets ?? []).some((x) => x.name === name.trim() && !x.set);
 	const field = (key: keyof InboxSourceParams, label: string, placeholder?: string) => (
@@ -164,6 +173,7 @@ export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: 
 				placeholder={placeholder ?? SECRET_PLACEHOLDERS[key]}
 				required={required.has(key)}
 				onChange={(e) => setV({ ...v, [key]: e.target.value })}
+				list={key.endsWith("_env") && secretNames.length ? `${ids}-secrets` : undefined}
 				data-testid={`inbox-source-${key}`}
 			/>
 			{key.endsWith("_env") && notStored((v[key] as string | undefined) ?? "") && (
@@ -176,6 +186,13 @@ export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: 
 	const secretHint = hosted ? t("inbox.source.secretHintHosted") : t("inbox.source.secretHint");
 	const form = (
 		<div className="flex flex-col gap-3">
+			{secretNames.length > 0 && (
+				<datalist id={`${ids}-secrets`} data-testid="inbox-source-secret-names">
+					{secretNames.map((n) => (
+						<option key={n} value={n} />
+					))}
+				</datalist>
+			)}
 			<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-kind`}>
 				<span className="text-foreground font-medium">{t("inbox.source.kind")}</span>
 				<select

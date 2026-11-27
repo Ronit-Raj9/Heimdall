@@ -9,6 +9,7 @@ import {
 } from "@/components/experiments/experiments.utils";
 import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useListEvaluationsLightQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +21,21 @@ export function experimentsNewestFirst(experiments: readonly ExperimentStatus[])
 		return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 	};
 	return [...experiments].sort((x, y) => at(y) - at(x));
+}
+
+/** Evaluation id to name from a list of evaluations, the id when there is no name. Pure, exported for tests. */
+export function evaluationNamesOf(list: readonly Pick<Evaluation, "id" | "spec">[] | undefined): EvaluationNames {
+	return new Map((list ?? []).map((ev) => [ev.id, ev.spec?.name?.trim() || ev.id] as const));
+}
+
+/**
+ * The names of finished evaluations, from the light finished-only list (M7-41): the triage picker
+ * lists comparisons with finished runs, so it never loads the full evaluations list. Empty while
+ * loading or on error; the picker then falls back to its older names.
+ */
+export function useFinishedEvaluationNames(): EvaluationNames {
+	const list = useListEvaluationsLightQuery();
+	return useMemo(() => evaluationNamesOf(list.data), [list.data]);
 }
 
 /** What a picker shows: the listed choices, every choice by id (to name a URL value), and how many are hidden. */

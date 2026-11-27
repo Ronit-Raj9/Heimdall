@@ -19,6 +19,8 @@ export interface ClustersFiltersProps {
 	synthetic: ClusterSynthetic;
 	/** Values to suggest while typing, from the current list. */
 	agentOptions?: readonly string[];
+	/** The org's benchmarks ("id" or "id@version"); when given, the benchmark is a select of them (M7-38). */
+	suiteOptions?: readonly string[];
 	experimentOptions?: readonly string[];
 	/** A text filter changed; "" clears it. */
 	onText: (filter: ClusterTextFilter, value: string) => void;
@@ -63,14 +65,26 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 				aria-describedby={hintId}
 				data-testid="clusters-filters"
 			>
-				<TextField
-					label={t("clusters.filters.suite")}
-					value={props.suite}
-					placeholder={t("clusters.filters.suitePlaceholder")}
-					onCommit={(value) => onText("suite", value)}
-					disabled={disabled}
-					testId="clusters-filter-suite"
-				/>
+				{props.suiteOptions && props.suiteOptions.length > 0 ? (
+					<SelectField
+						label={t("clusters.filters.suite")}
+						value={props.suite}
+						allLabel={t("clusters.filters.suitePlaceholder")}
+						options={props.suiteOptions}
+						onCommit={(value) => onText("suite", value)}
+						disabled={disabled}
+						testId="clusters-filter-suite"
+					/>
+				) : (
+					<TextField
+						label={t("clusters.filters.suite")}
+						value={props.suite}
+						placeholder={t("clusters.filters.suitePlaceholder")}
+						onCommit={(value) => onText("suite", value)}
+						disabled={disabled}
+						testId="clusters-filter-suite"
+					/>
+				)}
 				<SelectField
 					label={t("clusters.filters.agent")}
 					value={props.agent}

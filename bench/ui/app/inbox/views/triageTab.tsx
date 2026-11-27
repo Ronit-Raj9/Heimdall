@@ -5,8 +5,7 @@ import { TriageDrillDown, TriageRunEvidence } from "@/components/triage/triageDr
 import { TriageTable } from "@/components/triage/triageTable";
 import { ExperimentBehaviourChecks } from "@/components/runs/behaviourChecks"; // I28 behaviour checks
 import { runLocations, triageArms } from "@/components/triage/triage.utils";
-import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "@/components/triage/experimentSelect";
-import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
+import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker, useFinishedEvaluationNames } from "@/components/triage/experimentSelect";
 import { Card } from "@/components/ui/card";
 import { useGetGridQuery, useGetRunQuery, useGetTriageQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { FlaskConical, SearchCheck } from "lucide-react";
@@ -36,7 +35,7 @@ export default function TriageTab() {
 	const list = useListExperimentsQuery();
 	const experiments = useMemo(() => list.data?.experiments ?? [], [list.data]);
 	// Checks, practice runs and debug runs are listed only with all=1, so the tab opens on a real comparison.
-	const picker = useExperimentPicker(experiments, all === "1", useEvaluationNames());
+	const picker = useExperimentPicker(experiments, all === "1", useFinishedEvaluationNames());
 	// With no ?exp= the tab opens on the newest listed comparison that has finished runs, so it does not open empty (M7-41).
 	const expId =
 		defaultPickerExperiment(picker.options, triageExpId(expParam) ?? firstWithFinishedRuns(picker.options, experiments)) ?? null;
@@ -76,7 +75,7 @@ export default function TriageTab() {
 					<EmptyState
 						icon={FlaskConical}
 						message={t("triage.noExperiments")}
-						action={{ label: t("triage.newExperiment"), to: "/experiments/new" }}
+						action={{ label: t("triage.newExperiment"), to: "/evaluate" }}
 						testId="triage-no-experiments"
 					/>
 				)

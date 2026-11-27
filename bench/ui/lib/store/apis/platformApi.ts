@@ -33,6 +33,7 @@ import type {
 	PasswordChangeRequest,
 	SwitchOrgRequest,
 } from "@/lib/types/bench";
+import type { RetentionWithPreview } from "@/lib/types/serverFields";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 import { announceOrgSwitch, errorStatus, expectAuth, getAuthState, noteOrgReset, setAuthState } from "./session";
@@ -89,6 +90,12 @@ function switchedOrg(dispatch: (action: ReturnType<typeof benchApi.util.resetApi
 
 export const platformApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
+		// The retention dry run (G1, M8-55): the policy plus how many comparisons and runs a retention
+		// of N days would delete. Org admins only; a server without it leaves `preview` out.
+		getRetentionPreview: builder.query<RetentionWithPreview, number>({
+			query: (days) => ({ url: "/data/retention", params: { preview_days: days } }),
+			keepUnusedDataFor: 0,
+		}),
 		// Who is calling. 404 (a server before the platform) and auth_mode local both mean local mode.
 		getMe: builder.query<AuthMeResponse, void>({
 			query: () => "/auth/me",
@@ -284,6 +291,8 @@ export const platformApi = benchApi.injectEndpoints({
 });
 
 export const {
+	useGetRetentionPreviewQuery,
+	useLazyGetRetentionPreviewQuery,
 	useGetMeQuery,
 	useGetAuthConfigQuery,
 	useLoginMutation,

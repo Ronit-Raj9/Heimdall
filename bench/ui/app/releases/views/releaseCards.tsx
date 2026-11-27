@@ -68,12 +68,26 @@ export function releaseLink(origin: string, id: string): string {
 	return `${origin}/releases?release=${encodeURIComponent(id)}`;
 }
 
+/** Marks the page for printing one release, prints, and clears the mark after the print dialog closes. */
+export function printOneRelease(id: string, done: () => void, win: Window = window): void {
+	const root = win.document.documentElement;
+	const clear = () => {
+		delete root.dataset.printRelease;
+		win.removeEventListener("afterprint", clear);
+		done();
+	};
+	root.dataset.printRelease = id;
+	win.addEventListener("afterprint", clear);
+	win.setTimeout(() => win.print(), 0);
+}
+
 function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolean }) {
 	const { t } = useTranslation("u14");
 	const { t: tg } = useTranslation("gw06");
 	const { t: m } = useTranslation("uf7b");
 	const [open, setOpen] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [printing, setPrinting] = useState(false);
 	const id = record.release_id;
 	const ship = record.action === "ship";
 	// A record exists only because someone released, so the badge always says it was released (N171).
@@ -90,7 +104,13 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 		}
 	};
 	return (
-		<li className="relative scroll-mt-4" id={`release-${id}`} data-testid={`release-entry-${id}`}>
+		<li
+			className={cn(
+				"relative scroll-mt-4",
+				// "Print this release" prints only this card: the others hide while the page is marked (M7-83).
+				printing ? "print:break-inside-avoid" : "[html[data-print-release]_&]:print:hidden",
+			)}
+			id={`release-${id}`} data-testid={`release-entry-${id}`}>
 			<span
 				className={cn(
 					"bg-background absolute top-5 -left-6 size-3.5 rounded-full border-2",
@@ -183,7 +203,8 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 							className="text-primary flex min-h-6 items-center gap-1 hover:underline print:hidden"
 							onClick={() => {
 								setOpen(true);
-								window.setTimeout(() => window.print(), 0);
+								setPrinting(true);
+								printOneRelease(id, () => setPrinting(false));
 							}}
 							data-testid={`release-print-${id}`}
 						>

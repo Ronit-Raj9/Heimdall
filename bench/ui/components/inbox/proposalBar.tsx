@@ -116,8 +116,8 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 	const [createJob, { isLoading: starting }] = useCreateJobMutation();
 	const [accept, { isLoading: accepting }] = useAcceptInboxItemMutation();
 	const proposal = useGetInboxProposalQuery(itemId);
-	const draft = useGetJobQuery(draftJob ?? "", { skip: !draftJob, pollingInterval: draftJob ? 2000 : 0 });
-	const admit = useGetJobQuery(admitJob ?? "", { skip: !admitJob, pollingInterval: admitJob ? 3000 : 0 });
+	const draft = useGetJobQuery(draftJob ?? "", { skip: !draftJob, pollingInterval: draftJob ? 5000 : 0, skipPollingIfUnfocused: true });
+	const admit = useGetJobQuery(admitJob ?? "", { skip: !admitJob, pollingInterval: admitJob ? 5000 : 0, skipPollingIfUnfocused: true });
 
 	const draftStatus = draft.data?.status;
 	const { refetch } = proposal;
