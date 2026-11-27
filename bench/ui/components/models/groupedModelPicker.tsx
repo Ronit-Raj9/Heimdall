@@ -2,8 +2,7 @@ import { modelChoices, type ProviderId } from "@/components/models/modelPicker";
 import { Badge } from "@/components/ui/badge";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelOption, ModelProviderInfo } from "@/lib/types/models";
-import { KeyMissingNote } from "@/components/models/keyMissingNote";
-import { useRouterState } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/runs/uf5bI18n";
@@ -199,7 +198,6 @@ export function GroupedModelPicker({
 	const selected = customFor ? `${OTHER}${customFor}` : model !== "" ? `${provider}\u0000${model}` : "";
 	const keyState = provider ? keyStateFor(provider, keys) : "ok";
 	const providerName = catalog.find((p) => p.id === provider)?.name ?? provider;
-	const returnTo = useRouterState({ select: (st) => st.location.href });
 
 	const pick = (v: string) => {
 		if (v === MORE) {
@@ -296,10 +294,12 @@ export function GroupedModelPicker({
 			</div>
 			{failed && <InlineError error={models.error} title={tc("picker.loadError")} onRetry={() => void models.refetch()} testId={`${tid}-error`} />}
 			{loaded && provider !== "" && keyState !== "ok" && (
-				<div className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
-					{/* Opens Settings, Model keys, on the Add panel for this provider and comes back here (M8-12). */}
-					<KeyMissingNote provider={provider} providerName={providerName} returnTo={returnTo} className="flex flex-wrap items-center gap-2 text-xs" />
-				</div>
+				<p className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
+					{keyState === "invalid" ? t("picker.keyBroken", { name: providerName }) : t("picker.keyNone", { name: providerName })}{" "}
+					<Link to="/models" search={{ add: provider } as never} className="text-primary underline">
+						{t("picker.addKey")}
+					</Link>
+				</p>
 			)}
 		</div>
 	);

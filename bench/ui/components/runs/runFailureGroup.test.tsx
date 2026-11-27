@@ -36,3 +36,11 @@ describe("same failure link (M5-1, G1)", () => {
 		expect(without).not.toContain("same failure");
 	});
 });
+
+describe("failure group comes with the run answer (M5-1, C0 fold)", () => {
+	it("has no private request of its own any more", async () => {
+		const mod = (await import("./runFailureGroup")) as Record<string, unknown>;
+		expect(mod.useGetRunFailureQuery).toBeUndefined();
+		expect(mod.runFailureApi).toBeUndefined();
+	});
+});
