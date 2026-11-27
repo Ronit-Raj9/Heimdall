@@ -103,7 +103,7 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 		set["image"] = b.Tag
 	}
 	if root != "" && !dockerfileUsesArg(filepath.Join(root, b.Dockerfile), b.BaseArg) {
-		return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile %s does not start FROM ${%s})", cfg.ID, b.Dockerfile, b.BaseArg)}
+		return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile does not start FROM ${%s})", cfg.ID, b.BaseArg)}
 	}
 	return taskImageVariant{Set: set, Note: fmt.Sprintf("agent %s is built on each task's own image here", cfg.ID)}
 }
