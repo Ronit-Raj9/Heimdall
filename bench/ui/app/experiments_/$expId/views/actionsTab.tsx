@@ -22,6 +22,8 @@ export interface ActionsTabProps {
 	/** The manifest's suite id, and the version it froze. */
 	suite?: string;
 	suiteVersion?: string;
+	/** The grade source the page shows (decision 1); the broken parent note reads its verdict. */
+	gradeSource?: string;
 }
 
 /** One setup of the experiment (fix wave 2, N66), from the experiment status `setups`. */
@@ -41,7 +43,7 @@ export function decisionText(decision: string, words: Record<(typeof DECISIONS)[
  * comparison. Each queues a job that writes, freezes and starts a new experiment, then links it.
  * Compare models and Compare two git refs start from setup A's agent and model.
  */
-export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
+export function ActionsTab({ expId, suite, suiteVersion, gradeSource }: ActionsTabProps) {
 	const { t } = useTranslation("experimentActions");
 	const { t: tu } = useTranslation("compareUx");
 	const status = useGetExperimentQuery(expId);
@@ -53,7 +55,7 @@ export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
 	return (
 		<div className="flex flex-col gap-3" data-testid="experiment-actions">
 			<p className="text-muted-foreground text-sm">{tu("actions.intro")}</p>
-			<ExtendCard expId={expId} />
+			<ExtendCard expId={expId} gradeSource={gradeSource} />
 			<ProbeCard expId={expId} suite={suite} />
 			<ActionCard icon={GitCompareArrows} title={t("migrate.title")} description={t("migrate.description")} testId="actions-migrate">
 				<MigrateForm
@@ -100,9 +102,9 @@ export function brokenParentReason(reasons: readonly string[] | undefined): stri
 }
 
 /** The sentence on a broken comparison's Extend card, with the first reason from its verdict. */
-function BrokenParentNote({ expId }: { expId: string }) {
+function BrokenParentNote({ expId, gradeSource }: { expId: string; gradeSource?: string }) {
 	const { t } = useTranslation("experimentActions");
-	const verdict = useGetVerdictQuery(expId);
+	const verdict = useGetVerdictQuery(gradeSource ? { expId, gradeSource } : expId);
 	return (
 		<p className="text-chart-error-ink text-sm" role="note" data-testid="actions-extend-broken">
 			{t("extend.brokenParent", { reason: brokenParentReason(verdict.data?.verdict.invalid_reasons) })}
@@ -110,7 +112,7 @@ function BrokenParentNote({ expId }: { expId: string }) {
 	);
 }
 
-function ExtendCard({ expId }: { expId: string }) {
+function ExtendCard({ expId, gradeSource }: { expId: string; gradeSource?: string }) {
 	const { t } = useTranslation("experimentActions");
 	const { t: tHw09 } = useTranslation("hw09");
 	const uid = useId();
@@ -160,7 +162,7 @@ function ExtendCard({ expId }: { expId: string }) {
 				{more && !more.over && (
 					<p className="text-muted-foreground text-xs">{t("extend.sizing", { tasks: more.tasks, target: more.target_pp })}</p>
 				)}
-				{broken && !parent && <BrokenParentNote expId={expId} />}
+				{broken && !parent && <BrokenParentNote expId={expId} gradeSource={gradeSource} />}
 				{parent ? (
 					<p className="text-muted-foreground text-sm" data-testid="actions-extend-followup">
 						{t("extend.already", { expId: parent.exp_id })}

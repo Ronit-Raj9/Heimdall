@@ -345,7 +345,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 			>
 				{(active) =>
 					active === ANALYSIS_TAB_ID ? (
-						<AnalysisTab expId={expId} />
+						<AnalysisTab expId={expId} gradeSource={gradeQuery(expId, grade).gradeSource} />
 					) : notStarted && active === "verdict" ? (
 						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
 					) : (
@@ -357,6 +357,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 							suiteVersion={st.suite_version}
 							evaluationId={evaluationId}
 							live={live}
+							gradeSource={gradeQuery(expId, grade).gradeSource}
 						/>
 					)
 				}
@@ -404,6 +405,7 @@ function ExperimentTab({
 	suiteVersion,
 	evaluationId,
 	live,
+	gradeSource,
 }: {
 	tab: ExperimentTabId;
 	expId: string;
@@ -412,6 +414,8 @@ function ExperimentTab({
 	suiteVersion?: string;
 	evaluationId?: string;
 	live?: boolean;
+	/** The grade source the page shows (gradeQuery): the tabs that read the verdict read that one (decision 1). */
+	gradeSource?: string;
 }) {
 	switch (tab) {
 		case "verdict":
@@ -424,7 +428,7 @@ function ExperimentTab({
 		case "runs":
 			return <RunList expId={expId} running={live} testId="experiment-runs" />;
 		case "matrix":
-			return <MatrixTab expId={expId} />;
+			return <MatrixTab expId={expId} gradeSource={gradeSource} />;
 		case "cost":
 			return <CostTab expId={expId} arms={arms} />;
 		case "migration":
@@ -440,7 +444,7 @@ function ExperimentTab({
 		case "export":
 			return <ExportTab expId={expId} />;
 		case "actions":
-			return <ActionsTab expId={expId} suite={suite} suiteVersion={suiteVersion} />;
+			return <ActionsTab expId={expId} suite={suite} suiteVersion={suiteVersion} gradeSource={gradeSource} />;
 	}
 }
 

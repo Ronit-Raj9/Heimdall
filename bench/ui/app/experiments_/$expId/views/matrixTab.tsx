@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
  * The Matrix tab: every arm of the experiment ranked, with every pair tested (docs/model-matrix.md).
  * ?condition=, ?grade_source= and ?alpha= carry over from the old /matrix URL.
  */
-export function MatrixTab({ expId }: { expId: string }) {
+export function MatrixTab({ expId, gradeSource: pageSource }: { expId: string; gradeSource?: string }) {
 	const { t } = useTranslation("bench");
 	const [condition, setCondition] = useQueryState("condition", parseAsString);
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
@@ -19,13 +19,14 @@ export function MatrixTab({ expId }: { expId: string }) {
 	const matrix = useGetModelMatrixQuery({
 		expId,
 		condition: condition ?? undefined,
-		grade_source: gradeSource ?? undefined,
+		// A grade source picked on this tab wins; otherwise the one the page shows (decision 1).
+		grade_source: gradeSource ?? pageSource,
 		alpha: alpha ?? undefined,
 	});
 	// The default view (no condition, grade source or alpha chosen) is the analysis's own matrix, so its
 	// tiers and note come from the verdict's setups result: the Result tab and this tab tell one story (N244).
 	const asAnalysed = !condition && !gradeSource && !alpha;
-	const verdict = useGetVerdictQuery(expId, { skip: !asAnalysed });
+	const verdict = useGetVerdictQuery(pageSource ? { expId, gradeSource: pageSource } : expId, { skip: !asAnalysed });
 	const setups = asAnalysed ? verdict.data?.verdict.setups : undefined;
 
 	if (matrix.isLoading) return <BlockSkeleton rows={6} testId="matrix-report-loading" />;

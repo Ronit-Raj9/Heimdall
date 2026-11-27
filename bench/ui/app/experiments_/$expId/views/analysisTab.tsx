@@ -187,9 +187,10 @@ export function AnalysisTabLabel() {
  * The Analysis tab (web parity lane L15): the analysis commands as background jobs, each refreshing
  * the view it changes when it ends, the cost views one click away, and an audit of a published table.
  */
-export function AnalysisTab({ expId }: { expId: string }) {
+export function AnalysisTab({ expId, gradeSource }: { expId: string; gradeSource?: string }) {
 	const { t } = useTranslation("analysis");
-	const verdict = useGetVerdictQuery(expId);
+	// The grade source the page shows (decision 1): with "Show original result" the analysis reads the original too.
+	const verdict = useGetVerdictQuery(gradeSource ? { expId, gradeSource } : expId);
 	const awareness = useGetAwarenessQuery(expId);
 	const clusters = useGetClustersQuery({ exp: expId });
 	// multi_agent comes from the experiment status (fix wave 2, lane G04): blame splits a team run's failure between its agents.

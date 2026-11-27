@@ -114,4 +114,11 @@ func TestOneGradingRuleEverywhere(t *testing.T) {
 	if id, ok := ai.LatestAnalysis("e_rg"); !ok || id != want {
 		t.Fatalf("evaluation result analysis %q %v, want %s", id, ok, want)
 	}
+
+	// The extend job's broken-parent check (jobs_extend_hw11.go) reads the
+	// same analysis: the newest re-score is a score, so the original's
+	// INVALID, written later, does not refuse the follow-up.
+	if err := storedExtendRefusal(ctx, jobEnv{App: &app{store: st}}, "e_rg"); err != nil {
+		t.Fatalf("extend refusal reads another analysis than the page: %v", err)
+	}
 }

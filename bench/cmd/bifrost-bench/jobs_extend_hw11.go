@@ -23,13 +23,15 @@ func extendParentRefusal(an *schemas.Analysis) error {
 	return fmt.Errorf("This comparison's test was broken (%s). Fix that first; a follow-up would be broken the same way.", reason)
 }
 
-// storedExtendRefusal is extendParentRefusal on the parent's newest stored
-// analysis, read without analysing again; nil when it has none.
-func storedExtendRefusal(ctx context.Context, env jobEnv, expID string) error {
+// storedExtendRefusal is extendParentRefusal on the parent's stored
+// analysis that its page shows (decision 1, indexAdapter.latestAnalysis: the
+// newest of the newest re-score, else of the original), read without
+// analysing again; nil when it has none.
+func storedExtendRefusal(_ context.Context, env jobEnv, expID string) error {
 	if env.App == nil || env.App.store == nil {
 		return nil
 	}
-	an, err := env.App.store.LatestAnalysis(ctx, expID)
+	an, err := (indexAdapter{root: env.App.store.Root()}).latestAnalysis(expID)
 	if err != nil {
 		return nil // an unreadable analysis is decided by the job's own analysis at run
 	}
