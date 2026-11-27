@@ -1,4 +1,9 @@
-import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { JobLogPanel } from "@/components/jobs/jobLogPanel";
+import { JobRunButton, plainJobError } from "@/components/jobs/jobRunButton";
+import { PaidButton } from "@/components/ui/paidButton";
+import { canUse } from "@/lib/session/sessionContext";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/lib/session/sessionContext";
@@ -93,12 +98,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 							<div className="flex flex-wrap items-center gap-2">
 								<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
 								{hosted && (
-									<JobRunButton
-										kind="agent.check"
-										params={{ ...checkParams, real: true }}
-										label={t("checks.check.tryReal")}
-										variant="outline"
-									/>
+									<TryRealButton params={{ ...checkParams, real: true }} label={t("checks.check.tryReal")} />
 								)}
 							</div>
 						)
@@ -298,8 +298,8 @@ const ICON: Record<StepState, { icon: typeof Circle; cls: string }> = {
 	failed: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	broken: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	running: { icon: Loader2, cls: "text-sky-600 animate-spin dark:text-sky-400" },
-	never: { icon: Circle, cls: "text-muted-foreground/60" },
-	skipped: { icon: CircleMinus, cls: "text-muted-foreground/60" },
+	never: { icon: Circle, cls: "text-muted-foreground" },
+	skipped: { icon: CircleMinus, cls: "text-muted-foreground" },
 };
 
 /** One row of the checklist: status icon, title and short hint, the action, and options on demand. */
@@ -362,3 +362,37 @@ function CheckStep({
 }
 
 export default ChecksTab;
+
+/**
+ * "Try one real task": the check with real model calls on the org's own key, so it confirms first
+ * with the paid-action rule (M2-68), then queues the job and opens its live log like JobRunButton.
+ */
+function TryRealButton({ params, label }: { params: Record<string, unknown>; label: string }) {
+	const { t } = useTranslation("jobs");
+	const session = useSession();
+	const [createJob, { error, reset }] = useCreateJobMutation();
+	const [jobId, setJobId] = useState<string | null>(null);
+	return (
+		<div className="flex min-w-0 flex-col gap-2" data-testid="agent-check-try-real-wrap">
+			<PaidButton
+				verb={label}
+				capUsd={null}
+				confirm="always"
+				variant="outline"
+				disabled={!canUse(session, "member")}
+				onConfirm={async () => {
+					reset();
+					const res = await createJob({ kind: "agent.check", params });
+					if ("data" in res && res.data) setJobId(res.data.id);
+				}}
+				testId="agent-check-try-real"
+			/>
+			{error !== undefined && (
+				<p role="alert" className="text-danger-ink text-xs" data-testid="agent-check-try-real-error">
+					{t("panel.startError")}: {plainJobError(getBenchErrorMessage(error))}
+				</p>
+			)}
+			{jobId && <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} />}
+		</div>
+	);
+}

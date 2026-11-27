@@ -35,6 +35,10 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useValidateAgentConfigMutation: () => [vi.fn(), { isLoading: false }],
 }));
 // The Setup model field is the shared model picker (M2-49); its list is not needed here.
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useGetAgentVersionsQuery: () => ({ data: { versions: [{ version: 1 }] } }),
+}));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({ isLoading: false }) }));
 vi.mock("@/lib/store/apis/pullAgentsApi", () => ({ useGetPullAgentsQuery: () => ({ isLoading: false }) }));
 vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
@@ -43,6 +47,7 @@ vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
 }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+	useBlocker: () => undefined,
 }));
 
 const render = () => renderToStaticMarkup(<ConfigTab agentId="zz-test-loop" />);

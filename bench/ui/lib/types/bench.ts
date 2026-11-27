@@ -1754,6 +1754,12 @@ export interface RunListRow {
 	 * detected"); absent until the server sends it, then the list falls back to error. Inert text.
 	 */
 	fail_reason?: string;
+	/** The task's display title when the server sends it (lane 5b reads it); absent means show task_id. */
+	task_title?: string;
+	/** The benchmark's display title when the server sends it; absent means show suite_id. */
+	suite_title?: string;
+	/** The name of the experiment the run belongs to, when the server sends it. */
+	exp_name?: string;
 	paired?: boolean;
 	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
 	excluded?: string;

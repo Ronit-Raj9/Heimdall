@@ -338,7 +338,23 @@ function MCPSection({ id }: { id: string }) {
 	};
 
 	return (
-		<OpsSection title={t("tools.mcp.title")} hint={<span className="block max-w-prose">{t("tools.mcp.hint")}</span>} testId="agent-mcp-section">
+		<OpsSection
+			title={t("tools.mcp.title")}
+			hint={
+				<span className="block max-w-prose">
+					{t("tools.mcp.hint")}{" "}
+					{/* The MCP server test page tries one server on its own (M5-52). */}
+					<span data-testid="agent-mcp-test">
+						{tu("tools.mcpTestIntro")}{" "}
+						<Link to="/mcp-test" className="text-primary underline-offset-4 hover:underline" data-testid="agent-mcp-test-link">
+							{tu("tools.mcpTestLink")}
+						</Link>
+						.
+					</span>
+				</span>
+			}
+			testId="agent-mcp-section"
+		>
 			{isLoading ? (
 				<p className="text-muted-foreground text-xs">{t("tools.mcp.loading")}</p>
 			) : error ? (
@@ -373,7 +389,7 @@ function MCPSection({ id }: { id: string }) {
 					</div>
 					<Field label={t("tools.mcp.servers", { file: data?.servers_file ?? `agents/${id}/mcp.yaml` })}>
 						<textarea
-							className="border-input bg-background min-h-40 rounded-md border p-2 font-mono text-xs"
+							className="placeholder:text-neutral-500 border-input bg-background min-h-40 rounded-md border p-2 font-mono text-xs"
 							value={form.servers_yaml}
 							onChange={(e) => setForm({ ...form, servers_yaml: e.target.value })}
 							placeholder={tu("tools.noServers")}

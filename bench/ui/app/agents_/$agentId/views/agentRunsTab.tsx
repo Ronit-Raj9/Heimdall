@@ -1,4 +1,6 @@
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
+import { EmptyState } from "@/components/shell/emptyState";
+import { Pager } from "@/components/ui/pager";
 import { shortReason } from "@/components/runs/runFailure.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { formatShortTime } from "@/components/runs/runList";
@@ -164,7 +166,20 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 		return (
 			<div className="flex min-w-0 flex-col gap-3" data-testid="agent-runs-tab">
 				<div className="flex flex-wrap items-center gap-3">{filters}</div>
-				<EmptyNote testId="agent-runs-none-failed">{failedOnly ? tm("runs.noneFailed") : tu("runs.noneMatch")}</EmptyNote>
+				<EmptyState
+					kind="filtered"
+					compact
+					body={failedOnly ? tm("runs.noneFailed") : tu("runs.noneMatch")}
+					action={{
+						label: tu("runs.clearFilters"),
+						onClick: () => {
+							void setFailedParam(null);
+							void setSuite(null);
+							void setOutcome(null);
+						},
+					}}
+					testId="agent-runs-none-failed"
+				/>
 			</div>
 		);
 	}
@@ -270,23 +285,7 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 					</div>
 				</>
 			)}
-			{pages > 1 && (
-				<div className="flex items-center justify-end gap-2 text-sm">
-					<Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="agent-runs-prev">
-						{t("runs.prev")}
-					</Button>
-					<span className="text-muted-foreground tabular-nums">{t("runs.page", { page: page + 1, pages })}</span>
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={page + 1 >= pages}
-						onClick={() => setPage(page + 1)}
-						data-testid="agent-runs-next"
-					>
-						{t("runs.next")}
-					</Button>
-				</div>
-			)}
+			{pages > 1 && <Pager page={page + 1} pageCount={pages} onPage={(p) => setPage(p - 1)} testId="agent-runs-pager" />}
 		</div>
 	);
 }

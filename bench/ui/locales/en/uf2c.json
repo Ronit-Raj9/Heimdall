@@ -14,6 +14,7 @@
 			"infra_error": "Infrastructure error"
 		},
 		"noneMatch": "No run matches these filters.",
+		"clearFilters": "Clear filters",
 		"withFault": "{{reason}} (injected fault: {{fault}})",
 		"reason": {
 			"fail": "The grader marked the answer wrong",
@@ -41,7 +42,9 @@
 		"chooseFirst": "Choose a file first",
 		"noServers": "No MCP servers yet",
 		"insertExample": "Insert example",
-		"nothingChanged": "Nothing changed"
+		"nothingChanged": "Nothing changed",
+		"mcpTestIntro": "To try an MCP server on its own before the agent uses it, open",
+		"mcpTestLink": "MCP server test"
 	},
 	"versions": {
 		"sameAs": "Same as v{{n}}: change Setup first",

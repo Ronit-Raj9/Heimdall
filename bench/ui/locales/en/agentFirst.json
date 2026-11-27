@@ -136,7 +136,7 @@
 		"choose": "Choose an agent"
 	},
 	"why": {
-		"title": "Why agents fail",
+		"title": "Failures",
 		"subtitle": "Where each version of your agent breaks: loops, saying done too early, ignored errors. Every number links to example runs.",
 		"tabs": {
 			"label": "Failure views",
@@ -169,7 +169,7 @@
 		"cleanNote": "A clean run of every task is always included, so the drop has something to compare with.",
 		"benchmarks": "Benchmarks",
 		"noBenchmarks": "No benchmarks yet.",
-		"addBenchmark": "Add a benchmark",
+		"addBenchmark": "Browse the catalog",
 		"tasks": "Tasks per benchmark",
 		"trials": "Repeats per task",
 		"need": {

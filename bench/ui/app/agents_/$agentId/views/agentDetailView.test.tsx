@@ -4,7 +4,7 @@ import { LOCAL_SESSION, type SessionInfo } from "@/lib/session/sessionContext";
 import { errorQuery, mutation, okQuery, render } from "@/lib/testing/render";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it, vi } from "vitest";
-import AgentDetailView, { deleteDialogOpen } from "./agentDetailView";
+import AgentDetailView, { headerCheckState } from "./agentDetailView";
 
 const state = vi.hoisted(() => ({ configMissing: false }));
 
@@ -68,17 +68,18 @@ describe("agent page tabs opened from the menu", () => {
 });
 
 describe("delete agent", () => {
-	// M2-41: a pasted ?delete=1 never opens the dialog; the menu pick on the page does.
+	// M2-41: the menu opens the dialog from page state; a ?delete=1 in the URL opens nothing.
 	it("a pasted ?delete=1 opens no confirmation", () => {
 		state.configMissing = false;
 		const html = page("?delete=1");
 		expect(html).not.toContain('data-testid="delete-agent-dialog"');
 	});
 
-	it("opens only when the menu set the param on this page", () => {
-		expect(deleteDialogOpen("1", false)).toBe(true);
-		expect(deleteDialogOpen("1", true)).toBe(false);
-		expect(deleteDialogOpen(null, false)).toBe(false);
+	it("the header hides Setup not checked on an agent with runs (M2-22)", () => {
+		expect(headerCheckState("never", 3)).toBeNull();
+		expect(headerCheckState("never", 0)).toBe("never");
+		expect(headerCheckState("failed", 3)).toBe("failed");
+		expect(headerCheckState(null, 0)).toBeNull();
 	});
 
 	it("is not offered for a built-in agent (no settings file in the project)", () => {

@@ -71,12 +71,11 @@ describe("duplicate and rename agent", () => {
 		expect(html).toContain("Rename agent");
 	});
 
-	it("?copy=duplicate and ?copy=rename open the dialog", () => {
+	// M2-41: the menu items open the dialog from page state; a ?copy= in the URL opens nothing.
+	it("?copy=duplicate and ?copy=rename in the URL open no dialog", () => {
 		state.configMissing = false;
-		expect(page("?copy=duplicate")).toContain("Duplicate agent zz-test-loop");
-		const html = page("?copy=rename");
-		expect(html).toContain('data-testid="copy-agent-dialog"');
-		expect(html).toContain("Rename agent zz-test-loop");
+		expect(page("?copy=duplicate")).not.toContain('data-testid="copy-agent-dialog"');
+		expect(page("?copy=rename")).not.toContain('data-testid="copy-agent-dialog"');
 	});
 
 	it("is hidden for a built-in agent (no settings file in the project)", () => {
