@@ -6,7 +6,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/reportcard/evaluationReportCard", () => ({
-	EvaluationReportCard: ({ evaluationId }: { evaluationId: string }) => <div data-testid="report-card-mock">{evaluationId}</div>,
+	EvaluationReportCard: ({ evaluationId, evaluation }: { evaluationId: string; evaluation?: { id: string } }) => (
+		<div data-testid="report-card-mock" data-evaluation={evaluation?.id ?? ""}>
+			{evaluationId}
+		</div>
+	),
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<object>()),
@@ -155,8 +159,11 @@ describe("EvaluationBody budget (G4-01)", () => {
 		);
 		expect(html).toContain("Stopped by the budget: spent $4.60 of $5.00. 13 runs did not start.");
 		expect(html).toContain("$2.10 of $5.00 spent");
-		// A done evaluation's raise panel sits under the report card headline (M3-4), inside the mocked report card.
-		expect(html).toContain('data-testid="report-card-mock"');
+		// A done evaluation's raise panel sits under the report card headline (M3-4): the page hands the report card the
+		// evaluation and shows no second panel of its own. The headline and the panel are tested on the real card in
+		// components/reportcard/evaluationReportCard.budget.test.tsx.
+		expect(html).toContain('data-testid="report-card-mock" data-evaluation="ev_1"');
+		expect(html.match(/data-testid="evaluation-budget-stopped"/g)).toBeNull();
 	});
 
 	it("shows no raise panel when nothing was stopped", () => {
@@ -369,7 +376,8 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 		expect(html).toContain(
 			"Stopped by the budget: spent $0.0094 of $0.01; the next run was expected to cost about $0.0030. 4 runs did not start.",
 		);
-		expect(html).toContain('data-testid="report-card-mock"');
+		// The raise field is under the report card headline (see evaluationReportCard.budget.test.tsx).
+		expect(html).toContain('data-testid="report-card-mock" data-evaluation="ev_1"');
 	});
 
 	it("marks a scheduled repeat (N297)", () => {

@@ -63,5 +63,9 @@
 	},
 	"alignment": {
 		"awareness": "Said it knew it was being tested (keyword check, not scored)"
+	},
+	"picks": {
+		"showing": "Showing:",
+		"change": "Change"
 	}
 }

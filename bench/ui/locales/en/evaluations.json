@@ -28,10 +28,18 @@
 		"selectRow": "Select {{name}}",
 		"selectAll": "Select all shown",
 		"deleteSelected": "Delete selected ({{count}})",
-		"deleteSelectedTitle": "Delete {{count}} evaluations?",
 		"deleteSelectedBody": "These evaluations, their report cards and their benchmark comparisons with runs and traces are deleted. This cannot be undone.",
-		"deleteSelectedOk": "Delete",
-		"deleteSelectedError": "Could not delete {{count}} of them: {{error}}"
+		"deleteSelectedError": "Could not delete {{count}} of them: {{error}}",
+		"emptyTitle": "No evaluations yet",
+		"emptyAction": "Evaluate an agent",
+		"deletedToast_one": "{{count}} evaluation deleted.",
+		"deletedToast_other": "{{count}} evaluations deleted.",
+		"pageRange": "{{first}} to {{last}} of {{total}} evaluations",
+		"deleteSelectedOk_one": "Delete {{count}} evaluation",
+		"deleteSelectedOk_other": "Delete {{count}} evaluations",
+		"deleteSelectedTitle_one": "Delete {{count}} evaluation?",
+		"deleteSelectedTitle_other": "Delete {{count}} evaluations?",
+		"noMatchTitle": "No evaluations match"
 	},
 	"mode": {
 		"score": "Score one agent",
@@ -154,12 +162,13 @@
 		"title_other": "The budget stopped {{count}} benchmarks: {{notStarted}} runs not started.",
 		"body": "The report card only counts the runs that finished. Raise the budget to run the rest; finished runs are kept and never run again.",
 		"label": "New budget for the evaluation (now {{current}})",
-		"button": "Raise budget and continue",
+		"button": "Raise the budget and continue",
 		"busy": "Continuing...",
 		"limit": "Type more than {{current}} and at most $1000.",
 		"confirmTitle": "Raise the budget?",
 		"confirm": "Add {{added}} and continue? The evaluation can spend up to {{total}}.",
 		"confirmOk": "Raise and continue",
-		"keep": "Keep the budget"
+		"keep": "Keep the budget",
+		"done": "Budget raised to {{total}}. The rest of the runs start now."
 	}
 }

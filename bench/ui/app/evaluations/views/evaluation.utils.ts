@@ -1,3 +1,4 @@
+import { isTestObject } from "@/lib/testObjects";
 import type { StatusTone } from "@/components/ui/statusPill";
 import type { Evaluation, EvaluationArm, EvaluationChild } from "@/lib/store/apis/evaluationsApi";
 
@@ -119,15 +120,34 @@ const FAILURE_CAUSES: { cause: FailureCause; test: RegExp }[] = [
 	{ cause: "workerRefused", test: /refus|rejected|denied/i },
 ];
 
-/** The cause of a raw run problem, or undefined when the text matches none of the known ones. */
-export function failureCause(raw: string | undefined | null): FailureCause | undefined {
+/** The cause codes a newer server sends on each child (G1, `cause`); an older server sends none. */
+const CAUSE_CODES: Record<string, FailureCause> = {
+	image_missing: "imageMissing",
+	worker_refused: "workerRefused",
+	no_worker: "noWorker",
+};
+
+/** A child with the server's cause code (G1); absent on an older server. */
+export type ChildWithCause = EvaluationChild & { cause?: string };
+
+/**
+ * The cause of a raw run problem: the server's cause code when it sends a known one (M3-9), else the raw text
+ * matched against the known messages; undefined when neither says.
+ */
+export function failureCause(raw: string | undefined | null, code?: string | null): FailureCause | undefined {
+	if (code && CAUSE_CODES[code]) return CAUSE_CODES[code];
 	if (!raw) return undefined;
 	return FAILURE_CAUSES.find((c) => c.test.test(raw))?.cause;
 }
 
 /** Why each benchmark did not run: its skip reason, else its status. */
-export function childReasons(children: readonly EvaluationChild[] | null | undefined): { benchmark: string; reason: string }[] {
-	return (children ?? []).map((c) => ({ benchmark: c.benchmark, reason: c.skipped || c.status }));
+export function childReasons(
+	children: readonly EvaluationChild[] | null | undefined,
+): { benchmark: string; reason: string; cause?: string }[] {
+	return (children ?? []).map((c) => {
+		const cause = (c as ChildWithCause).cause;
+		return { benchmark: c.benchmark, reason: c.skipped || c.status, ...(cause ? { cause } : {}) };
+	});
 }
 
 /** The evaluation's budget: the sum of its launched benchmarks' caps (raised anywhere), else the spec's. */
@@ -270,4 +290,8 @@ export function filterEvaluations(list: readonly Evaluation[], f: EvaluationFilt
 		default:
 			return sortNewestFirst(out);
 	}
+}
+/** An evaluation the project's own checks made: a test name or id, or a test agent in an arm (M1-18). Pure. */
+export function isTestEvaluation(ev: Pick<Evaluation, "id" | "spec">): boolean {
+	return isTestObject(ev.spec?.name) || isTestObject(ev.id) || (ev.spec?.arms ?? []).some((a) => isTestObject(a.agent));
 }

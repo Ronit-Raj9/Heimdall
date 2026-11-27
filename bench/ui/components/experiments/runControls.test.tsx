@@ -172,6 +172,14 @@ describe("Rerun failures only where it can work (fix wave 3, N183 and N285)", ()
 		expect(render(<EvaluationRunActions evaluation={ev("cancelled")} />, m)).not.toContain("evaluation-rerun-failures");
 		expect(render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, m)).toContain("evaluation-rerun-failures");
 	});
+	it("Rerun failures is the shared paid button: it says it costs money and names the runs (M4-41)", async () => {
+		const { tagOf } = await import("@/lib/testing/render");
+		const html = render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, hostedSession("member"));
+		const tag = tagOf(html, "evaluation-rerun-failures") ?? "";
+		expect(tag).toContain('data-paid="true"');
+		expect(tag).toContain('title="About 2 runs."');
+		expect(html).toContain("(uses your model key)");
+	});
 	it("keeps the rerun notice out of the actions row (N193)", () => {
 		const html = render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, hostedSession("member"));
 		expect(html).not.toContain("evaluation-rerun-started");

@@ -1,7 +1,7 @@
 import { formatCost } from "@/components/leaderboard/agentBoard.utils";
-import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { type Evaluation, type EvaluationChild, useRaiseEvaluationBudgetMutation } from "@/lib/store/apis/evaluationsApi";
-import { useConfirm } from "@/components/platform/confirmDialog";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,7 +21,7 @@ export function budgetStopOf(ev: Evaluation, doneRuns: number): { budget: string
 
 /**
  * Budget on the evaluation page (G4-01): each benchmark's spend against its cap, the benchmarks the
- * cap stopped with the runs they never started, and "Raise budget and continue", which calls
+ * cap stopped with the runs they never started, and "Raise the budget and continue", which calls
  * POST /evaluations/{id}/raise-budget. Nothing that already ran runs again.
  */
 
@@ -80,7 +80,6 @@ function errorText(e: unknown): string {
 
 export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 	const { t } = useTranslation("evaluations");
-	const confirm = useConfirm();
 	const { stopped, current, notStarted } = raiseTargets(evaluation);
 	const [text, setText] = useState(() => String(suggestedRaise(evaluation)));
 	const [raise, state] = useRaiseEvaluationBudgetMutation();
@@ -116,21 +115,23 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 						/>
 					</span>
 				</label>
-				<Button
+				{/* Paid action: raising commits more money, so it never runs on one click (M3-23); the label names the new cap. */}
+				<PaidButton
+					verb={t("raise.button")}
+					capUsd={valid ? value : current}
+					confirm="always"
+					confirmText={valid ? t("raise.confirm", { added: dollars(value - current), total: dollars(value) }) : undefined}
 					disabled={!valid || state.isLoading}
-					onClick={async () => {
-						// Paid action: raising commits more money, so it never runs on one click (M3-23).
-						const ok = await confirm(t("raise.confirm", { added: dollars(value - current), total: dollars(value) }), {
-							title: t("raise.confirmTitle"),
-							confirmLabel: t("raise.confirmOk"),
-							cancelLabel: t("raise.keep"),
-						});
-						if (ok) void raise({ id: evaluation.id, budget_usd: value });
+					onConfirm={async () => {
+						try {
+							await raise({ id: evaluation.id, budget_usd: value }).unwrap();
+							notify({ text: t("raise.done", { total: dollars(value) }) });
+						} catch {
+							// The error shows under the field from the mutation state.
+						}
 					}}
-					data-testid="evaluation-raise-budget"
-				>
-					{state.isLoading ? t("raise.busy") : t("raise.button")}
-				</Button>
+					testId="evaluation-raise-budget"
+				/>
 			</div>
 			{!valid && text.trim() !== "" && <span className="text-muted-foreground text-xs">{t("raise.limit", { current: dollars(current) })}</span>}
 			{state.error ? (

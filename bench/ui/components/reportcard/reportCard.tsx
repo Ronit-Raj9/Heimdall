@@ -325,23 +325,45 @@ export function WinnerMark({ result, name }: { result?: ComparisonResult; name?:
 
 const METRIC_HEADS = ["Score", "Runs", "Cost", "Tokens", "Steps", "Tool calls", "Time"] as const;
 
+/**
+ * Which metric columns a phone keeps (M2-37, M1-57): the score and the cost; runs, tokens, steps, tool calls and time
+ * hide below sm, so the table fits 390 px without sideways scrolling.
+ */
+export const METRIC_PRIORITY: Record<(typeof METRIC_HEADS)[number], "metric" | "secondary"> = {
+	Score: "metric",
+	Runs: "secondary",
+	Cost: "metric",
+	Tokens: "secondary",
+	Steps: "secondary",
+	"Tool calls": "secondary",
+	Time: "secondary",
+};
+
 function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
 	const num = "text-right tabular-nums";
 	return (
 		<>
-			<TableCell>
+			<TableCell priority="metric">
 				<ScoreCell metrics={metrics} />
 			</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.runs) : "-"}</TableCell>
-			<TableCell className={num}>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.runs) : "-"}
+			</TableCell>
+			<TableCell priority="metric" className={num}>
 				<CostValue metrics={metrics} />
 			</TableCell>
-			<TableCell className={num}>
+			<TableCell priority="secondary" className={num}>
 				{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}
 			</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.steps) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.tool_calls) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? duration(metrics.wall_s) : "-"}</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.steps) : "-"}
+			</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? compactNumber(metrics.tool_calls) : "-"}
+			</TableCell>
+			<TableCell priority="secondary" className={num}>
+				{metrics ? duration(metrics.wall_s) : "-"}
+			</TableCell>
 		</>
 	);
 }
@@ -353,7 +375,7 @@ export function CostValue({ metrics }: { metrics?: ReportArmMetrics }) {
 	return (
 		<span data-testid="cost-not-known" title={c.reason} className="inline-flex flex-col items-end leading-tight">
 			<span className="text-muted-foreground">{c.text}</span>
-			<span className="text-muted-foreground text-[11px]">{c.detail}</span>
+			<span className="text-muted-foreground text-xs">{c.detail}</span>
 		</span>
 	);
 }
@@ -374,7 +396,7 @@ function CapabilityTable({ report }: { report: Report }) {
 					<TableHead scope="col">Capability</TableHead>
 					{ab && <TableHead scope="col">Setup</TableHead>}
 					{METRIC_HEADS.map((h) => (
-						<TableHead key={h} scope="col" className={h === "Score" ? undefined : "text-right"}>
+						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={h === "Score" ? undefined : "text-right"}>
 							{h}
 						</TableHead>
 					))}
@@ -513,7 +535,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 						{row.suite_version ? ` Benchmark version ${row.suite_version}.` : ""}
 					</p>
 				)}
-				<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
+				<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
 					{report.arms.map((arm) => {
 						const m = row.arms[arm.label];
 						const prefix = ab ? `${arm.label} ` : "";
@@ -540,7 +562,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					);
 				})}
 				{hasProcess(row.arms) && (
-					<div className="flex flex-col gap-1 text-xs" data-testid={`benchmark-process-${row.benchmark}`}>
+					<div className="flex flex-col gap-1 text-sm" data-testid={`benchmark-process-${row.benchmark}`}>
 						<span className="text-muted-foreground font-medium" title={PROCESS_NOTE}>
 							Process (report only)
 						</span>

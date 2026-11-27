@@ -113,3 +113,13 @@ describe("small samples, budget stops and faults in the headline (M3-2, M3-3, M3
 		expect(h.detail).toBe("3 normal runs and 3 with faults.");
 	});
 });
+
+describe("report card picks line (M2-34)", () => {
+	it("names what is shown in one line, leaving out what is unknown", async () => {
+		const { picksSummary } = await import("./reportPicks");
+		expect(picksSummary({ name: "codex v2", date: "Nov 21", runs: 40 })).toBe("codex v2, Nov 21 (40 runs)");
+		expect(picksSummary({ name: "codex v2", runs: 1 })).toBe("codex v2 (1 run)");
+		expect(picksSummary({ name: "codex v2" })).toBe("codex v2");
+		expect(picksSummary({})).toBe("");
+	});
+});

@@ -16,6 +16,7 @@ import {
 	evaluationBudget,
 	evaluationSpend,
 	failureCause,
+	type ChildWithCause,
 	formatCreated,
 	isActiveStatus,
 	splitChildren,
@@ -155,9 +156,9 @@ export function runAgainSearch(evaluation: Evaluation): Record<string, string> {
 }
 
 /** A raw worker message as one plain sentence when its cause is known, the raw text inside "Technical details" (M3-9). */
-function ProblemText({ raw, benchmark, testId }: { raw: string; benchmark: string; testId?: string }) {
+function ProblemText({ raw, benchmark, testId, code }: { raw: string; benchmark: string; testId?: string; code?: string }) {
 	const { t } = useTranslation("evaluations");
-	const cause = failureCause(raw);
+	const cause = failureCause(raw, code);
 	const [copied, setCopied] = useState(false);
 	if (!cause) return <>{testId ? <span data-testid={testId}>{t("detail.childProblem", { problem: raw })}</span> : raw}</>;
 	return (
@@ -349,8 +350,8 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							<span className="mt-2 flex flex-col gap-1" data-testid="evaluation-no-benchmarks-reasons">
 								{childReasons(skipped).map((r) => (
 									<span key={r.benchmark} className="block break-words" data-testid={`evaluation-no-benchmarks-reason-${r.benchmark}`}>
-										{failureCause(r.reason) ? (
-											<ProblemText raw={r.reason} benchmark={r.benchmark} />
+										{failureCause(r.reason, r.cause) ? (
+											<ProblemText raw={r.reason} benchmark={r.benchmark} code={r.cause} />
 										) : (
 											tf("childReason", { benchmark: r.benchmark, reason: r.reason })
 										)}
@@ -378,9 +379,9 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 								<li key={child.benchmark} data-testid={`evaluation-skipped-${child.benchmark}`}>
 									<span className="font-medium">{child.benchmark}</span>
 									{child.skipped &&
-										(failureCause(child.skipped) ? (
+										(failureCause(child.skipped, (child as ChildWithCause).cause) ? (
 											<span className="text-muted-foreground block">
-												<ProblemText raw={child.skipped} benchmark={child.benchmark} />
+												<ProblemText raw={child.skipped} benchmark={child.benchmark} code={(child as ChildWithCause).cause} />
 											</span>
 										) : (
 											<span className="text-muted-foreground">: {child.skipped}</span>
@@ -468,7 +469,12 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 					{/* Infrastructure, not the agent: warning tone and an icon, the raw text folded away (M1-26, M3-9). */}
 					<ServerCrash className="size-4 shrink-0 self-center" aria-hidden="true" />
 					<span className="font-medium">{t("failure.infraTitle")}</span>
-					<ProblemText raw={problem} benchmark={child.benchmark} testId={`evaluation-child-problem-text-${child.benchmark}`} />
+					<ProblemText
+						raw={problem}
+						benchmark={child.benchmark}
+						code={(child as ChildWithCause).cause}
+						testId={`evaluation-child-problem-text-${child.benchmark}`}
+					/>
 					{exp.data?.run_job_id && (
 						<Link
 							to="/jobs/$jobId"
