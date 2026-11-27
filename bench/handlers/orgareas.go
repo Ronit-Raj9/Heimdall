@@ -57,6 +57,10 @@ type Services struct {
 	// own worker's pool, a platform target 0 (not bounded). nil in local
 	// mode; the estimate is then not bounded by it.
 	WorkerSlots func(ctx context.Context, target string) (int, error)
+	// WorkerStatus says whether the worker for target is online and when
+	// it was last seen (fix wave M3-21), from the same runner rows as
+	// WorkerSlots. nil in local mode.
+	WorkerStatus func(ctx context.Context, target string) (WorkerStatus, error)
 }
 
 // OrgEnv is what an org area gets when it registers its routes.

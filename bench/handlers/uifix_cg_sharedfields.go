@@ -4,9 +4,17 @@ package handlers
 // payload until the owner decides (same rule as sharedfields_srv.go):
 //
 //	report, report_card  totals.<arm>.fault_cost_usd, fault_cost_runs
+//	evaluation           queue
 var cgSharedTotalsHidden = []string{"fault_cost_usd", "fault_cost_runs"}
 
 func withoutCGSharedFields(part string, v any) any {
+	if part == "evaluation" {
+		if m, ok := v.(map[string]any); ok {
+			delete(m, "queue")
+			return m
+		}
+		return v
+	}
 	if part != "report" && part != "report_card" {
 		return v
 	}
