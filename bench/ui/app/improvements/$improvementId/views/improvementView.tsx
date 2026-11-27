@@ -16,14 +16,19 @@ import {
 	useResumeImprovementMutation,
 	useStopImprovementMutation,
 } from "@/lib/store/apis/improveApi";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ImprovementStatus } from "@/lib/types/improve";
+import { improvementPollMs } from "@/components/improvements/improvementPoll";
 import { useTranslation } from "react-i18next";
 
 /** /improvements/$improvementId: the improvement report, polled while the run is live. */
 export default function ImprovementView({ id }: { id: string }) {
 	const { t } = useTranslation("improve");
 	const confirm = useConfirm();
-	const q = useGetImprovementQuery(id, { pollingInterval: 5_000 });
+	// Poll only while the run can still change (M1-62); the status comes from the last answer.
+	const [status, setStatus] = useState<ImprovementStatus | undefined>(undefined);
+	const q = useGetImprovementQuery(id, { pollingInterval: improvementPollMs(status), skipPollingIfUnfocused: true });
+	useEffect(() => setStatus(q.data?.status), [q.data?.status]);
 	const [approve, approveState] = useApproveImprovementRoundMutation();
 	const [stop, stopState] = useStopImprovementMutation();
 	const [resume, resumeState] = useResumeImprovementMutation();

@@ -99,6 +99,6 @@ export function PullServeStatus({ status, name, origin, loading }: { status?: Pu
 /** "Serve this agent from your code" for a pull agent's Setup tab. */
 export function PullServePanel({ agentId, yaml }: { agentId: string; yaml: string }) {
 	const name = pullNameOf(yaml, agentId);
-	const q = useGetPullAgentsQuery(undefined, { pollingInterval: 10_000 });
+	const q = useGetPullAgentsQuery(undefined, { pollingInterval: 10_000, skipPollingIfUnfocused: true });
 	return <PullServeStatus status={statusFor(q.data?.agents, name)} name={name} origin={currentOrigin()} loading={q.isLoading} />;
 }

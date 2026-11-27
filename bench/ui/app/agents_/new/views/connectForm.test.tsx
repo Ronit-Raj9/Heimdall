@@ -144,7 +144,8 @@ describe("mapping fields", () => {
 		const hidden = renderToStaticMarkup(<ParamFields tpl={mapped} params={{ auth_type: "none" }} onChange={() => undefined} />);
 		expect(hidden).toContain('data-testid="param-group-mapping"');
 		expect(hidden).toContain("Request and answer mapping");
-		expect(hidden).toContain("OAuth 2 client credentials");
+		// The shared Select renders its options only when open (M2-106); option labels are tested by optionLabel.
+		expect(hidden).toContain('data-testid="param-auth_type"');
 		expect(hidden).not.toContain("param-token_url");
 		const shown = renderToStaticMarkup(<ParamFields tpl={mapped} params={{ auth_type: "oauth2" }} onChange={() => undefined} />);
 		expect(shown).toContain("param-token_url");
@@ -216,7 +217,7 @@ describe("pull mode", () => {
 		expect(off).toContain("Coding tasks: send the repository, take a patch back");
 		expect(off).not.toContain("pull-history");
 		const on = renderToStaticMarkup(<PullOptionsFields value={{ ...DEFAULT_PULL_OPTIONS, benchDrives: true }} onChange={() => {}} />);
-		expect(on).toContain("Send the whole chat each turn");
-		expect(on).toContain("Agent keeps its own history");
+		// The shared Select renders its options only when open (M2-106).
+		expect(on).toContain('data-testid="pull-history"');
 	});
 });

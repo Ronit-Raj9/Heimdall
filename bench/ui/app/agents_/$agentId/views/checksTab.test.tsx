@@ -20,6 +20,7 @@ vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 	useGetSuiteQuery: () => ({ data: { tasks: [{ id: "t1" }] }, isLoading: false }),
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useListJobsQuery: () => ({ data: { jobs: state.jobs } }) }));
+vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: { count: 0, more: false } }) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/components/platform/useJobLog", () => ({ useJobLog: () => ({ lines: [] }) }));
 vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({

@@ -11,13 +11,19 @@ import { useGetImprovementsQuery } from "@/lib/store/apis/improveApi";
 import type { ImprovementSummary } from "@/lib/types/improve";
 import { Link } from "@tanstack/react-router";
 import { Plus, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { isLiveImprovement, listPollMs } from "@/components/improvements/improvementPoll";
 import { useTranslation } from "react-i18next";
 
 /** /improvements: every improvement run with status, rounds, versions kept and held-out gain. */
 export default function ImprovementsView() {
 	const { t } = useTranslation("improve");
-	const list = useGetImprovementsQuery(undefined, { pollingInterval: 10_000 });
+	// Fast polling only while a run is live (M1-62).
+	const [anyLive, setAnyLive] = useState(true);
+	const list = useGetImprovementsQuery(undefined, { pollingInterval: listPollMs(anyLive), skipPollingIfUnfocused: true });
+	useEffect(() => {
+		if (list.data) setAnyLive(list.data.improvements.some((r) => isLiveImprovement(r.status)));
+	}, [list.data]);
 	// Starting a run spends the organization's model keys, so only admins may (policy org(admin)).
 	const admin = canUse(useSession(), "admin");
 	const [creating, setCreating] = useState(false);

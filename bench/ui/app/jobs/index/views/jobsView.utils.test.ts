@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canRetryJob, firstErrorLine, isTestJob, jobBudget, jobBudgetUsd, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
+import { canRetryJob, firstErrorLine, isTestJob, jobBudget, jobBudgetUsd, jobsPollMs, parseJobStatus } from "./jobsView.utils";
+import { targetLabel } from "@/components/jobs/jobKindLabels";
 
 describe("jobs list helpers (fix wave lane 2a)", () => {
 	it("offers Retry only on failed or cancelled jobs (N8-1)", () => {
@@ -17,12 +18,12 @@ describe("jobs list helpers (fix wave lane 2a)", () => {
 	});
 
 	it("strips internal prefixes from targets and drops the search index (M8-58)", () => {
-		expect(jobTargetLabel("exp:e_eval_1")).toBe("e_eval_1");
-		expect(jobTargetLabel("onboard:zz-test-p10-csv")).toBe("zz-test-p10-csv");
-		expect(jobTargetLabel("suite:mini@1")).toBe("mini@1");
-		expect(jobTargetLabel("index")).toBe("");
-		expect(jobTargetLabel(undefined)).toBe("");
-		expect(jobTargetLabel("codex")).toBe("codex");
+		expect(targetLabel("exp:e_eval_1")).toBe("e_eval_1");
+		expect(targetLabel("onboard:zz-test-p10-csv")).toBe("zz-test-p10-csv");
+		expect(targetLabel("suite:mini@1")).toBe("mini@1");
+		expect(targetLabel("index")).toBe("");
+		expect(targetLabel(undefined)).toBe("");
+		expect(targetLabel("codex")).toBe("codex");
 	});
 
 	it("keeps the first line of an error and reads URL filters (M2-3, M2-5)", () => {
@@ -48,5 +49,12 @@ describe("isTestJob", () => {
 		expect(isTestJob({ target: "exp:abc", params: { name: "zz-test-run" } }, isTest)).toBe(true);
 		expect(isTestJob({ target: "suite:bfcl", params: {} }, isTest)).toBe(false);
 		expect(isTestJob({ target: "index", params: {} }, isTest)).toBe(false);
+	});
+});
+
+describe("jobs list polling (M1-62)", () => {
+	it("polls fast only while a job is active", () => {
+		expect(jobsPollMs(true)).toBe(5000);
+		expect(jobsPollMs(false)).toBe(30_000);
 	});
 });

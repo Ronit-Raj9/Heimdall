@@ -64,7 +64,7 @@ function errorStatus(error: unknown): number | undefined {
 
 export function ConnectedWorkers() {
 	const { t } = useTranslation("byoworker");
-	const query = useListWorkerConnectionsQuery(undefined, { pollingInterval: 15000 });
+	const query = useListWorkerConnectionsQuery(undefined, { pollingInterval: 15000, skipPollingIfUnfocused: true });
 	const [connecting, setConnecting] = useState(false);
 	const status = query.isError ? errorStatus(query.error) : undefined;
 	if (status === 503 || status === 404) return null; // not a hosted server

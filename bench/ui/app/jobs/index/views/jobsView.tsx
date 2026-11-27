@@ -1,5 +1,5 @@
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
-import { jobKindLabelFor } from "@/components/jobs/jobKindLabels";
+import { jobKindLabelFor, targetLabel } from "@/components/jobs/jobKindLabels";
 import { useJobKindName } from "@/components/jobs/useJobKindName";
 import { PageHeader } from "@/components/shell";
 import { useEmbedded } from "@/components/shell/embedded";
@@ -21,16 +21,16 @@ import { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useListJobsFilteredQuery } from "@/lib/store/apis/jobsApi";
-import { JOBS_POLL_MS, useCancelJobMutation } from "@/lib/store/apis/platformApi";
+import { useCancelJobMutation } from "@/lib/store/apis/platformApi";
 import type { Job } from "@/lib/types/bench";
 import { JOB_STATUSES } from "@/lib/types/jobs";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ListTodo, SquareTerminal } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { canRetryJob, firstErrorLine, isTestJob, jobBudgetUsd, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
+import { canRetryJob, firstErrorLine, isTestJob, jobBudgetUsd, jobsPollMs, parseJobStatus } from "./jobsView.utils";
 
 /** Jobs shown per step of "Load older jobs". */
 export const JOBS_PAGE_SIZE = 50;
@@ -58,10 +58,15 @@ export default function JobsView() {
 	const kind = filters.kind;
 	const status = parseJobStatus(filters.status, JOB_STATUSES);
 	const [limit, setLimit] = useState(JOBS_PAGE_SIZE);
+	// Fast polling only while a listed job is active (M1-62).
+	const [anyActive, setAnyActive] = useState(true);
 	const list = useListJobsFilteredQuery(
 		{ kind: kind || undefined, status: status || undefined, limit },
-		{ pollingInterval: JOBS_POLL_MS, skipPollingIfUnfocused: true },
+		{ pollingInterval: jobsPollMs(anyActive), skipPollingIfUnfocused: true },
 	);
+	useEffect(() => {
+		if (list.data) setAnyActive(list.data.jobs.some(isActiveJob));
+	}, [list.data]);
 	const [cancel, cancelState] = useCancelJobMutation();
 	const [retry, retryState] = useCreateJobMutation();
 	const [retried, setRetried] = useState<string | null>(null);
@@ -234,7 +239,7 @@ export default function JobsView() {
 /** A job's list title: the kind label, then the comparison name or target without its prefix (M8-58). */
 export function jobTitle(job: Job, kindName: (kind: string) => string, of: (kind: string, target: string) => string): string {
 	const kindLabel = jobKindLabelFor(job.kind, job.params, kindName(job.kind));
-	const name = typeof job.params?.name === "string" && job.params.name ? job.params.name : jobTargetLabel(job.target);
+	const name = typeof job.params?.name === "string" && job.params.name ? job.params.name : targetLabel(job.target);
 	return name ? of(kindLabel, name) : kindLabel;
 }
 

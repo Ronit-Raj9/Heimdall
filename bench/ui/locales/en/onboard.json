@@ -32,6 +32,8 @@
 		"noSamples": "No sample to show."
 	},
 	"plan": {
+		"name": "Name",
+		"nameHint": "Shown in lists. The id below is made from it until you change the id yourself.",
 		"suite": "Benchmark id",
 		"suiteHint": "A new id creates a private benchmark; an existing one adds tasks to it.",
 		"suiteInvalid": "Use 1 to 64 lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
