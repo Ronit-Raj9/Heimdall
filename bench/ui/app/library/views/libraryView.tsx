@@ -173,7 +173,7 @@ function BenchmarkCard({ b, packs, canOpen }: { b: PublicBenchmark; packs: Publi
 							</>
 						)}
 					</h2>
-					<span className="text-muted-foreground min-w-0 truncate font-mono text-xs">{b.id}</span>
+					{b.title !== b.id && <span className="text-muted-foreground min-w-0 truncate font-mono text-xs">{b.id}</span>}
 				</div>
 				{b.description && <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">{b.description}</p>}
 				{b.error && (

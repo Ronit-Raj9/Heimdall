@@ -21,7 +21,7 @@
 		"appTitle": "App name (optional)",
 		"spec": "OpenAPI file (v3)",
 		"policy": "Policy (text or Markdown)",
-		"pasteOrPick": "Paste it here or pick a file.",
+		"pasteOrPick": "",
 		"submit": "Check and save",
 		"invalidIds": "Ids: lowercase letters, digits, - or _."
 	},

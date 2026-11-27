@@ -217,7 +217,6 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 				</div>
 				<label className="flex flex-col gap-1 text-sm">
 					{t("new.spec")}
-					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
 					{specUrlError && specUrl && (
 						<span role="note" className="text-xs" data-testid="from-api-spec-url-error">
 							{tr("fromApi.specUrlError", { url: specUrl })}
@@ -239,7 +238,6 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 				</label>
 				<label className="flex flex-col gap-1 text-sm">
 					{t("new.policy")}
-					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
 					<input
 						type="file"
 						className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent"

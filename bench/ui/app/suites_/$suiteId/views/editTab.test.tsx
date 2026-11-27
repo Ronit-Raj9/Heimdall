@@ -39,8 +39,7 @@ describe("EditTab", () => {
 	});
 	it("is read-only for a built-in library suite, even for a member", () => {
 		const html = render(<EditTab suite={{ ...suite, builtin: true, source: "library" } as SuiteSummary} />);
-		expect(html).toContain('data-testid="suite-edit-builtin"');
-		expect(html).toContain("Built-in benchmark, read-only");
+		expect(html).toBe("");
 		expect(html).not.toContain("suite-edit-tab");
 		expect(html).not.toContain("job-run-suite.lock");
 	});
