@@ -18,6 +18,9 @@ import { armHasModel, useOwnModelAgents } from "./ownModel";
 import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
 import { useDebounced } from "./useDebounced";
 import { evalArmLabel } from "@/lib/evaluationArms";
+import { isRoughEstimate } from "./evaluate.utils";
+import { KeyLines, useArmKeys } from "./armKeys";
+import "@/lib/types/evaluateI18n";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -71,22 +74,29 @@ export function groupFaults(faults: readonly FaultCatalogItem[]): { group: strin
 	return groups.map((group) => ({ group, faults: by.get(group)! }));
 }
 
+/** Above this a detectable change is meaningless: a score moves at most 100 points. */
+export const POWER_MAX_PP = 100;
+
 /** The power line: "These settings can detect a change of about X points overall (Y per benchmark)." */
 export function powerText(e: Pick<EvaluationEstimate, "power">): { line: string; advice: string } | undefined {
 	const p = e.power;
 	if (!p) return undefined;
 	const overall = p.overall?.mde_pp;
 	const per = (p.per_benchmark ?? []).map((b) => b.mde_pp).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+	// A change above 100 points cannot happen (scores run 0 to 100): it means too few tasks (Q-9).
+	const perMax = per.length ? Math.max(...per) : undefined;
 	const perText =
 		(p.per_benchmark ?? []).length === 0
 			? ""
-			: per.length === 0
-				? " (too few tasks to decide per benchmark)"
-				: ` (${Math.round(Math.max(...per))} per benchmark)`;
+			: perMax === undefined || perMax > POWER_MAX_PP
+				? fw05("power.perTooFew")
+				: fw05("power.per", { n: String(Math.round(perMax)) });
 	const line =
-		typeof overall === "number" && Number.isFinite(overall)
-			? `These settings can detect a change of about ${Math.round(overall)} points overall${perText}.`
-			: "These settings have too few tasks to detect a change.";
+		typeof overall === "number" && Number.isFinite(overall) && overall <= POWER_MAX_PP
+			? fw05("power.line", { n: String(Math.round(overall)), per: perText })
+			: typeof overall === "number" && Number.isFinite(overall)
+				? fw05("power.tooFewChange")
+				: fw05("power.tooFew");
 	return { line, advice: p.advice ?? "" };
 }
 
@@ -219,13 +229,38 @@ export interface EstimateNote {
 	notes: string[];
 }
 
+/**
+ * A server note in plain words (Q-66): the same-config refusal of a two-model draft becomes a hint, the
+ * "arm A:" and "rough:" prefixes go, and long numbers get thousands separators.
+ */
+export function plainNote(note: string): string {
+	if (/same config hash/i.test(note)) return fw05("note.sameConfig");
+	const s = note
+		.replace(/^\s*arms? [A-Za-z0-9]+:\s*/i, "")
+		.replace(/^\s*rough:\s*/i, "")
+		.replace(/(?<![\d.,])\d{4,}(?![\d.,])/g, (n) => Number(n).toLocaleString("en-US"))
+		.trim();
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Notes through plainNote, empty ones and repeats left out (each sentence once). */
+export function plainNotes(notes: readonly string[]): string[] {
+	const out: string[] = [];
+	for (const n of notes) {
+		if (!n) continue;
+		const p = plainNote(n);
+		if (p && !out.includes(p)) out.push(p);
+	}
+	return out;
+}
+
 /** Per-benchmark skips and notes in plain words, plus the estimate's own notes under "". Empty ones are left out. */
 export function estimateNotes(e: Pick<EvaluationEstimate, "per_benchmark" | "notes">): EstimateNote[] {
 	const out: EstimateNote[] = [];
-	const general = (e.notes ?? []).filter(Boolean);
+	const general = plainNotes(e.notes ?? []);
 	if (general.length) out.push({ benchmark: "", notes: general });
 	for (const b of e.per_benchmark ?? []) {
-		const notes = [...(b.notes ?? []), ...(b.faults_skipped ?? []).map((f) => `${f.fault} is skipped: ${f.reason}`)].filter(Boolean);
+		const notes = plainNotes([...(b.notes ?? []), ...(b.faults_skipped ?? []).map((f) => `${f.fault} is skipped: ${f.reason}`)]);
 		if (b.skipped || notes.length)
 			out.push({
 				benchmark: b.benchmark,
@@ -234,6 +269,33 @@ export function estimateNotes(e: Pick<EvaluationEstimate, "per_benchmark" | "not
 			});
 	}
 	return out;
+}
+
+/** The server's message for a failed estimate, if it sent one. */
+export function estimateErrorText(error: unknown): string {
+	const data = (error as { data?: { error?: { message?: string } | string } } | undefined)?.data;
+	const msg = typeof data?.error === "string" ? data.error : data?.error?.message;
+	return msg ? plainNote(msg) : "";
+}
+
+/**
+ * Tasks per benchmark for the texts that name it (Q-8): "10 tasks" when every benchmark has that many ready tasks,
+ * else "2 ready of 10 tasks" with the ready count from the estimate, so the number never disagrees with the runs.
+ */
+export function tasksText(
+	t: (key: string, opts?: Record<string, unknown>) => string,
+	spec: Pick<EvaluationSpec, "tasks_per_benchmark">,
+	est: Pick<EvaluationEstimate, "power"> | undefined,
+): string {
+	const ready = readyTasks(spec, est);
+	return ready === null ? t("step4.tasksN", { count: spec.tasks_per_benchmark }) : t("step4.tasksReady", { n: spec.tasks_per_benchmark, ready });
+}
+
+/** Ready tasks over all benchmarks when some benchmark has fewer than asked; null when every one has enough or it is not known. */
+export function readyTasks(spec: Pick<EvaluationSpec, "tasks_per_benchmark">, est: Pick<EvaluationEstimate, "power"> | undefined): number | null {
+	const per = est?.power?.per_benchmark ?? [];
+	if (per.length === 0 || !per.some((b) => b.tasks < spec.tasks_per_benchmark)) return null;
+	return per.reduce((n, b) => n + Math.min(b.tasks, spec.tasks_per_benchmark), 0);
 }
 
 /** Whether a failed estimate is a real HTTP error (a status code), not a missing answer. */
@@ -283,11 +345,37 @@ export const ESTIMATE_DEBOUNCE_MS = 400;
  * The wizard calls it too (same arguments, so the same cached request) to block Next.
  */
 export function useStep4Estimate(spec: EvaluationSpec, skip: boolean) {
+	const owns = useOwnModelAgents();
 	const settled = useDebounced(spec, ESTIMATE_DEBOUNCE_MS);
-	const main = useEstimateEvaluationQuery(settled, { skip });
-	const presets = useEstimateEvaluationQuery(presetsRequest(settled), { skip });
+	// Q-7: the request sends the held-back spec, so its readiness decides the skip too. A link that fills the
+	// draft makes the live spec ready while the held-back one is still half made; that one is never posted.
+	const skipSettled = estimateSkip(skip, specReady(settled, owns));
+	const main = useEstimateEvaluationQuery(settled, { skip: skipSettled });
+	const presets = useEstimateEvaluationQuery(presetsRequest(settled), { skip: skipSettled });
 	const pending = JSON.stringify(settled) !== JSON.stringify(spec);
 	return { main, presets, pending };
+}
+
+/** Whether step 4 skips its estimate: the live spec says skip, or the held-back spec it would post is not ready. */
+export function estimateSkip(skipLive: boolean, settledReady: boolean): boolean {
+	return skipLive || !settledReady;
+}
+
+/** Whether step 4 is still working out its estimate (Next waits): a change is held back or the request is in flight. */
+export function estimateBusy(e: { pending: boolean; main: { isFetching?: boolean } }, skipped: boolean): boolean {
+	return !skipped && (e.pending || Boolean(e.main.isFetching));
+}
+
+/**
+ * What the estimate's cost rests on, for the basis line (Q-10): other agents' runs ("library"), a rough list
+ * price guess ("rough"), this setup's own past runs ("own"), or nothing to say (null: no known cost).
+ */
+export function estimateBasis(
+	e: Pick<EvaluationEstimate, "from_library" | "per_benchmark"> & { est_cost_usd?: { known?: boolean } },
+): "library" | "rough" | "own" | null {
+	if (e.from_library) return "library";
+	if (isRoughEstimate(e)) return "rough";
+	return e.est_cost_usd?.known ? "own" : null;
 }
 
 /** The estimate result: runs, cost and time, what it is based on, why nothing runs, then every note. */
@@ -298,6 +386,7 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 	const power = powerText(estimate);
 	const slots = slotsText(estimate);
 	const none = Number(estimate.runs) > 0 ? [] : notes.filter((n) => n.skipped);
+	const basis = estimateBasis(estimate);
 	return (
 		<div className="flex flex-col gap-2">
 			<span>
@@ -305,12 +394,15 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 				<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
 				{updating && <span className="text-muted-foreground"> Updating...</span>}
 			</span>
-			<span
-				className={estimate.from_library ? "text-chart-info-ink text-xs font-medium" : "text-muted-foreground text-xs"}
-				data-testid="step4-basis"
-			>
-				{estimate.from_library ? t("step4.basisLibrary") : t("step4.basisOwn")}
-			</span>
+			{/* "From past runs" only when there are past runs: a list price guess says so instead (Q-10). */}
+			{basis && (
+				<span
+					className={basis === "library" ? "text-chart-info-ink text-xs font-medium" : "text-muted-foreground text-xs"}
+					data-testid="step4-basis"
+				>
+					{basis === "library" ? t("step4.basisLibrary") : basis === "rough" ? fw05("basis.rough") : t("step4.basisOwn")}
+				</span>
+			)}
 			{none.length > 0 && (
 				<div className="border-chart-warning/40 bg-chart-warning/10 rounded-md border px-3 py-2" data-testid="step4-nothing-runs">
 					<span className="font-medium">{t("step4.nothingRuns")}</span>
@@ -408,11 +500,12 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const { t: te } = useTranslation("evaluate");
 	const faultCount = spec.faults.filter((f) => f !== "clean").length;
 	const moreSummary = te("step4.moreSummary", {
-		tasks: spec.tasks_per_benchmark,
-		tries: spec.trials,
+		tasks: tasksText(te as never, spec, estimate.data),
+		tries: te("step4.triesN", { count: spec.trials }),
 		faults: faultCount ? te("step4.faultsN", { count: faultCount }) : te("step4.noFaults"),
 		gateway: spec.mcp_route && spec.mcp_route !== "direct" ? te("step4.gatewayOn") : te("step4.gatewayOff"),
 	});
+	const keys = useArmKeys(spec.arms);
 	const overWorker = concurrencyNote(estimate.data?.slots, concurrency);
 	const catalog = useGetBenchFaultsQuery();
 	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
@@ -430,13 +523,15 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	return (
 		<div className="flex flex-col gap-6" data-testid="step4-setup">
 			<section className="flex flex-col gap-3">
-				<h3 className="text-base font-semibold">Model</h3>
+				<h3 className="text-base font-semibold">{te("step4.model")}</h3>
 				{spec.arms.map((arm, i) => (
 					<div key={`${arm.label}-${i}`} className="flex flex-col gap-1.5" data-testid={`step4-arm-${arm.label}`}>
 						<span className="text-sm font-medium">
-							{spec.arms.length > 1 ? `${arm.label}: ` : ""}
-							{arm.agent || "Your agent"}
-							{arm.version ? ` v${arm.version}` : ""} uses
+							{te("step4.armUses", {
+								label: spec.arms.length > 1 ? `${arm.label}: ` : "",
+								agent: arm.agent || te("step4.yourAgent"),
+								version: arm.version ? ` v${arm.version}` : "",
+							})}
 						</span>
 						{owns.has(arm.agent) && !arm.model && !picking.has(arm.label) ? (
 							<div
@@ -444,8 +539,8 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 								data-testid={`step4-own-model-${arm.label}`}
 							>
 								<span>
-									<span className="font-medium">Its own model.</span>{" "}
-									<span className="text-muted-foreground">This agent picks its model itself; cost is what the agent reports.</span>
+									<span className="font-medium">{te("step4.ownModel")}</span>{" "}
+									<span className="text-muted-foreground">{te("step4.ownModelHelp")}</span>
 								</span>
 								<button
 									type="button"
@@ -453,7 +548,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									onClick={() => setPicking((p) => new Set(p).add(arm.label))}
 									data-testid={`step4-pick-model-${arm.label}`}
 								>
-									Pick a model instead
+									{te("step4.pickModelInstead")}
 								</button>
 							</div>
 						) : (
@@ -462,8 +557,9 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									value={arm.model || arm.provider ? { provider: arm.provider ?? "", model: arm.model } : null}
 									onChange={(v) => setArm(i, v.provider, v.model)}
 									testId={`step4-model-${arm.label}`}
-									label={te("step4.modelFor", { agent: arm.agent || "your agent" })}
+									label={te("step4.modelFor", { agent: arm.agent || te("step4.yourAgentLower") })}
 								/>
+								<KeyLines rows={keys.rows.filter((k) => k.label === arm.label)} returnTo="/evaluate?step=4" okOnly testId={`step4-key-${arm.label}`} />
 								{owns.has(arm.agent) && (
 									<button
 										type="button"
@@ -478,7 +574,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 										}}
 										data-testid={`step4-use-own-${arm.label}`}
 									>
-										Use the agent's own model
+										{te("step4.useOwnModel")}
 									</button>
 								)}
 							</>
@@ -649,14 +745,18 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					<span className="text-muted-foreground" data-testid="step4-estimate-problem">
 						{problem}
 					</span>
-				) : estimate.isError && estimateFailed(estimate.error) ? (
-					<span className="text-muted-foreground">Could not estimate this evaluation right now.</span>
+				) : estimate.isError && !pending ? (
+					// A failed estimate says so, with the server's reason when it gave one; never a stuck "Estimating..." (Q-7).
+					<span className="text-muted-foreground" role="alert" data-testid="step4-estimate-error">
+						{estimateFailed(estimate.error) ? te("step4.estimateFailed") : te("step4.noEstimate")}
+						{estimateErrorText(estimate.error) && ` ${estimateErrorText(estimate.error)}`}
+					</span>
 				) : estimate.data ? (
 					<EstimateSummary estimate={estimate.data} updating={estimate.isFetching || pending} />
-				) : estimate.isError ? (
-					<span className="text-muted-foreground">No estimate yet.</span>
 				) : (
-					<span className="text-muted-foreground">Estimating...</span>
+					<span className="text-muted-foreground" data-testid="step4-estimating">
+						{te("step4.estimating")}
+					</span>
 				)}
 			</section>
 		</div>

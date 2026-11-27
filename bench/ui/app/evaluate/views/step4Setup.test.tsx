@@ -334,9 +334,9 @@ describe("Step4Setup", () => {
 		// The estimate stays in plain view; only the settings above it fold (M3-29).
 		expect(html.slice(html.indexOf('data-testid="step4-estimate"'))).not.toContain("<details");
 		expect(html).toContain('data-testid="step4-est-notes"');
-		expect(html).toContain("no history for this benchmark yet");
+		expect(html).toContain("No history for this benchmark yet");
 		expect(html).toContain("skipped, agent codex cannot run benchmark voicebench: needs voice");
-		expect(html).toContain("broken-tool is skipped: no tool layer");
+		expect(html).toContain("Broken-tool is skipped: no tool layer");
 		expect(html).toContain("no official price");
 	});
 

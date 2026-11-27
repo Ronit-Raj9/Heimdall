@@ -145,7 +145,7 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 	);
 
 	return (
-		<div className="flex flex-col gap-6" data-testid="evaluate-step-1">
+		<div className="flex flex-col gap-4" data-testid="evaluate-step-1">
 			<div className="flex flex-col gap-1">
 				<h2 className="text-lg font-semibold">{t("agent.heading")}</h2>
 				<p className="text-muted-foreground text-sm">{t("agent.hint")}</p>
@@ -258,7 +258,7 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 				</Button>
 			</section>
 
-			{!draft.agent && <p className="text-muted-foreground text-sm">{t("agent.pickFirst")}</p>}
+			{/* "Pick an agent to continue." is said once, in the footer (Q-64). */}
 		</div>
 	);
 }

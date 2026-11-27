@@ -59,7 +59,8 @@ describe("Step1Agent", () => {
 	it("has no bar before an agent is picked", () => {
 		const html = render({});
 		expect(html).not.toContain('data-testid="evaluate-selected-agent"');
-		expect(html).toContain("Pick an agent to continue.");
+		// Q-64: the footer says it; the step does not repeat it.
+		expect(html).not.toContain("Pick an agent to continue.");
 	});
 
 	it("hides test agents without an unasked note (N97, M3-49)", () => {

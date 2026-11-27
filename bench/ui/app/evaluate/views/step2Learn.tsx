@@ -145,7 +145,7 @@ export function Step2Learn() {
 				</label>
 			)}
 
-			{draft.mode === "models" && <p className="text-muted-foreground text-sm">{t("learn.modelsLater")}</p>}
+			{/* Two models: the What will run block below says the second model comes in step 4, once (Q-72). */}
 			{draft.mode === "models" && draft.agent && (
 				<Link
 					to="/agents/$agentId"
@@ -165,7 +165,7 @@ export function Step2Learn() {
 					<ul className="flex flex-col gap-1 text-sm">
 						{draft.arms.map((a, i) => (
 							<li key={a.label}>
-								{draft.mode === "models" && i > 0 && !a.model ? (
+								{draft.mode === "models" && i > 0 && (!a.model || sameSetup(a, draft.arms[0])) ? (
 									t("learn.secondSetupLater")
 								) : (
 									<>
@@ -188,3 +188,8 @@ export function Step2Learn() {
 }
 
 export default Step2Learn;
+
+/** Whether two setups would run the same thing: same agent, version and model (Q-72, F2-9). */
+export function sameSetup(a: { agent?: string; version?: number | null; model?: string }, b: { agent?: string; version?: number | null; model?: string } | undefined): boolean {
+	return Boolean(b) && a.agent === b!.agent && (a.version ?? null) === (b!.version ?? null) && (a.model ?? "") === (b!.model ?? "");
+}
