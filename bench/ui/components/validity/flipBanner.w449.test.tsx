@@ -26,7 +26,7 @@ const flipped: ExperimentValidity = {
 describe("flip banner", () => {
 	it("says the 23 Nov re-score turned a broken test into no clear winner", () => {
 		const html = renderToStaticMarkup(<FlipBannerView validity={flipped} />);
-		expect(html).toContain("This result changed after a re-score on 23 Nov");
+		expect(html).toContain("Re-scored on 23 Nov");
 		expect(html).toContain("Test was broken");
 		expect(html).toContain("No clear winner yet");
 		expect(html).toContain("The test check was fixed.");
@@ -40,7 +40,7 @@ describe("flip banner", () => {
 				validity={{ entries: [], stale: { exp_id: "e_1", gates: { protected_files: ["1", "2"] }, checked: "2026-11-27T00:00:00Z" } }}
 			/>,
 		);
-		expect(html).toContain("A check this comparison used has been updated since it ran.");
+		expect(html).toContain("A check used here was updated.");
 	});
 
 	it("shows nothing for an unchanged comparison", () => {

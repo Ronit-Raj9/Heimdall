@@ -531,7 +531,6 @@ export function CatalogBody(props: CatalogBodyProps) {
 				<div>
 					{/* X-42: the Benchmarks hub header holds the page's one h1; the tab's title is an h2. */}
 					<h2 className="text-lg font-semibold">{t("title")}</h2>
-					<p className="text-muted-foreground mt-1 text-sm text-pretty">{t("subtitle")}</p>
 				</div>
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="catalog-toolbar">

@@ -172,7 +172,6 @@ export default function AddBenchmarkView() {
 		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="onboard-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				breadcrumbs={[{ label: t("crumbs.benchmarks"), to: "/suites" }, { label: t("crumbs.add") }]}
 			/>
 			{!input && !setId && <AddChooser current="file" />}
@@ -227,10 +226,10 @@ export function DraftSteps({ id }: { id: string }) {
 	}
 	return (
 		<>
-			<Section title={t("steps.preview")} description={t("preview.description")} testId="onboard-step-preview">
+			<Section title={t("steps.preview")} testId="onboard-step-preview">
 				<DraftPreview set={set} />
 			</Section>
-			<Section title={t("steps.ready")} description={t("ready.description")} testId="onboard-step-ready">
+			<Section title={t("steps.ready")} testId="onboard-step-ready">
 				<ReadinessPanel set={set} />
 			</Section>
 			<Section title={t("steps.publish")} description={t("publish.description")} testId="onboard-step-publish">

@@ -133,7 +133,7 @@ describe("benchmark data tab", () => {
 		};
 		const html = text(render(<ImportPreview result={result} t={t} />));
 		expect(html).toContain("Read 2 records.");
-		expect(html).toContain("More records exist");
+		expect(html).toContain("Only the first records were read.");
 		expect(html).toContain("1 email in 1 row, replaced");
 		expect(html).toContain("Where is my order?");
 	});

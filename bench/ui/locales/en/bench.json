@@ -2508,7 +2508,7 @@
 			"unknown": "Frozen state not checked",
 			"lockedHint": "Tasks pinned. Every run sees the same version.",
 			"unlockedHint": "No task runs until frozen and checked.",
-			"staleHint": "Files changed after freeze. Freeze and check again.",
+			"staleHint": "Files changed after freeze. Changed tasks are not ready until frozen and checked again.",
 			"unknownHint": "Files could not be compared to the frozen version."
 		},
 		"verifier": {
@@ -2635,7 +2635,7 @@
 		},
 		"probes": {
 			"title": "Fault cases",
-			"description": "Model outage, broken tool, trick instruction, fake secret.",
+			"description": "",
 			"none": "No built-in failure tests.",
 			"goalPreserving": "still solvable",
 			"goalPreservingHint": "A correct solution still passes.",
@@ -2871,7 +2871,7 @@
 			"quarantined": "Paused"
 		},
 		"flagHints": {
-			"flaky_verifier": "Verifier graded the same output differently, or the reference failed.",
+			"flaky_verifier": "Verifier graded the same output differently, or the reference failed. Verdicts are not reliable.",
 			"difficulty_mismatch": "Observed difficulty differs from the declared one.",
 			"no_discrimination": "Every config always passes or always fails.",
 			"saturated": "Every scored run of every agent config passed.",
@@ -3127,7 +3127,7 @@
 	},
 	"imports": {
 		"title": "Imports",
-		"subtitle": "Import a public benchmark from a local copy.",
+		"subtitle": "",
 		"synthetic": "Synthetic fixture data. Example importers only.",
 		"loadError": "Could not load the importers.",
 		"empty": "This server links no importers.",

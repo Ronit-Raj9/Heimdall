@@ -3,7 +3,7 @@
 	"intro": "",
 	"policy": {
 		"title": "Personal data",
-		"description": "Imports and API rows are scanned before becoming tasks.",
+		"description": "Imports and API rows are scanned for personal data before becoming tasks.",
 		"mode": "When personal data is found",
 		"modes": {
 			"off": "Do not scan",
@@ -38,7 +38,7 @@
 	},
 	"versions": {
 		"title": "Versions",
-		"description": "Newest first. Evaluations record their version.",
+		"description": "",
 		"empty": "No versions yet.",
 		"version": "Version",
 		"when": "When",
@@ -54,11 +54,11 @@
 	},
 	"api": {
 		"title": "Manage from code",
-		"description": "API v1, Python or TypeScript clients."
+		"description": ""
 	},
 	"import": {
 		"title": "Import from another platform",
-		"description": "LangSmith, Langfuse, Braintrust or Datadog. Previewed first.",
+		"description": "",
 		"platform": "Platform",
 		"kind": "What to import",
 		"kindDataset": "A dataset, as tasks of this benchmark",

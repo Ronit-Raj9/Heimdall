@@ -331,7 +331,7 @@ export function FromCommitSection({
 			}
 		: null;
 	return (
-		<Section title={t("fromCommit.title")} description={t("fromCommit.description")} testId="suite-ops-from-commit">
+		<Section title={t("fromCommit.title")} testId="suite-ops-from-commit">
 			<div className="flex min-w-0 flex-col gap-3">
 				{!shared && <RepoPicker value={src} onChange={setOwn} hosted={hosted} t={t} testId="suite-ops-from-commit-repo" />}
 				<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
@@ -374,7 +374,7 @@ function MineSection({ suite, hosted, t, src: shared }: { suite: SuiteSummary; h
 		: null;
 	const label = preview ? t("mine.preview") : t("mine.run");
 	return (
-		<Section title={t("mine.title")} description={t("mine.description")} testId="suite-ops-mine">
+		<Section title={t("mine.title")} testId="suite-ops-mine">
 			<div className="flex min-w-0 flex-col gap-3">
 				{!shared && <RepoPicker value={src} onChange={setOwn} hosted={hosted} t={t} testId="suite-ops-mine-repo" />}
 				<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">

@@ -91,6 +91,6 @@ describe("SuiteTasksTab paging (M6-1)", () => {
 	it("a search narrows the count", () => {
 		query.q = { q: "bfcl-364" };
 		const html = renderToStaticMarkup(<SuiteTasksTab suite={big} health={health} />);
-		expect(html).toContain("1 to 2 of 2 matching tasks (3641 in all)");
+		expect(html).toContain("1 to 2 of 2 matching tasks, 3641 in all");
 	});
 });

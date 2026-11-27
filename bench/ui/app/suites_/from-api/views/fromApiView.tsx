@@ -50,7 +50,6 @@ export default function FromApiView() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="from-api-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				breadcrumbs={[{ label: tb("suites.title"), to: "/suites" }, { label: t("breadcrumb") }]}
 			/>
 			<p className="text-muted-foreground -mt-3 text-sm" data-testid="from-api-cost-note">
@@ -218,7 +217,6 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 				</div>
 				<label className="flex flex-col gap-1 text-sm">
 					{t("new.spec")}
-					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
 					{specUrlError && specUrl && (
 						<span role="note" className="text-xs" data-testid="from-api-spec-url-error">
 							{tr("fromApi.specUrlError", { url: specUrl })}
@@ -240,7 +238,6 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 				</label>
 				<label className="flex flex-col gap-1 text-sm">
 					{t("new.policy")}
-					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
 					<input
 						type="file"
 						className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent"
@@ -548,7 +545,7 @@ function TasksSection({
 	const [perRule, setPerRule] = useState(2);
 	const [judged, setJudged] = useState(draft.judged);
 	return (
-		<Section title={t("tasks.title")} description={t("tasks.description")} testId="from-api-tasks">
+		<Section title={t("tasks.title")} testId="from-api-tasks">
 			{writable && draft.status !== "written" && (
 				<div className="flex flex-wrap items-end gap-4">
 					<label className="flex flex-col gap-1 text-sm">
@@ -654,7 +651,7 @@ function WriteSection({ draft, onChanged }: { draft: ListedAppTasksDraft; onChan
 		if ("data" in res) onChanged();
 	};
 	return (
-		<Section title={t("write.title")} description={t("write.description")} testId="from-api-write">
+		<Section title={t("write.title")} testId="from-api-write">
 			{draft.judged && (
 				<LabeledModelPicker
 					label={t("write.judgeModel")}
@@ -707,7 +704,6 @@ function ReviewSection({ draft, writable, onChanged }: { draft: ListedAppTasksDr
 	return (
 		<Section
 			title={t("review.title")}
-			description={t("review.description")}
 			testId="from-api-review"
 			actions={
 				<Link

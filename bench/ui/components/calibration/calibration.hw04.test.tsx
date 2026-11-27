@@ -100,7 +100,7 @@ describe("CalibrateJudgeForm with no labels", () => {
 		const buttons = tags(html, "job-run-calibrate.run");
 		expect(buttons).toHaveLength(2);
 		for (const b of buttons) expect(b).toContain('disabled=""');
-		expect(html).toContain("Add at least one label above, or tick");
+		expect(html).toContain("Add a label, or tick");
 	});
 
 	it("enables them with a label and shows All instead of 0 in the sample box", () => {
@@ -115,7 +115,7 @@ describe("CalibrateJudgeForm with no labels", () => {
 describe("CalibrationCard", () => {
 	it("points at Run the check, not the command line", () => {
 		const html = render(<CalibrationCard status={CALIBRATION_STATUS_FIXTURE} />);
-		expect(html).toContain("Use Run the check below. It shows the cost first.");
+		expect(html).toContain("Shows the cost first.");
 		expect(html).not.toContain("heimdall judge calibrate");
 	});
 });

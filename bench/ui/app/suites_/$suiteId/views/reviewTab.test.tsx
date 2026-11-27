@@ -71,7 +71,7 @@ describe("ReviewTab", () => {
 		expect(html).toMatch(/data-testid="suite-review-op-rubric"[^>]*checked=""/);
 		// Q-198: the sentence is said once, by the model field's hint; Q-193: 44px checkbox rows.
 		expect(html).not.toContain('data-testid="suite-review-need-model"');
-		expect(html.split("Pick a model from your model keys.").length).toBeLessThanOrEqual(2);
+		expect(html.split("Use a different family from the judge and agent.").length).toBeLessThanOrEqual(2);
 		expect(html).toMatch(/<label class="flex min-h-11 items-center gap-2 text-sm[^"]*"><input type="checkbox" class="size-4 shrink-0"[^>]*data-testid="suite-review-op-rubric"/);
 		expect(html).toContain("1 waiting, 1 accepted, 0 rejected");
 		expect(html).toContain('data-testid="suite-review-accept-refund-window"');
@@ -133,7 +133,7 @@ describe("reviewTab helpers", () => {
 		queue.data = { ...generated, pending: 0, accepted: 0, tasks: [] };
 		try {
 			const html = render(<ReviewTab suite={qa} />);
-			expect(html).toContain("No drafts to review yet. Make some with Draft with a model above.");
+			expect(html).toContain("No drafts yet.");
 			expect(html).not.toContain("suite-review-queue-policy-link");
 			const support = render(<ReviewTab suite={{ ...qa, track: "support" } as SuiteSummary} />);
 			expect(support).toMatch(/<a[^>]*href="\/suites\/support-faq\?tab=policy"[^>]*data-testid="suite-review-queue-policy-link"/);
@@ -146,7 +146,7 @@ describe("reviewTab helpers", () => {
 		let html = render(<ReviewTab suite={qa} />);
 		expect(html).not.toContain('data-testid="suite-review-provider"');
 		expect(tagOf(html, "suite-review-model-model") ?? "").toContain('data-model="openai/gpt-test"');
-		expect(html).toContain("Pick a model from your model keys.");
+		expect(html).toContain("Use a different family from the judge and agent.");
 		keys.list = [{ id: "k1", provider: "openai", status: "ok" }];
 		html = render(<ReviewTab suite={qa} />);
 		expect(html).not.toContain('data-testid="suite-review-need-model"');

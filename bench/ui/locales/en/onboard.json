@@ -1,6 +1,6 @@
 {
 	"title": "Add a benchmark",
-	"subtitle": "Drop a file or paste a link.",
+	"subtitle": "",
 	"crumbs": {
 		"benchmarks": "Benchmarks",
 		"add": "Add"
@@ -73,7 +73,7 @@
 		"draftHint": "Nothing is added to a benchmark until you publish."
 	},
 	"preview": {
-		"description": "Accept or reject each task.",
+		"description": "",
 		"count": "{{count}} tasks in draft {{id}} for {{suite}}",
 		"countNew": "{{count}} tasks in draft {{id}} for {{suite}} (new benchmark)",
 		"newSuite": "new benchmark",
@@ -115,7 +115,7 @@
 		"empty": "No task drafted. See problems below."
 	},
 	"ready": {
-		"description": "Right answer must pass. Wrong, empty and gaming answers must fail.",
+		"description": "",
 		"run": "Run the readiness checks",
 		"rerun": "Run them again",
 		"confirm": "Run readiness checks on {{count}} tasks? Rubric tasks call the judge on your key.",

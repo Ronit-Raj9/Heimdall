@@ -34,8 +34,7 @@ import "@/components/suites/ufw3I18n";
  */
 export function SuitesPageHeader({ tabs }: { tabs?: ReactNode }) {
 	const { t } = useTranslation("bench");
-	const { t: tu } = useTranslation("suitesUx");
-	return <PageHeader title={t("suites.title")} subtitle={tu("subtitle")} actions={<AddBenchmarkMenu />} tabs={tabs} />;
+	return <PageHeader title={t("suites.title")} actions={<AddBenchmarkMenu />} tabs={tabs} />;
 }
 
 /**

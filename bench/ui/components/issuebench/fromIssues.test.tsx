@@ -128,7 +128,7 @@ describe("repository field", () => {
 		const out = render(<FromIssues writable />, hostedSession("member"));
 		expect(out).toContain('data-testid="ib-repo-input"');
 		expect(out).toContain(
-			"Connect GitHub in Settings &gt; GitHub (any account). GitHub needs a sign-in to list a repository&#x27;s pull requests, public ones included.",
+			"Connect GitHub in Settings &gt; GitHub. GitHub needs sign-in to list pull requests.",
 		);
 		expect(tagOf(out, "issuebench-scan") ?? "").toContain("disabled");
 	});
@@ -174,13 +174,13 @@ describe("readiness", () => {
 		expect(out).toContain('data-testid="issuebench-readiness"');
 		expect(out).toContain("No worker online: this job starts containers");
 		expect(tagOf(out, "issuebench-readiness-workers")).toContain('href="/settings?tab=runners"');
-		expect(out).toContain("Open Settings &gt; Workers");
+		expect(out).toContain("Open Workers");
 	});
 
 	it("shows the banner without a workers link when the gateway is missing", () => {
 		const out = html((t) => <ReadinessBanner readiness={{ ...READY, gateway: false }} t={t} />);
 		expect(out).toContain('data-testid="issuebench-readiness"');
-		expect(out).toContain("no model gateway");
+		expect(out).toContain("No model gateway");
 		expect(out).not.toContain('data-testid="issuebench-readiness-workers"');
 	});
 
@@ -194,7 +194,7 @@ describe("readiness", () => {
 		expect(out).toContain('data-testid="issuebench-readiness"');
 		const start = tagOf(out, "issuebench-start") ?? "";
 		expect(start).toContain("disabled");
-		expect(start).toContain('title="Start needs a worker online"');
+		expect(start).toContain('title="Needs a worker online"');
 	});
 
 	it("leaves Start without a block title when ready", () => {
@@ -205,7 +205,7 @@ describe("readiness", () => {
 
 	it("disables Start when the gateway is missing", () => {
 		const out = html((t) => <RunView id="ib_1" writable readiness={{ ...READY, gateway: false }} t={t} />);
-		expect(tagOf(out, "issuebench-start") ?? "").toContain('title="Start needs the server&#x27;s model gateway"');
+		expect(tagOf(out, "issuebench-start") ?? "").toContain('title="Needs the model gateway"');
 	});
 });
 
@@ -221,8 +221,8 @@ describe("issue rows", () => {
 
 	it("names the stage a worker runs", () => {
 		const out = row(item({ status: "building", stage: "build", job_id: "job_b1" }));
-		expect(out).toContain("Building the environment on a worker");
-		expect(row(item({ status: "built", stage: "validate" }))).toContain("Running the tests on a worker");
+		expect(out).toContain("Building on a worker");
+		expect(row(item({ status: "built", stage: "validate" }))).toContain("Testing on a worker");
 		expect(row(item({ status: "validated", stage: "checks" }))).toContain("Checking the issue text");
 		expect(row(item({ status: "ready", stage: "checks" }))).not.toContain("issuebench-stage-12");
 	});

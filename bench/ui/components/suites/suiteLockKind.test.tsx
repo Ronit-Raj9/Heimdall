@@ -30,7 +30,7 @@ describe("LockKindBadge", () => {
 		const html = renderToStaticMarkup(<LockKindBadge kind="legacy" testId="kind" />);
 		expect(html).toContain('data-tone="warn"');
 		expect(html).toContain("Frozen (older format)");
-		expect(html).toContain("Grader settings are not fingerprinted. Freeze again to add fingerprints.");
+		expect(html).toContain("No grader fingerprints. Freeze again to add them.");
 	});
 
 	it("shows nothing for an unlocked suite", () => {

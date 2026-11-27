@@ -137,7 +137,7 @@ describe("Earlier drafts Delete (N289)", () => {
 		del?.onSelect?.();
 		await vi.waitFor(() => expect(api.remove).toHaveBeenCalledWith("d1"));
 		const ask = confirmed.asks.at(-1);
-		expect(ask?.message).toBe("Delete the draft for faq? Its 2 drafted task(s) go. A benchmark it already published stays.");
+		expect(ask?.message).toBe("Delete the draft for faq and its 2 task(s)? Published benchmarks stay.");
 		expect(ask?.opts?.title).toBe("Delete the draft of faq?");
 		expect(ask?.opts?.destructive).toBe(true);
 	});
@@ -160,7 +160,7 @@ describe("Draft preview (N235, draft task Drop)", () => {
 	it("asks before dropping a task", () => {
 		renderToStaticMarkup(<DraftPreview set={set} />);
 		const drop = asked.list.find((p) => p.testId === "onboard-drop-what-is-2-2");
-		expect(drop?.question).toBe("Drop What is 2+2? from this draft? It cannot be added back without drafting again.");
+		expect(drop?.question).toBe("Drop What is 2+2?? Only drafting again brings it back.");
 		expect(api.edit).not.toHaveBeenCalled();
 		drop?.onConfirm();
 		expect(api.edit).toHaveBeenCalledWith({ set: set.id, task: "what-is-2-2", drop: true });
@@ -183,7 +183,7 @@ describe("Held out made visible (N252)", () => {
 				}}
 			/>,
 		);
-		expect(html).toContain("1 held out (the plan holds out 25%).");
+		expect(html).toContain("1 held out (25% planned).");
 		expect(html).toContain("Run the readiness checks now");
 		expect(html).toContain('data-testid="onboard-run-readiness"');
 	});
@@ -206,6 +206,6 @@ describe("Held out made visible (N252)", () => {
 		const html = renderToStaticMarkup(
 			<InventoryPanel inv={inv} plan={inv.suggest} onPlan={() => undefined} onDraft={() => undefined} busy={false} />,
 		);
-		expect(html).toContain("Held out: 25% of the tasks (1 of 3) stay private. Change it here.");
+		expect(html).toContain("Held out: 25% (1 of 3).");
 	});
 });

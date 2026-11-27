@@ -1,7 +1,7 @@
 {
 	"title": "Grader accuracy check",
 	"intro": "Measures grader agreement with human labels. Each answer costs a few model calls.",
-	"notJudged": "Graded by automatic checks. Nothing to check.",
+	"notJudged": "Graded by automatic checks. For a judge, set grading: judged in the benchmark file.",
 	"editSuite": "Open benchmark files",
 	"seedControls": "Add expected and wrong answers as weak labels",
 	"model": "Grader model",

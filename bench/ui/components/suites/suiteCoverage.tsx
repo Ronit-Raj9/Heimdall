@@ -11,7 +11,7 @@ export function CapabilityCoverage({ tasks }: { tasks: readonly SuiteTask[] }) {
 	const { rows, missing } = capabilityCoverage(tasks);
 	const max = Math.max(1, ...rows.map((row) => row.count));
 	return (
-		<Section title={t("suites.coverage.title")} description={t("suites.coverage.description")} testId="suites-coverage">
+		<Section title={t("suites.coverage.title")} testId="suites-coverage">
 			{rows.length === 0 ? (
 				<p className="text-muted-foreground text-xs" data-testid="suites-coverage-none">
 					{t("suites.coverage.none")}
@@ -93,7 +93,7 @@ export function ProbeList({ probes }: { probes: readonly SuiteProbe[] }) {
 	const { t } = useTranslation("bench");
 	const groups = probesByFamily(probes);
 	return (
-		<Section title={t("suites.probes.title")} description={t("suites.probes.description")} testId="suites-probes">
+		<Section title={t("suites.probes.title")} testId="suites-probes">
 			{groups.length === 0 ? (
 				<p className="text-muted-foreground text-xs">{t("suites.probes.none")}</p>
 			) : (

@@ -69,7 +69,6 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 		<section className="flex min-w-0 flex-col gap-6" data-testid="suites-new-screen">
 			<PageHeader
 				title={t("new.title")}
-				subtitle={t("new.subtitle")}
 				breadcrumbs={[{ label: tb("suites.title"), to: "/suites" }, { label: t("new.title") }]}
 			/>
 			{!writable && (

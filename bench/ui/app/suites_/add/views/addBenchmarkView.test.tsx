@@ -248,13 +248,13 @@ describe("Add benchmark plan checks", () => {
 	it("shows the rule and disables Draft for an invalid id", () => {
 		const html = panel("bad id!");
 		expect(html).toContain('data-testid="onboard-plan-suite-check"');
-		expect(html).toContain("Use 1 to 64 lowercase letters");
+		expect(html).toContain("1 to 64 lowercase letters");
 		expect(draftDisabled(html)).toBe(true);
 	});
 
 	it("refuses a built-in benchmark id", () => {
 		const html = panel("coding-core");
-		expect(html).toContain("coding-core is the name of a built-in benchmark. Pick another id.");
+		expect(html).toContain("coding-core is a built-in benchmark. Pick another id.");
 		expect(draftDisabled(html)).toBe(true);
 	});
 
@@ -268,9 +268,9 @@ describe("Add benchmark plan checks", () => {
 	it("says readiness runs cost nothing, and names judge calls only when there are any", () => {
 		const html = panel("faq");
 		expect(html).toContain("18 readiness runs");
-		expect(html).toContain("cost nothing");
+		expect(html).toContain("Both are free");
 		expect(html).not.toContain("judge calls");
 		const judged = panel("faq", { estimate: { tasks: 3, readiness_runs: 18, judge_calls: 18, assist_usd: 0 } });
-		expect(judged).toContain("Rubric grading adds 18 judge calls, paid on your own model key.");
+		expect(judged).toContain("Rubric grading adds 18 judge calls, paid on your model key.");
 	});
 });

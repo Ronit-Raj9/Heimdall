@@ -87,7 +87,7 @@ describe("BuildTab", () => {
 		} as unknown as SuiteSummary;
 		const html = render(<BuildTab suite={judged} />, { ...LOCAL_SESSION, authMode: "hosted", role: "member" });
 		expect(html).toContain('data-testid="suite-build-readiness-judge-consent"');
-		expect(html).toContain("openai/gpt-x, about 12 calls");
+		expect(html).toContain("openai/gpt-x about 12 times");
 		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="job-run-suite.admit"|data-testid="job-run-suite.admit"[^>]*disabled=""/);
 		const plain = render(<BuildTab suite={qa} />, { ...LOCAL_SESSION, authMode: "hosted", role: "member" });
 		expect(plain).not.toContain("suite-build-readiness-judge-consent");

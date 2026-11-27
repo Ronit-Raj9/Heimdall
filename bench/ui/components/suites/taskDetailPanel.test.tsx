@@ -47,7 +47,7 @@ describe("TaskDetailBody", () => {
 		const draft = render("p03");
 		expect(draft).toMatch(/data-testid="suites-control-mutant" data-state="fail"/);
 		expect(draft).toMatch(/data-testid="suites-control-network" data-state="pass"/);
-		expect(render("h01")).toContain("The readiness check has not run for this version of the task.");
+		expect(render("h01")).toContain("Readiness check not run for this version.");
 	});
 
 	it("counts hidden tests without naming them and lists visible files and protected globs", () => {

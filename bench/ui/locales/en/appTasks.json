@@ -1,6 +1,6 @@
 {
 	"title": "Tasks from your API",
-	"subtitle": "Draft policy test tasks from your OpenAPI file.",
+	"subtitle": "",
 	"breadcrumb": "Tasks from your API",
 	"entry": "Build tasks from your OpenAPI file and policy",
 	"costNote": "Uses your model key. Drafting usually under $0.05. Check and save is free.",
@@ -21,7 +21,7 @@
 		"appTitle": "App name (optional)",
 		"spec": "OpenAPI file (v3)",
 		"policy": "Policy (text or Markdown)",
-		"pasteOrPick": "Paste it here or pick a file.",
+		"pasteOrPick": "",
 		"submit": "Check and save",
 		"invalidIds": "Ids: lowercase letters, digits, - or _."
 	},
@@ -75,7 +75,7 @@
 	},
 	"tasks": {
 		"title": "Draft tasks",
-		"description": "Each task is checked on the app copy. Wrong agents must fail.",
+		"description": "",
 		"perRule": "Tasks per rule",
 		"judged": "Also grade the reply (needs a judge model)",
 		"draft": "Draft the tasks",
@@ -90,7 +90,7 @@
 	},
 	"write": {
 		"title": "Write into the benchmark",
-		"description": "Added as pending review. Run readiness checks next.",
+		"description": "",
 		"judgeModel": "Judge model",
 		"confirmTitle": "Write into the benchmark?",
 		"confirm": "Add {{count}} tasks to {{suite}}?",

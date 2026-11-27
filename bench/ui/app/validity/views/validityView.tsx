@@ -162,7 +162,7 @@ export default function ValidityView() {
 	const last = lastScanAt(data?.stale ?? []);
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="validity-screen">
-			<PageHeader title={t("page.heading")} subtitle={t("page.intro")} />
+			<PageHeader title={t("page.heading")} />
 			{validity.isLoading ? (
 				<BlockSkeleton rows={4} testId="validity-loading" />
 			) : validity.isError || !data ? (
