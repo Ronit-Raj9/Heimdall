@@ -34,7 +34,7 @@ export function RunFailureCard({
   testId?: string;
 }) {
   const card = <RunFailureBody run={run} detail={detail} testId={testId} />;
-  const same = run.outcome === "pass" ? undefined : sameFailureLink(group);
+  const same = run.outcome === "pass" ? undefined : failureGroupLink(group);
   if (!same) return card;
   return (
     <div className="flex flex-col gap-2">
@@ -44,8 +44,22 @@ export function RunFailureCard({
   );
 }
 
-/** "The same failure in N runs of this evaluation", linking to that failure group. */
-function SameFailureLink({ count, search, testId }: { count: number; search: Record<string, string>; testId: string }) {
+/**
+ * The link under the cause card (R3-1): "The same failure in N runs of this evaluation" when the
+ * evaluation holds others, else, when the run still has a group signature, "See this failure in all
+ * runs" (the group across evaluations, no count, since the server counts only this evaluation).
+ */
+export function failureGroupLink(
+  group: RunFailureGroup | undefined,
+): { count?: number; search: Record<string, string> } | undefined {
+  const same = sameFailureLink(group);
+  if (same) return same;
+  if (!group?.signature) return undefined;
+  return { search: { tab: "groups", sig: group.signature } };
+}
+
+/** "The same failure in N runs of this evaluation", or "See this failure in all runs", linking to that failure group. */
+function SameFailureLink({ count, search, testId }: { count?: number; search: Record<string, string>; testId: string }) {
   const { t } = useTranslation("uf5a");
   return (
     <Link
@@ -54,7 +68,7 @@ function SameFailureLink({ count, search, testId }: { count: number; search: Rec
       className="text-primary self-start text-sm underline-offset-2 hover:underline"
       data-testid={testId}
     >
-      {t("reason.sameFailure", { count })}
+      {count === undefined ? t("reason.failureGroup") : t("reason.sameFailure", { count })}
     </Link>
   );
 }

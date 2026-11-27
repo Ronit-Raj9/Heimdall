@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { RunDetail } from "@/lib/types/bench";
-import { gateName, orderRunTabs, rerunSearch, runCrumbs } from "./runView.uf5a";
+import { gateName, gradeAfterCause, orderRunTabs, rerunSearch, runCrumbs } from "./runView.uf5a";
+import { runsSearchFrom } from "@/components/runs/runsListSearch";
+import uf5a from "@/locales/en/uf5a.json";
+import uf3 from "@/locales/en/uf3.json";
 
-const labels = { runs: "Runs and traces", evaluations: "Evaluations", run: "Run t08" };
+const labels = { runs: "Runs", evaluations: "Evaluations", run: "Run t08" };
 
 describe("run page helpers (lane 5a)", () => {
 	it("keeps the fixed tabs in place and puts optional tabs after Proof", () => {
@@ -21,7 +24,7 @@ describe("run page helpers (lane 5a)", () => {
 
 	it("names crumbs, never raw ids once loaded; evaluation runs start at Evaluations", () => {
 		expect(runCrumbs({ task: "t08", expId: "e_1", expName: "Nightly", labels }).map((c) => c.label)).toEqual([
-			"Runs and traces",
+			"Runs",
 			"Nightly",
 			"Run t08",
 		]);
@@ -47,5 +50,32 @@ describe("run page helpers (lane 5a)", () => {
 		const t = (key: string, o: { defaultValue: string }) => (key === "gates.names.g6_null_agents" ? "An empty agent fails this task" : o.defaultValue);
 		expect(gateName("g6_null_agents", t)).toBe("An empty agent fails this task");
 		expect(gateName("g99", t)).toBe("g99");
+	});
+
+	it("keeps the runs list filters on the Runs crumb (M5-7)", () => {
+		const search = runsSearchFrom("?outcome=fail&suite=s1&x=1");
+		expect(search).toEqual({ outcome: "fail", suite: "s1" });
+		const crumbs = runCrumbs({ task: "t08", expId: "e_1", labels, runsSearch: search });
+		expect(crumbs[0]).toEqual({ label: "Runs", to: "/runs", search: { outcome: "fail", suite: "s1" } });
+		expect(runsSearchFrom("?x=1")).toBeUndefined();
+		expect(runCrumbs({ task: "t08", expId: "e_1", labels })[0].search).toBeUndefined();
+	});
+
+	it("explains the grader's reason by the tool server cause, one story per page (R3-2)", () => {
+		const grade = { reason: "test run broken by the patch: no reward file (exit 3)." };
+		const explain = (r: string) => `${r}. follows from the tool error`;
+		expect(gradeAfterCause(grade, true, explain)?.reason).toBe("test run broken by the patch: no reward file (exit 3). follows from the tool error");
+		expect(gradeAfterCause(grade, false, explain)).toBe(grade);
+		expect(gradeAfterCause({ reason: "" }, true, explain)?.reason).toBe("");
+		expect(gradeAfterCause(null, true, explain)).toBeUndefined();
+		expect(uf5a.claim.afterTool).toContain("tool server error above");
+	});
+
+	it("names the last gate and says the rerun link runs the benchmark, like the wizard banner (F3-16, R3-3)", () => {
+		expect(uf5a.gates.names.insecure_code_added).toBe("Did not add insecure code");
+		expect(uf5a.page.rerun).toBe("Run this benchmark again (1 task)");
+		expect(uf5a.page.rerunHint).toContain("can be a different task of the same benchmark");
+		expect(JSON.stringify(uf3)).toContain("different task of the same benchmark");
+		expect(uf5a.page.crumbRuns).toBe("Runs");
 	});
 });

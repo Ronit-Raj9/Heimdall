@@ -21,11 +21,14 @@ export interface SetupName {
 /** "A: claude-code gpt-5" per arm that has a known setup, in the grid's arm order. */
 export function setupNames(arms: readonly string[], setups: readonly SetupName[] | undefined): string[] {
 	if (!setups?.length) return [];
-	return arms.flatMap((arm) => {
+	// Every arm gets its header once any setup is named, so B never goes missing beside A (X-33).
+	const named = arms.map((arm) => {
 		const s = setups.find((x) => x.arm === arm);
 		const what = s ? [s.agent, s.model].filter(Boolean).join(" ") : "";
-		return what ? [`${arm}: ${what}`] : [];
+		return { arm, what };
 	});
+	if (!named.some((n) => n.what)) return [];
+	return named.map(({ arm, what }) => (what ? `${arm}: ${what}` : arm));
 }
 
 export interface PairPickerProps {
@@ -101,9 +104,11 @@ export function PairTable({
 				{t5("pair.legend")}
 			</p>
 			{setupNames(arms, setups).length > 0 && (
-				<p className="text-sm" data-testid="pair-picker-setups">
-					{setupNames(arms, setups).join(" / ")}
-				</p>
+				<ul className="flex flex-wrap gap-x-4 gap-y-1 font-sans text-sm" data-testid="pair-picker-setups">
+					{setupNames(arms, setups).map((name) => (
+						<li key={name}>{name}</li>
+					))}
+				</ul>
 			)}
 			<Table stickyColumns={1} data-testid="pair-picker-table">
 				<TableHeader>
@@ -129,7 +134,10 @@ export function PairTable({
 								className={cn(first && "hover:bg-muted cursor-pointer")}
 							>
 								<TableCell className="text-sm">
-									<EntityLink kind="task" id={row.task} suite={suite} testId={`pair-picker-task-${row.task}`} />
+									{/* Plain sans text, not a monospace slug (X-33). */}
+									<EntityLink kind="task" id={row.task} suite={suite} testId={`pair-picker-task-${row.task}`}>
+										{row.task}
+									</EntityLink>
 								</TableCell>
 								{showCondition && (
 									<TableCell>

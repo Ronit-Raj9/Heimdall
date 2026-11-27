@@ -4,7 +4,7 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { outcomeTone } from "@/components/runs/runs.utils";
 import { Button } from "@/components/ui/button";
 import { Pager, pageWindow } from "@/components/ui/pager";
-import { StatusPill } from "@/components/ui/statusPill";
+import { StatusDot } from "@/components/ui/statusPill";
 import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
@@ -22,6 +22,7 @@ import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { TraceMatches, TraceSearchInput } from "./traceMatches";
 import { pastLastPage } from "@/components/runs/runList";
+import { saveRunsSearch } from "@/components/runs/runsListSearch";
 import "./w4m4I18n";
 
 export { pastLastPage };
@@ -230,23 +231,25 @@ const PILL_TONE: Record<RunTone, "ok" | "bad" | "neutral" | "running" | "warn"> 
 	warn: "warn",
 };
 
-/** Outcome as the shared status pill; a running run shows the running icon. */
+/** Outcome as a status dot and its word (X-37): a quiet list, no filled pill; a running run's dot pulses. */
 export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome" | "run_id"> }) {
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
 	const { t: t5 } = useTranslation("uf5b");
 	const tone = runTone(row);
 	return (
-		<StatusPill
-			raw={row.sealed ? row.outcome : "running"}
-			tone={PILL_TONE[tone]}
+		<span
+			data-slot="status-dot-text"
+			data-tone={PILL_TONE[tone]}
+			className="text-foreground inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
 			title={tone === "warn" ? t5("runs.graderBroken") : undefined}
-			testId={`runs-outcome-${row.run_id}`}
+			data-testid={`runs-outcome-${row.run_id}`}
 			data-outcome={row.sealed ? row.outcome : "running"}
 			data-run-tone={tone}
 		>
+			<StatusDot tone={PILL_TONE[tone]} />
 			{row.sealed ? tb(`runs.outcome.${row.outcome}`, { defaultValue: row.outcome }) : tu("runs.live")}
-		</StatusPill>
+		</span>
 	);
 }
 
@@ -287,6 +290,10 @@ export function RunsTable() {
 	useEffect(() => {
 		if (search.benchmark) void setSearch(benchmarkAlias(search));
 	}, [search.benchmark]); // eslint-disable-line react-hooks/exhaustive-deps
+	// M5-7: remember the filters, so the run page crumb leads back to this same list.
+	useEffect(() => {
+		if (typeof window !== "undefined") saveRunsSearch(window.location.search);
+	}, [search]);
 	const { t: t5 } = useTranslation("uf5b");
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const agentsQuery = useGetAgentsQuery();
@@ -580,7 +587,7 @@ export function RunsTable() {
 										onSort={onSort}
 										className="hidden px-3 text-right xl:table-cell"
 									/>
-									<th scope="col" className="hidden px-3 py-2.5 text-right font-medium xl:table-cell">
+									<th scope="col" className="hidden px-3 py-2.5 text-right font-medium 2xl:table-cell">
 										{tu("runs.col.toolCalls")}
 									</th>
 									<SortHeader
@@ -591,7 +598,7 @@ export function RunsTable() {
 										className="hidden px-3 text-right xl:table-cell"
 									/>
 									<SortHeader label={tu("runs.col.cost")} sortKey="cost" current={search} onSort={onSort} className="px-3 text-right" />
-									<th scope="col" className="hidden px-3 py-2.5 text-left font-medium xl:table-cell">
+									<th scope="col" className="hidden px-3 py-2.5 text-left font-medium 2xl:table-cell">
 										{tu("runs.col.fault")}
 									</th>
 									<SortHeader
@@ -602,7 +609,7 @@ export function RunsTable() {
 										className="hidden px-3 text-right lg:table-cell"
 									/>
 									<SortHeader label={tu("runs.col.when")} sortKey="started" current={search} onSort={onSort} className="px-4 text-right" />
-									<th scope="col" className="w-10 px-2">
+									<th scope="col" className="w-10 min-w-10 px-2">
 										<span className="sr-only">{ta("archive.actions")}</span>
 									</th>
 								</tr>
@@ -619,10 +626,10 @@ export function RunsTable() {
 										)}
 										data-testid={`runs-row-${row.run_id}`}
 									>
-										<td className="max-w-64 px-4 py-2">
-											<div className="truncate font-medium">{runLink(row)}</div>
+										<td className="px-4 py-2">
+											<div className="max-w-44 truncate font-medium lg:max-w-56 xl:max-w-64">{runLink(row)}</div>
 											{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-archived-${row.run_id}`} />}
-											<div className="text-muted-foreground truncate text-xs" title={row.suite}>
+											<div className="text-muted-foreground max-w-44 truncate text-xs lg:max-w-56 xl:max-w-64" title={row.suite}>
 												{runSuiteLabel(row)}
 												{(row as RunListRowNamed).exp_name && (
 													<span data-testid={`runs-exp-${row.run_id}`}> · {(row as RunListRowNamed).exp_name}</span>
@@ -632,19 +639,20 @@ export function RunsTable() {
 										<td className="px-3 py-2">
 											<OutcomePill row={row} />
 										</td>
-										<td className="max-w-56 px-3 py-2">
-											<span className="truncate" title={agentTitle(row)} data-testid={`runs-agent-${row.run_id}`}>
+										<td className="px-3 py-2">
+											{/* The cell's width comes from this block: a table cell ignores max-width (V5-2). */}
+											<span className="block max-w-36 truncate xl:max-w-56" title={agentTitle(row)} data-testid={`runs-agent-${row.run_id}`}>
 												<span className="font-medium">{runAgent(row)}</span>
 												{agentVersionLabel(row) && <span className="text-muted-foreground"> {agentVersionLabel(row)}</span>}
-												{row.model && <span className="text-muted-foreground"> · {row.model}</span>}
+												{row.model && <span className="text-muted-foreground hidden xl:inline"> · {row.model}</span>}
 											</span>
 										</td>
 										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{formatNumber(row.steps, locale)}</td>
-										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{formatNumber(row.tool_calls, locale)}</td>
+										<td className="hidden px-3 py-2 text-right tabular-nums 2xl:table-cell">{formatNumber(row.tool_calls, locale)}</td>
 										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{tokensCell(row)}</td>
-										<td className="px-3 py-2 text-right">{costCell(row)}</td>
+										<td className="px-3 py-2 text-right whitespace-nowrap">{costCell(row)}</td>
 										<td
-											className="text-muted-foreground hidden px-3 py-2 text-xs whitespace-nowrap xl:table-cell"
+											className="text-muted-foreground hidden px-3 py-2 text-xs whitespace-nowrap 2xl:table-cell"
 											data-testid={`runs-fault-${row.run_id}`}
 										>
 											{row.fault ? faultLabel(row.fault) : "-"}
@@ -658,7 +666,7 @@ export function RunsTable() {
 										>
 											{timeAgo(row.started, locale)}
 										</td>
-										<td className="px-2 py-2 text-right">
+										<td className="w-10 min-w-10 px-2 py-2 text-right">
 											<RunRowMenu row={row} testId={`runs-row-${row.run_id}`} />
 										</td>
 									</tr>

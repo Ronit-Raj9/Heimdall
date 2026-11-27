@@ -408,10 +408,14 @@ describe("agent events status", () => {
 		const html = renderToStaticMarkup(<AgentEventsLine status={status} arm="A" locale="en" />);
 		expect(html).toContain('data-collector="missing"');
 		expect(html).toContain("The agent reported nothing");
-		expect(html).toMatch(/data-testid="step-agent-events-A-collector" data-tone="bad">listener missing</);
+		// M4-56: a missing collector is a quiet note, not a red pill, unless the run failed because of it.
+		expect(html).toMatch(/data-testid="step-agent-events-A-collector" data-tone="neutral">listener missing</);
 		expect(html).toContain("&lt;script&gt;alert(&#x27;r&#x27;)&lt;/script&gt; port 4318 busy next");
 		expect(html).not.toContain("<script>");
-		expect(html).toMatch(/class="text-chart-error-ink" data-testid="step-agent-events-A-reason"/);
+		expect(html).not.toContain("text-chart-error-ink");
+		const blocking = renderToStaticMarkup(<AgentEventsLine status={status} arm="A" locale="en" blocking />);
+		expect(blocking).toMatch(/data-testid="step-agent-events-A-collector" data-tone="bad">listener missing</);
+		expect(blocking).toMatch(/class="text-chart-error-ink" data-testid="step-agent-events-A-reason"/);
 	});
 
 	it("orders and caps the per-channel counts", () => {

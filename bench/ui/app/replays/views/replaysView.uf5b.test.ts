@@ -38,3 +38,13 @@ describe("shadow replay start (M5-56)", () => {
 		expect(modelText({ provider: "", model: "m" })).toBe("m");
 	});
 });
+
+import { replaySetupMissing } from "./replaysView";
+
+describe("replays setup first (FR-13)", () => {
+	it("names what is missing; an unknown source list is not missing", () => {
+		expect(replaySetupMissing(false, [])).toEqual({ off: true, noSource: true });
+		expect(replaySetupMissing(true, ["prod"])).toEqual({ off: false, noSource: false });
+		expect(replaySetupMissing(true, undefined)).toEqual({ off: false, noSource: false });
+	});
+});
