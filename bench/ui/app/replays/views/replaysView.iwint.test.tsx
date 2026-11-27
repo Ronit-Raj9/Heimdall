@@ -4,6 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReplayFormFields, bifrostSourceNames, type ReplayForm } from "./replaysView";
 
+vi.mock("@/components/models/groupedModelPicker", () => ({
+	GroupedModelPicker: ({ testId, value }: { testId?: string; value: { model: string } | null }) => (
+		<div data-testid={testId} data-model={value?.model ?? ""} />
+	),
+}));
+
+
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const form: ReplayForm = {
@@ -43,7 +50,8 @@ describe("shadow replay source picker", () => {
 
 	it("says how to add a source when the inbox has none", () => {
 		const html = renderToStaticMarkup(<ReplayFormFields form={form} onChange={() => undefined} sources={[]} />);
-		expect(html).toContain("Your inbox has no Bifrost source yet. Add one on the Inbox page first.");
+		expect(html).toContain("No recorded sessions yet. Connect Bifrost in the Failure inbox");
+		expect(html).toContain('href="/inbox?tab=connect"');
 		expect(html).toMatch(/<select[^>]*disabled=""/);
 	});
 });

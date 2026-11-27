@@ -1,6 +1,8 @@
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { hasReadyTasks } from "@/app/evaluate/views/step3Benchmarks";
+import "@/app/experiments_/new/views/builderI18n";
 import { SkillScanProblem, parseSkillRefusal } from "@/app/evaluations_/$evalId/views/skillScanProblem";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
@@ -93,6 +95,7 @@ function formatCost(res: QuickRunResponse): string | null {
 export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRunDialogProps) {
 	const { t } = useTranslation("quickrun");
 	const { t: tz } = useTranslation("wizard");
+	const { t: tb } = useTranslation("builder");
 	const suites = useGetSuitesLightQuery(undefined, { skip: !!suite });
 	const agents = useGetAgentsQuery(undefined, { skip: !!agent });
 	const [run, state] = useQuickRunMutation();
@@ -217,11 +220,23 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								<span className="font-medium">{t("suite")}</span>
 								<select className={fieldCls} value={suiteV} onChange={(e) => setSuite(e.target.value)} data-testid="quickrun-suite">
 									<option value="">{t("suiteDefault")}</option>
-									{suiteList.map((s) => (
+									{/* Benchmarks with ready tasks first; the rest wait in a disabled "Not ready yet" group (M2-105). */}
+									{suiteList.filter(hasReadyTasks).map((s) => (
 										<option key={s.id} value={s.id}>
 											{s.id}@{s.version} ({s.task_count})
 										</option>
 									))}
+									{suiteList.some((s) => !hasReadyTasks(s)) && (
+										<optgroup label={tb("fields.notReadyGroup")} data-testid="quickrun-suite-not-ready">
+											{suiteList
+												.filter((s) => !hasReadyTasks(s))
+												.map((s) => (
+													<option key={s.id} value={s.id} disabled title={tb("fields.notReadyTitle")}>
+														{s.id}@{s.version} ({s.task_count})
+													</option>
+												))}
+										</optgroup>
+									)}
 								</select>
 								{suites.isSuccess && suiteList.length === 0 && (
 									<Link to="/catalog" className="text-primary text-xs underline">
@@ -289,6 +304,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={tasksT}
 										onChange={(e) => setTasks(e.target.value)}
 										aria-invalid={!!problems.tasks}
+										size="number"
 										data-testid="quickrun-tasks"
 									/>
 								</label>
@@ -301,6 +317,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={trialsT}
 										onChange={(e) => setTrials(e.target.value)}
 										aria-invalid={!!problems.trials}
+										size="number"
 										data-testid="quickrun-trials"
 									/>
 								</label>
@@ -314,6 +331,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 										value={budgetT}
 										onChange={(e) => setBudget(e.target.value)}
 										aria-invalid={!!problems.budget}
+										size="number"
 										data-testid="quickrun-budget"
 									/>
 								</label>

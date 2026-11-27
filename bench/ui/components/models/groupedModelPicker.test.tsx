@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { okQuery, render } from "@/lib/testing/render";
 import type { ModelKey } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type CatalogProvider, GroupedModelPicker, duplicateIds, groupModels, optionLabel } from "./groupedModelPicker";
+import { type CatalogProvider, GroupedModelPicker, duplicateIds, groupModels, optionLabel, preferNative, visibleGroups } from "./groupedModelPicker";
 
 const q = vi.hoisted(() => ({ models: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => q.models }));
@@ -44,19 +44,30 @@ beforeEach(() => {
 	q.models = okQuery({ providers: catalog, keys });
 });
 
-describe("duplicate model ids (N88)", () => {
-	it("finds an id two providers list and names the provider in each option", () => {
+describe("duplicate model ids (N88, M1-21)", () => {
+	it("finds an id two providers list, and the picker keeps it only under the native provider", () => {
 		const groups = groupModels(catalog, keys);
 		const dup = duplicateIds(groups);
 		expect([...dup]).toEqual(["gpt-5.6-luna"]);
 		const openai = groups.find((g) => g.provider === "openai")!;
 		expect(optionLabel({ id: "gpt-5.6-luna", open: false }, openai, true)).toBe("gpt-5.6-luna (OpenAI)");
 		expect(optionLabel({ id: "llama-3-8b", open: true }, openai, false)).toBe("llama-3-8b  [open]");
+		const native = preferNative(groups, catalog);
+		expect(native.find((g) => g.provider === "openai-compatible")!.models.map((m) => m.id)).toEqual([]);
+		expect(duplicateIds(native).size).toBe(0);
 		const texts = optionTexts(render(<GroupedModelPicker value={null} onChange={() => undefined} />));
-		expect(texts).toContain("gpt-5.6-luna (OpenAI)");
-		expect(texts).toContain("gpt-5.6-luna (OpenAI-compatible endpoint)");
+		expect(texts).toContain("gpt-5.6-luna");
+		expect(texts).not.toContain("gpt-5.6-luna (OpenAI-compatible endpoint)");
 		expect(texts).toContain("gpt-4o-mini");
-		expect(texts).toContain("llama-3-8b");
+	});
+	it("puts providers without a key behind More providers, except the picked one (M1-21)", () => {
+		const groups = preferNative(groupModels(catalog, keys), catalog);
+		expect(visibleGroups(groups, "", false).shown.map((g) => g.provider)).toEqual(["openai"]);
+		expect(visibleGroups(groups, "groq", false).shown.map((g) => g.provider)).toEqual(["openai", "groq"]);
+		expect(visibleGroups(groups, "", true).hidden).toBe(0);
+		const texts = optionTexts(render(<GroupedModelPicker value={null} onChange={() => undefined} />));
+		expect(texts).not.toContain("llama-3-8b");
+		expect(texts).toContain("More providers (needs a key)...");
 	});
 });
 

@@ -17,7 +17,7 @@ vi.mock("@/lib/store/apis/secretsApi", () => ({
 		return okQuery({ secrets: [{ id: "k1", name: "SHOP_MCP_TOKEN", created_at: "", updated_at: "" }] });
 	},
 }));
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 
 const report: McpReport = {
 	url: "https://mcp.shop.example/mcp",
@@ -172,6 +172,6 @@ describe("DraftEvaluateLink (N113)", () => {
 		expect(html).not.toContain('data-testid="mcp-draft-evaluate"');
 		expect(html).toContain("None of the reference agents (claude-code, codex, opencode) has a model key in this organization.");
 		expect(html).toContain('href="/models"');
-		expect(html).toContain("Models &amp; keys");
+		expect(html).toContain("Settings &gt; Model keys");
 	});
 });

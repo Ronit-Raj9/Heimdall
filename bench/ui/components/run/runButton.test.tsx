@@ -62,7 +62,7 @@ describe("RunButton and QuickRunDialog", () => {
 			},
 		});
 		const html = render(<QuickRunDialog onClose={() => undefined} />);
-		expect(html).toContain("Experiment e_quick_ab12 is running.");
+		expect(html).toContain("Comparison e_quick_ab12 is running.");
 		expect(html).toContain("$0.20 ($0.10 to $0.40)");
 		expect(html).toContain("/experiments/e_quick_ab12");
 	});

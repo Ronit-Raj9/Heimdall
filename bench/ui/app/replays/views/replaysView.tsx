@@ -1,4 +1,6 @@
-import { EmptyNote, LoadError, BlockSkeleton } from "@/components/runs/screenStates";
+import { LoadError, BlockSkeleton } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
+import { PaidButton } from "@/components/ui/paidButton";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,12 @@ import {
 	type ReplaySettings,
 } from "@/lib/store/apis/replaysApi";
 import type { InboxSourceStatus } from "@/lib/types/bench";
+import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import { useCancelJobMutation, useGetJobQuery } from "@/lib/store/apis/platformApi";
+import "@/components/runs/uf5bI18n";
+import { skipToken } from "@reduxjs/toolkit/query/react";
+import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -71,6 +79,35 @@ export function replayJobParams(f: ReplayForm): object | null {
 	};
 }
 
+/** Most sessions one replay may take when the org setting does not say. */
+export const MAX_REPLAY_SESSIONS = 200;
+/** While a replay job is queued or running the page asks for its state and the list this often (M5-59). */
+export const REPLAY_POLL_MS = 5_000;
+
+export type ReplayNeed = "needOn" | "needSource" | "needModel" | "needSessions" | "needCap" | "needConsent";
+
+/** What still keeps Start off, in form order; empty when the replay can start (M5-56). */
+export function replayProblems(
+	f: ReplayForm,
+	o: { enabled: boolean; maxSessions?: number; maxUsd?: number },
+): ReplayNeed[] {
+	const out: ReplayNeed[] = [];
+	if (!o.enabled) out.push("needOn");
+	if (!f.source.trim()) out.push("needSource");
+	if (!replayJobParams(f)) out.push("needModel");
+	const n = Number(f.sessions);
+	if (!Number.isInteger(n) || n < 1 || n > (o.maxSessions || MAX_REPLAY_SESSIONS)) out.push("needSessions");
+	const cap = Number(f.cap);
+	if (!(cap > 0) || (o.maxUsd ? cap > o.maxUsd : false)) out.push("needCap");
+	if (!f.yes) out.push("needConsent");
+	return out;
+}
+
+/** "provider/model" from the picker's choice, the form's text value. */
+export function modelText(v: { provider: string; model: string }): string {
+	return v.provider && v.model ? `${v.provider}/${v.model}` : v.model;
+}
+
 export interface ReplayForm {
 	source: string;
 	window: string;
@@ -115,37 +152,61 @@ export default function ReplaysView() {
 	);
 }
 
-/** The admin toggle with its confirmation. */
+/**
+ * The org switch (M5-54): a status line "Shadow replay: Off" and, for admins, a switch that asks
+ * before turning on. Everyone else reads who can turn it on.
+ */
 export function SettingsToggle({
 	settings,
 	onSave,
 	busy,
 	error,
+	admin = true,
 }: {
 	settings: ReplaySettings;
 	onSave: (s: ReplaySettings) => void;
 	busy?: boolean;
 	error?: string;
+	/** The viewer may change the setting (an org admin). */
+	admin?: boolean;
 }) {
 	const { t } = useTranslation("w447");
+	const { t: t5 } = useTranslation("uf5b");
 	const [asking, setAsking] = useState(false);
-	const boxId = useId();
+	const on = settings.enabled;
 	return (
 		<div className="flex flex-col gap-2 rounded-lg border p-4" data-testid="replays-settings">
-			<div className="flex items-center gap-2">
-				<input
-					id={boxId}
-					type="checkbox"
-					checked={settings.enabled}
-					disabled={busy}
-					data-testid="replays-toggle"
-					onChange={(e) => (e.target.checked ? setAsking(true) : onSave({ ...settings, enabled: false }))}
-				/>
-				<label htmlFor={boxId} className="text-sm font-medium">
-					{t("settings.toggle")}
-				</label>
+			<div className="flex flex-wrap items-center gap-3">
+				{admin && (
+					<button
+						type="button"
+						role="switch"
+						aria-checked={on}
+						aria-label={t("settings.toggle")}
+						disabled={busy}
+						data-testid="replays-toggle"
+						onClick={() => (on ? onSave({ ...settings, enabled: false }) : setAsking(true))}
+						className={
+							"focus-visible:ring-ring relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50 " +
+							(on ? "bg-primary" : "bg-muted-foreground/30")
+						}
+					>
+						<span
+							aria-hidden="true"
+							className={"bg-background inline-block size-5 rounded-full shadow transition-transform " + (on ? "translate-x-5" : "translate-x-0.5")}
+						/>
+					</button>
+				)}
+				<span className="text-sm font-medium" data-testid="replays-status">
+					{on ? t5("replays.statusOn") : t5("replays.statusOff")}
+				</span>
+				{admin && !on && !asking && (
+					<Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(true)} data-testid="replays-turn-on">
+						{t5("replays.turnOn")}
+					</Button>
+				)}
 			</div>
-			{!settings.enabled && !asking && <p className="text-muted-foreground text-sm">{t("settings.off")}</p>}
+			{!on && !asking && !admin && <p className="text-muted-foreground text-sm">{t("settings.off")}</p>}
 			{asking && (
 				<div className="flex flex-col gap-2" data-testid="replays-confirm">
 					<p className="text-sm">{t("settings.confirm")}</p>
@@ -178,6 +239,7 @@ function SettingsPanel() {
 	const { t } = useTranslation("w447");
 	const q = useGetReplaySettingsQuery();
 	const [save, saved] = usePutReplaySettingsMutation();
+	const admin = canUse(useSession(), "admin");
 	if (q.isLoading) return <BlockSkeleton rows={1} testId="replays-settings-loading" />;
 	if (q.isError || !q.data)
 		return <LoadError title={t("settings.saveError")} error={q.error} onRetry={() => void q.refetch()} testId="replays-settings-error" />;
@@ -187,6 +249,7 @@ function SettingsPanel() {
 			busy={saved.isLoading}
 			error={saved.isError ? getBenchErrorMessage(saved.error) || t("settings.saveError") : undefined}
 			onSave={(s) => void save(s)}
+			admin={admin}
 		/>
 	);
 }
@@ -204,48 +267,63 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 	);
 }
 
-/** The form that starts a replay job. */
+/** The form that starts a replay job; disabled as a whole while shadow replay is off (M5-54). */
 export function ReplayFormFields({
 	form,
 	onChange,
 	sources,
+	disabled,
 }: {
 	form: ReplayForm;
 	onChange: (f: ReplayForm) => void;
 	/** The Bifrost source names of the organization's inbox; undefined while they load. */
 	sources?: readonly string[];
+	disabled?: boolean;
 }) {
 	const { t } = useTranslation("w447");
+	const { t: t5 } = useTranslation("uf5b");
 	const set = <K extends keyof ReplayForm>(k: K, v: ReplayForm[K]) => onChange({ ...form, [k]: v });
+	const picked = (v: string) => splitModel(v) ?? (v ? { provider: "", model: v } : null);
 	return (
-		<div className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="replays-form">
-			<Field label={t("form.source")} hint={sources && sources.length === 0 ? t("form.sourceNone") : t("form.sourceHint")}>
-				{(id) => (
-					<select
-						id={id}
-						className="h-9 rounded-md border px-2 text-sm"
-						value={form.source}
-						onChange={(e) => set("source", e.target.value)}
-						disabled={!sources || sources.length === 0}
-						data-testid="replays-source"
-					>
-						<option value="">{t("form.sourcePick")}</option>
-						{(sources ?? []).map((name) => (
-							<option key={name} value={name}>
-								{name}
-							</option>
-						))}
-					</select>
+		<fieldset disabled={disabled} className="grid min-w-0 gap-3 disabled:opacity-60 sm:grid-cols-2" data-testid="replays-form">
+			<div className="flex min-w-0 flex-col gap-2">
+				<Field label={t("form.source")} hint={sources && sources.length === 0 ? undefined : t("form.sourceHint")}>
+					{(id) => (
+						<select
+							id={id}
+							className="h-9 rounded-md border px-2 text-sm"
+							value={form.source}
+							onChange={(e) => set("source", e.target.value)}
+							disabled={!sources || sources.length === 0}
+							data-testid="replays-source"
+						>
+							<option value="">{t("form.sourcePick")}</option>
+							{(sources ?? []).map((name) => (
+								<option key={name} value={name}>
+									{name}
+								</option>
+							))}
+						</select>
+					)}
+				</Field>
+				{sources && sources.length === 0 && (
+					// No source yet: say where one comes from, with the way there (M5-55).
+					<p className="text-muted-foreground text-xs" data-testid="replays-no-sources">
+						{t5("replays.noSources")}:{" "}
+						<Link to={"/inbox" as never} search={{ tab: "connect" } as never} className="text-primary underline-offset-4 hover:underline">
+							{t5("replays.connect")}
+						</Link>
+					</p>
 				)}
-			</Field>
+				{/* The session filter sits with the source it filters (M5-58). */}
+				<label className="flex items-center gap-2 text-sm">
+					<input type="checkbox" className="size-4" checked={form.onlyFailed} onChange={(e) => set("onlyFailed", e.target.checked)} />
+					{t("form.onlyFailed")}
+				</label>
+			</div>
 			<Field label={t("form.window")}>
 				{(id) => (
-					<select
-						id={id}
-						className="h-9 rounded-md border px-2 text-sm"
-						value={form.window}
-						onChange={(e) => set("window", e.target.value)}
-					>
+					<select id={id} className="h-9 rounded-md border px-2 text-sm" value={form.window} onChange={(e) => set("window", e.target.value)}>
 						<option value="24h">{t("form.window24h")}</option>
 						<option value="7d">{t("form.window7d")}</option>
 						<option value="14d">{t("form.window14d")}</option>
@@ -253,9 +331,21 @@ export function ReplayFormFields({
 				)}
 			</Field>
 			<Field label={t("form.sessions")}>
-				{(id) => <Input id={id} type="number" min={1} value={form.sessions} onChange={(e) => set("sessions", e.target.value)} />}
+				{(id) => (
+					<Input
+						id={id}
+						type="number"
+						min={1}
+						max={MAX_REPLAY_SESSIONS}
+						step={1}
+						size="number"
+						value={form.sessions}
+						onChange={(e) => set("sessions", e.target.value)}
+						data-testid="replays-sessions"
+					/>
+				)}
 			</Field>
-			<Field label={t("form.mode")}>
+			<Field label={t("form.mode")} hint={form.mode === "fixed" ? t("form.modeFixedHelp") : t("form.modeTrajectoryHelp")}>
 				{(id) => (
 					<select
 						id={id}
@@ -269,31 +359,63 @@ export function ReplayFormFields({
 					</select>
 				)}
 			</Field>
-			<Field label={t("form.candidate")} hint={t("form.candidateHint")}>
+			{/* Model fields are the shared model picker, not free text (M5-57). */}
+			<div className="flex min-w-0 flex-col gap-1">
+				<span className="text-muted-foreground text-xs">{t("form.candidate")}</span>
+				<GroupedModelPicker
+					value={picked(form.candidate)}
+					onChange={(v) => set("candidate", modelText(v))}
+					label={t("form.candidate")}
+					disabled={disabled}
+					testId="replays-candidate"
+				/>
+			</div>
+			<div className="flex min-w-0 flex-col gap-1">
+				<span className="text-muted-foreground text-xs">{t("form.judge")}</span>
+				<GroupedModelPicker
+					value={picked(form.judge)}
+					onChange={(v) => set("judge", modelText(v))}
+					label={t("form.judge")}
+					disabled={disabled}
+					testId="replays-judge"
+				/>
+				{form.judge && (
+					<button type="button" className="text-primary self-start text-xs underline-offset-4 hover:underline" onClick={() => set("judge", "")}>
+						{t("settings.cancel")}
+					</button>
+				)}
+			</div>
+			<Field label={t("form.cap")} hint={t("form.capHint")}>
 				{(id) => (
-					<Input id={id} value={form.candidate} onChange={(e) => set("candidate", e.target.value)} data-testid="replays-candidate" />
+					<span className="relative inline-flex w-24 items-center">
+						<span aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-2 text-sm">
+							$
+						</span>
+						<Input
+							id={id}
+							type="number"
+							min={0}
+							step="0.5"
+							size="number"
+							className="pl-5"
+							value={form.cap}
+							onChange={(e) => set("cap", e.target.value)}
+							data-testid="replays-cap"
+						/>
+					</span>
 				)}
 			</Field>
-			<Field label={t("form.judge")} hint={t("form.candidateHint")}>
-				{(id) => <Input id={id} value={form.judge} onChange={(e) => set("judge", e.target.value)} />}
-			</Field>
-			<Field label={t("form.cap")} hint={t("form.capHint")}>
-				{(id) => <Input id={id} type="number" min={0} step="0.5" value={form.cap} onChange={(e) => set("cap", e.target.value)} />}
-			</Field>
-			<label className="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={form.onlyFailed} onChange={(e) => set("onlyFailed", e.target.checked)} />
-				{t("form.onlyFailed")}
-			</label>
 			<label className="flex items-center gap-2 text-sm sm:col-span-2">
-				<input type="checkbox" checked={form.yes} onChange={(e) => set("yes", e.target.checked)} data-testid="replays-yes" />
+				<input type="checkbox" className="size-4" checked={form.yes} onChange={(e) => set("yes", e.target.checked)} data-testid="replays-yes" />
 				{t("form.confirmCost")}
 			</label>
-		</div>
+		</fieldset>
 	);
 }
 
 function NewReplay() {
 	const { t } = useTranslation("w447");
+	const { t: t5 } = useTranslation("uf5b");
 	const [form, setForm] = useState<ReplayForm>(emptyForm);
 	const [create, job] = useCreateJobMutation();
 	const settings = useGetReplaySettingsQuery();
@@ -301,21 +423,60 @@ function NewReplay() {
 	const sources = inbox.data ? bifrostSourceNames(inbox.data.sources) : undefined;
 	const params = replayJobParams(form);
 	const enabled = settings.data?.enabled === true;
+	const problems = replayProblems(form, {
+		enabled,
+		maxSessions: settings.data?.max_sessions_per_run,
+		maxUsd: settings.data?.max_usd_per_run,
+	});
+	// After Start the job is followed until it ends; the list below refreshes with it (M5-59).
+	const jobId = job.data?.id;
+	const jobState = useGetJobQuery(jobId ?? skipToken, { pollingInterval: REPLAY_POLL_MS, skipPollingIfUnfocused: true });
+	const active = Boolean(jobId) && (!jobState.data || jobState.data.status === "queued" || jobState.data.status === "running");
+	useGetReplaysQuery(undefined, { pollingInterval: active ? REPLAY_POLL_MS : 0 });
+	const [cancel, cancelled] = useCancelJobMutation();
+	const why = problems.map((k) =>
+		k === "needSessions" ? t5("replays.needSessions", { max: settings.data?.max_sessions_per_run || MAX_REPLAY_SESSIONS }) : t5(`replays.${k}`),
+	);
 	return (
 		<section className="flex flex-col gap-3 rounded-lg border p-4">
 			<h2 className="text-base font-semibold tracking-tight">{t("form.title")}</h2>
-			<ReplayFormFields form={form} onChange={setForm} sources={sources} />
+			<ReplayFormFields form={form} onChange={setForm} sources={sources} disabled={!enabled} />
 			{form.candidate && !params && <p className="text-destructive text-sm">{t("form.badModel")}</p>}
-			<div className="flex items-center gap-3">
-				<Button
+			{Number(form.cap) > 0 && Number(form.sessions) > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid="replays-cap-estimate">
+					{t5("replays.capEstimate", { sessions: Number(form.sessions), cap: usd(Number(form.cap)) })}
+				</p>
+			)}
+			<div className="flex flex-wrap items-center gap-3">
+				{/* Start spends money: the shared PaidButton names the cap and asks first (M1-51). */}
+				<PaidButton
 					size="sm"
-					disabled={!enabled || !params || !form.yes || !form.source.trim() || job.isLoading}
-					onClick={() => params && void create({ kind: "replay.run", params })}
-					data-testid="replays-start"
-				>
-					{t("form.start")}
-				</Button>
+					verb={t("form.start")}
+					capUsd={Number(form.cap) > 0 ? Number(form.cap) : null}
+					estimateRuns={Number(form.sessions) > 0 ? Number(form.sessions) : undefined}
+					estimateAt="title"
+					confirm="always"
+					disabled={problems.length > 0 || active}
+					isLoading={job.isLoading}
+					aria-describedby={problems.length > 0 ? "replays-why" : undefined}
+					onConfirm={async () => {
+						if (params) await create({ kind: "replay.run", params });
+					}}
+					testId="replays-start"
+				/>
+				{problems.length > 0 && (
+					<span id="replays-why" className="text-muted-foreground text-xs" data-testid="replays-why">
+						{t5("replays.why", { list: why.join(", ") })}
+					</span>
+				)}
 				{job.isSuccess && <span className="text-sm">{t("form.started")}</span>}
+				{active && jobId && (
+					// Stop cancels the replay job (M1-53).
+					<Button size="sm" variant="outline" disabled={cancelled.isLoading} onClick={() => void cancel(jobId)} data-testid="replays-stop">
+						{t5("replays.stop")}
+					</Button>
+				)}
+				{cancelled.isSuccess && <span className="text-sm">{t5("replays.stopped")}</span>}
 				{job.isError && (
 					<span className="text-destructive text-sm" role="alert">
 						{getBenchErrorMessage(job.error)}
@@ -353,18 +514,25 @@ function ReplayList({ onOpen }: { onOpen: (id: string) => void }) {
 		<section className="flex flex-col gap-3">
 			<h2 className="text-base font-semibold tracking-tight">{t("list.title")}</h2>
 			{rows.length === 0 ? (
-				<EmptyNote testId="replays-empty">{t("list.empty")}</EmptyNote>
+				<EmptyState compact body={t("list.empty")} testId="replays-empty" />
 			) : (
 				<ul className="flex flex-col gap-2" data-testid="replays-list">
 					{rows.map((r) => (
 						<li key={r.id} className="flex flex-col gap-1 rounded-lg border p-3">
-							<button
-								type="button"
-								className="text-left text-sm font-medium underline-offset-2 hover:underline"
-								onClick={() => onOpen(r.id)}
+							{/* A real link to ?id=, so a replay opens in a new tab and its address can be copied (X-87, M7-32). */}
+							<Link
+								to={"/replays" as never}
+								search={{ id: r.id } as never}
+								className="self-start text-left text-sm font-medium underline-offset-2 hover:underline"
+								onClick={(e) => {
+									if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+									e.preventDefault();
+									onOpen(r.id);
+								}}
+								data-testid={`replays-open-${r.id}`}
 							>
 								{r.candidate} · {new Date(r.created_at).toLocaleString()}
-							</button>
+							</Link>
 							<span className="text-muted-foreground text-xs">
 								{t("list.sessions", { count: r.sessions })} · {t("list.spent", { usd: r.spent_usd.toFixed(2) })}
 							</span>

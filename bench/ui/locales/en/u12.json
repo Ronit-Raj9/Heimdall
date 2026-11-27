@@ -1,7 +1,8 @@
 {
 	"runs": {
-		"title": "Runs",
-		"subtitle": "Every attempt an agent made at a task, newest first.",
+		"title": "Benchmark runs",
+		"subtitle": "Every attempt an agent made at a benchmark task. Production sessions are under Live sessions.",
+		"notRecorded": "Not recorded: this agent calls no model",
 		"search": "Search task or agent",
 		"searchLabel": "Search runs",
 		"filters": "Filters",
@@ -27,7 +28,7 @@
 		"open": "Open run {{run}}",
 		"empty": "No runs yet. Start a comparison to see runs here.",
 		"noMatch": "No runs match these filters.",
-		"newExperiment": "New comparison",
+		"newExperiment": "Evaluate an agent",
 		"loadError": "Could not load runs",
 		"showing": "{{first}}-{{last}} of {{total}}",
 		"prev": "Previous",

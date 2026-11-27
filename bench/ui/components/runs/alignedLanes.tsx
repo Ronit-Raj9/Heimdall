@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { GitFork } from "lucide-react";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
+import "./uf5bI18n";
 
 export interface AlignedLanesProps {
 	alignment: readonly AlignedStep[];
@@ -21,6 +22,7 @@ export interface AlignedLanesProps {
  */
 export function AlignedLanes({ alignment, arms, eventsByArm, firstDivergence }: AlignedLanesProps) {
 	const { t } = useTranslation("bench");
+	const { t: t5 } = useTranslation("uf5b");
 	const divergenceIndex = firstDivergence?.index ?? null;
 
 	return (
@@ -58,7 +60,10 @@ export function AlignedLanes({ alignment, arms, eventsByArm, firstDivergence }: 
 								<TableCell className="text-muted-foreground px-3 align-top font-mono text-xs tabular-nums">{step.index}</TableCell>
 								<TableCell className="px-3 align-top whitespace-normal">
 									<div className="flex min-w-0 flex-col gap-0.5">
-										<span className="text-muted-foreground font-mono text-[11px]">{step.type}</span>
+										{/* The step kind in plain words; the raw kind stays as the title (M5-26). */}
+										<span className="text-muted-foreground text-xs" title={step.type} data-kind={step.type}>
+											{t5(`lanes.${step.type}`, { defaultValue: step.type })}
+										</span>
 										<span className="font-mono text-xs break-all">{step.target}</span>
 										{step.diverged && <span className="text-chart-warning-ink text-[11px] font-medium">{t("runs.lanes.diverged")}</span>}
 									</div>

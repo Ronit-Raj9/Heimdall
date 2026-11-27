@@ -5,7 +5,9 @@ import { pairOpenable, useGetExperimentQuery, useGetGridQuery } from "@/lib/stor
 import { frozenSuiteRef, type GridRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { skipToken } from "@reduxjs/toolkit/query/react";
+import { Check, ChevronRight, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./uf5bI18n";
 import { outcomeTone, pairsOfRow, type PairCell } from "./runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "./screenStates";
 
@@ -64,48 +66,80 @@ export function PairTable({
 	onPick: (pairId: string) => void;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: t5 } = useTranslation("uf5b");
+	// The condition column only when some row ran under a fault; "clean" reads "No fault" (X-33).
+	const showCondition = rows.some((r) => r.condition !== "clean");
 	return (
-		<Table stickyColumns={1} data-testid="pair-picker-table">
-			<TableHeader>
-				<TableRow>
-					<TableHead>{t("runs.picker.task")}</TableHead>
-					<TableHead>{t("runs.picker.condition")}</TableHead>
-					<TableHead>{t("runs.picker.trials")}</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rows.map((row) => (
-					<TableRow key={`${row.task}-${row.condition}`} data-testid={`pair-picker-row-${row.task}-${row.condition}`}>
-						<TableCell className="font-mono text-xs">
-							<EntityLink kind="task" id={row.task} suite={suite} testId={`pair-picker-task-${row.task}`} />
-						</TableCell>
-						<TableCell>
-							<span className="flex items-center gap-2">
-								<span className="font-mono text-xs">{row.condition}</span>
-								{row.discordant && (
-									<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1 text-[10px] font-medium">
-										{t("runs.picker.discordant")}
-									</span>
-								)}
-							</span>
-						</TableCell>
-						<TableCell>
-							<div className="flex flex-wrap gap-1.5">
-								{pairsOfRow(row).map((pair) => (
-									<PairButton key={pair.pairId} pair={pair} arms={arms} row={row} onPick={onPick} />
-								))}
-							</div>
-						</TableCell>
+		<div className="flex min-w-0 flex-col gap-2">
+			<p className="text-muted-foreground text-xs" data-testid="pair-picker-legend">
+				{t5("pair.legend")}
+			</p>
+			<Table stickyColumns={1} data-testid="pair-picker-table">
+				<TableHeader>
+					<TableRow>
+						<TableHead className="text-sm">{t("runs.picker.task")}</TableHead>
+						{showCondition && <TableHead className="text-sm">{t("runs.picker.condition")}</TableHead>}
+						<TableHead className="text-sm">{t("runs.picker.trials")}</TableHead>
+						<TableHead className="w-6" aria-hidden="true" />
 					</TableRow>
-				))}
-			</TableBody>
-		</Table>
+				</TableHeader>
+				<TableBody>
+					{rows.map((row) => {
+						const first = pairsOfRow(row).find((p) => p.hasRuns && pairOpenable(p.pairId));
+						return (
+							<TableRow
+								key={`${row.task}-${row.condition}`}
+								data-testid={`pair-picker-row-${row.task}-${row.condition}`}
+								// The whole row opens its first pair; the task link and the trial buttons keep their own action.
+								onClick={(e) => {
+									if (!first || (e.target as HTMLElement).closest("a,button")) return;
+									onPick(first.pairId);
+								}}
+								className={cn(first && "hover:bg-muted cursor-pointer")}
+							>
+								<TableCell className="text-sm">
+									<EntityLink kind="task" id={row.task} suite={suite} testId={`pair-picker-task-${row.task}`} />
+								</TableCell>
+								{showCondition && (
+									<TableCell>
+										<span className="flex items-center gap-2">
+											<span className="text-sm">{row.condition === "clean" ? t5("pair.noFault") : row.condition}</span>
+											{row.discordant && (
+												<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1.5 text-xs font-medium">
+													{t("runs.picker.discordant")}
+												</span>
+											)}
+										</span>
+									</TableCell>
+								)}
+								<TableCell>
+									<div className="flex flex-wrap items-center gap-1.5">
+										{pairsOfRow(row).map((pair) => (
+											<PairButton key={pair.pairId} pair={pair} arms={arms} row={row} onPick={onPick} />
+										))}
+										{!showCondition && row.discordant && (
+											<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1.5 text-xs font-medium">
+												{t("runs.picker.discordant")}
+											</span>
+										)}
+									</div>
+								</TableCell>
+								<TableCell className="w-6 px-1">
+									{first && <ChevronRight className="text-muted-foreground size-4" aria-hidden="true" />}
+								</TableCell>
+							</TableRow>
+						);
+					})}
+				</TableBody>
+			</Table>
+		</div>
 	);
 }
 
+// Each dot carries a check or a cross, so the result does not rest on colour alone (M5-27).
 const DOT_CLASS = {
-	pass: "bg-chart-success",
-	zero: "bg-chart-error",
+	pass: "bg-chart-success text-white",
+	zero: "bg-chart-error text-white",
 	unknown: "bench-hatched border border-dashed border-muted-foreground/50",
 } as const;
 
@@ -122,12 +156,17 @@ function PairButton({
 }) {
 	const { t } = useTranslation("bench");
 	const label = t("runs.picker.openHint", { trial: pair.trial, task: row.task, condition: row.condition });
+	const texts = arms.map((arm) => {
+		const outcome = pair.outcomes[arm] ?? null;
+		return t("runs.picker.cellOutcome", { arm, outcome: outcome ? t(`runs.outcome.${outcome}`) : t("runs.picker.notRun") });
+	});
 	return (
 		<button
 			type="button"
 			onClick={() => onPick(pair.pairId)}
 			disabled={!pair.hasRuns || !pairOpenable(pair.pairId)}
 			title={label}
+			aria-label={`${label}. ${texts.join(", ")}`}
 			data-testid={`pair-picker-open-${pair.pairId}`}
 			className="hover:bg-accent focus-visible:ring-ring/50 inline-flex cursor-pointer items-center gap-1.5 rounded-sm border px-2 py-1 text-xs transition-colors focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
 		>
@@ -137,8 +176,16 @@ function PairButton({
 				const text = t("runs.picker.cellOutcome", { arm, outcome: outcome ? t(`runs.outcome.${outcome}`) : t("runs.picker.notRun") });
 				return (
 					<span key={arm} className="inline-flex" title={text}>
-						<span className={cn("inline-block size-2.5 rounded-full", DOT_CLASS[outcomeTone(outcome)])} aria-hidden="true" />
-						<span className="sr-only">{text}</span>
+						<span
+							className={cn("inline-flex size-3.5 items-center justify-center rounded-full", DOT_CLASS[outcomeTone(outcome)])}
+							aria-hidden="true"
+						>
+							{outcomeTone(outcome) === "pass" ? (
+								<Check className="size-2.5" strokeWidth={3} />
+							) : outcomeTone(outcome) === "zero" ? (
+								<X className="size-2.5" strokeWidth={3} />
+							) : null}
+						</span>
 					</span>
 				);
 			})}
