@@ -1,6 +1,7 @@
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import "@/components/suites/w4iwidI18n";
 import { Button } from "@/components/ui/button";
+import { DELETE_ROLE } from "@/lib/constants/deleteRole";
 import { canUse, useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import { agentBuilderApi } from "@/lib/store/apis/agentBuilderApi";
 import { useDeleteAgentMutation } from "@/lib/store/apis/agentDeleteApi";
@@ -11,9 +12,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isBaselineAgent } from "./agentDisplay";
 
-/** Whether the agents list offers Delete on this card: admins only, never on a built-in baseline agent (X4). */
+/** Whether the agents list offers Delete on this card: the role the server lets delete (DELETE_ROLE), never on a built-in baseline agent (X4). */
 export function agentRowDeletable(session: SessionInfo, agent: Pick<AgentSummary, "id">): boolean {
-	return canUse(session, "admin") && agent.id !== "" && !isBaselineAgent(agent);
+	return canUse(session, DELETE_ROLE) && agent.id !== "" && !isBaselineAgent(agent);
 }
 
 export type AgentRowDeleteOutcome = "builtin" | "cancelled" | "asked";

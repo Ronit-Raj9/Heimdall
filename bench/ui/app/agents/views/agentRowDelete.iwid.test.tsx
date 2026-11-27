@@ -18,14 +18,15 @@ const { AgentRowDelete, agentRowDeletable, deleteAgentRow } = await import("./ag
 const own = { id: "my-agent" };
 
 describe("agent card Delete (X4)", () => {
-	it("is hidden for members and viewers and on a built-in baseline agent", () => {
+	// One rule (lead's rule 15): the role the server's DELETE /agents/{id} allows, member, as on the agent's own page.
+	it("is shown from member up, hidden for viewers and on a built-in baseline agent", () => {
 		expect(agentRowDeletable(hostedSession("admin"), own)).toBe(true);
-		expect(agentRowDeletable(hostedSession("member"), own)).toBe(false);
+		expect(agentRowDeletable(hostedSession("member"), own)).toBe(true);
 		expect(agentRowDeletable(hostedSession("viewer"), own)).toBe(false);
 		expect(agentRowDeletable(hostedSession("owner"), { id: "codex" })).toBe(false);
 		expect(agentRowDeletable(hostedSession("owner"), { id: "" })).toBe(false);
 		mutation.state = { isLoading: false, error: undefined };
-		expect(render(<AgentRowDelete agent={own} name="my-agent" testId="agents-row-my-agent" />, hostedSession("member"))).toBe("");
+		expect(render(<AgentRowDelete agent={own} name="my-agent" testId="agents-row-my-agent" />, hostedSession("viewer"))).toBe("");
 		expect(
 			render(<AgentRowDelete agent={{ id: "claude-code" }} name="claude-code" testId="agents-row-claude-code" />, hostedSession("owner")),
 		).toBe("");

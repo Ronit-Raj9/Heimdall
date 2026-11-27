@@ -17,15 +17,16 @@ const own = { id: "faq-bench", builtin: false };
 const library = { id: "hd-swe-verified", builtin: true, source: "library" as const };
 
 describe("benchmark row Delete (N288)", () => {
-	it("is hidden for members and viewers and on a built-in benchmark", () => {
+	// One rule (lead's rule 15): the role the server's DELETE /suites/{id} allows, member, as on the Settings tab.
+	it("is shown from member up, hidden for viewers and on a built-in benchmark", () => {
 		expect(suiteRowDeletable(hostedSession("admin"), own)).toBe(true);
-		expect(suiteRowDeletable(hostedSession("member"), own)).toBe(false);
+		expect(suiteRowDeletable(hostedSession("member"), own)).toBe(true);
 		expect(suiteRowDeletable(hostedSession("viewer"), own)).toBe(false);
 		expect(suiteRowDeletable(hostedSession("owner"), library)).toBe(false);
 		expect(suiteRowDeletable(hostedSession("owner"), { id: "x", source: "library" })).toBe(false);
 		expect(suiteRowDeletable(hostedSession("owner"), { id: "coding-core", builtin: false })).toBe(false);
 		mutation.state = { isLoading: false, error: undefined };
-		expect(render(<SuiteRowDelete suite={own} name="FAQ" />, hostedSession("member"))).toBe("");
+		expect(render(<SuiteRowDelete suite={own} name="FAQ" />, hostedSession("viewer"))).toBe("");
 		expect(render(<SuiteRowDelete suite={library} name="SWE" />, hostedSession("owner"))).toBe("");
 		expect(render(<SuiteRowDelete suite={own} name="FAQ" />, hostedSession("admin"))).toContain(
 			'data-testid="suites-row-faq-bench-delete"',

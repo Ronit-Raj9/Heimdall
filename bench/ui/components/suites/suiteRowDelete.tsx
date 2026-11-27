@@ -1,5 +1,6 @@
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import { DELETE_ROLE } from "@/lib/constants/deleteRole";
 import { canUse, useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import { authoringError, useDeleteSuiteMutation } from "@/lib/store/apis/suiteAuthoringApi";
 import type { SuiteSummary } from "@/lib/types/bench";
@@ -11,9 +12,9 @@ import "./w4iwidI18n";
 /** Built-in ids a hosted list may hide but that stay built-in names (the server's practice suites, N46). */
 const RESERVED_SUITE_IDS: ReadonlySet<string> = new Set(["coding-core"]);
 
-/** Whether the benchmarks list offers Delete on this row: admins only, never on a built-in benchmark (N288). */
+/** Whether the benchmarks list offers Delete on this row: the role the server lets delete (DELETE_ROLE), never on a built-in benchmark (N288). */
 export function suiteRowDeletable(session: SessionInfo, suite: Pick<SuiteSummary, "id" | "builtin" | "source">): boolean {
-	return canUse(session, "admin") && !isBuiltinSuite(suite) && !RESERVED_SUITE_IDS.has(suite.id);
+	return canUse(session, DELETE_ROLE) && !isBuiltinSuite(suite) && !RESERVED_SUITE_IDS.has(suite.id);
 }
 
 /** Asks once, then deletes. Resolves false when the person cancelled; a refusal stays on the mutation state. */

@@ -1,5 +1,6 @@
 import "@/components/agents/hw02I18n";
 import { ConfirmButton } from "@/components/platform/badges";
+import { DELETE_ROLE } from "@/lib/constants/deleteRole";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { authoringError, useDeleteSuiteMutation } from "@/lib/store/apis/suiteAuthoringApi";
 import { useNavigate } from "@tanstack/react-router";
@@ -15,7 +16,7 @@ export function SuiteDeleteSection({ suiteId, builtin }: { suiteId: string; buil
 	const session = useSession();
 	const navigate = useNavigate();
 	const [remove, state] = useDeleteSuiteMutation();
-	if (builtin || !canUse(session, "member")) return null;
+	if (builtin || !canUse(session, DELETE_ROLE)) return null;
 	return (
 		<div className="border-destructive/30 mt-5 flex min-w-0 flex-col gap-2 rounded-lg border p-4" data-testid="suite-delete">
 			<h3 className="text-sm font-semibold">{t("suiteDelete.title")}</h3>
