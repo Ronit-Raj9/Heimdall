@@ -69,7 +69,8 @@ describe("U3 redirects", () => {
 
 	it("sends /why-agents-fail to the per-agent tab of /failures, its filters kept", () => {
 		expect(whyAgentsFailRedirect({})).toEqual({ to: "/failures", search: { tab: "agents" } });
-		expect(whyAgentsFailRedirect({ tab: "patterns" }).search.tab).toBe("agents");
+		expect(whyAgentsFailRedirect({ tab: "patterns" }).search.tab).toBe("patterns");
+		expect(whyAgentsFailRedirect({ tab: "agents" }).search.tab).toBe("agents");
 		expect(whyAgentsFailRedirect({ tab: "groups", sig: "c_1" })).toEqual({ to: "/failures", search: { sig: "c_1", tab: "groups" } });
 		expect(whyAgentsFailRedirect({ agent: "a1", version: 3, benchmark: "coding-core", practice: true })).toEqual({
 			to: "/failures",

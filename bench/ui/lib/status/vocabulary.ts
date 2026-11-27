@@ -30,11 +30,11 @@ const RAW: Readonly<Record<StatusState, readonly string[]>> = {
 		"rules_drafted",
 		"watching",
 	],
-	needsYou: ["awaiting_approval", "needs_files", "pending_review", "disputed", "rules_to_approve", "needs_lock", "stale", "past_due", "needs_you"],
-	finished: ["done", "succeeded", "success", "built", "validated", "delivered", "imported", "accepted", "steady", "healthy", "finished", "completed"],
-	failed: ["failed", "error", "fail", "down", "refused", "lost", "invalid_key", "unpaid"],
+	needsYou: ["awaiting_approval", "needs_files", "pending_review", "disputed", "rules_to_approve", "flagged", "needs_lock", "stale", "past_due", "needs_you"],
+	finished: ["done", "succeeded", "success", "built", "validated", "delivered", "imported", "accepted", "steady", "healthy", "finished", "completed", "pass", "passed", "solved", "ok", "pinned", "clear"],
+	failed: ["failed", "error", "fail", "down", "refused", "lost", "invalid_key", "unpaid", "timeout", "budget", "crash", "refusal", "integrity_violation"],
 	stopped: ["cancelled", "canceled", "stopped", "interrupted", "budget_stop", "paused", "quarantined", "retired", "revoked", "snoozed"],
-	broken: ["invalid", "broken", "replay_infrastructure_failure", "baseline_stale", "infra_refusal", "infrastructure"],
+	broken: ["invalid", "broken", "replay_infrastructure_failure", "baseline_stale", "infra_refusal", "infrastructure", "infra_error", "aborted_infra", "invalid_evaluator"],
 	noAnswer: ["inconclusive", "cannot_tell", "insufficient_sample", "no_data", "not_enough_data", "unknown", "tie"],
 };
 

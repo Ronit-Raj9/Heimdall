@@ -123,14 +123,31 @@ export function costSentence(t: (k: string, o?: Record<string, unknown>) => stri
 	return costUsd === null ? t("confirm.bodyUnknown", { ns: "paid" }) : t("confirm.body", { ns: "paid", cap: formatUsd(costUsd) });
 }
 
+/** What a confirmation is: paid (it names a cost), destructive (it cannot be undone) or plain. */
+export type ConfirmKind = "paid" | "destructive" | "plain";
+
+export function confirmKind(opts: ConfirmOptions = {}): ConfirmKind {
+	if (opts.costUsd !== undefined) return "paid";
+	return opts.destructive ? "destructive" : "plain";
+}
+
+/**
+ * Which button holds focus when the dialog opens (Q-1). Always Cancel: Enter right after opening
+ * must never spend money or delete anything; the confirming button stays one Tab away.
+ */
+export function initialFocusTarget(_kind: ConfirmKind): "cancel" | "confirm" {
+	return "cancel";
+}
+
 /**
  * The modal itself: an alertdialog through the shared Dialog (focus trapped, app behind inert),
- * focus on Confirm; Escape cancels in the capture phase so a dialog that opened it stays open.
+ * focus on Cancel (see initialFocusTarget); Escape cancels in the capture phase so a dialog that opened it stays open.
  * The backdrop does not cancel (an alertdialog), Cancel and Escape do.
  */
 export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }: ConfirmDialogProps) {
 	const { t } = useTranslation("platform");
 	const okRef = useRef<HTMLButtonElement>(null);
+	const cancelRef = useRef<HTMLButtonElement>(null);
 	useEffect(() => {
 		const handle = (e: KeyboardEvent) => {
 			const handled = onKey ? onKey(e.key) : e.key === "Escape" && (onCancel(), true);
@@ -151,7 +168,7 @@ export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }
 			size="sm"
 			hideClose
 			closeLabel={t("confirmDialog.cancel")}
-			initialFocus={okRef}
+			initialFocus={initialFocusTarget(confirmKind(opts)) === "confirm" ? okRef : cancelRef}
 			title={opts.title ?? t("confirmDialog.title")}
 			testId="confirm-dialog"
 			description={
@@ -170,7 +187,7 @@ export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }
 			}
 			footer={
 				<>
-					<Button type="button" variant="outline" onClick={onCancel} dataTestId="confirm-dialog-cancel">
+					<Button ref={cancelRef} type="button" variant="outline" onClick={onCancel} dataTestId="confirm-dialog-cancel">
 						{opts.cancelLabel ?? t("confirmDialog.cancel")}
 					</Button>
 					<Button

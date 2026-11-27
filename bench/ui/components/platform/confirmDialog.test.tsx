@@ -1,7 +1,7 @@
 import { tagOf } from "@/lib/testing/render";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ConfirmDialog, createConfirmStore, useConfirm } from "./confirmDialog";
+import { ConfirmDialog, confirmKind, createConfirmStore, initialFocusTarget, useConfirm } from "./confirmDialog";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 
@@ -75,5 +75,20 @@ describe("useConfirm without a provider", () => {
 		}
 		renderToStaticMarkup(<Probe />);
 		await expect(fn!("x")).resolves.toBe(true);
+	});
+});
+
+describe("initial focus (Q-1)", () => {
+	it("opens on Cancel for paid, destructive and plain confirms", () => {
+		expect(initialFocusTarget("paid")).toBe("cancel");
+		expect(initialFocusTarget("destructive")).toBe("cancel");
+		expect(initialFocusTarget("plain")).toBe("cancel");
+	});
+	it("classifies options", () => {
+		expect(confirmKind({ costUsd: 5 })).toBe("paid");
+		expect(confirmKind({ costUsd: null })).toBe("paid");
+		expect(confirmKind({ costUsd: 5, destructive: true })).toBe("paid");
+		expect(confirmKind({ destructive: true })).toBe("destructive");
+		expect(confirmKind({})).toBe("plain");
 	});
 });
