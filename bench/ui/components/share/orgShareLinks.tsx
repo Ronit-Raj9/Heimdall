@@ -74,33 +74,59 @@ export function OrgShareLinks() {
 			) : links.isLoading ? null : rows.length === 0 ? (
 				<p className="text-muted-foreground text-sm">{td("share.org.empty")}</p>
 			) : (
-				<div className="overflow-x-auto rounded-lg border">
-					<Table>
+				// Q-23: every column fits at 1440 (long ids are cut with the full id on hover, the
+				// "On" column wraps); below sm each link stacks into a card with its Turn off button.
+				<div className="min-w-0 rounded-lg border">
+					<Table stack className="sm:table-fixed" data-testid="org-share-table">
 						<TableHeader>
 							<TableRow>
-								<TableHead>{td("share.org.link")}</TableHead>
-								<TableHead>{td("share.org.on")}</TableHead>
-								<TableHead>{td("share.org.by")}</TableHead>
-								<TableHead>{td("share.org.created")}</TableHead>
-								<TableHead>{td("share.org.expiry")}</TableHead>
-								<TableHead>{td("share.org.state")}</TableHead>
-								<TableHead />
+								<TableHead className="w-[22%]">{td("share.org.link")}</TableHead>
+								<TableHead className="w-[24%]">{td("share.org.on")}</TableHead>
+								<TableHead className="w-[14%]">{td("share.org.by")}</TableHead>
+								<TableHead className="w-[11%]">{td("share.org.created")}</TableHead>
+								<TableHead className="w-[11%]">{td("share.org.expiry")}</TableHead>
+								<TableHead className="w-[8%]">{td("share.org.state")}</TableHead>
+								<TableHead className="w-[10%]">
+									<span className="sr-only">{t("revoke")}</span>
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{rows.map((s) => (
 								<TableRow key={s.id} data-testid={`org-share-${s.id}`}>
-									<TableCell className="font-medium">{s.label || s.id}</TableCell>
-									<TableCell>
-										{t(`what.${s.kind}`)} <span className="text-muted-foreground font-mono text-xs">{s.target}</span>
+									<TableCell className="font-medium" label={td("share.org.link")}>
+										<span className="block min-w-0 truncate" title={s.label ? `${s.label} (${s.id})` : s.id}>
+											{s.label || s.id}
+										</span>
 									</TableCell>
-									<TableCell>{creatorName(s) || td("share.org.unknownCreator")}</TableCell>
-									<TableCell className="tabular-nums">{formatDate(s.created_at)}</TableCell>
-									<TableCell className="tabular-nums">{s.expires_at ? formatDate(s.expires_at) : t("neverExpires")}</TableCell>
-									<TableCell>{t(`state.${s.state}`)}</TableCell>
-									<TableCell>
+									<TableCell className="whitespace-normal" label={td("share.org.on")}>
+										<span className="flex min-w-0 flex-col max-sm:items-end">
+											<span>{t(`what.${s.kind}`)}</span>
+											<span className="text-muted-foreground block max-w-full truncate font-mono text-xs" title={s.target}>
+												{s.target}
+											</span>
+										</span>
+									</TableCell>
+									<TableCell label={td("share.org.by")}>
+										<span className="block min-w-0 truncate">{creatorName(s) || td("share.org.unknownCreator")}</span>
+									</TableCell>
+									<TableCell className="tabular-nums" label={td("share.org.created")}>
+										{formatDate(s.created_at)}
+									</TableCell>
+									<TableCell className="tabular-nums whitespace-normal" label={td("share.org.expiry")}>
+										{s.expires_at ? formatDate(s.expires_at) : t("neverExpires")}
+									</TableCell>
+									<TableCell label={td("share.org.state")}>{t(`state.${s.state}`)}</TableCell>
+									<TableCell className="text-right max-sm:justify-end">
 										{s.state === "active" && (
-											<Button type="button" variant="ghost" size="sm" onClick={() => void turnOff(s)} dataTestId={`org-share-revoke-${s.id}`}>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="max-sm:w-full"
+												onClick={() => void turnOff(s)}
+												dataTestId={`org-share-revoke-${s.id}`}
+											>
 												{t("revoke")}
 											</Button>
 										)}
