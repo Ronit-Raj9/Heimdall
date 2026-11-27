@@ -94,14 +94,14 @@ describe("hidden test names", () => {
 		const html = renderToStaticMarkup(<ClusterLayers layers={limiter.layers} />);
 		const list = html.match(/data-testid="cluster-hidden-tests".*?<\/ul>/)?.[0] ?? "";
 		expect(list).toContain(">Failed hidden checks<");
-		expect(list).toContain('<li class="text-chart-error-ink font-mono text-xs break-all">test_limiter_window</li>');
+		expect(list).toContain('<li class="text-danger-ink font-mono text-xs break-all">test_limiter_window</li>');
 	});
 
 	it("use the same list markup as the run page's TestList", () => {
 		// The run page's list (components/runs/claimVsResult.tsx) and this one must look the same.
 		const runPage = fs.readFileSync(path.resolve(__dirname, "../runs/claimVsResult.tsx"), "utf8");
 		const ours = fs.readFileSync(path.resolve(__dirname, "clusterDetail.tsx"), "utf8");
-		const itemClass = 'className="text-chart-error-ink font-mono text-xs break-all"';
+		const itemClass = 'className="text-danger-ink font-mono text-xs break-all"';
 		expect(runPage).toContain(itemClass);
 		expect(ours).toContain(itemClass);
 	});

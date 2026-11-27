@@ -138,7 +138,7 @@ function TestList({ title, tests }: { title: string; tests: readonly string[] })
 			<span className="text-muted-foreground font-medium">{title}</span>
 			<ul className="flex flex-col gap-0.5">
 				{tests.map((test) => (
-					<li key={test} className="text-chart-error-ink font-mono text-xs break-all">
+					<li key={test} className="text-danger-ink font-mono text-xs break-all">
 						{test}
 					</li>
 				))}
