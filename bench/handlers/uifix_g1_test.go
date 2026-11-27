@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/maximhq/bifrost/bench/benchcatalog"
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/sharelinks"
@@ -202,5 +203,16 @@ func TestSuiteHealthTaskFilter(t *testing.T) {
 	var h schemas.SuiteHealth
 	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &h) != nil || len(h.Tasks) != 1 || h.Tasks[0].Task != "pub" {
 		t.Fatalf("filtered %d %s", resp.StatusCode(), resp.Body())
+	}
+}
+
+func TestEvaluationChildCause(t *testing.T) {
+	ev := &schemas.Evaluation{Children: []schemas.EvaluationChild{
+		{Benchmark: "a", Skipped: "plan e_x: arm A: policy refused: base image ghcr.io/x/base:1 is not in the shared worker's image registry"},
+		{Benchmark: "b"},
+	}}
+	fillChildCauses(ev)
+	if ev.Children[0].Cause != engine.CauseImageMissing || ev.Children[1].Cause != "" {
+		t.Fatalf("causes %+v", ev.Children)
 	}
 }

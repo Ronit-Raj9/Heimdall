@@ -181,6 +181,7 @@ func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
 		_ = h.store().Save(ev)
 	}
 	h.livePaused(ev)
+	fillChildCauses(ev)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(ev))
 }
 

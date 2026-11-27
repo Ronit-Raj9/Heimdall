@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"github.com/valyala/fasthttp"
-	"slices"
 
 	"github.com/maximhq/bifrost/bench/clusters"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -29,16 +28,15 @@ func runFailureGroup(ctx *fasthttp.RequestCtx, index ReadIndex, rv *RunView) *sc
 	if err != nil {
 		return nil
 	}
-	for _, c := range rep.Clusters {
-		d, err := clusters.Find(rep, c.Signature)
-		if err != nil {
-			continue
-		}
-		i := slices.IndexFunc(d.Runs, func(r clusters.RunRef) bool { return r.RunID == rv.Run.RunID })
-		if i < 0 {
-			continue
-		}
-		return &schemas.RunFailureGroup{Signature: c.Signature, Title: c.Title, Text: d.Runs[i].ErrorText, Count: c.Count, ExpID: expID}
+	f, found := clusters.FindRun(rep, rv.Run.RunID)
+	if !found {
+		return nil
 	}
-	return nil
+	out := &schemas.RunFailureGroup{Signature: f.Signature, Text: f.Text, Count: f.Count, ExpID: expID}
+	for _, c := range rep.Clusters {
+		if c.Signature == f.Signature {
+			out.Title = c.Title
+		}
+	}
+	return out
 }
