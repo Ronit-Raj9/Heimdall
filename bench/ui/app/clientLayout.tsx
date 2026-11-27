@@ -11,6 +11,7 @@ import { SessionProvider } from "@/components/platform/sessionProvider";
 import { VerifyEmailBanner } from "@/components/platform/verifyEmailBanner";
 import { ThemeProvider } from "@/components/themeProvider";
 import { pageTitle } from "@/lib/constants/navigation";
+import { useDoneCount, withDoneCount } from "@/lib/routing/pageTitle";
 import i18n from "@/lib/i18n";
 import { frameFor, useSession } from "@/lib/session/sessionContext";
 import { ReduxProvider } from "@/lib/store";
@@ -48,6 +49,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 function Frame({ children }: { children: React.ReactNode }) {
 	const session = useSession();
 	const location = useRouterState({ select: (state) => state.location });
+	// Whether this tab was signed in before: a later redirect to /login means the session ended.
+	const wasSignedIn = useRef(false);
+	if (session.signedIn) wasSignedIn.current = true;
 	switch (frameFor(session, location.pathname)) {
 		case "share":
 			return <SharedFrame>{children}</SharedFrame>;
@@ -65,7 +69,13 @@ function Frame({ children }: { children: React.ReactNode }) {
 				</PublicFrame>
 			);
 		case "login":
-			return <Navigate to="/login" search={{ return_to: location.href }} replace />;
+			return (
+				<Navigate
+					to="/login"
+					search={(wasSignedIn.current ? { return_to: location.href, reason: "expired" } : { return_to: location.href }) as never}
+					replace
+				/>
+			);
 		case "error":
 			return <SessionError />;
 		default:
@@ -109,7 +119,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 			{/* First in the tab order, before the navigation. */}
 			<a
 				href="#bench-main"
-				className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+				className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:inline-flex focus:min-h-11 focus:items-center"
 				data-testid="skip-to-content"
 			>
 				{t("app.skipToContent")}
@@ -125,7 +135,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 						<main
 							id="bench-main"
 							tabIndex={-1}
-							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 duration-300 outline-none md:px-8 md:py-8 lg:px-10"
+							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 duration-300 outline-none md:px-8 md:py-8 lg:px-(--page-px)"
 							data-bench-main
 						>
 							<VerifyEmailBanner />
@@ -146,14 +156,19 @@ function Shell({ children }: { children: React.ReactNode }) {
 function useRouteChange() {
 	const { t } = useTranslation("bench");
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
+	// Settings names its tab in the title, so the tab is part of the title's input.
+	const tab = useRouterState({ select: (state) => (state.location.search as Record<string, unknown>).tab });
+	const doneCount = useDoneCount();
 	// The path focus was last handled for; the first load and a repeated effect run do nothing.
 	const handled = useRef(pathname);
 	useEffect(() => {
-		document.title = pageTitle(pathname);
+		document.title = withDoneCount(pageTitle(pathname, tab === undefined ? undefined : { tab }), doneCount);
+	}, [pathname, tab, doneCount, t]);
+	useEffect(() => {
 		if (handled.current === pathname) return;
 		handled.current = pathname;
 		const content = document.querySelector<HTMLElement>("[data-bench-content]");
 		if (content) content.scrollTop = 0;
 		document.getElementById("bench-main")?.focus({ preventScroll: true });
-	}, [pathname, t]);
+	}, [pathname]);
 }

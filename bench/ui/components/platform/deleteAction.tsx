@@ -1,5 +1,6 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { Trash2 } from "lucide-react";
@@ -48,9 +49,14 @@ export function DeleteAction({
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	if (!canUse(session, "admin")) {
+		// Visible to everyone, not only screen readers (X-106): a disabled button and its reason.
 		return (
-			<span className="sr-only" data-testid={`${testId}-admin-only`}>
-				{adminOnly}
+			<span className="flex flex-col items-start gap-1">
+				<Button size="sm" variant="outline" disabled aria-describedby={`${testId}-admin-only`} dataTestId={testId}>
+					<Trash2 aria-hidden="true" />
+					{label}
+				</Button>
+				<WhyDisabled reason={adminOnly} testId={`${testId}-admin-only`} />
 			</span>
 		);
 	}
@@ -71,7 +77,7 @@ export function DeleteAction({
 	return (
 		<span className="flex items-center gap-2">
 			{error && (
-				<span role="alert" className="text-chart-error-ink max-w-80 text-xs" data-testid={`${testId}-error`}>
+				<span role="alert" className="text-danger-ink max-w-80 text-xs" data-testid={`${testId}-error`}>
 					{error}
 				</span>
 			)}
@@ -83,7 +89,7 @@ export function DeleteAction({
 			<Button
 				size="sm"
 				variant="ghost"
-				className="text-chart-error-ink hover:text-chart-error-ink"
+				className="text-danger-ink hover:text-danger-ink"
 				disabled={Boolean(busyReason) || pending}
 				isLoading={pending}
 				title={busyReason}

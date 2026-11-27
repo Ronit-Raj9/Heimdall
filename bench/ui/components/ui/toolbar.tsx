@@ -70,7 +70,7 @@ export function FilterChips<T extends string = string>({
 						data-testid={testId ? `${testId}-${o.value}` : undefined}
 						onClick={() => toggle(o.value)}
 						className={cn(
-							"focus-visible:ring-ring/50 inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none [&_svg]:size-3.5",
+							"focus-visible:ring-(--focus) inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none [&_svg]:size-3.5",
 							on
 								? "border-primary/40 bg-primary/10 text-primary"
 								: "border-border/80 bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -79,7 +79,7 @@ export function FilterChips<T extends string = string>({
 						{o.icon}
 						{o.label}
 						{o.count !== undefined && (
-							<span className={cn("tabular-nums", on ? "text-primary/80" : "text-muted-foreground/70")}>{o.count}</span>
+							<span className={cn("tabular-nums", on ? "text-primary" : "text-muted-foreground")}>{o.count}</span>
 						)}
 					</button>
 				);
@@ -89,7 +89,7 @@ export function FilterChips<T extends string = string>({
 					type="button"
 					onClick={() => onChange([])}
 					data-testid={testId ? `${testId}-clear` : undefined}
-					className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+					className="text-muted-foreground hover:text-foreground focus-visible:ring-(--focus) inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
 				>
 					<X className="size-3.5" aria-hidden="true" />
 					{t("clearFilters")}
@@ -127,7 +127,7 @@ export function FilterSelect({ label, options, value, onChange, allLabel = "All"
 		<label
 			data-slot="filter-select"
 			className={cn(
-				"border-input bg-card hover:border-ring/50 focus-within:ring-ring/40 relative inline-flex h-8 shrink-0 items-center rounded-md border text-sm shadow-xs transition-colors focus-within:ring-2",
+				"border-input bg-card hover:border-ring/50 focus-within:ring-(--focus) relative inline-flex h-8 shrink-0 items-center rounded-md border text-sm shadow-xs transition-colors focus-within:ring-2",
 				disabled && "opacity-50",
 				className,
 			)}
@@ -177,7 +177,7 @@ export function FilterTokens({ tokens, onClear, className, testId }: { tokens: r
 						type="button"
 						onClick={tk.onRemove}
 						aria-label={`${t("clearFilters")} ${typeof tk.label === "string" ? tk.label : tk.key}`}
-						className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-4 cursor-pointer items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+						className="text-muted-foreground hover:text-foreground focus-visible:ring-(--focus) inline-flex size-4 cursor-pointer items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:outline-none"
 					>
 						<X className="size-3" aria-hidden="true" />
 					</button>
@@ -232,7 +232,7 @@ export function SegmentedControl<T extends string>({
 						onClick={() => onChange(o.value)}
 						data-testid={testId ? `${testId}-${o.value}` : undefined}
 						className={cn(
-							"focus-visible:ring-ring/50 h-full cursor-pointer rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none",
+							"focus-visible:ring-(--focus) h-full cursor-pointer rounded-sm px-2.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none",
 							on ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
 						)}
 					>
@@ -271,8 +271,32 @@ export function ToolbarSearch({
 				placeholder={placeholder}
 				aria-label={label}
 				data-testid={testId}
-				className="border-input bg-card placeholder:text-muted-foreground focus-visible:ring-ring/40 h-8 w-full rounded-md border pr-2.5 pl-8 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+				className="border-input bg-card placeholder:text-muted-foreground focus-visible:ring-(--focus) h-8 w-full rounded-md border pr-2.5 pl-8 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
 			/>
 		</label>
+	);
+}
+
+/**
+ * The chip that shows or hides test objects in a list (M1-18). Renders nothing when the list has
+ * no test items. Pair it with useShowTests and withoutTests from lib/testObjects.
+ */
+export function ShowTestsChip({ count, on, onChange, className, testId }: { count: number; on: boolean; onChange: (on: boolean) => void; className?: string; testId?: string }) {
+	const { t } = useTranslation("ufs1");
+	if (count === 0) return null;
+	return (
+		<button
+			type="button"
+			aria-pressed={on}
+			onClick={() => onChange(!on)}
+			className={cn(
+				"inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
+				on ? "border-primary/40 bg-primary-soft text-primary" : "bg-card text-muted-foreground hover:text-foreground hover:bg-muted",
+				className,
+			)}
+			data-testid={testId ?? "show-tests-chip"}
+		>
+			{on ? t("testObjects.hide", { count }) : t("testObjects.show", { count })}
+		</button>
 	);
 }

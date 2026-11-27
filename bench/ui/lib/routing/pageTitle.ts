@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 /**
  * Browser tab titles a page sets for itself (a guide's name, a shared item's label), keyed by
@@ -36,4 +36,31 @@ export function usePageTitle(title: string | undefined): void {
 		document.title = title;
 		return () => setPageTitleOverride(pathname, undefined);
 	}, [title]);
+}
+/**
+ * Background work that finished while the user was elsewhere: the shell prefixes the tab title
+ * with "(n done)" until the user looks (M1-45). The notice code (Spec 5) calls setDoneCount.
+ */
+let doneCount = 0;
+const doneListeners = new Set<() => void>();
+
+export function setDoneCount(count: number): void {
+	doneCount = Math.max(0, Math.floor(count));
+	for (const listener of doneListeners) listener();
+}
+
+export function useDoneCount(): number {
+	return useSyncExternalStore(
+		(listener) => {
+			doneListeners.add(listener);
+			return () => doneListeners.delete(listener);
+		},
+		() => doneCount,
+		() => 0,
+	);
+}
+
+/** The title with the "(n done)" prefix when n is above 0. Pure. */
+export function withDoneCount(title: string, count: number): string {
+	return count > 0 ? `(${count} done) ${title}` : title;
 }

@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { useScrollEdges } from "@/lib/hooks/useScrollEdges";
 import { cn } from "@/lib/utils";
 
 interface TableProps extends React.ComponentProps<"table"> {
@@ -9,6 +10,8 @@ interface TableProps extends React.ComponentProps<"table"> {
 	 * whose numbers it holds. Offsets are measured from the header row.
 	 */
 	stickyColumns?: number;
+	/** A long table scrolls inside itself (at most 70% of the viewport) and keeps its header row in view. */
+	scrollY?: boolean;
 }
 
 /** Marks the first `count` columns of every row as sticky and sets their left offsets. */
@@ -46,8 +49,10 @@ function pinLeadingColumns(table: HTMLTableElement, count: number) {
 	}
 }
 
-function Table({ className, containerClassName, stickyColumns = 0, ...props }: TableProps) {
+function Table({ className, containerClassName, stickyColumns = 0, scrollY = false, ...props }: TableProps) {
 	const containerRef = React.useRef<HTMLDivElement>(null);
+	// Fade the edge that hides columns (X-95); pinned leading columns never fade.
+	useScrollEdges(containerRef, { start: stickyColumns <= 0 });
 	const tableRef = React.useRef<HTMLTableElement>(null);
 	const [isScrollable, setIsScrollable] = React.useState(false);
 
@@ -97,6 +102,7 @@ function Table({ className, containerClassName, stickyColumns = 0, ...props }: T
 				// A pinned table also caps its height near the viewport, so a long one scrolls inside
 				// itself and keeps its header row in view.
 				stickyColumns > 0 && "max-h-[max(24rem,calc(100dvh-10rem))] overflow-y-auto",
+				scrollY && "max-h-[70vh] overflow-y-auto",
 				containerClassName,
 			)}
 			tabIndex={isScrollable ? 0 : undefined}
@@ -118,22 +124,32 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
 	return <tfoot data-slot="table-footer" className={cn("bg-muted/50 border-t font-medium [&>tr]:last:border-b-0", className)} {...props} />;
 }
 
+/**
+ * Column priority on phones (M1-57): "low" cells and heads are hidden below sm, so a row keeps its
+ * name, status and one number on a 390 px screen. Give the head and the cells of a column the same value.
+ */
+export type ColumnPriority = "high" | "low";
+const priorityClass = (priority?: ColumnPriority) => (priority === "low" ? "max-sm:hidden" : undefined);
+
 function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	return (
 		<tr
 			data-slot="table-row"
-			className={cn("hover:bg-(--table-hover-bg) data-[state=selected]:bg-muted border-b transition-colors duration-100", className)}
+			className={cn("hover:bg-(--table-hover-bg) data-[state=selected]:bg-muted h-(--row-h) border-b transition-colors duration-100", className)}
 			{...props}
 		/>
 	);
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({ className, priority, scope = "col", ...props }: React.ComponentProps<"th"> & { priority?: ColumnPriority }) {
 	return (
 		<th
 			data-slot="table-head"
+			scope={scope}
+			data-priority={priority}
 			className={cn(
-				"text-muted-foreground sticky top-0 z-[2] h-10 bg-(--table-head-bg) px-4 text-left align-middle text-xs font-medium tracking-[0.01em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				priorityClass(priority),
+				"text-muted-foreground sticky top-0 z-[2] h-(--row-h) bg-(--table-head-bg) px-4 text-left align-middle text-xs font-medium tracking-[0.01em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}
 			{...props}
@@ -141,12 +157,14 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 	);
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, priority, ...props }: React.ComponentProps<"td"> & { priority?: ColumnPriority }) {
 	return (
 		<td
 			data-slot="table-cell"
+			data-priority={priority}
 			className={cn(
-				"px-4 py-2.5 align-middle whitespace-nowrap tabular-nums [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				priorityClass(priority),
+				"px-4 py-1 align-middle whitespace-nowrap tabular-nums [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}
 			{...props}

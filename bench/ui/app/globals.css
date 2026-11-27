@@ -61,6 +61,12 @@
 	--color-chart-cat-other: var(--chart-cat-other);
 	--color-chart-track: var(--chart-track);
 	--color-ring: var(--ring);
+	--color-brand-panel: var(--brand-panel);
+	--color-brand-ink: var(--brand-ink);
+	--color-brand-muted: var(--brand-muted);
+	--color-brand-faint: var(--brand-faint);
+	--color-brand-glow: var(--brand-glow);
+	--color-brand-tick: var(--brand-tick);
 	--color-primary-hover: var(--primary-hover);
 	--color-primary-active: var(--primary-active);
 	--color-primary-soft: var(--primary-soft);
@@ -169,6 +175,13 @@
 	   status hues below (pass, fail, warning, info) and one accent for links, focus and the
 	   active place in the app. Text pairs clear WCAG AA (4.5:1) on card and background. */
 	--radius: 0.625rem;
+	/* The dark brand panel of the sign-in and landing pages (same in both themes, darker in dark). */
+	--brand-panel: oklch(0.2 0.035 272);
+	--brand-ink: oklch(0.96 0.01 272);
+	--brand-muted: oklch(0.82 0.03 272);
+	--brand-faint: oklch(0.74 0.03 272);
+	--brand-glow: oklch(0.55 0.18 272);
+	--brand-tick: oklch(0.8 0.12 160);
 	/* Primitives and status tokens (ui-review-2 colour proposal). Status ink sits on its own
 	   soft background or on the card; fills, dots and bars use the base hue. */
 	--neutral-50: oklch(0.985 0.002 264);
@@ -282,6 +295,7 @@
 
 .dark {
 	color-scheme: dark;
+	--brand-panel: oklch(0.17 0.03 272);
 	--neutral-50: oklch(0.155 0.006 264);
 	--neutral-100: oklch(0.19 0.007 264);
 	--neutral-200: oklch(0.235 0.008 264);

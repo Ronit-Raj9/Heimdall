@@ -81,7 +81,7 @@
 			"mode": "Mode",
 			"configHash": "Config",
 			"network": "Network",
-			"experiments": "Experiments",
+			"experiments": "Comparisons",
 			"labels": "Labels",
 			"points": "Operating points",
 			"targetFpr": "Target FPR",
@@ -152,11 +152,11 @@
 			"counts": "Common tasks by class"
 		},
 		"test": {
-			"p": "Paired sign-flip test: p = {{p}} at alpha {{alpha}}, {{changed}} of {{total}} tasks changed.",
+			"p": "{{changed}} of {{total}} tasks changed. Chance this is luck: {{p}} (we call it real below {{alpha}}).",
 			"noP": "No p value: there is no common task.",
 			"approx": "(approximate)",
-			"minP_one": "With {{count}} changed task the smallest possible p is {{p}}, so no result could reach alpha {{alpha}}.",
-			"minP_other": "With {{count}} changed tasks the smallest possible p is {{p}}, so no result could reach alpha {{alpha}}."
+			"minP_one": "Only {{count}} task changed, too few to tell a real change from luck. Add tasks.",
+			"minP_other": "Only {{count}} tasks changed, too few to tell a real change from luck. Add tasks."
 		},
 		"conclusion": {
 			"b_better": "B is better",
@@ -191,7 +191,7 @@
 			"arm": "Setup",
 			"armValue": "{{arm}} of {{exp}}",
 			"runs": "Verified runs",
-			"experiments": "Experiments",
+			"experiments": "Comparisons",
 			"noExperiments": "none",
 			"excluded": "Left out",
 			"noneExcluded": "No run left out",
@@ -199,7 +199,7 @@
 			"excludedItem_other": "{{reason}}: {{count}} runs"
 		},
 		"config": {
-			"title": "Config diff",
+			"title": "Version diff",
 			"description_one": "{{count}} change between the two resolved configs, field by field. Files compare by hash; small text files show their diff.",
 			"description_other": "{{count}} changes between the two resolved configs, field by field. Files compare by hash; small text files show their diff.",
 			"identical": "Same resolved config: A and B differ only in their runs.",
@@ -321,7 +321,8 @@
 		"offlineData": "No server"
 	},
 	"theme": {
-		"toggle": "Toggle theme"
+		"toggle": "Toggle theme",
+		"dark": "Dark theme"
 	},
 	"value": {
 		"unknown": "unknown",
@@ -386,7 +387,7 @@
 			"success": "Solve rate",
 			"successHint": "Mean over tasks of the per-task verified success rate, with a descriptive 95% t interval over tasks.",
 			"reliability": "Solves every time",
-			"reliabilityHint": "pass^k: the chance that all k tries of a task succeed, mean over tasks. k is min(3, the fewest trials per task among the experiments that repeat tasks) unless the query sets it.",
+			"reliabilityHint": "How often every try of a task succeeds, averaged over tasks. Higher means the agent is steady, not just lucky once.",
 			"cost_per_success": "Cost per solved task",
 			"cost_per_successHint": "Total observed cost over verified successes. n/a with no success.",
 			"steps": "Model replies",
@@ -414,7 +415,7 @@
 			"two": "Behind",
 			"twoShort": "clearly behind",
 			"leaderHint": "Leader: every other entry is compared with this one.",
-			"hint": "{{reason}}. Holm-adjusted p vs leader: {{p}}.",
+			"hint": "{{reason}}. Chance the gap to the leader is luck: {{p}}.",
 			"groupOne": "Top group: cannot be told apart from the leader yet",
 			"groupTwo": "Behind: clearly worse than the leader"
 		},
@@ -440,7 +441,7 @@
 		},
 		"footnote": {
 			"title": "About this board",
-			"generated": "Generated {{time}}. Sorted by {{metric}}; tiers at alpha {{alpha}}.",
+			"generated": "Generated {{time}}. Sorted by {{metric}}.",
 			"rankClaim": "Rank alone does not prove one agent beats another. Only the Behind group means an agent is clearly worse than the leader.",
 			"scopeAll": "Scope all: each entry is measured over its own tasks, so two success rates can rest on different tasks. Tiers still compare each entry with the leader on the tasks both ran.",
 			"scopeCommon_one": "Scope common: every entry is measured over the same {{count}} common task only.",
@@ -484,7 +485,7 @@
 		}
 	},
 	"verdict": {
-		"title": "Verdict",
+		"title": "Result",
 		"noExperiments": "No comparisons yet. Plan one and run it, and its verdict appears here.",
 		"newExperiment": "New comparison",
 		"loadError": "Could not load the verdict for {{id}}: {{error}}",
@@ -735,6 +736,12 @@
 				"permission": "A file in the task's container cannot be read. This is a setup problem with the benchmark, not your agent.",
 				"image": "The benchmark's container image is missing on the worker.",
 				"keySlot": "All model key slots were busy; it will retry."
+			},
+			"reason": {
+				"tool": "The tool server {{server}} answered {{status}} to {{tool}} at step {{seq}}. This is likely infrastructure, not the agent.",
+				"noChecks": "The grader ran no checks, so this result is not a real fail.",
+				"mode": "The grader compared the final {{what}} with the expected one; it did not match.",
+				"checks": "{{failures}} of {{ran}} hidden checks failed."
 			}
 		},
 		"title": "Compare runs",
@@ -1418,7 +1425,7 @@
 				"run": "Replay run"
 			}
 		},
-		"experimentLabel": "Experiment",
+		"experimentLabel": "Comparison",
 		"lanesCapped": "Showing the first {{shown}} of {{total}} setups.",
 		"output": {
 			"title": "What it produced",
@@ -1497,8 +1504,8 @@
 			"backToList": "All runs",
 			"loadError": "Could not load this run.",
 			"crumb": "Run {{id}}",
-			"title": "Task: {{task}} · Setup {{arm}} · {{outcome}}",
-			"experiment": "Experiment",
+			"title": "Task: {{task}} · Setup {{arm}}",
+			"experiment": "Comparison",
 			"task": "Task",
 			"slotFacts": "{{condition}}, attempt {{trial}}",
 			"compare": "Compare Setup A and B",
@@ -1540,7 +1547,7 @@
 		}
 	},
 	"receipts": {
-		"title": "Failure test steps",
+		"title": "Fault test steps",
 		"subtitle": "What each failure test did, step by step, for each setup. Every step is backed by records the agent cannot write.",
 		"empty": "No failure tests ran in this comparison.",
 		"experiment": "comparison {{id}}",
@@ -1624,27 +1631,27 @@
 	"matrix": {
 		"title": "Model matrix",
 		"subtitle": "Every setup of one experiment in the normal run or under one fault, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
-		"experiment": "Experiment {{id}}",
+		"experiment": "Comparison {{id}}",
 		"noExperiments": "No experiments yet. Plan and run one, then compare its setups here.",
 		"listError": "Could not load experiments",
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
-		"facts": "{{suite}}, common tasks {{tasks}}, alpha {{alpha}}",
+		"facts": "{{suite}}, {{tasks}} shared tasks",
 		"notSeparable": "Cannot separate",
 		"synthetic": "Synthetic data: scripted agent, scripted model or smoke experiment. These numbers are not findings.",
 		"openVerdict": "Open verdict",
 		"table": {
 			"title": "Setups",
-			"description": "Rank and tier come from the server. Success shows its 95% interval over tasks; unknown values are hatched, never 0.",
+			"description": "Best first. Bars show the likely range of each solve rate; hatched means not measured.",
 			"label": "Setups ranked by verified success",
 			"arm": "Setup",
 			"provider": "Provider"
 		},
 		"grid": {
 			"title": "Pairwise tests",
-			"description": "Each cell is the Holm-adjusted p of the row setup against the column setup. Bold and coloured: significant at alpha {{alpha}}. Hover a cell for the reason.",
-			"label": "Holm-adjusted p for every pair of setups",
+			"description": "Each cell says whether the row setup really differs from the column setup. Bold and coloured: a real difference. Hover a cell for the reason.",
+			"label": "Real differences between every pair of setups",
 			"rowVsColumn": "row vs column",
 			"same": "same setup",
 			"noTest": "no test",
@@ -1874,7 +1881,7 @@
 				"concurrency": "Concurrency",
 				"runnerPool": "Worker group",
 				"totalUsd": "Total spend cap (USD)",
-				"token": "Write token",
+				"token": "Access token",
 				"tokenPlaceholder": "printed by the server at first start",
 				"tokenHint": "Kept in this tab only. Sent as Authorization: Bearer on plan, estimate, create and start."
 			},
@@ -1902,7 +1909,7 @@
 				"needsPlan": "Plan the experiment first.",
 				"planStale": "The form changed since the last plan. Plan again before starting.",
 				"blocked": "The plan has errors that block the start.",
-				"needsToken": "Enter the write token to plan and start.",
+				"needsToken": "Enter the access token to plan and start.",
 				"planError": "Planning failed.",
 				"createError": "Could not create the experiment.",
 				"startError": "Created {{id}}, but could not start it."
@@ -1961,7 +1968,7 @@
 				"notes": "Notes"
 			},
 			"progress": {
-				"title": "Experiment {{id}}",
+				"title": "Comparison {{id}}",
 				"description": "Live status, refreshed every 2 seconds until the experiment ends.",
 				"state": {
 					"created": "created",
@@ -2032,7 +2039,7 @@
 		}
 	},
 	"releases": {
-		"title": "Release records",
+		"title": "Releases",
 		"subtitle": "Who approved which agent version, based on which test results.",
 		"disclaimer": "Each record is linked to the one before it by a fingerprint, so any later change to the log is detected. This is not a digital signature and not a compliance certificate.",
 		"timeline": {
@@ -2083,13 +2090,14 @@
 			"approverPlaceholder": "Who approves this release",
 			"note": "Note",
 			"notePlaceholder": "Optional",
-			"token": "Write password",
-			"tokenHint": "The server's write token (BENCH_WRITE_TOKEN). Kept in this tab only.",
-			"tokenPlaceholder": "Paste the write token",
+			"token": "Access token",
+			"tokenHint": "The server access token (BENCH_WRITE_TOKEN). Kept in this tab only.",
+			"tokenPlaceholder": "Paste the access token",
 			"submit": "Record release",
 			"error": "Not recorded: {{error}}",
 			"created": "Recorded as {{id}}."
-		}
+		},
+		"complianceHint": "Makes a report you can download below."
 	},
 	"policy": {
 		"title": "Release policy",
@@ -2274,7 +2282,7 @@
 		}
 	},
 	"inbox": {
-		"title": "Failure inbox",
+		"title": "Production failures",
 		"subtitle": "Each row is one kind of failure seen in production. Turn it into a new test task, reject it, or snooze it to decide later.",
 		"loadError": "Could not load the failure inbox.",
 		"regressionTasks_one": "{{count}} new test task made from the inbox",
@@ -2345,7 +2353,10 @@
 			"sources": "Where failures come from is listed in {{file}}. Each pull continues where the last one stopped.",
 			"docs": "How it works: {{doc}}.",
 			"filtered": "No failures with this status.",
-			"filteredSource": "No failures from this place with this status."
+			"filteredSource": "No failures from this place with this status.",
+			"first": "No production failures yet. Connect a source to pull them in, or send them in with an access token.",
+			"firstAction": "Connect a source",
+			"filteredState": "No failures with status {{state}}. Show all ({{count}})"
 		},
 		"sources": {
 			"title": "Where failures come from",
@@ -2472,7 +2483,7 @@
 	},
 	"notFound": {
 		"title": "Page not found",
-		"description": "There is no bench screen at this address."
+		"description": "We could not find that page. It may have moved, or the link is wrong."
 	},
 	"errors": {
 		"rateLimited_one": "Too many requests. Try again in {{count}} second.",
@@ -2568,7 +2579,7 @@
 			"kind": "Kind",
 			"difficulty": "Difficulty",
 			"capabilities": "Skills tested",
-			"admission": "Ready?",
+			"admission": "Status",
 			"license": "License",
 			"hiddenTests": "Hidden checks",
 			"hiddenTestsCell": "{{files}} files, {{required}} required",
@@ -2582,7 +2593,8 @@
 			"unset": "not set",
 			"empty": "This benchmark has no tasks.",
 			"noMatch": "No task matches these filters.",
-			"showing": "Showing {{shown}} of {{total}} tasks"
+			"showing": "Showing {{shown}} of {{total}} tasks",
+			"pageOf": "{{first}} to {{last}} of {{total}} tasks"
 		},
 		"filters": {
 			"label": "Task filters",
@@ -2605,7 +2617,9 @@
 			"draftHint": "Failed or has not run the readiness check, so it is not used in tests.",
 			"not_lockedHint": "This task is not part of the frozen version yet.",
 			"quarantinedHint": "Paused: taken out of new tests while someone looks into it.",
-			"retiredHint": "No longer used in tests."
+			"retiredHint": "No longer used in tests.",
+			"unchecked": "Not checked yet",
+			"checkFailed": "Check failed"
 		},
 		"difficulty": {
 			"easy": "Easy",
@@ -2630,7 +2644,7 @@
 			"count_other": "{{count}} tasks"
 		},
 		"probes": {
-			"title": "Failure tests",
+			"title": "Fault cases",
 			"description": "Harder versions of the tasks this benchmark can run: a model outage, a broken tool, a trick instruction, a fake secret. The details of how each works stay on the server.",
 			"none": "No failure tests are built into this benchmark. You can add failure tests when you start an evaluation.",
 			"goalPreserving": "still solvable",
@@ -2922,7 +2936,7 @@
 			"at": "Since",
 			"version": "Task version",
 			"evidence": "Evidence",
-			"verifierTitle": "Verifier",
+			"verifierTitle": "Grader",
 			"flakyBody_one": "Flaky verifier: {{count}} piece of evidence from {{checks}} checks. Verdicts on this task are not trustworthy until the verifier is fixed.",
 			"flakyBody_other": "Flaky verifier: {{count}} pieces of evidence from {{checks}} checks. Verdicts on this task are not trustworthy until the verifier is fixed.",
 			"verifierStable_one": "No disagreement found in {{count}} check.",
@@ -2984,7 +2998,7 @@
 		"subtitle": "Every agent config in agents/, the systems under test.",
 		"synthetic": "Synthetic fixture data. These agent configs are examples for checking the screen.",
 		"loadError": "Could not load the agent configs.",
-		"empty": "No agent configs yet. Run `heimdall agent init <id> -template command`.",
+		"empty": "No agents yet. Connect an agent or start from a template.",
 		"secretNote": "Environment values are never shown, only variable names. Delivered files are listed by path, never by content.",
 		"label": "Agent configs",
 		"loadFailed": "Failed to load",
@@ -3018,7 +3032,7 @@
 		"runsUnknown": "unknown",
 		"tabs": {
 			"label": "Agent views",
-			"configs": "Configs",
+			"configs": "Versions",
 			"diff": "Diff",
 			"frameworks": "Frameworks"
 		},
@@ -3356,7 +3370,7 @@
 			"evidence": "Cited",
 			"problems": "Ignored reviews",
 			"sealed": "Original outcome",
-			"effective": "Outcome under reviews",
+			"effective": "Outcome after human reviews",
 			"hash": "Fingerprint {{hash}}"
 		},
 		"form": {
@@ -3368,8 +3382,8 @@
 			"reviewerPlaceholder": "Your name",
 			"evidence": "Evidence cited (optional, one per line)",
 			"evidencePlaceholder": "grade.json failed_tests\nworkspace.diff",
-			"token": "Write password",
-			"tokenHint": "The server's write token (BENCH_WRITE_TOKEN). Kept in this tab only.",
+			"token": "Access token",
+			"tokenHint": "The server access token (BENCH_WRITE_TOKEN). Kept in this tab only.",
 			"tokenPlaceholder": "paste the token",
 			"submit": "Record review",
 			"error": "Could not record the review: {{error}}",
@@ -3378,7 +3392,7 @@
 			"reviewerRequired": "A reviewer name is required.",
 			"decisionRequired": "Pick a decision.",
 			"readOnly": "This server runs in {{mode}} mode, which refuses reviews. Only a live run folder takes new reviews.",
-			"noAuth": "There is no login. The reviewer name is what you type here, and the write token is the only guard."
+			"noAuth": "There is no login. The reviewer name is what you type here, and the access token is the only guard."
 		},
 		"badge": {
 			"reviewed_one": "{{count}} run human-reviewed",
@@ -3532,7 +3546,7 @@
 		"pickLabel": "Pick correct or incorrect",
 		"labeller": "Your name",
 		"note": "Note",
-		"token": "Write token",
+		"token": "Access token",
 		"submit": "Add label",
 		"incomplete": "Task, answer, label and your name are required.",
 		"noLabels": "No labels yet.",
@@ -3618,8 +3632,8 @@
 		"harborCli": "A runnable export carries the hidden tests, so only the CLI writes it, on purpose:"
 	},
 	"live": {
-		"title": "Live traffic",
-		"subtitle": "Compare two versions of your agent on real user traffic, without ground truth.",
+		"title": "Live scoring",
+		"subtitle": "Compare two versions of your agent on real user traffic, without an answer key.",
 		"loadError": "Could not load live quality scoring.",
 		"pull": "Read new sessions now",
 		"pulled": "Done: {{sessions}} sessions scored",
@@ -3697,7 +3711,7 @@
 		"subtitle": "One agent moved from one model to others on a model matrix experiment: a verdict per model pair overall and per stratum (exact sign-flip test, Holm across the strata), cost per verified success and why it moved, behaviour differences, flipped tasks and a recommendation that follows the release policy and is never stronger than the tests.",
 		"listError": "Could not load experiments",
 		"noExperiments": "No experiments yet. Run `heimdall migrate -agent <config> -from <model> -to <model> -suite <suite> -yes`, then read its report here.",
-		"experiment": "Experiment {{id}}",
+		"experiment": "Comparison {{id}}",
 		"fromLabel": "Old model or setup",
 		"toLabel": "New models or setups",
 		"loadError": "Could not load the migration report",
@@ -3723,7 +3737,8 @@
 			"wall": "Median wall s",
 			"steps": "Median steps",
 			"latency": "Latency per turn",
-			"pareto": "Pareto position"
+			"pareto": "Pareto position",
+			"costPerRunMean": "Average cost per run"
 		},
 		"overall": "Overall:",
 		"strata": {
@@ -3789,9 +3804,9 @@
 			"row": {
 				"model": "Model (served)",
 				"runs": "Graded runs (verified)",
-				"perRun": "Cost per run",
+				"perRun": "Average cost per run",
 				"perSuccess": "Cost per verified success",
-				"cacheNeutral": "Cache-neutral cost per success",
+				"cacheNeutral": "Cost if nothing were cached",
 				"cacheRead": "Cache read share",
 				"turns": "Model turns per run",
 				"tokensPerTurn": "Input / output tokens per turn",
@@ -4020,34 +4035,34 @@
 		"closeMenu": "Close navigation",
 		"groupToggle": "Show or hide {{group}}",
 		"groups": {
-			"agents": "Agents",
 			"test": "Test",
-			"tasks": "Tasks",
-			"watch": "Watch",
-			"release": "Release",
-			"settings": "Settings"
+			"results": "Results",
+			"benchmarks": "Benchmarks",
+			"production": "Production"
 		},
 		"nav": {
 			"home": "Home",
-			"agents": "My agents",
+			"agents": "Agents",
 			"leaderboard": "Leaderboard",
 			"improvements": "Improvements",
 			"evaluations": "Evaluations",
 			"experiments": "Comparisons",
 			"failureTests": "Failure tests",
-			"mcpTest": "Test my MCP server",
-			"runs": "Runs and traces",
+			"mcpTest": "MCP server test",
+			"runs": "Runs",
 			"suites": "Benchmarks",
-			"labelling": "Labelling",
-			"whyAgentsFail": "Why agents fail",
-			"scheduledChecks": "Scheduled checks",
-			"live": "Live sessions",
+			"labelling": "Human review",
+			"whyAgentsFail": "Failures",
+			"scheduledChecks": "Schedules",
+			"live": "Live scoring",
 			"releases": "Releases",
 			"settings": "Settings",
-			"monitors": "Safety monitors",
-			"quickstart": "Get started"
+			"monitors": "Safety monitor tests",
+			"inbox": "Production failures",
+			"gateway": "Gateway",
+			"docs": "Guides"
 		},
-		"backHome": "Go to Home",
+		"backHome": "Back to Home",
 		"error": {
 			"title": "This page failed to load",
 			"description": "Something on this page broke while it loaded. The rest of the app still works.",
@@ -4058,22 +4073,25 @@
 			"agents": "The agents you test: their versions, report cards and setup.",
 			"leaderboard": "How each agent and version ranks, at what cost, and how it holds up under faults.",
 			"improvements": "Your agent rewriting its own prompt and skills, each change kept only when it wins on unseen tasks.",
-			"evaluations": "Your agent scored on many benchmarks at once, with a report card per version and model.",
-			"experiments": "Two agents or versions on the same tasks, with a clear verdict on which is better.",
+			"evaluations": "Your agent scored on many benchmarks at once, with a report card per version and model. Open one and press Share to send a link.",
+			"experiments": "Two agents or versions on the same tasks, with a clear result on which is better.",
 			"failureTests": "How your agent copes when the model goes down, a tool breaks or an instruction misleads it.",
 			"mcpTest": "Your own MCP server tested: how it behaves, then which tools work for standard agents on real tasks.",
 			"runs": "Every attempt by an agent at a task, step by step. Pick two to compare.",
 			"suites": "Sets of tasks your agents are tested on. Add one from the catalog or import your own.",
 			"labelling": "People label agent answers or judge decisions, with agreement measured, to check and calibrate judges.",
-			"whyAgentsFail": "Where your agents break: failure patterns per version and groups of similar failures.",
+			"whyAgentsFail": "Where your agents break on benchmarks: failure patterns per version and groups of similar failures.",
 			"scheduledChecks": "Small benchmarks re-run on a schedule to catch an agent or model getting worse.",
-			"live": "Quality scores for real agent sessions as they happen.",
-			"releases": "Which agent version shipped, the runs a person checked, and the rules a version must pass.",
-			"settings": "API keys, workers, usage, files, background jobs, integrations and members.",
-			"monitors": "Rules that watch runs and flag problems",
-			"quickstart": "Set up Heimdall step by step"
+			"live": "Scores for real agent sessions as they happen.",
+			"releases": "Which agent version shipped, the runs a person checked, and the rules a version must pass. Open one and press Share to send a link.",
+			"settings": "Model keys, usage, workers, members, files, background jobs and integrations.",
+			"monitors": "Check that your safety monitors catch what they should.",
+			"gateway": "What each Bifrost feature does to cost and score.",
+			"inbox": "Failed real sessions sent from your traces, grouped and turned into tasks.",
+			"docs": "Guides for every page."
 		},
-		"help": "Help: what do these words mean?"
+		"help": "Help: what do these words mean?",
+		"moreActions": "More actions"
 	},
 	"home": {
 		"title": "Home",
@@ -4086,8 +4104,8 @@
 			"addSuiteHint": "Bring in tasks from a public benchmark or your own code.",
 			"addAgent": "Add an agent",
 			"addAgentHint": "Tell Heimdall which agent program and AI model to use.",
-			"getStarted": "Get started",
-			"getStartedHint": "Four commands, run from your own code folder."
+			"getStarted": "Evaluate an agent",
+			"getStartedHint": "Pick an agent, pick benchmarks, get a report card."
 		},
 		"running": {
 			"title": "Running now",
@@ -4101,7 +4119,7 @@
 				"slot_started": "Setting up the workspace",
 				"stage": "{{stage}}",
 				"slot_sealed": "Saved",
-				"budget_stop": "Stopped: spending limit reached",
+				"budget_stop": "Stopped: spending limit reached. Raise the budget and continue.",
 				"experiment_done": "Finished",
 				"error": "Something went wrong",
 				"end": "No more live updates"

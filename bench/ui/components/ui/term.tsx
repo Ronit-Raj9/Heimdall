@@ -63,7 +63,7 @@ export function Term({ k, children, showTechnical = false, className, testId }: 
 					data-testid={testId}
 					className={cn(
 						"decoration-muted-foreground/70 cursor-help underline decoration-dotted underline-offset-[3px]",
-						"focus-visible:ring-ring/60 rounded-sm focus-visible:ring-2 focus-visible:outline-none",
+						"focus-visible:ring-(--focus) rounded-sm focus-visible:ring-2 focus-visible:outline-none",
 						className,
 					)}
 				>
