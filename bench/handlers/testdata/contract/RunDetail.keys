@@ -22,3 +22,6 @@ canonical?
 adapter_fault?
 debug_allowed?
 output?
+suite_title?
+task_title?
+failure?

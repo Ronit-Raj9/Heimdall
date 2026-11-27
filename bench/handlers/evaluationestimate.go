@@ -11,6 +11,7 @@ package handlers
 // lists every arm model; otherwise known is false and nothing is guessed.
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -765,7 +766,7 @@ func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, want []string
 		be.EstCostUSD.High += hi
 		costKnown = costKnown && ok
 		if !ok && a.CostUSD.Reason != "" {
-			be.Notes = append(be.Notes, fmt.Sprintf("arm %s cost: %s", a.Arm, a.CostUSD.Reason))
+			be.Notes = append(be.Notes, fmt.Sprintf("arm %s cost: %s", cmp.Or(a.Label, a.Arm), a.CostUSD.Reason))
 		}
 		lo, hi, ok = rangeBounds(a.AgentTimeS)
 		agentLow += lo

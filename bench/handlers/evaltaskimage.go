@@ -90,7 +90,6 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 	set := map[string]any{"build.base_arg": taskImageBaseArg}
 	b := *cfg.Build
 	b.BaseArg = taskImageBaseArg
-	variant := "agents/" + cfg.ID + ".yaml with build.base_arg " + taskImageBaseArg
 	if lib := agents["agents/"+cfg.ID+"-task.yaml"]; lib != nil && lib.Build != nil && lib.Build.BaseArg != "" && lib.Build.Dockerfile != "" {
 		b = *lib.Build
 		set = map[string]any{"build.base_arg": b.BaseArg, "build.dockerfile": b.Dockerfile, "build.tag": b.Tag}
@@ -100,14 +99,13 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 		if lib.Image != "" {
 			set["image"] = lib.Image
 		}
-		variant = "the build of agents/" + lib.ID + ".yaml"
 	} else if cfg.Image != b.Tag {
 		set["image"] = b.Tag
 	}
 	if root != "" && !dockerfileUsesArg(filepath.Join(root, b.Dockerfile), b.BaseArg) {
 		return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile %s does not start FROM ${%s})", cfg.ID, b.Dockerfile, b.BaseArg)}
 	}
-	return taskImageVariant{Set: set, Note: fmt.Sprintf("agent %s is built on each task's own image here (%s)", cfg.ID, variant)}
+	return taskImageVariant{Set: set, Note: fmt.Sprintf("agent %s is built on each task's own image here", cfg.ID)}
 }
 
 // scriptedAdapterName runs in the task image already.
