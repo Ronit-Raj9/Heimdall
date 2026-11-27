@@ -27,6 +27,15 @@ const api = vi.hoisted(() => ({
 	github: { connected: true } as { connected: boolean },
 }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+// M6-27: the builder model comes from the shared model picker; stub its key list and the picker.
+vi.mock("@/lib/store/apis/modelsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/modelsApi")>()),
+	useGetModelsQuery: () => ({ data: { providers: [], keys: [] } }),
+}));
+vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
+	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
+	GroupedModelPicker: ({ testId }: { testId?: string }) => <select data-testid={`${testId}-model`} />,
+}));
 vi.mock("@/lib/store/apis/issuebenchApi", () => ({
 	useGetIssueReadinessQuery: (...args: unknown[]) => {
 		api.readinessArgs = args;

@@ -1,4 +1,5 @@
 import "@/components/agents/hw02I18n";
+import "@/components/suites/w4iwidI18n";
 import { ConfirmButton } from "@/components/platform/badges";
 import { DELETE_ROLE } from "@/lib/constants/deleteRole";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -13,21 +14,25 @@ import { useTranslation } from "react-i18next";
  */
 export function SuiteDeleteSection({ suiteId, builtin }: { suiteId: string; builtin: boolean }) {
 	const { t } = useTranslation("hw02");
+	// M6-35: the same question and labels as the Delete of a benchmarks list row (w4iwid delete.*).
+	const { t: tw } = useTranslation("w4iwid");
 	const session = useSession();
 	const navigate = useNavigate();
 	const [remove, state] = useDeleteSuiteMutation();
 	if (builtin || !canUse(session, DELETE_ROLE)) return null;
 	return (
-		<div className="border-destructive/30 mt-5 flex min-w-0 flex-col gap-2 rounded-lg border p-4" data-testid="suite-delete">
+		// M6-35: a plain section under a top border, not a red card; the button is an outline, not a filled red one.
+		<section className="mt-2 flex min-w-0 flex-col gap-2 border-t pt-5" data-testid="suite-delete">
 			<h3 className="text-sm font-semibold">{t("suiteDelete.title")}</h3>
 			<p className="text-muted-foreground text-sm">{t("suiteDelete.body")}</p>
 			<div>
 				<ConfirmButton
 					label={t("suiteDelete.button")}
-					question={t("suiteDelete.question", { id: suiteId })}
-					confirmLabel={t("suiteDelete.confirm")}
-					cancelLabel={t("suiteDelete.cancel")}
-					variant="destructive"
+					question={tw("delete.suite", { name: suiteId })}
+					confirmLabel={tw("delete.confirm")}
+					cancelLabel={tw("delete.cancel")}
+					variant="outline"
+					className="text-destructive border-destructive/40 hover:text-destructive"
 					isLoading={state.isLoading}
 					testId="suite-delete-button"
 					onConfirm={() =>
@@ -43,6 +48,6 @@ export function SuiteDeleteSection({ suiteId, builtin }: { suiteId: string; buil
 					{authoringError(state.error, t("suiteDelete.failed"))}
 				</p>
 			)}
-		</div>
+		</section>
 	);
 }

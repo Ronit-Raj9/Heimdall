@@ -1,4 +1,4 @@
-import { GradingBadge, JudgedNotice, OutputBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
+import { JudgedNotice, OutputBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -6,6 +6,7 @@ import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./uf6aI18n";
 import { CopyCodeBlock } from "./copyCodeBlock";
 import { LockBadge, VerifierBadge } from "./suiteBadges";
 import { LockKindBadge } from "./suiteLockKind";
@@ -31,22 +32,34 @@ export function SuiteFacts({
 	showImported?: boolean;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
 	const locale = getLocale();
-	const none = <span className="text-muted-foreground">{t("suites.facts.none")}</span>;
+	// M6-36: an empty fact is a plain dash, not the word "none".
+	const none = <span className="text-muted-foreground">-</span>;
 	const grading = suiteGrading(suite);
 	const services = suite.services ?? [];
 	const facts: { label: string; value: React.ReactNode; testId: string }[] = [
 		{ label: t("suites.facts.track"), value: <TrackBadge track={suiteTrack(suite)} />, testId: "track" },
-		{ label: t("suites.facts.grading"), value: <GradingBadge grading={grading} />, testId: "grading" },
+		// M6-36: grading as plain words (no green "Verified" on a benchmark that may not be finished).
+		{
+			label: t("suites.facts.grading"),
+			value: <span title={t(`scenario.grading.${grading}Hint`)}>{t(`scenario.grading.${grading}`)}</span>,
+			testId: "grading",
+		},
 		{ label: t("suites.facts.output"), value: <OutputBadge output={suite.output || "diff"} />, testId: "output" },
 		{
 			label: t("suites.facts.services"),
 			value: services.length > 0 ? <span className="break-all">{services.join(", ")}</span> : none,
 			testId: "services",
 		},
+	];
+	// M6-36: ids and hashes are for experts: they sit behind "Technical details".
+	const technical: { label: string; value: React.ReactNode; testId: string }[] = [
 		{ label: t("suites.facts.environment"), value: <code>{suite.environment}</code>, testId: "environment" },
 		{ label: t("suites.facts.grader"), value: <code>{suite.grader}</code>, testId: "grader" },
 		{ label: t("suites.facts.verifier"), value: <VerifierBadge format={suite.verifier_result} />, testId: "verifier" },
+	];
+	facts.push(
 		{
 			label: t("suites.facts.timeout"),
 			value: suite.verifier_timeout_s ? t("suites.facts.seconds", { count: suite.verifier_timeout_s }) : none,
@@ -55,6 +68,8 @@ export function SuiteFacts({
 		...(suite.pass_threshold !== null
 			? [{ label: t("suites.facts.threshold"), value: <span className="tabular-nums">{suite.pass_threshold}</span>, testId: "threshold" }]
 			: []),
+	);
+	technical.push(
 		{ label: t("suites.facts.image"), value: <code className="break-all">{suite.base_image.tag}</code>, testId: "image" },
 		{
 			label: t("suites.facts.digest"),
@@ -67,7 +82,17 @@ export function SuiteFacts({
 			testId: "lock-hash",
 		},
 		{ label: t("suites.facts.lockedAt"), value: formatDateTime(suite.locked_at ?? undefined, locale) ?? none, testId: "locked-at" },
-	];
+	);
+	const factList = (list: typeof facts, mono: boolean) => (
+		<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
+			{list.map((fact) => (
+				<div key={fact.testId} className="flex min-w-0 flex-col gap-0.5" data-testid={`suites-fact-${fact.testId}`}>
+					<dt className="text-muted-foreground">{fact.label}</dt>
+					<dd className={mono ? "text-foreground min-w-0 font-mono" : "text-foreground min-w-0"}>{fact.value}</dd>
+				</div>
+			))}
+		</dl>
+	);
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid="suites-facts">
 			<div className="flex flex-wrap items-center gap-2">
@@ -84,14 +109,11 @@ export function SuiteFacts({
 					</Link>
 				)}
 			</div>
-			<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
-				{facts.map((fact) => (
-					<div key={fact.testId} className="flex min-w-0 flex-col gap-0.5" data-testid={`suites-fact-${fact.testId}`}>
-						<dt className="text-muted-foreground">{fact.label}</dt>
-						<dd className="text-foreground min-w-0 font-mono">{fact.value}</dd>
-					</div>
-				))}
-			</dl>
+			{factList(facts, false)}
+			<details className="text-xs" data-testid="suites-facts-technical">
+				<summary className="text-muted-foreground hover:text-foreground cursor-pointer">{tf("facts.technical")}</summary>
+				<div className="mt-2">{factList(technical, true)}</div>
+			</details>
 			{suite.artifacts && suite.artifacts.length > 0 && <DeclaredArtifacts artifacts={suite.artifacts} testId="suites-artifacts" />}
 			{grading === "judged" && <JudgedNotice testId="suites-judged-note" />}
 			{showImported && suite.imported && <ImportedFrom record={suite.imported} />}

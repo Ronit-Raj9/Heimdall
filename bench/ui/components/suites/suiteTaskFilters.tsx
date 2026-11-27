@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useAdmissionLabel } from "./suiteBadges";
+import "./uf6aI18n";
 import type { AdmissionState, FilterOptions, TaskFilters } from "./suites.utils";
 
 /** The value the select uses for "no filter": Radix Select needs a non-empty value per item. */
@@ -12,14 +15,38 @@ export interface SuiteTaskFiltersProps {
 	options: FilterOptions;
 	onChange: (next: Partial<TaskFilters>) => void;
 	onReset: () => void;
+	/** M6-1: the search text (task id or title) and its change handler; no search box when absent. */
+	search?: string;
+	onSearch?: (next: string) => void;
+	/** X-44: controls that sit at the end of the filter row (the columns toggle). */
+	trailing?: ReactNode;
 }
 
 /** Kind, difficulty, capability and admission filters. Options are the values this suite has. */
-export function SuiteTaskFilters({ filters, options, onChange, onReset }: SuiteTaskFiltersProps) {
+export function SuiteTaskFilters({ filters, options, onChange, onReset, search, onSearch, trailing }: SuiteTaskFiltersProps) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf6a");
+	const admissionLabel = useAdmissionLabel();
+	const searchId = useId();
 	const active = Boolean(filters.kind || filters.difficulty || filters.capability || filters.status);
 	return (
 		<div className="flex flex-wrap items-end gap-3" role="group" aria-label={t("suites.filters.label")} data-testid="suites-task-filters">
+			{onSearch && (
+				<div className="flex w-full min-w-0 flex-col gap-1 sm:w-64">
+					<label htmlFor={searchId} className="text-muted-foreground text-xs">
+						{tf("tasks.search")}
+					</label>
+					<Input
+						id={searchId}
+						type="search"
+						value={search ?? ""}
+						placeholder={tf("tasks.searchPlaceholder")}
+						onChange={(event) => onSearch(event.target.value)}
+						className="h-8"
+						data-testid="suites-task-search"
+					/>
+				</div>
+			)}
 			<FilterSelect
 				label={t("suites.filters.kind")}
 				value={filters.kind}
@@ -45,9 +72,9 @@ export function SuiteTaskFilters({ filters, options, onChange, onReset }: SuiteT
 				testId="suites-filter-capability"
 			/>
 			<FilterSelect
-				label={t("suites.filters.status")}
+				label={tf("tasks.statusColumn")}
 				value={filters.status}
-				options={options.statuses.map((status) => ({ value: status, label: t(`suites.status.${status}`) }))}
+				options={options.statuses.map((status) => ({ value: status, label: admissionLabel(status) }))}
 				onChange={(status) => onChange({ status: status as AdmissionState | null })}
 				testId="suites-filter-status"
 			/>
@@ -56,6 +83,7 @@ export function SuiteTaskFilters({ filters, options, onChange, onReset }: SuiteT
 					{t("suites.filters.reset")}
 				</Button>
 			)}
+			{trailing && <div className="ml-auto flex items-end">{trailing}</div>}
 		</div>
 	);
 }
@@ -73,12 +101,14 @@ function FilterSelect({ label, value, options, onChange, testId }: FilterSelectP
 	const id = useId();
 	// A value the suite does not have (an old URL) still shows as selected.
 	const all = value && !options.some((o) => o.value === value) ? [{ value, label: value }, ...options] : options;
+	// M6-8: a filter with no option to pick is not shown, not shown disabled.
+	if (all.length === 0) return null;
 	return (
 		<div className="flex min-w-0 flex-col gap-1">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
-			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)} disabled={all.length === 0}>
+			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)}>
 				<SelectTrigger id={id} size="sm" className="min-w-32 text-xs" data-testid={testId}>
 					<SelectValue />
 				</SelectTrigger>

@@ -34,6 +34,14 @@ describe("admissionState", () => {
 		expect(admissionState(failed)).toBe("draft");
 		expect(admissionState({ ...failed, status: "quarantined" })).toBe("quarantined");
 	});
+	it("M6-2: a task whose check never ran is unchecked, not failed", () => {
+		const never = { ...acme.tasks[2], admitted: false, status: "draft", checks: [] } as SuiteTask;
+		expect(admissionState(never)).toBe("unchecked");
+	});
+	it("M6-4: ids sort with numbers in order", () => {
+		const tasks = ["t-10", "t-2", "t-1", "t-0"].map((id) => ({ ...acme.tasks[0], id }));
+		expect(ids(sortTasks(tasks, { key: "id", dir: "asc" }))).toEqual(["t-0", "t-1", "t-2", "t-10"]);
+	});
 });
 
 describe("sort", () => {

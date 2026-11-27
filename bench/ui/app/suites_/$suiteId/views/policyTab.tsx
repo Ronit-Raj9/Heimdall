@@ -4,6 +4,8 @@ import { ConfirmButton } from "@/components/platform/badges";
 import type { PickedModel } from "@/components/models/groupedModelPicker";
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import { Input } from "@/components/ui/input";
+import { FileDrop } from "@/components/onboard/sourceBox";
+import { Link } from "@tanstack/react-router";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
@@ -20,7 +22,7 @@ import {
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import type { JsonValue, SuiteSummary } from "@/lib/types/bench";
 import type { PolicyClause, PolicyDocView, PolicyDraft, PolicyGenerateParams, PolicyRate, PolicyReport } from "@/lib/types/policyDocs";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -109,15 +111,21 @@ function UploadSection({ suite, onUploaded, blocked = false }: { suite: string; 
 		<section className="flex flex-col gap-2" data-testid="policy-upload">
 			<h3 className="text-sm font-medium">{t("upload.title")}</h3>
 			<div className="flex flex-wrap items-center gap-2">
-				<Input
-					type="file"
-					accept=".pdf,.docx,.md,.markdown,.txt"
-					className="h-9 w-72"
-					aria-label={t("upload.file")}
-					disabled={blocked}
-					onChange={(e: ChangeEvent<HTMLInputElement>) => (setFile(e.target.files?.[0] ?? null), setPreview(null))}
-					data-testid="policy-upload-file"
-				/>
+				{/* M6-21: the same drop zone as Add benchmark, not the native file input. */}
+				<div className="w-full sm:w-80">
+					<FileDrop
+						file={file}
+						onFile={(f) => {
+							setFile(f);
+							setPreview(null);
+						}}
+						accept=".pdf,.docx,.md,.markdown,.txt"
+						disabled={blocked}
+						label={file ? file.name : t("upload.file")}
+						testId="policy-upload-drop"
+						inputTestId="policy-upload-file"
+					/>
+				</div>
 				<Button
 					variant="outline"
 					disabled={blocked || !file || state.isLoading}
@@ -585,8 +593,10 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 	// No support task to copy: say so before anything is uploaded or a job fails.
 	const noShape = !!list.data && !list.data.shape;
 	const current = (docs.some((d) => d.id === doc) ? doc : "") || docs[0]?.id || "";
-	const onDelete = (id: string, name: string) => {
-		if (typeof window !== "undefined" && !window.confirm(t("docs.deleteConfirm", { name }))) return;
+	// M6-75: the in-page confirm, not window.confirm.
+	const confirm = useConfirm();
+	const onDelete = async (id: string, name: string) => {
+		if (!(await confirm(t("docs.deleteConfirm", { name })))) return;
 		void remove({ suite: suite.id, doc: id }).then((r) => {
 			if (!("error" in r) && id === doc) setDoc("");
 		});
@@ -600,12 +610,17 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 				</p>
 			)}
 			{noShape && (
-				<p
-					role="note"
-					className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink max-w-3xl rounded-sm border px-4 py-2 text-sm"
-					data-testid="policy-no-shape"
-				>
-					{t("noShape")}
+				// M6-17: "does not apply here" is a neutral note with the way out, not a red error.
+				<p role="note" className="bg-muted/40 text-foreground max-w-3xl rounded-sm border px-4 py-2 text-sm" data-testid="policy-no-shape">
+					{t("noShape")}{" "}
+					<Link
+						to="/suites/new"
+						search={{ template: "support" } as never}
+						className="text-primary hover:underline"
+						data-testid="policy-no-shape-create"
+					>
+						{t("noShapeLink")}
+					</Link>
 				</p>
 			)}
 			{writable && <UploadSection suite={suite.id} onUploaded={setDoc} blocked={noShape} />}
@@ -637,7 +652,7 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 										size="sm"
 										variant="ghost"
 										disabled={removeState.isLoading}
-										onClick={() => onDelete(d.id, d.title || d.name || d.id)}
+										onClick={() => void onDelete(d.id, d.title || d.name || d.id)}
 										dataTestId={`policy-doc-delete-${d.id}`}
 									>
 										{t("docs.delete")}

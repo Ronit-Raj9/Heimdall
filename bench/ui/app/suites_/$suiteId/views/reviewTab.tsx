@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/uf6aI18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -101,9 +102,10 @@ export const canDecide = (decision: "accepted" | "rejected", note: string) => de
 export function ReviewTab({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-review-tab">
+			{/* M6-78: the free quality checks come first; the paid drafting after them. */}
+			<QualitySection suite={suite} />
 			<DraftSection suite={suite} />
 			<QueueSection suite={suite} />
-			<QualitySection suite={suite} />
 			<GuardChecks suite={suite} />
 			<SplitSection suite={suite} />
 		</div>
@@ -118,6 +120,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 		judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"],
 	);
 	const { t: tm } = useTranslation("hw15");
+	const { t: tf } = useTranslation("uf6a");
 	const queue = useGetGeneratedTasksQuery(suite.id);
 	const [picked, setPicked] = useState<PickedModel | null>(null);
 	// N278: the picker starts on the last assist model recorded on the generated fields, until a person picks.
@@ -151,7 +154,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 						<label key={op} className={cn("flex items-start gap-2 text-sm", off && "opacity-50")}>
 							<input
 								type="checkbox"
-								className="mt-1"
+								className="mt-0.5 size-4 shrink-0"
 								checked={ops.includes(op) && !off}
 								disabled={off}
 								onChange={() => toggle(op)}
@@ -192,7 +195,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 					<JobRunButton
 						kind={ASSIST_KIND}
 						params={run}
-						label={t("draft.run")}
+						label={tf("review.run", { budget: budget.toFixed(2) })}
 						confirm={t("draft.confirm", { model: `${provider.trim()}/${model.trim()}`, budget: budget.toFixed(2) })}
 						onDone={onDone}
 					/>
@@ -232,16 +235,22 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 				</p>
 			) : !q.data || q.data.tasks.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="suite-review-queue-empty">
-					{tp("reviewEmpty")}{" "}
-					<Link
-						to="/suites/$suiteId"
-						params={{ suiteId: suite.id }}
-						search={{ tab: "policy" } as never}
-						className="text-primary underline"
-						data-testid="suite-review-queue-policy-link"
-					>
-						{tp("reviewEmptyLink")}
-					</Link>
+					{tp("reviewEmpty")}
+					{/* The policy section applies to support benchmarks only (M6-17). */}
+					{suite.track === "support" && (
+						<>
+							{" "}
+							<Link
+								to="/suites/$suiteId"
+								params={{ suiteId: suite.id }}
+								search={{ tab: "policy" } as never}
+								className="text-primary underline"
+								data-testid="suite-review-queue-policy-link"
+							>
+								{tp("reviewEmptyLink")}
+							</Link>
+						</>
+					)}
 				</p>
 			) : (
 				<>

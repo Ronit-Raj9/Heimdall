@@ -30,7 +30,8 @@ export function suitePillState(suite: Pick<SuiteSummary, "error" | "task_count" 
 
 const DOT_TONE: Record<SuitePillState, string> = {
 	ready: "bg-chart-success",
-	needsAdmission: "bg-chart-warning",
+	// M6-45: partly ready is normal (a built-in benchmark admits a subset by design): neutral, not amber.
+	needsAdmission: "bg-muted-foreground/60",
 	notReady: "bg-muted-foreground/60",
 	frozenNotChecked: "bg-muted-foreground/60",
 	needsLock: "bg-chart-warning",

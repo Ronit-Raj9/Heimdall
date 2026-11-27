@@ -58,3 +58,28 @@ describe("SuiteTasksTab opened from a link", () => {
 		expect(panel.scrollIntoView).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("SuiteTasksTab paging (M6-1)", () => {
+	const big = {
+		id: "hd-harbor-bfcl",
+		version: "1.0.0",
+		tasks: Array.from({ length: 3641 }, (_, i) => task(`bfcl-${i}`)),
+	} as unknown as SuiteSummary;
+	it("counts the page of 50 rows and has no second Tasks heading", () => {
+		query.q = {};
+		const html = renderToStaticMarkup(<SuiteTasksTab suite={big} health={health} />);
+		expect(html).toContain("1 to 50 of 3641 tasks");
+		expect(html).toContain('data-testid="suites-tasks-next"');
+		expect(html).not.toContain("<h2");
+	});
+	it("page 2 reads 51 to 100", () => {
+		query.q = { page: 2 as unknown as string };
+		const html = renderToStaticMarkup(<SuiteTasksTab suite={big} health={health} />);
+		expect(html).toContain("51 to 100 of 3641 tasks");
+	});
+	it("a search narrows the count", () => {
+		query.q = { q: "bfcl-364" };
+		const html = renderToStaticMarkup(<SuiteTasksTab suite={big} health={health} />);
+		expect(html).toContain("1 to 2 of 2 matching tasks (3641 in all)");
+	});
+});

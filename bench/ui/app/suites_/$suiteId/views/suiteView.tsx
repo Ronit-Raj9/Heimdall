@@ -19,8 +19,13 @@ import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/app/failure-tests/views/gw07I18n";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Boxes, CircleCheck, History, ListChecks, type LucideIcon, Radar, Trophy } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { AlertTriangle, Boxes, ListChecks, Trophy } from "lucide-react";
+import { useGetReferenceBoardQuery } from "@/lib/store/apis/referenceApi";
+import { usePageTitle } from "@/lib/routing/pageTitle";
+import { READINESS_CHECKLIST_ID } from "@/components/suites/readinessChecklist";
+import "@/components/suites/uf6aI18n";
+import { parseAsString, useQueryState } from "nuqs";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { BuildTab } from "./buildTab";
 import { PolicyTab } from "./policyTab";
@@ -79,6 +84,41 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 	return <SuiteBody suite={suite} mode={suite.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
 }
 
+/**
+ * M6-11: the five tabs of a benchmark and the old tab ids each one answers to, so old links keep
+ * working (?tab=ops opens Build at the readiness section). Exported for tests.
+ */
+export const TAB_ALIASES = {
+	build: ["ops", "policy", "review"],
+	quality: ["health", "tiers", "calibration"],
+	files: ["edit", "export"],
+	settings: ["data"],
+} as const;
+
+/** The section id an old tab id scrolls to inside its new tab (ops opens Build at the readiness steps). */
+export function aliasSection(tab: string | null): string | null {
+	switch (tab) {
+		case "ops":
+			return "suite-section-readiness";
+		case "policy":
+		case "review":
+		case "tiers":
+		case "calibration":
+		case "export":
+		case "data":
+			return `suite-section-${tab}`;
+		default:
+			return null;
+	}
+}
+
+/** M6-10: the one facts line under the title, "3641 tasks, 36 ready, 103 runs so far". */
+export function headerFacts(
+	parts: { tasks: string; ready: string; probes?: string | null; runs?: string | null },
+): string {
+	return [parts.tasks, parts.ready, parts.probes, parts.runs].filter(Boolean).join(", ");
+}
+
 function SuiteBody({
 	suite,
 	mode,
@@ -94,9 +134,8 @@ function SuiteBody({
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("suitesUx");
 	const { t: tb } = useTranslation("suiteBuild");
-	const { t: td } = useTranslation("benchData");
 	const { t: tpd } = useTranslation("policyDocs");
-	const { t: ta } = useTranslation("authoring");
+	const { t: tf } = useTranslation("uf6a");
 	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
 	const healthQuery = useGetSuiteHealthQuery(suite.id, {
 		skip: Boolean(suite.error),
@@ -106,68 +145,93 @@ function SuiteBody({
 	const builtin = isBuiltinSuite(suite);
 	const tasks = suite.tasks.length;
 	const definedTiers = (suite.tiers ?? []).filter((tier) => tier.defined).length;
+	// M6-17: the policy section only applies to a support benchmark (a simulated customer to copy).
+	const hasSupportTrack = suite.track === "support";
+	// M6-11: five tabs; the old ids are aliases, so every old link still lands on its content.
 	const tabs: RouteTab[] = [
 		{ id: "tasks", label: tu("tabs.tasks"), badge: tasks },
-		{ id: "build", label: tb("tab"), hidden: builtin }, // X13: grader, add tasks, held out, readiness
-		{ id: "data", label: td("tab"), hidden: builtin }, // Y15: personal data policy, access, versions, platform imports
-		{ id: "policy", label: tpd("tab"), hidden: builtin }, // Z23: policy document to compliance benchmark
-		{ id: "review", label: ta("tab"), hidden: builtin }, // Z19: draft with a model, review generated tasks, quality checks, held out
-		{ id: "settings", label: tu("tabs.settings") },
-		{ id: "health", label: tu("tabs.health") },
-		// C2.levels: the implicit nightly level (defined false) is not a difficulty level the suite set.
-		{
-			id: "tiers",
-			label: tu("tabs.tiers"),
-			hidden: definedTiers === 0,
-			badge: definedTiers || undefined,
-		},
-		{ id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
-		{ id: "ops", label: tu("tabs.ops") },
-		editTabEntry(tu("tabs.edit"), builtin), // L10 suite authoring; a built-in library suite is read-only; N271: ?tab=files opens it
-		{ id: "export", label: tu("tabs.export") },
+		{ id: "build", label: tb("tab"), hidden: builtin, aliases: TAB_ALIASES.build },
+		{ id: "quality", label: tf("tabs.quality"), aliases: TAB_ALIASES.quality },
+		{ id: "files", label: tf("tabs.files"), aliases: TAB_ALIASES.files },
+		{ id: "settings", label: tu("tabs.settings"), aliases: TAB_ALIASES.settings },
 	];
+	// An old tab id in the link scrolls its section into view once the merged tab renders.
+	const [rawTab] = useQueryState("tab", parseAsString);
+	useEffect(() => {
+		const id = aliasSection(rawTab);
+		if (!id || typeof document === "undefined") return;
+		const timer = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "start" }), 50);
+		return () => window.clearTimeout(timer);
+	}, [rawTab]);
+	// M1-12: a task link from a run names the version it used in ?rev=.
+	const [rev] = useQueryState("rev", parseAsString);
+	const askedVersion = requestedVersion ?? rev;
+	// M1-8, M3-19: the browser tab names the benchmark.
+	usePageTitle(`${suiteDisplayName(suite.id, suite)} · ${t("suites.title")} · Heimdall`);
 	const { t: tg } = useTranslation("gw07");
 	// Runs so far comes from the run list (GET /runs total), not the health report: the health report can be slow or
 	// fail on a big benchmark, and "None yet" must only mean there are no runs (fix wave 2, N164).
 	const runList = useListRunsQuery({ benchmark: suite.id, limit: 1 }, { skip: Boolean(suite.error) });
-	const runsValue = runList.data ? (
-		runList.data.total === 0 ? (
-			tu("stats.never")
-		) : (
-			runList.data.total
-		)
-	) : runList.isError ? (
-		<span title={getBenchErrorMessage(runList.error)} data-testid="suite-runs-error">
-			-
-		</span>
-	) : (
-		<span className="text-muted-foreground text-base font-normal">{tg("suite.counting")}</span>
-	);
+	const runsText = runList.data
+		? runList.data.total === 0
+			? tf("header.noRuns")
+			: tf("header.runs", { count: runList.data.total })
+		: runList.isError
+			? null
+			: tg("suite.counting");
+	const facts = headerFacts({
+		tasks: tf("header.tasks", { count: suite.task_count }),
+		ready: tf("header.ready", { count: suite.admitted_count }),
+		probes: (suite.probes ?? []).length > 0 ? tf("header.probes", { count: (suite.probes ?? []).length }) : null,
+		runs: runsText,
+	});
+	// M6-13: an own benchmark with no ready task says what to do, and offers the steps instead of Run.
+	const noneReady = !builtin && !suite.error && suite.task_count > 0 && suite.admitted_count === 0;
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suite-screen">
 			<PageHeader
 				title={
-					<span className="flex min-w-0 flex-col gap-0.5">
-						<span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{suiteDisplayName(suite.id, suite)}</span>
-						<span className="text-muted-foreground truncate font-mono text-xs font-normal" data-testid="suite-header-line">
-							{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version)}
-						</span>
+					// M6-16: the h1 holds the name only; the id and version line sits under it in the subtitle.
+					<span className="line-clamp-2 min-w-0 text-2xl font-semibold tracking-tight sm:line-clamp-1 sm:text-3xl">
+						{suiteDisplayName(suite.id, suite)}
 					</span>
 				}
 				breadcrumbs={crumbs}
 				subtitle={
 					<span className="flex flex-col gap-0.5" data-testid="suite-plain-subtitle">
+						{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version) && (
+							<span className="text-muted-foreground truncate font-mono text-xs font-normal" data-testid="suite-header-line">
+								{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version)}
+							</span>
+						)}
 						<span>
-							{describedByOwnWords(suite) && suiteDisplayDescription(suite)
-								? suiteDisplayDescription(suite)
-								: tu("pageSubtitle", {
-										count: suite.task_count,
-										skill: suiteSkill(suite) ?? tu("skillFallback"),
-									})}
+							{noneReady
+								? tf("header.notReady", { count: suite.task_count })
+								: describedByOwnWords(suite) && suiteDisplayDescription(suite)
+									? suiteDisplayDescription(suite)
+									: tu("pageSubtitle", {
+											count: suite.task_count,
+											skill: suiteSkill(suite) ?? tu("skillFallback"),
+										})}
 						</span>
-						{!describedByOwnWords(suite) && suiteDisplayDescription(suite) && (
-							<span className="text-muted-foreground line-clamp-2 text-xs">{suiteDisplayDescription(suite)}</span>
+						{/* M6-15: the benchmark's own words only from sm up; on a phone one sentence is enough. */}
+						{!noneReady && !describedByOwnWords(suite) && suiteDisplayDescription(suite) && (
+							<span className="text-muted-foreground hidden text-xs sm:line-clamp-2">{suiteDisplayDescription(suite)}</span>
+						)}
+						{!suite.error && (
+							<span className="text-muted-foreground flex items-center gap-1.5 text-xs tabular-nums" data-testid="suite-stats">
+								<ListChecks className="size-3.5 shrink-0" aria-hidden="true" />
+								{facts}
+								{runList.isError && (
+									<>
+										,{" "}
+										<span title={getBenchErrorMessage(runList.error)} data-testid="suite-runs-error">
+											-
+										</span>
+									</>
+								)}
+							</span>
 						)}
 					</span>
 				}
@@ -186,36 +250,27 @@ function SuiteBody({
 									{t("suites.facts.leaderboard")}
 								</Link>
 							</Button>
-							<SuiteRunButton suiteId={suite.id} size="lg" testId="suite-run" />
+							{noneReady ? (
+								<Button size="lg" asChild>
+									<Link
+										to="/suites/$suiteId"
+										params={{ suiteId: suite.id }}
+										search={{ tab: "tasks" } as never}
+										hash={READINESS_CHECKLIST_ID}
+										data-testid="suite-make-ready"
+									>
+										{tf("header.makeReady")}
+									</Link>
+								</Button>
+							) : (
+								<SuiteRunButton suiteId={suite.id} size="lg" testId="suite-run" />
+							)}
 						</div>
 					)
 				}
 				testId="suite-header"
 			/>
-			{!suite.error && (
-				<div className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-4" data-testid="suite-stats">
-					<StatTile icon={ListChecks} label={tu("stats.tasks")} hint={tu("stats.tasksHint")} value={suite.task_count} />
-					<StatTile
-						icon={CircleCheck}
-						label={tu("stats.admitted")}
-						hint={tu("stats.admittedHint")}
-						value={tu("stats.admittedValue", {
-							ready: suite.admitted_count,
-							total: suite.task_count,
-						})}
-						tone={suite.task_count > 0 && suite.admitted_count === suite.task_count ? "good" : "warn"}
-					/>
-					<StatTile
-						icon={Radar}
-						label={tu("stats.probes")}
-						hint={tu("stats.probesHint")}
-						value={suite.probes.length}
-						note={tg("suite.probesHint")}
-					/>
-					<StatTile icon={History} label={tu("stats.lastRun")} hint={tu("stats.lastRunHint")} value={runsValue} />
-				</div>
-			)}
-			{requestedVersion && requestedVersion !== suite.version && (
+			{askedVersion && askedVersion !== suite.version && (
 				<p
 					role="note"
 					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
@@ -223,7 +278,7 @@ function SuiteBody({
 				>
 					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{t("suites.detail.versionMismatch", {
-						requested: requestedVersion,
+						requested: askedVersion,
 						current: suite.version || "?",
 					})}
 				</p>
@@ -254,30 +309,57 @@ function SuiteBody({
 					<RouteTabs tabs={tabs} defaultTab="tasks" label={t("suites.tabs.label")} testId="suite-tabs">
 						{(active) =>
 							active === "settings" ? (
-								<div className="bg-card min-w-0 rounded-xl border p-5" data-testid="suite-settings">
-									<SuiteFacts suite={suite} showLeaderboard={false} showImported={false} />
+								<div className="flex min-w-0 flex-col gap-6" data-testid="suite-settings">
+									<div className="bg-card min-w-0 rounded-xl border p-5">
+										<SuiteFacts suite={suite} showLeaderboard={false} showImported={false} />
+									</div>
+									{!builtin && (
+										<div id="suite-section-data" className="scroll-mt-4">
+											<DataTab suite={suite} />
+										</div>
+									)}
 									<SuiteDeleteSection suiteId={suite.id} builtin={builtin} />
 								</div>
-							) : active === "health" ? (
-								<SuiteHealthTab suite={suite} health={health} />
-							) : active === "tiers" ? (
-								<SuiteTiersTab suite={suite} />
-							) : active === "calibration" ? (
-								<SuiteCalibrationTab suite={suite} />
+							) : active === "quality" ? (
+								<div className="flex min-w-0 flex-col gap-8" data-testid="suite-quality">
+									<SuiteHealthTab suite={suite} health={health} />
+									{definedTiers > 0 && (
+										<div id="suite-section-tiers" className="scroll-mt-4">
+											<SuiteTiersTab suite={suite} />
+										</div>
+									)}
+									{judged && (
+										<div id="suite-section-calibration" className="scroll-mt-4">
+											<SuiteCalibrationTab suite={suite} />
+										</div>
+									)}
+								</div>
 							) : active === "build" ? (
-								<BuildTab suite={suite} />
-							) : active === "data" ? (
-								<DataTab suite={suite} />
-							) : active === "policy" ? (
-								<PolicyTab suite={suite} />
-							) : active === "review" ? (
-								<ReviewTab suite={suite} />
-							) : active === "ops" ? (
-								<OpsTab suite={suite} />
-							) : active === "edit" ? (
-								<EditTab suite={suite} />
-							) : active === "export" ? (
-								<SuiteExportTab suite={suite} />
+								<div className="flex min-w-0 flex-col gap-8" data-testid="suite-build">
+									<BuildTab suite={suite} />
+									<div id="suite-section-readiness" className="scroll-mt-4">
+										<OpsTab suite={suite} />
+									</div>
+									{hasSupportTrack && (
+										<section id="suite-section-policy" className="flex scroll-mt-4 flex-col gap-3" aria-label={tpd("tab")}>
+											<h2 className="text-foreground text-base font-semibold tracking-tight">{tf("sections.policy")}</h2>
+											<PolicyTab suite={suite} />
+										</section>
+									)}
+									<section id="suite-section-review" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="suite-section-review-title">
+										<h2 id="suite-section-review-title" className="text-foreground text-base font-semibold tracking-tight">
+											{tf("sections.review")}
+										</h2>
+										<ReviewTab suite={suite} />
+									</section>
+								</div>
+							) : active === "files" ? (
+								<div className="flex min-w-0 flex-col gap-8" data-testid="suite-files">
+									<EditTab suite={suite} />
+									<div id="suite-section-export" className="scroll-mt-4">
+										<SuiteExportTab suite={suite} />
+									</div>
+								</div>
 							) : (
 								<SuiteTasksTab suite={suite} health={health} />
 							)
@@ -288,44 +370,6 @@ function SuiteBody({
 		</section>
 	);
 }
-/** One headline number of the suite (local StatCard until the shared one lands). */
-function StatTile({
-	icon: Icon,
-	label,
-	value,
-	tone,
-	hint,
-	note,
-}: {
-	icon: LucideIcon;
-	label: string;
-	value: React.ReactNode;
-	tone?: "good" | "warn";
-	/** Plain explanation shown on hover. */
-	hint?: string;
-	/** A short line under the value, always shown. */
-	note?: string;
-}) {
-	return (
-		<div className="bg-card flex min-w-0 flex-col gap-2 rounded-xl border p-5" title={hint}>
-			<span className={cn("text-muted-foreground flex items-center gap-1.5 text-sm", hint && "cursor-help")}>
-				<Icon className="size-4" aria-hidden="true" />
-				{label}
-			</span>
-			<span
-				className={cn(
-					"text-2xl font-semibold tracking-tight tabular-nums",
-					tone === "good" && "text-chart-success-ink",
-					tone === "warn" && "text-chart-warning-ink",
-				)}
-			>
-				{value}
-			</span>
-			{note && <span className="text-muted-foreground text-xs">{note}</span>}
-		</div>
-	);
-}
-
 /**
  * The Edit files tab entry. A built-in benchmark hides it, but ?tab=edit still opens it, so the
  * read-only note of the Edit tab is reachable (p12-8).
@@ -363,6 +407,9 @@ function suiteSkill(suite: SuiteSummary): string | null {
 /** A built-in benchmark's reference scores: how known agents score here, or a plain note when none is published. */
 function SuiteReferenceScores({ suiteId }: { suiteId: string }) {
 	const { t } = useTranslation("reference");
+	// M6-10: no empty "How known agents score here" box; the section shows only when scores exist.
+	const board = useGetReferenceBoardQuery({ benchmark: suiteId });
+	if (board.data && board.data.entries.length === 0) return null;
 	return (
 		<Section
 			title={t("benchmark.title")}

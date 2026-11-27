@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import SuiteView from "./suiteView";
+import SuiteView, { aliasSection, headerFacts, TAB_ALIASES } from "./suiteView";
 
 // QC2-27-09: a task link from frozen evidence names its suite version; when the catalog holds a
 // newer revision the page says it shows the current one.
@@ -39,6 +39,7 @@ vi.mock("@/components/suites/suiteFacts", () => ({ BrokenSuite: () => null, Suit
 vi.mock("@/components/suites/suiteRunButton", () => ({ SuiteRunButton: () => null }));
 vi.mock("@/components/suites/suiteLockKind", () => ({ FingerprintDriftNotice: () => null }));
 vi.mock("@/components/reference/referenceBoard", () => ({ ReferenceBoardPanel: () => null }));
+vi.mock("@/lib/store/apis/referenceApi", () => ({ useGetReferenceBoardQuery: () => ({ data: undefined }) }));
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: () => [null, () => undefined],
@@ -86,9 +87,13 @@ describe("SuiteView difficulty levels tab (C2.levels)", () => {
 				],
 			}),
 		];
+		// M6-11: difficulty levels are a section of the Quality tab; ?tab=tiers still opens it there.
 		const html = render(<SuiteView suiteId="hd-swe-verified" />);
-		expect(html).toMatch(/Difficulty levels[\s\S]{0,400}?>1</);
-		expect(html).not.toMatch(/Difficulty levels[\s\S]{0,400}?>2</);
+		expect(html).not.toContain("Difficulty levels");
+		expect(html).toContain("Quality");
+		expect(TAB_ALIASES.quality).toContain("tiers");
+		expect(aliasSection("tiers")).toBe("suite-section-tiers");
+		expect(aliasSection("ops")).toBe("suite-section-readiness");
 	});
 });
 
@@ -113,7 +118,7 @@ describe("SuiteView stat tiles (N164)", () => {
 		fixture.health = { isError: true, error: { status: 500 } };
 		fixture.runs = okQuery({ runs: [], total: 59, limit: 1 });
 		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
-		expect(html).toMatch(/Runs so far[\s\S]{0,400}?>59</);
+		expect(html).toContain("59 runs so far");
 		expect(html).not.toContain("None yet");
 	});
 	it("says Counting while the run list loads and - with the error when it fails", () => {
@@ -134,20 +139,28 @@ describe("SuiteView stat tiles (N164)", () => {
 	it("says None yet only when the benchmark has no runs", () => {
 		fixture.suites = [bfcl()];
 		fixture.runs = okQuery({ runs: [], total: 0, limit: 1 });
-		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("None yet");
+		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("no runs yet");
 	});
 	it("labels the benchmark's own failure tests and says the model faults work on every benchmark", () => {
-		fixture.suites = [bfcl()];
+		fixture.suites = [{ ...bfcl(), probes: [{ id: "a" }, { id: "b" }] }];
 		fixture.runs = undefined;
 		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
-		// D1 N164 (lead's rule 17): the header names them built-in failure tests.
-		expect(html).toContain("Built-in failure tests");
-		expect(html).toContain("Plus model faults (outage, brownout, flaky) that work on every benchmark.");
+		// D1 N164 (lead's rule 17): the header names them built-in failure tests. M6-10: in the one facts line,
+		// which has no room for the tile's model faults note (the Quality tab lists the failure tests).
+		expect(html).toContain("2 built-in failure tests");
 	});
 	it("says it is working out task health while the health report loads", () => {
 		fixture.suites = [bfcl()];
 		fixture.health = { isLoading: true };
 		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("Working out task health...");
 		fixture.health = {};
+	});
+});
+
+describe("SuiteView facts line (M6-10)", () => {
+	it("joins the parts with commas and skips empty ones", () => {
+		expect(headerFacts({ tasks: "3641 tasks", ready: "36 ready", probes: null, runs: "103 runs so far" })).toBe(
+			"3641 tasks, 36 ready, 103 runs so far",
+		);
 	});
 });

@@ -43,6 +43,7 @@ vi.mock("@/lib/store/apis/modelsApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/modelsApi")>()),
 	useGetModelsQuery: () => ({ data: { providers: [], keys: [{ id: "k1", provider: "openai", status: "ok" }] } }),
 }));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
 	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
 	GroupedModelPicker: ({
@@ -183,9 +184,10 @@ describe("policy tab", () => {
 		pol.list = okQuery(noShape);
 		let html = render(<PolicyTab suite={suite} />, hostedSession("member"));
 		expect(html).toContain('data-testid="policy-no-shape"');
-		expect(html).toContain(
-			"Policy tasks are support conversations: this benchmark has no task with a simulated customer. Use a support benchmark (Benchmarks &gt; New, template support).",
-		);
+		// M6-17: a neutral note with a link to make a support benchmark.
+		expect(html).toContain("Policy tasks are support conversations, and this benchmark has no task with a simulated customer.");
+		expect(html).toMatch(/href="\/suites\/new\?template=support"[^>]*data-testid="policy-no-shape-create"/);
+		expect(html).not.toMatch(/data-testid="policy-no-shape"[^>]*chart-error/);
 		for (const id of ["policy-upload-file", "policy-generate-estimate", "policy-generate-start", "policy-generate-model-model"]) {
 			expect(tagOf(html, id) ?? "", id).toContain(' disabled=""');
 		}

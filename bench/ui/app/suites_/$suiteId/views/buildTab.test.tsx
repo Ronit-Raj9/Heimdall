@@ -210,7 +210,7 @@ describe("row mapping step", () => {
 		);
 		expect(html).toMatch(/data-testid="suite-build-map-messages"[\s\S]*?<option value="-" selected="">Do not read/);
 		expect(html).toContain("Detect automatically");
-		expect(html).toMatch(/<input type="checkbox" checked=""\/>meta.region/);
+		expect(html).toMatch(/<input type="checkbox" class="size-4 shrink-0" checked=""\/>meta.region/);
 		expect(html).toContain('data-testid="suite-build-grade-on"');
 		expect(html).toMatch(/data-testid="suite-build-grade-on-transcript"/);
 		expect(html).toMatch(

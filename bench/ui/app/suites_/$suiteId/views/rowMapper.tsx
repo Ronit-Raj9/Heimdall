@@ -16,7 +16,10 @@ import type {
 	RowImportStatus,
 	RowMapping,
 } from "@/lib/types/suiteBuild";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileDrop } from "@/components/onboard/sourceBox";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import "@/components/suites/uf6aI18n";
 import { useTranslation } from "react-i18next";
 
 // Row import with a column mapping step, attached files and background imports (lane Y13).
@@ -246,8 +249,8 @@ export function MappingStep({
 					<legend className="text-muted-foreground text-sm">{t("rows.map.metadata")}</legend>
 					<div className="flex flex-wrap gap-x-4 gap-y-1">
 						{columns.map((c) => (
-							<label key={c.path} className="flex items-center gap-1.5 font-mono text-xs">
-								<input type="checkbox" checked={meta.has(c.path)} disabled={disabled} onChange={() => toggleMeta(c.path)} />
+							<label key={c.path} className="flex min-h-11 items-center gap-2 font-mono text-xs">
+								<input type="checkbox" className="size-4 shrink-0" checked={meta.has(c.path)} disabled={disabled} onChange={() => toggleMeta(c.path)} />
 								{c.path}
 							</label>
 						))}
@@ -274,9 +277,10 @@ export function MappingStep({
 				</fieldset>
 			)}
 			{onSaveMapping && (
-				<label className="flex items-center gap-2 text-sm">
+				<label className="flex min-h-11 items-center gap-2 text-sm">
 					<input
 						type="checkbox"
+						className="size-4 shrink-0"
 						checked={!!saveMapping}
 						disabled={disabled}
 						onChange={(e) => onSaveMapping(e.target.checked)}
@@ -302,9 +306,8 @@ export function AttachmentsInput({
 	t: T;
 }) {
 	const [problem, setProblem] = useState("");
-	const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
-		const picked = Array.from(e.target.files ?? []);
-		e.target.value = "";
+	const { t: tf } = useTranslation("uf6a");
+	const onPick = async (picked: File[]) => {
 		if (picked.length === 0) return;
 		const merged = [...files.filter((f) => !picked.some((p) => p.name === f.name)), ...picked.map((p) => ({ name: p.name, size: p.size }))];
 		const bad = attachmentProblem(merged);
@@ -321,13 +324,15 @@ export function AttachmentsInput({
 	return (
 		<div className="flex min-w-0 flex-col gap-1" data-testid="suite-build-attachments">
 			<Field label={t("rows.attach.label")} hint={t("rows.attach.help")}>
-				<input
-					type="file"
+				<FileDrop
+					file={null}
+					onFile={() => undefined}
 					multiple
+					onFiles={(picked) => void onPick(picked)}
 					disabled={disabled}
-					onChange={(e) => void onPick(e)}
-					className="text-sm"
-					data-testid="suite-build-attachments-file"
+					label={tf("rows.attachDrop")}
+					testId="suite-build-attachments-drop"
+					inputTestId="suite-build-attachments-file"
 				/>
 			</Field>
 			{files.length > 0 && (
@@ -501,6 +506,7 @@ export interface RowsImportFormProps {
  * for large data, with live progress).
  */
 export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsImportFormProps) {
+	const { t: tf } = useTranslation("uf6a");
 	const tickets = format === "tickets";
 	const dispatch = useAppDispatch();
 	const [data, setData] = useState("");
@@ -562,8 +568,7 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 		setStarted(null);
 		setMapping(null);
 	};
-	const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
+	const onFile = (file: File | null) => {
 		if (!file) return;
 		const f = formatOfFile(file.name);
 		if (f && !tickets) setFileFormat(f);
@@ -608,7 +613,12 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 	const busy = state.isLoading || job?.status === "running";
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid={`suite-build-${format}`}>
-			<p className="text-muted-foreground max-w-3xl text-xs">{tickets ? t("rows.ticketsHelp") : t("rows.help")}</p>
+			{/* M6-21: the columns as a 3-row example table, not a 4-line paragraph. */}
+			{tickets ? (
+				<p className="text-muted-foreground max-w-3xl text-xs">{t("rows.ticketsHelp")}</p>
+			) : (
+				<RowsExample />
+			)}
 			<p className="text-muted-foreground max-w-3xl text-xs" data-testid="suite-build-verbatim">
 				{t("rows.verbatim")}
 			</p>
@@ -622,15 +632,17 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 				</p>
 			)}
 			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("rows.file")}>
-					<input
-						type="file"
+				<div className="flex w-full min-w-0 flex-col gap-1 text-sm sm:w-80">
+					<span className="text-muted-foreground">{t("rows.file")}</span>
+					<FileDrop
+						file={null}
+						onFile={onFile}
 						accept={tickets ? ".json,.jsonl,.txt" : ".csv,.tsv,.jsonl,.ndjson,.json"}
-						onChange={onFile}
-						className="text-sm"
-						data-testid={`suite-build-${format}-file`}
+						label={source ? source : tf("rows.drop")}
+						testId={`suite-build-${format}-drop`}
+						inputTestId={`suite-build-${format}-file`}
 					/>
-				</Field>
+				</div>
 				{!tickets && (
 					<Field label={t("rows.format")}>
 						<select
@@ -660,23 +672,26 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					</Field>
 				)}
 			</div>
-			<textarea
-				className="border-input bg-background min-h-40 w-full rounded-md border p-2 font-mono text-xs"
-				value={data}
-				placeholder={tickets ? t("rows.ticketsPlaceholder") : fileFormat === "csv" ? t("rows.csvPlaceholder") : t("rows.jsonlPlaceholder")}
-				aria-label={t("rows.paste")}
-				onChange={(e) => (setData(e.target.value), reset())}
-				data-testid={`suite-build-${format}-data`}
-			/>
+			<label className="flex min-w-0 flex-col gap-1 text-sm">
+				<span className="text-muted-foreground">{tf("rows.pasteLabel")}</span>
+				<textarea
+					className="border-input bg-card min-h-40 w-full rounded-md border p-2 font-mono text-xs"
+					value={data}
+					placeholder={tickets ? t("rows.ticketsPlaceholder") : fileFormat === "csv" ? t("rows.csvPlaceholder") : t("rows.jsonlPlaceholder")}
+					onChange={(e) => (setData(e.target.value), reset())}
+					data-testid={`suite-build-${format}-data`}
+				/>
+			</label>
 			{mode === "too_big" && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="suite-build-too-big">
 					{t("rows.tooBig")}
 				</p>
 			)}
 			{mode === "async" && <p className="text-muted-foreground text-xs">{t("rows.background")}</p>}
-			<label className="flex items-center gap-2 text-sm">
+			<label className="flex min-h-11 items-center gap-2 text-sm">
 				<input
 					type="checkbox"
+					className="size-4 shrink-0"
 					checked={heldOut}
 					onChange={(e) => (setHeldOut(e.target.checked), reset())}
 					data-testid={`suite-build-${format}-held-out`}
@@ -697,11 +712,19 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					disabled={!preview || count === 0 || busy}
 					isLoading={state.isLoading}
 					onClick={() => void doImport()}
+					aria-describedby={!preview ? `suite-build-${format}-import-why` : undefined}
 					dataTestId={`suite-build-${format}-import`}
 				>
 					{preview ? t("rows.import", { count }) : t("rows.importIdle")}
 				</Button>
 			</div>
+			{!preview && !busy && (
+				<WhyDisabled
+					reason={data.trim() ? tf("rows.whyPreview") : tf("rows.whyNothing")}
+					id={`suite-build-${format}-import-why`}
+					testId={`suite-build-${format}-import-why`}
+				/>
+			)}
 			<ErrorLine error={state.error} testId={`suite-build-${format}-error`} />
 			{preview && !tickets && mapping && (
 				<MappingStep
@@ -731,6 +754,42 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 					{done.problems.length > 0 && <ProblemList problems={done.problems} t={t} />}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** M6-21: what a rows file looks like, as a small example table (question, answer, rubric). */
+function RowsExample() {
+	const { t } = useTranslation("uf6a");
+	const cols = ["question", "answer", "rubric"] as const;
+	return (
+		<div className="flex min-w-0 flex-col gap-1" data-testid="suite-build-rows-example">
+			<p className="text-muted-foreground text-xs">{t("rows.exampleIntro")}</p>
+			<div className="max-w-full overflow-x-auto rounded-md border">
+				<table className="w-full text-left text-xs">
+					<thead className="bg-muted/40">
+						<tr>
+							{cols.map((c) => (
+								<th key={c} scope="col" className="px-2 py-1 font-mono font-medium">
+									{c}
+								</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						{[1, 2, 3].map((n) => (
+							<tr key={n} className="border-t">
+								{cols.map((c) => (
+									<td key={c} className="text-muted-foreground px-2 py-1">
+										{t(`rows.example.${c}${n}` as "rows.example.question1")}
+									</td>
+								))}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p className="text-muted-foreground text-xs">{t("rows.exampleMore")}</p>
 		</div>
 	);
 }
