@@ -16,6 +16,7 @@ vi.mock("@/lib/store/apis/githubApi", () => ({
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useGetJobQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
+vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: undefined }) }));
 vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: unknown }) => children }));
 
 const base = {

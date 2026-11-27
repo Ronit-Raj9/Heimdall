@@ -99,7 +99,7 @@ export function EmergencyStopBanner() {
 	const { t } = useTranslation("ufs1");
 	const session = useSession();
 	const skip = session.authMode !== "hosted" || !session.signedIn;
-	const pool = useGetPoolStatusQuery(undefined, { skip, pollingInterval: 60_000 });
+	const pool = useGetPoolStatusQuery(undefined, { skip, pollingInterval: 60_000, skipPollingIfUnfocused: true });
 	if (!emergencyStopOn(session, pool.data)) return null;
 	return (
 		<div
