@@ -145,3 +145,10 @@ describe("email verification and allowlist sign-up (Wave A)", () => {
 		expect(signupOffered(anon())).toBe(false);
 	});
 });
+describe("hasPassword (Q-236)", () => {
+	it("reads has_password for a signed-in user and leaves it unknown otherwise", () => {
+		expect(sessionFromMe({ me: { ...ME_OWNER, has_password: false }, meLoading: false }).hasPassword).toBe(false);
+		expect(sessionFromMe({ me: { ...ME_OWNER, has_password: true }, meLoading: false }).hasPassword).toBe(true);
+		expect(sessionFromMe({ me: ME_OWNER, meLoading: false }).hasPassword).toBeUndefined();
+	});
+});
