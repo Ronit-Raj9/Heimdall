@@ -24,7 +24,7 @@ type MonitorCertDeleter interface {
 
 // MonitorCertDeleteRouteDoc documents the delete route.
 var MonitorCertDeleteRouteDoc = RouteDoc{Method: "DELETE", Path: APIPrefix + "/monitors/certifications/{id}", Tag: "monitors",
-	Summary: "Delete a monitor certificate (safety rule test) and its report (admin). Its runs and comparisons are not touched", Auth: AuthWrite, Response: DeletedInfo{}}
+	Summary: "Delete a monitor certificate (safety rule test) and its report (admin). Its runs and comparisons are not touched. Refused (409) on a hosted server whose organizations share one certificate folder (BENCH_MONITOR_CERTS_ROOT set)", Auth: AuthWrite, Response: DeletedInfo{}}
 
 func init() { APIRoutes = append(APIRoutes, MonitorCertDeleteRouteDoc) }
 
