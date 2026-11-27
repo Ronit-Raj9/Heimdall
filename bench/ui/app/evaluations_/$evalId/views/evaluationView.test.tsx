@@ -54,7 +54,7 @@ vi.mock("@/lib/store/apis/bifrostUseApi", async (orig) => ({
 	useGetEvaluationBifrostUseQuery: vi.fn(() => ({ data: undefined })),
 }));
 
-const { EvaluationBody } = await import("./evaluationView");
+const { EvaluationBody, EvaluationMoreItems } = await import("./evaluationView");
 
 const base: Evaluation = {
 	id: "ev_1",
@@ -116,13 +116,16 @@ describe("EvaluationBody", () => {
 		);
 		expect(html).toContain('data-testid="gate-mock"');
 		expect(html).toContain('data-testid="promote-mock"');
-		expect(html).toContain('data-testid="repeat-mock"');
+		// Repeat lives in the header More menu, rendered when it opens.
+		expect(html).toContain('data-testid="evaluation-more-button"');
+		expect(render(<EvaluationMoreItems evaluation={{ ...base, status: "done" }} name="x" />)).toContain('data-testid="repeat-mock"');
 	});
 
 	it("offers no promotion while running", () => {
 		const html = render(<EvaluationBody evaluation={base} />);
 		expect(html).not.toContain('data-testid="promote-mock"');
 		expect(html).not.toContain('data-testid="repeat-mock"');
+		expect(render(<EvaluationMoreItems evaluation={base} name="x" />)).not.toContain('data-testid="repeat-mock"');
 	});
 });
 
@@ -130,12 +133,12 @@ describe("EvaluationBody delete (X16)", () => {
 	it("disables Delete while the evaluation runs and enables it once done", async () => {
 		const { hostedSession } = await import("@/lib/testing/platformFixtures");
 		const { tagOf } = await import("@/lib/testing/render");
-		const running = render(<EvaluationBody evaluation={base} />, hostedSession("admin"));
+		const running = render(<EvaluationMoreItems evaluation={base} name="x" />, hostedSession("admin"));
 		expect(tagOf(running, "evaluation-delete")).toContain('disabled=""');
 		expect(running).toContain("Cancel the evaluation or wait for it to finish before deleting it.");
-		const done = render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("admin"));
+		const done = render(<EvaluationMoreItems evaluation={{ ...base, status: "done" }} name="x" />, hostedSession("admin"));
 		expect(tagOf(done, "evaluation-delete")).not.toContain('disabled=""');
-		expect(render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("viewer"))).not.toContain(
+		expect(render(<EvaluationMoreItems evaluation={{ ...base, status: "done" }} name="x" />, hostedSession("viewer"))).not.toContain(
 			'data-testid="evaluation-delete"',
 		);
 	});

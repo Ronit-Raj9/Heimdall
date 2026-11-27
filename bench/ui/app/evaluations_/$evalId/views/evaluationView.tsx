@@ -33,6 +33,7 @@ import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { ArchiveButton } from "@/components/ui/archiveAction";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
 import {
 	useCancelEvaluationMutation,
@@ -210,6 +211,18 @@ function ProblemText({ raw, benchmark, testId, code }: { raw: string; benchmark:
 	);
 }
 
+/** The items of the header "More" menu: schedules (finished only), archive and delete (M3-11). */
+export function EvaluationMoreItems({ evaluation, name }: { evaluation: Evaluation; name: string }) {
+	const done = evaluation.status === "done";
+	return (
+		<>
+			{done && <RepeatEvaluation evaluationId={evaluation.id} />}
+			<ArchiveButton kind="evaluation" id={evaluation.id} name={name} archivedAt={(evaluation as { archived_at?: string | null }).archived_at} testId="evaluation-more" />
+			<DeleteEvaluationAction id={evaluation.id} active={isActiveStatus(evaluation.status)} />
+		</>
+	);
+}
+
 export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
@@ -286,16 +299,20 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						)}
 						{active && <CancelButton id={evaluation.id} spent={formatCost(evaluationSpend(evaluation) ?? 0)} />}
 						{/* Schedules and Delete live in one More menu, schedules only on a finished evaluation (M3-11). */}
-						<details className="relative" data-testid="evaluation-more">
-							<summary className="border-input hover:bg-muted inline-flex h-8 cursor-pointer list-none items-center rounded-md border px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-								{t("detail.more")}
-							</summary>
-							<div className="bg-popover absolute right-0 z-20 mt-1 flex min-w-56 flex-col items-stretch gap-2 rounded-lg border p-2 shadow-md">
-								{done && <RepeatEvaluation evaluationId={evaluation.id} />}
-								<ArchiveButton kind="evaluation" id={evaluation.id} name={name} archivedAt={(evaluation as { archived_at?: string | null }).archived_at} testId="evaluation-more" />
-								<DeleteEvaluationAction id={evaluation.id} active={active} />
-							</div>
-						</details>
+						<DropdownMenu
+							label={t("detail.more")}
+							testId="evaluation-more"
+							items={[]}
+							contentClassName="w-64 gap-2 p-2"
+							content={
+<EvaluationMoreItems evaluation={evaluation} name={name} />
+							}
+							trigger={(props) => (
+								<Button {...props} variant="outline" size="sm" data-testid="evaluation-more-button">
+									{t("detail.more")}
+								</Button>
+							)}
+						/>
 					</div>
 				}
 			/>

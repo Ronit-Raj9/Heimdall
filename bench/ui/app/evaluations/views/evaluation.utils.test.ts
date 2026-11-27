@@ -202,6 +202,8 @@ describe("stored result, kind and runs text (N161, N142)", () => {
 		expect(evaluationSpend(ev({ result: result([0.5], 1.25) }))).toBe(1.25);
 		expect(evaluationSpend(ev({ children: [{ benchmark: "a", experiment_id: "e", status: "done", spent_usd: 0.5 }] }))).toBe(0.5);
 		expect(evaluationSpend(ev())).toBeNull();
+		// Children spend wins over the stored clean-runs result, like the evaluation page (N3-1).
+		expect(evaluationSpend(ev({ result: result([0.5], 0.005), children: [{ benchmark: "a", experiment_id: "e", status: "done", spent_usd: 0.009 }] }))).toBe(0.009);
 	});
 
 	it("calls a score evaluation with faults a failure test", () => {

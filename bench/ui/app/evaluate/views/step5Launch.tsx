@@ -217,7 +217,7 @@ export function NameField({ value, placeholder, onName }: { value: string; place
 				id="step5-name"
 				type="text"
 				maxLength={NAME_MAX}
-				className="border-input bg-background h-8 w-full max-w-md rounded-md border px-2 text-sm"
+				className="border-input bg-background h-(--control-h) w-full max-w-md rounded-md border px-2 text-sm"
 				placeholder={placeholder}
 				value={value}
 				onChange={(e) => onName(e.target.value.slice(0, NAME_MAX))}
@@ -334,7 +334,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 					inputMode="decimal"
 					aria-invalid={budgetIssue ? true : undefined}
 					aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
-					className="border-input bg-background h-10 w-40 rounded-md border pr-2 pl-6 text-sm"
+					className="border-input bg-background h-(--control-h) w-40 rounded-md border pr-2 pl-6 text-sm"
 					placeholder={fw05("launch.budgetPlaceholder", { cap: String(DEFAULT_BENCHMARK_BUDGET) })}
 					value={budget}
 					onChange={(e) => {
