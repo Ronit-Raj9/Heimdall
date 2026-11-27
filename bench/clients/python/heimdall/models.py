@@ -1532,6 +1532,17 @@ class Approval(_ApprovalRequired, total=False):
     by_name: str
 
 
+class _ArchiveResultRequired(TypedDict):
+    archived: bool
+    id: str
+    kind: str
+
+
+class ArchiveResult(_ArchiveResultRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
+
+
 class _ArmRequired(TypedDict):
     agent: str
     label: str
@@ -4006,6 +4017,8 @@ class _Detail_improveRequired(TypedDict):
 
 
 class Detail_improve(_Detail_improveRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
     can_continue: bool
     can_resume: bool
     control_band: Optional[ControlBand]
@@ -4840,6 +4853,8 @@ class _EvaluationRequired(TypedDict):
 
 
 class Evaluation(_EvaluationRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
     cheat_check_of: str
     created_by: str
     failed_runs: int
@@ -5287,6 +5302,8 @@ class _ExperimentStatusRequired(TypedDict):
 
 class ExperimentStatus(_ExperimentStatusRequired, total=False):
     analysis_id: str
+    archived_at: Optional[str]
+    archived_by: str
     arms: List[str]
     arms_differ: str
     debug: str
@@ -5638,6 +5655,8 @@ class _FindingRequired(TypedDict):
 
 
 class Finding(_FindingRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
     arm: str
     experiment: str
     fix: Optional[FixProof]
@@ -11652,6 +11671,8 @@ class RunDetail(_RunDetailRequired, total=False):
     adapter_fault: Optional[AdapterFaultEvidence]
     agents: Optional[AgentTree]
     answer: Optional[Answer]
+    archived_at: Optional[str]
+    archived_by: str
     artifacts: List[ArtifactFile]
     canonical: Optional[CanonicalRun]
     debug_allowed: Optional[RunDebugAllowed]
@@ -11768,6 +11789,8 @@ class _RunListRowRequired(TypedDict):
 
 class RunListRow(_RunListRowRequired, total=False):
     agent_version: str
+    archived_at: Optional[str]
+    archived_by: str
     cost_usd: Optional[Value]
     error: str
     excluded: str
@@ -12668,6 +12691,7 @@ class _SharedMetaRequired(TypedDict):
 
 
 class SharedMeta(_SharedMetaRequired, total=False):
+    created_by_name: str
     expires_at: Optional[str]
     exports: List[str]
     label: str
@@ -13580,6 +13604,8 @@ class _Summary_improveRequired(TypedDict):
 
 
 class Summary_improve(_Summary_improveRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
     sealed_gain: Optional[float]
     teacher: str
     verdict: str
@@ -15136,6 +15162,8 @@ class _evaluationWithQueueRequired(TypedDict):
 
 
 class evaluationWithQueue(_evaluationWithQueueRequired, total=False):
+    archived_at: Optional[str]
+    archived_by: str
     cheat_check_of: str
     created_by: str
     failed_runs: int
@@ -15352,6 +15380,10 @@ class AppTasksWriteResultResponse(AppTasksWriteResult):
 
 
 class ApplyResultResponse(ApplyResult):
+    mode: Mode
+
+
+class ArchiveResultResponse(ArchiveResult):
     mode: Mode
 
 
@@ -16779,6 +16811,7 @@ __all__ = [
     'ApplyResult',
     'ApplyStep',
     'Approval',
+    'ArchiveResult',
     'Arm',
     'ArmChanges',
     'ArmCost',
@@ -18034,6 +18067,7 @@ __all__ = [
     'AppTasksReviewResultResponse',
     'AppTasksWriteResultResponse',
     'ApplyResultResponse',
+    'ArchiveResultResponse',
     'AuthInfoResponse',
     'AwarenessReportResponse',
     'BehaviourChecksResponse',
