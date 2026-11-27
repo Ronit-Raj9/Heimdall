@@ -15,7 +15,13 @@ import { ArrowLeft, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import "@/app/schedules/views/ufrjI18n";
+
+/** True when at least one comparison finished: a safety rule test reads its runs (Q-308). Pure. */
+export function hasFinishedComparison(exps: readonly { state?: string }[]): boolean {
+	return exps.some((e) => e.state === "done");
+}
 
 /** The monitors screen (Eval integrity area, S2): every monitor certification, or one with ?cert=. */
 export default function MonitorsView() {
@@ -27,6 +33,9 @@ export default function MonitorsView() {
 	// While the list is empty its empty state carries the one "certify" action, so the header does not repeat it (M7-68).
 	const list = useListMonitorCertificationsQuery();
 	const listEmpty = !list.isLoading && !list.isError && (list.data?.certifications ?? []).length === 0;
+	// A safety rule test needs a finished comparison (Q-308): without one the action is held and says why.
+	const exps = useListExperimentsQuery();
+	const noComparison = exps.isSuccess && !hasFinishedComparison(exps.data?.experiments ?? []);
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="monitors-screen">
 			<PageHeader
@@ -34,7 +43,12 @@ export default function MonitorsView() {
 				subtitle={tu("monitors.subtitle")}
 				actions={
 					cert || listEmpty ? undefined : (
-						<Button onClick={() => setCertifying(true)} data-testid="monitors-certify-open">
+						<Button
+							onClick={() => setCertifying(true)}
+							disabled={noComparison}
+							title={noComparison ? tr("monitors.needComparison") : undefined}
+							data-testid="monitors-certify-open"
+						>
 							<Plus className="size-4" aria-hidden="true" />
 							{tu("monitors.certifyNew")}
 						</Button>
@@ -42,7 +56,7 @@ export default function MonitorsView() {
 				}
 				breadcrumbs={cert ? [{ label: tu("monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
 			/>
-			{cert ? <CertificationScreen certId={cert} onDeleted={() => (void setCert(null), void list.refetch())} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} />}
+			{cert ? <CertificationScreen certId={cert} onDeleted={() => (void setCert(null), void list.refetch())} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} noComparison={noComparison} />}
 			<p
 				className="text-muted-foreground line-clamp-2 max-w-3xl text-xs"
 				data-testid="monitors-disclaimer"
@@ -54,7 +68,15 @@ export default function MonitorsView() {
 	);
 }
 
-function CertificationList({ certifying, onCertifying }: { certifying: boolean; onCertifying(open: boolean): void }) {
+function CertificationList({
+	certifying,
+	onCertifying,
+	noComparison = false,
+}: {
+	certifying: boolean;
+	onCertifying(open: boolean): void;
+	noComparison?: boolean;
+}) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
 	const { t: tr } = useTranslation("ufrj");
@@ -74,9 +96,14 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 				<EmptyState
 					icon={ShieldCheck}
 					message={tu("monitors.empty")}
-					action={{ label: tu("monitors.certifyNew"), onClick: () => onCertifying(true) }}
+					body={noComparison ? tr("monitors.needComparison") : undefined}
+					action={
+						noComparison
+							? { label: tr("monitors.runComparison"), to: "/evaluate" }
+							: { label: tu("monitors.certifyNew"), onClick: () => onCertifying(true) }
+					}
 					// Q-134: a second way forward for someone with nothing to certify yet.
-					secondary={{ label: tr("monitors.runComparison"), to: "/evaluate" }}
+					secondary={noComparison ? undefined : { label: tr("monitors.runComparison"), to: "/evaluate" }}
 					testId="monitors-empty"
 				/>
 			) : (

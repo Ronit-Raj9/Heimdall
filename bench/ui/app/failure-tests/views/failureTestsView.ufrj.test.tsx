@@ -56,3 +56,11 @@ describe("one fault name in form and results (F10-15)", () => {
 		expect(html).toContain("Model down");
 	});
 });
+
+describe("monitors need a finished comparison (Q-308)", () => {
+	it("counts only done comparisons", async () => {
+		const { hasFinishedComparison } = await import("@/app/monitors/views/monitorsView");
+		expect(hasFinishedComparison([{ state: "running" }])).toBe(false);
+		expect(hasFinishedComparison([{ state: "done" }])).toBe(true);
+	});
+});

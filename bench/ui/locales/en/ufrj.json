@@ -2,7 +2,10 @@
 	"ft": {
 		"capNote": "The run stops at the {{cap}} budget; the full run may need up to {{high}}.",
 		"faultsSkipped_one": "{{faults}} does not apply to {{benchmark}} and adds no runs.",
-		"faultsSkipped_other": "{{faults}} do not apply to {{benchmark}} and add no runs."
+		"faultsSkipped_other": "{{faults}} do not apply to {{benchmark}} and add no runs.",
+		"noAgentTitle": "No agent yet",
+		"noAgentBody": "A failure test runs faults against one of your agents. Connect an agent first.",
+		"connectAgent": "Connect an agent"
 	},
 	"gw": {
 		"estimateUnknownCost": "The cost is not known yet; about {{minutes}} minutes. The budget is the most it can spend.",
@@ -41,7 +44,8 @@
 		"judgeKeyBudgetHosted_other": "Also grade with a model (paid with your organization's model key: at most {{count}} sessions a pull; that key's budget caps the cost)"
 	},
 	"monitors": {
-		"runComparison": "Run an evaluation first"
+		"runComparison": "Run an evaluation first",
+		"needComparison": "A safety rule test reads the runs of a finished comparison, and none has finished yet. Run an evaluation first."
 	},
 	"checks": {
 		"watchLink": "Model watch on the Gateway page",

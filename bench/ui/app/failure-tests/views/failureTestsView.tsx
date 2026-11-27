@@ -418,6 +418,8 @@ export default function FailureTestsView() {
 	};
 	const toggle = <T,>(list: T[], item: T, on: boolean) => (on ? [...list, item] : list.filter((x) => x !== item));
 	const { t: tu } = useTranslation("uf5b");
+	const { t: tr } = useTranslation("ufrj");
+	const noAgents = agents.isSuccess && (agents.data?.agents ?? []).length === 0;
 	const planned = plannedRuns(form);
 	const [query, setQuery] = useState("");
 	const [onlyRunnable, setOnlyRunnable] = useState(true);
@@ -459,6 +461,15 @@ export default function FailureTestsView() {
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8 pb-40 sm:pb-0" data-testid="failure-tests-screen">
 			<PageHeader title={t("ft.title")} subtitle={t("ft.subtitle")} />
 
+			{noAgents ? (
+				// Q-307: with no agent the form cannot start anything, so it shows the way forward instead.
+				<EmptyState
+					title={tr("ft.noAgentTitle")}
+					body={tr("ft.noAgentBody")}
+					action={{ label: tr("ft.connectAgent"), to: "/connect" }}
+					testId="ft-no-agent"
+				/>
+			) : (
 			<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
 				{/* No nested card inside the section (BD-13): the fields sit on the page. */}
 				<div className="flex min-w-0 flex-col gap-6">
@@ -718,6 +729,7 @@ capUsd={cost.capUsd}
 					</div>
 				</div>
 			</Section>
+			)}
 
 			<Section title={t("ft.pastTitle")} description={t("ft.pastHint")} testId="ft-past">
 				{evals.isLoading ? (
