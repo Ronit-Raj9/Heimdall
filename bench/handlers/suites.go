@@ -139,6 +139,7 @@ func (h *SuitesHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Midd
 	r.GET(APIPrefix+"/suites", lib.ChainMiddlewares(h.getSuites, middlewares...))
 	r.GET(APIPrefix+"/suites/{id}", lib.ChainMiddlewares(h.getSuite, middlewares...))
 	r.GET(APIPrefix+"/suites/{id}/tasks/{task}", lib.ChainMiddlewares(h.getSuiteTask, middlewares...))
+	r.GET(APIPrefix+"/suites/{id}/task-list", lib.ChainMiddlewares(h.getSuiteTasks, middlewares...)) // UI fix wave (G3): one page of a suite's tasks (uifix_g3_suites.go)
 }
 
 // getSuites handles GET /api/bench/suites. A pack that fails to load is
@@ -161,9 +162,23 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "fields must be light or full")
 		return
 	}
+	paging, ok := readListPaging(ctx, h.mode) // UI fix wave (G3): limit, offset, q (uifix_g3_suites.go)
+	if !ok {
+		return
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	list, err := h.listSummaries(work, light)
+	var facts []*SuiteLightFacts
+	var beforeLight func(int, *schemas.SuiteSummary)
+	if light {
+		beforeLight = func(i int, s *schemas.SuiteSummary) {
+			for len(facts) <= i {
+				facts = append(facts, nil)
+			}
+			facts[i] = lightFacts(s)
+		}
+	}
+	list, err := h.listSummariesWith(work, light, beforeLight)
 	if err != nil {
 		sendDepError(ctx, h.mode, "list suites", err)
 		return
@@ -175,6 +190,10 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 				out.ReservedIDs = append(out.ReservedIDs, id)
 			}
 		}
+	}
+	if light || paging.on {
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, suiteListAnswer(out, facts, paging))
+		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
@@ -193,14 +212,24 @@ func (h *SuitesHandler) getSuite(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
+	sum, ok := h.oneSummary(ctx, work, id)
+	if !ok {
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &sum)
+}
+
+// oneSummary is the summary GET /suites/{id} answers, or answers the error
+// (404 for a suite the list leaves out) and returns false.
+func (h *SuitesHandler) oneSummary(ctx *fasthttp.RequestCtx, work context.Context, id string) (schemas.SuiteSummary, bool) {
 	ids, err := h.suites.SuiteIDs(work)
 	if err != nil {
 		sendDepError(ctx, h.mode, "list suites", err)
-		return
+		return schemas.SuiteSummary{}, false
 	}
 	if !slices.Contains(ids, id) || onboard.IsStagingSuite(id) || (h.hidden != nil && h.hidden(id)) {
 		sendNotFound(ctx, h.mode, "suite", id)
-		return
+		return schemas.SuiteSummary{}, false
 	}
 	var sum schemas.SuiteSummary
 	if _, cached := h.suites.(suiteStamper); cached {
@@ -216,7 +245,7 @@ func (h *SuitesHandler) getSuite(ctx *fasthttp.RequestCtx) {
 	if isBuiltinSuite(h.suites, id) {
 		sum.Builtin, sum.Source = true, "library"
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &sum)
+	return sum, true
 }
 
 // ListSummaries is the GET /suites list: every pack with its summary, built-in
@@ -233,6 +262,13 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 // lock (ready_task_ids, ready_known). A missing or stale entry starts a
 // background refresh.
 func (h *SuitesHandler) listSummaries(work context.Context, light bool) ([]schemas.SuiteSummary, error) {
+	return h.listSummariesWith(work, light, nil)
+}
+
+// listSummariesWith is listSummaries; beforeLight, when set, sees each
+// light entry before its task lists are dropped (UI fix wave G3: the light
+// list's task counts, uifix_g3_suites.go).
+func (h *SuitesHandler) listSummariesWith(work context.Context, light bool, beforeLight func(i int, s *schemas.SuiteSummary)) ([]schemas.SuiteSummary, error) {
 	if h.suites == nil {
 		return nil, errors.New("suite loader is not available")
 	}
@@ -295,6 +331,9 @@ func (h *SuitesHandler) listSummaries(work context.Context, light bool) ([]schem
 			out.Suites[i].Builtin, out.Suites[i].Source = true, "library"
 		}
 		if light {
+			if beforeLight != nil {
+				beforeLight(i, &out.Suites[i])
+			}
 			lightSummary(&out.Suites[i])
 		}
 	}

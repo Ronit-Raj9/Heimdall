@@ -153,9 +153,17 @@ func (h *evaluationsHandler) load(ctx *fasthttp.RequestCtx) (*schemas.Evaluation
 }
 
 func (h *evaluationsHandler) list(ctx *fasthttp.RequestCtx) {
+	opt, ok := readEvaluationListOptions(ctx, h.env.Mode) // UI fix wave (G3): limit, offset, q, status, fields (uifix_g3_evaluations.go)
+	if !ok {
+		return
+	}
 	evs, err := h.store().List()
 	if err != nil {
 		h.fail(ctx, fasthttp.StatusInternalServerError, "list evaluations: "+err.Error())
+		return
+	}
+	if opt.on() {
+		h.listPaged(ctx, opt, evs)
 		return
 	}
 	out := EvaluationList{Evaluations: []*schemas.Evaluation{}}

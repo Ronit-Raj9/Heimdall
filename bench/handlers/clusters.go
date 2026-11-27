@@ -44,8 +44,16 @@ func (h *ClustersHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mi
 // /api/bench/clusters?suite=&agent=&exp=&since=&min=&synthetic=. exp may
 // repeat or carry a comma list. A malformed parameter is a 400.
 func (h *ClustersHandler) getClusters(ctx *fasthttp.RequestCtx) {
+	paging, ok := readListPaging(ctx, h.mode) // UI fix wave (G3): limit, offset, q (uifix_g3_lists.go)
+	if !ok {
+		return
+	}
 	rep, ok := h.build(ctx)
 	if !ok {
+		return
+	}
+	if paging.on {
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, pagedClusters(paging, rep))
 		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, rep)
