@@ -1,7 +1,7 @@
 {
 	"header": {
 		"export": "Export",
-		"more": "More",
+		"more": "More actions",
 		"copyId": "Id",
 		"moreActions": "Actions",
 		"systemBanner": "This is an automatic readiness check Heimdall ran on the benchmark's tasks, not a comparison you started.",
@@ -114,7 +114,8 @@
 		"statistics": "Advanced statistics",
 		"changes": "What changed between A and B",
 		"policy": "Release rule",
-		"tasks": "Task by task"
+		"tasks": "Task by task",
+		"changesMany": "What changed between setups"
 	},
 	"meterGroup": {
 		"quality": "Quality",
@@ -148,7 +149,9 @@
 		"statistics": "The math behind the result, for experts.",
 		"changes": "The settings that differ between the two setups, and the raw solved counts.",
 		"policy": "Whether this result meets your rule for releasing a change.",
-		"tasks": "Each task, with how A and B did on it. Click a cell to compare the two runs."
+		"tasks": "Each task, with how A and B did on it. Click a cell to compare the two runs.",
+		"guardsMany": "Limits each new setup must stay within, such as cost or safety, even when it scores better.",
+		"diagnosticsMany": "How the setups did in the normal run and under each failure test."
 	},
 	"exportTab": {
 		"description": "Download every saved run of this comparison as JSON lines or CSV, or as Every Eval Ever records."

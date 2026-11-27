@@ -60,7 +60,7 @@ describe("ProbeCard on a benchmark the server is still loading (N281)", () => {
 			isLoading: false,
 			refetch: () => undefined,
 		};
-		const html = render(<ActionsTab expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
 		expect(html).toContain('data-testid="actions-probe-own-loading"');
 		expect(html).toContain("Loading this benchmark&#x27;s own failure tests...");
 		expect(html).toContain('data-testid="actions-fault-model-down"');
@@ -71,7 +71,7 @@ describe("ProbeCard on a benchmark the server is still loading (N281)", () => {
 			isLoading: false,
 			refetch: () => undefined,
 		};
-		const html = render(<ActionsTab expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
 		expect(html).not.toContain("actions-probe-own-loading");
 		expect(html).toContain('data-testid="actions-probe-rate-limit"');
 	});

@@ -35,3 +35,11 @@ describe("listHasRunning (M4-79)", () => {
 		expect(listHasRunning(undefined)).toBe(false);
 	});
 });
+
+describe("setupsLine names the arm when agent and model match (Q-254)", () => {
+	it("appends the arm", async () => {
+		const { setupsLine } = await import("./experimentBoard");
+		const s = (arm: string) => ({ arm, agent: "codex", agent_file: "a", model: "m" });
+		expect(setupsLine({ setups: [s("clean"), s("tool-timeout")] })).toBe("codex m (clean) vs codex m (tool-timeout)");
+	});
+});

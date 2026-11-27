@@ -7,7 +7,12 @@ import { EstimateBox } from "@/components/experiments/estimateBox";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
 import { PaidButton } from "@/components/ui/paidButton";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
-import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
+import { draftKeys, draftOr, useDraftSync } from "./draftSync";
+import { forecastRangeView } from "@/components/experiments/estimate.utils";
+import "@/components/experiments/ufrcI18n";
+import { getLocale } from "@/lib/i18n";
+import { type ModelRef } from "@/components/models/modelPicker";
+import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,13 +83,29 @@ export async function estimateWithOneRetry<T>(call: () => Promise<T>, wait: (ms:
 	}
 }
 
+/** The estimate for the phone bar (M4-84): "about $1.20" from history, "up to $3.00" from limits, else null. Pure. */
+export function mobileEstimate(
+	range: Parameters<typeof forecastRangeView>[0],
+	locale: string,
+	t: (k: string, o?: Record<string, unknown>) => string,
+): string | null {
+	const view = forecastRangeView(range, "usd", locale);
+	if (view.kind === "history") return t("builder.about", { usd: view.median });
+	if (view.kind === "upper_bound") return t("builder.upTo", { usd: view.high });
+	return null;
+}
+
+/** Where the builder's draft is kept (Q-150). */
+export const MATRIX_DRAFT_KEY = "newComparison.matrix";
+
 /** The no-YAML builder: agents x models x suite, adaptive toggle, preview, estimate, plan and run. */
 export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPending, onStarted }: MatrixBuilderProps) {
 	const { t } = useTranslation("builder");
 	const { t: tf } = useTranslation("fw11");
-	const [v, setV] = useState<BuilderValues>(defaults);
+	// Q-150: a reload brings back what was typed (a draft in this tab's storage).
+	const [v, setV] = useState<BuilderValues>(() => draftOr(MATRIX_DRAFT_KEY, defaults));
 	// L2: the fields the person changed. New defaults (the ready list arrived) fill only the others; no remount.
-	const touchedKeys = useRef(new Set<keyof BuilderValues>());
+	const touchedKeys = useRef(new Set<keyof BuilderValues>(draftKeys(MATRIX_DRAFT_KEY) as (keyof BuilderValues)[]));
 	const shownDefaults = useRef(defaults);
 	useEffect(() => {
 		if (shownDefaults.current === defaults) return;
@@ -125,6 +146,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
 	const [started, setStarted] = useState(false);
 	useLeaveGuard(!started && builderDirty(v, defaults));
+	useDraftSync(MATRIX_DRAFT_KEY, v, builderDirty(v, defaults), started);
 
 	const suite = catalog.suites.find((s) => suiteRef(s) === v.suite);
 	const errors = useMemo(() => validateBuilder(v, suite, ready), [v, suite, ready]);
@@ -179,6 +201,10 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	const readyBlock = readyPending ? t("ready.checking") : readyUnknown(suite, ready) ? t("ready.unknown", { benchmark: suite?.id }) : null;
 	const stale = planned !== null && builderPlanIsStale(planned.experiment, v, catalog, ready);
 	const estimateFresh = estimated !== null && !builderPlanIsStale(estimated, v, catalog, ready);
+	const { t: tr } = useTranslation("ufrc");
+	const mobileCost = estimateFresh
+		? mobileEstimate(estimateState.data?.cost_usd, getLocale(), (k, o) => String(tr(k as never, o as never)))
+		: null;
 	// N43: after a Plan or Estimate press on an invalid form, how many fields to fix, next to the buttons.
 	const invalidCount = touched ? Object.keys(errors).length : 0;
 	const busy = createState.isLoading || startState.isLoading;
@@ -340,7 +366,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 							{v.models.map((m, i) => (
 								<li key={i} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
 									<div className="w-full min-w-0">
-										<ModelPicker value={m} purpose="agent" onChange={(next) => setModel(i, next)} testId={`builder-model-${i}`} />
+										{/* M4-86: the shared grouped picker (one searchable list), not a search box beside two native selects. */}
+										<GroupedModelPicker
+											value={m.model || m.provider ? m : null}
+											onChange={(next) => setModel(i, { ...m, provider: next.provider as ModelRef["provider"], model: next.model })}
+											label={t("fields.modelN", { n: i + 1 })}
+											testId={`builder-model-${i}`}
+										/>
 									</div>
 									<Button
 										type="button"
@@ -428,10 +460,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 										onChange={(e) => set("taskCount", e.target.valueAsNumber)}
 										data-testid="builder-task-count"
 									/>
+									{/* Q-166: "of N" only once the benchmark's task count is known. */}
 									<span className="text-muted-foreground text-xs">
-										{partlyReady
-											? t("fields.tasksFirstSuffixReady", { count: runnable })
-											: t("fields.tasksFirstSuffix", { count: runnable })}
+										{runnable === 0
+											? t("fields.tasksFirstNone")
+											: partlyReady
+												? t("fields.tasksFirstSuffixReady", { count: runnable })
+												: t("fields.tasksFirstSuffix", { count: runnable })}
 									</span>
 								</div>
 								<label className="flex min-h-6 items-center gap-2">
@@ -494,13 +529,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 							hint={t("fields.adaptiveHint")}
 							testId="builder-adaptive"
 							onChange={(on) => {
-									setV((prev) => ({
-										...prev,
-										adaptive: on,
-										trials: on && !(prev.trials >= 2) ? 3 : prev.trials,
-										adaptiveMin: 1,
-									}));
-								}}
+								setV((prev) => ({
+									...prev,
+									adaptive: on,
+									trials: on && !(prev.trials >= 2) ? 3 : prev.trials,
+									adaptiveMin: 1,
+								}));
+							}}
 						/>
 						{v.adaptive && (
 							<Field label={t("fields.adaptiveMin")} error={shown.adaptiveMin}>
@@ -732,6 +767,8 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 				<span className="min-w-0 flex-1 text-xs tabular-nums">
 					{tu("form.mobileBar", { count: preview.arms.length, runs: preview.maxRuns })}
 					{Number.isFinite(v.totalUsd) ? `, ${tu("form.mobileCap", { usd: v.totalUsd })}` : ""}
+					{/* M4-84: the same estimate as the summary's estimate box, once it is fresh. */}
+					{mobileCost ? `, ${mobileCost}` : ""}
 				</span>
 				<Button
 					type="button"

@@ -31,6 +31,13 @@ import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
 import { useAppDispatch } from "@/lib/store";
+import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
+import { skipToken } from "@reduxjs/toolkit/query/react";
+import { comparisonSummaryMarkdown } from "@/components/verdict/comparisonSummary";
+import { formatUsd2, observedNumber } from "@/components/verdict/armCost";
+import { armOrder } from "@/components/verdict/verdict.utils";
+import { getLocale } from "@/lib/i18n";
+import "@/components/experiments/ufrcI18n";
 import {
 	EXPERIMENT_POLL_MS,
 	benchApi,
@@ -67,7 +74,6 @@ import {
 import { RegradeNotice, gradeQuery, useGradeChoice } from "./gradeChoice";
 import { IntegrityTab } from "./integrityTab";
 import { LiveProgress } from "./liveProgress";
-import { suiteIcon } from "./suiteIcon";
 import { MatrixTab } from "./matrixTab";
 import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
@@ -126,11 +132,11 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const { t: tx } = useTranslation("experimentsUx");
 	const { t: tf } = useTranslation("fw11");
 	const { t: th } = useTranslation("hw12");
-	const { t: tp } = useTranslation("platform");
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	// M4-15: an old ?tab=adaptive or ?tab=export link lands where that content lives now.
 	const redirect = redirectExperimentTab(tabParam);
 	const { t: tu } = useTranslation("uf4a");
+	const { t: tr } = useTranslation("ufrc");
 	const session = useSession();
 	const canMember = canUse(session, "member");
 	const [regradeOpen, setRegradeOpen] = useState(false);
@@ -151,7 +157,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	// An experiment that has not started has no runs to analyse, so nothing asks for its verdict.
 	const notStarted = status.data?.state === "created";
 	const verdict = useGetVerdictQuery(gradeQuery(expId, grade), {
-		skip: !status.data || notStarted,
+		skip: notStarted,
 	});
 	// The grid fills in while the experiment runs, so it polls alongside the status. It needs only the id,
 	// so it starts with the status call, not after it (M4-6).
@@ -170,6 +176,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	// The facts that decide the tabs. Each is the request its tab makes anyway, so nothing is fetched twice.
 	// They need only the id, so they start in parallel with the status call (M4-6).
 	const adaptive = useGetExperimentAdaptiveQuery(expId);
+	// Q-70: the pair's average cost for the summary; the same request the Result and Cost tabs make (shared cache).
+	const costExplain = useGetCostExplainQuery((status.data?.arms?.length ?? 0) === 2 ? { expId } : skipToken);
 	const support = useGetExperimentSupportQuery(expId);
 	const research = useGetExperimentResearchQuery(expId);
 	const routing = useGetExperimentRoutingQuery(expId);
@@ -184,13 +192,18 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const monitors = useDriftMonitorNames();
 	// The browser tab names the comparison and its section (M1-8, M3-19); set once the title is known below.
 	const titleForTab = status.data && status.data.exp_id === expId ? status.data.name?.trim() || expId : undefined;
-	const section = tp(
-		((current?.evaluation_id ? "shell.nav.evaluations" : activeNavItem("/experiments")?.labelKey) ?? "shell.nav.experiments") as never,
-	);
+	// shell.nav.* lives in the bench namespace, not platform (Q-4).
+	const section = t(experimentSectionKey(current?.evaluation_id) as never);
 	usePageTitle(titleForTab ? `${titleForTab} · ${String(section)} · Heimdall` : undefined);
 	const deleteItem = useDeleteExperimentItem(expId, titleForTab ?? expId, live, setDeleteError);
 	// Phase D decision 6: Archive sits above Delete in the More menu.
-	const archive = useArchiveItems({ kind: "experiment", id: expId, name: titleForTab ?? expId, archivedAt: (status.data as { archived_at?: string | null } | undefined)?.archived_at, testId: "experiment" });
+	const archive = useArchiveItems({
+		kind: "experiment",
+		id: expId,
+		name: titleForTab ?? expId,
+		archivedAt: (status.data as { archived_at?: string | null } | undefined)?.archived_at,
+		testId: "experiment",
+	});
 	const copyId = async () => {
 		setCopyError(null);
 		try {
@@ -201,6 +214,37 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		}
 	};
 	const headerError = exportItems.error ?? deleteError ?? copyError;
+	const downloadSummary = () => {
+		const data = verdict.data;
+		const st = status.data;
+		if (!data || !st) return;
+		const arms = armOrder(data);
+		const ce = costExplain.data;
+		const costs: Record<string, string | undefined> = {};
+		if (ce)
+			for (const side of [ce.a, ce.b]) {
+				const v = observedNumber(side.cost_per_run);
+				if (v !== null) costs[side.arm] = formatUsd2(v, getLocale());
+			}
+		const names = Object.fromEntries((st.setups ?? []).map((x) => [x.arm, [x.agent, x.model].filter(Boolean).join(" on ")]));
+		const text = comparisonSummaryMarkdown({
+			title: st.name?.trim() || expId,
+			expId,
+			suite: st.suite,
+			verdict: data.verdict,
+			arms,
+			naive: data.naive,
+			names,
+			costs,
+			url: typeof window !== "undefined" ? window.location.href.split("?")[0] : undefined,
+			date: new Date(),
+		});
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+		a.download = `${expId}-summary.md`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	};
 
 	// RTK keeps the last result in data while a new argument loads; only a response for this id may
 	// drive the header and its write actions (QC2-28-04).
@@ -275,7 +319,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					evaluationId
 						? [
 								{
-									label: String(tp("shell.nav.evaluations" as never)),
+									label: String(t("shell.nav.evaluations" as never)),
 									to: "/evaluations",
 								},
 								{
@@ -287,7 +331,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 							]
 						: [
 								{
-									label: String(tp((activeNavItem("/experiments")?.labelKey ?? "shell.nav.experiments") as never)),
+									label: String(t(experimentSectionKey(undefined) as never)),
 									to: "/experiments",
 								},
 								{ label: title },
@@ -295,7 +339,6 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				}
 				title={
 					<span className="flex min-w-0 items-center gap-2.5">
-						<SuiteGlyph suite={st.suite} />
 						<span className="min-w-0 break-words" title={expId}>
 							{title}
 						</span>
@@ -364,6 +407,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 						testId: "experiment-compare",
 					},
 					...exportItems.items,
+					// Q-70: a summary a person can read and send on, built from what the page has.
+					...(verdict.data && !kind ? [{ label: tr("report.menu"), onSelect: () => downloadSummary(), testId: "experiment-summary" }] : []),
 					{ label: tu("header.copyId", { id: expId }), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
 					...archive.items.map((item) => ({ ...item, separatorBefore: true })),
 					deleteItem,
@@ -467,6 +512,11 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	);
 }
 
+/** The bench key of the sidebar section a comparison sits under: Evaluations for a benchmark of an evaluation. Pure. */
+export function experimentSectionKey(evaluationId: string | undefined): string {
+	return evaluationId ? "shell.nav.evaluations" : (activeNavItem("/experiments")?.labelKey ?? "shell.nav.experiments");
+}
+
 /** Whether the More menu's Delete is off and why: admins only, and never while the comparison runs. Pure. */
 export function deleteBlocked(
 	admin: boolean,
@@ -515,15 +565,6 @@ function useDeleteExperimentItem(expId: string, name: string, running: boolean, 
 				}
 			})(),
 	};
-}
-
-function SuiteGlyph({ suite }: { suite?: string }) {
-	const Icon = suiteIcon(suite);
-	return (
-		<span className="text-muted-foreground flex shrink-0 items-center" aria-hidden="true">
-			<Icon className="size-4" />
-		</span>
-	);
 }
 
 function ExperimentTab({

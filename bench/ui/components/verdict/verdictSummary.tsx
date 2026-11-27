@@ -4,6 +4,8 @@ import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Ratio, Value, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { cheaperArm, formatUsd2, observedNumber } from "./armCost";
+import "@/components/experiments/ufrcI18n";
+import { plainSetupsNote } from "./setupsTable";
 import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, Hourglass, Trophy, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
@@ -91,6 +93,7 @@ export function VerdictSummary({
 	className,
 }: VerdictSummaryProps) {
 	const { t } = useTranslation("experimentPage");
+	const { t: tr } = useTranslation("ufrc");
 	const locale = getLocale();
 	// No clear winner is not a warning (M4-12): the panel stays grey.
 	const tone: Tone = partial || verdict.decision === "inconclusive" ? "neutral" : (DECISION_TONE[verdict.decision] ?? "neutral");
@@ -101,6 +104,7 @@ export function VerdictSummary({
 	const costs = costNumbers(panels, armCost, armMetrics);
 	const cheaper = !partial && !setups ? cheaperArm(panels, costs) : null;
 	const detail = !partial && !setups ? headlineDetail(panels, naive, costs, names, locale, t) : null;
+	const hintText = hint(verdict, partial, t, tr as unknown as (k: string, o?: Record<string, unknown>) => string);
 
 	return (
 		<section
@@ -124,9 +128,9 @@ export function VerdictSummary({
 							{line}
 						</p>
 					))}
-					{hint(verdict, partial, t) && (
+					{hintText && (
 						<p className="text-muted-foreground text-sm" data-testid="verdict-summary-hint">
-							{hint(verdict, partial, t)}
+							{hintText}
 						</p>
 					)}
 				</div>
@@ -193,6 +197,7 @@ function ArmPanel({
 	const { t } = useTranslation("experimentPage");
 	const { t: tu } = useTranslation("uf4a");
 	const { t: td } = useTranslation("ufd4");
+	const { t: tr } = useTranslation("ufrc");
 	const locale = getLocale();
 	// Under 10 runs the rate is not a score: the same rule as the shared comparison page.
 	const { rate: measured, tooFew } = rateOrTooFew(ratio);
@@ -211,17 +216,17 @@ function ArmPanel({
 	};
 	const meanCost = observedNumber(mean);
 	const medianCost = observedNumber(metrics?.cost_usd);
-	// Without the mean (three or more setups, or the cost explanation is missing) the median shows under its own label.
-	// M4-2: one label, "Average cost per run" (the mean), on every tab; the median is only a labelled second value.
-	const costLabel = t("summary.cost");
-	// No mean: a known median is not the average, so the average reads not known (median under it); else the load state or the reason.
+	// M4-2: "Average cost per run" (the mean) on every tab. Q-49: without the mean (three or more setups, or the cost
+	// explanation is missing) a known median is the headline under its own label, never "Not known" above a number.
+	const head = costHeadline(meanCost, medianCost);
+	const costLabel = head === "median" ? tr("summary.medianCost") : t("summary.cost");
 	const costText =
-		meanCost !== null
-			? formatUsd2(meanCost, locale)
-			: mean
-				? notKnown(mean.reason, t)
-				: medianCost !== null
-					? t("summary.unknown")
+		head === "mean"
+			? formatUsd2(meanCost as number, locale)
+			: head === "median"
+				? formatUsd2(medianCost as number, locale)
+				: mean
+					? notKnown(mean.reason, t)
 					: value("cost_usd", "usd");
 	return (
 		<div
@@ -283,14 +288,14 @@ function ArmPanel({
 						</span>
 						{cheaper && (
 							<span
-								className="bg-chart-success/10 text-chart-success-ink rounded-full px-2 py-0.5 text-xs font-medium"
+								className="bg-chart-success/10 text-chart-success-ink inline-flex min-h-6 items-center rounded-full px-2 py-1 text-xs font-medium"
 								data-testid={`verdict-summary-cheaper-${arm}`}
 							>
 								{t("summary.cheaper")}
 							</span>
 						)}
 					</dd>
-					{medianCost !== null && (
+					{head === "mean" && medianCost !== null && (
 						<dd className="text-muted-foreground mt-0.5 text-xs tabular-nums" data-testid={`verdict-summary-median-${arm}`}>
 							{t("summary.medianSecond", {
 								cost: formatUsd2(medianCost, locale),
@@ -393,9 +398,16 @@ function safetyLines(verdict: Verdict, t: TFn): string[] {
 		.map((arm) => t("summary.safetyLine", { setup: arm, tasks: safety[arm].join(", ") }));
 }
 
-function hint(verdict: Verdict, partial: boolean | undefined, t: TFn): string | null {
+function hint(
+	verdict: Verdict,
+	partial: boolean | undefined,
+	t: TFn,
+	tr: (k: string, o?: Record<string, unknown>) => string,
+): string | null {
 	if (partial) return t("summary.partialHint");
-	if (isSetupsVerdict(verdict)) return verdict.decision === "invalid" ? t("summary.invalidHint") : verdict.setups.note || null;
+	// Q-140: the server's setups note is statistics; the page says it in plain words.
+	if (isSetupsVerdict(verdict))
+		return verdict.decision === "invalid" ? t("summary.invalidHint") : verdict.setups ? plainSetupsNote(verdict.setups, tr) : null;
 	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint");
 	if (verdict.decision === "invalid" && !verdict.invalid_reasons?.length) return t("summary.invalidHint");
 	return null;
@@ -479,6 +491,13 @@ function nextLine(verdict: Verdict, arms: readonly string[], opts: HeadlineOptio
 	}
 	return "";
 }
+
+/** Which cost a setup's tile leads with (Q-49): the mean, else a known median, else neither. Pure. */
+export function costHeadline(mean: number | null, median: number | null): "mean" | "median" | "none" {
+	if (mean !== null) return "mean";
+	return median !== null ? "median" : "none";
+}
+
 /** Runs thrown out for cheating per arm, counted from the grid cells (M4-11). Pure. */
 export function thrownByArm(
 	rows: readonly { cells: readonly { arm: string; outcome: string | null }[] }[] | undefined,

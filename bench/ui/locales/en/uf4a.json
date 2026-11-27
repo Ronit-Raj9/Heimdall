@@ -61,7 +61,7 @@
 		"deleteTitle": "Delete this comparison?",
 		"deleteOk": "Delete comparison",
 		"deleteError": "Could not delete the comparison.",
-		"moreViews": "More",
+		"moreViews": "Other views",
 		"moreViewsLabel": "More views of this comparison"
 	},
 	"matrix": {

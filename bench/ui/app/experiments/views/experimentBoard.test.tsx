@@ -205,7 +205,7 @@ describe("ExperimentBoard", () => {
 		expect(html).toContain("experiment-row-e_eval_two");
 		expect(html).toContain("codex: two models · BFCL function calling");
 		expect(html).not.toContain("experiment-row-e_named");
-		expect(html).toContain("Search comparisons");
+		expect(html).toContain('placeholder="Search"');
 	});
 	it("hides debug runs by default and tags them when shown (N29)", () => {
 		url.extra = [{ ...rows[1], exp_id: "e_replay_r_n697kiewjt_x4qq", name: "replay r_n697kiewjt", arms: ["A"], decision: undefined }];

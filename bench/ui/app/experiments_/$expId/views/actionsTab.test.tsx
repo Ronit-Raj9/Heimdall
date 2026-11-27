@@ -76,7 +76,7 @@ describe("ActionsTab", () => {
 	it("offers extend on an inconclusive verdict and lists the suite's probes", () => {
 		api.adaptive = { data: { decision: "inconclusive", more_evidence: { tasks: 12, target_pp: 10, over: false }, extends: null } };
 		api.suites = { data: { suites: [{ id: "coding-core", probes: [{ id: "rate-limit" }, { id: "timeout" }] }] }, isLoading: false };
-		const html = render(<ActionsTab expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" suiteVersion="1.0.0" />);
 		expect(html).toContain('data-testid="job-run-experiment.extend"');
 		expect(html).toContain("about 12 more tasks");
 		expect(html).toContain('data-testid="actions-probe-rate-limit"');
@@ -92,7 +92,7 @@ describe("ActionsTab", () => {
 	it("refuses to extend a follow-up and offers the fault catalog on a suite without probes", () => {
 		api.adaptive = { data: { decision: "inconclusive", more_evidence: null, extends: { exp_id: "e0", kind: "trials" } } };
 		api.suites = { data: { suites: [{ id: "coding-core", probes: [] }] }, isLoading: false };
-		const html = render(<ActionsTab expId="e1" suite="coding-core" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" />);
 		expect(html).toContain('data-testid="actions-extend-followup"');
 		expect(html).toContain('data-testid="actions-extend-job-disabled"');
 		expect(html).not.toContain('data-testid="actions-probe-none"');
@@ -102,7 +102,7 @@ describe("ActionsTab", () => {
 	it("needs extend anyway when the verdict is decided", () => {
 		api.adaptive = { data: { decision: "improved", more_evidence: null, extends: null } };
 		api.suites = { data: { suites: [] }, isLoading: false };
-		const html = render(<ActionsTab expId="e1" />);
+		const html = render(<ActionsTab openAll expId="e1" />);
 		expect(html).toContain('data-testid="actions-extend-force"');
 		expect(html).toContain('data-testid="actions-extend-job-disabled"');
 	});
@@ -131,7 +131,7 @@ describe("ActionsTab fault test (N65)", () => {
 		api.adaptive = { data: { decision: "improved", more_evidence: null, extends: null } };
 		api.suites = { data: { suites: [{ id: "coding-core", probes: [{ id: "rate-limit" }] }] }, isLoading: false };
 		api.experiment = {};
-		const html = render(<ActionsTab expId="e1" suite="coding-core" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" />);
 		expect(html).toContain("Faults to add");
 		expect(html).toContain('data-testid="actions-probe-group-Model"');
 		expect(html).toContain('data-testid="actions-probe-group-Tools"');
@@ -156,7 +156,7 @@ describe("ActionsTab setups and Extend words (N66)", () => {
 				],
 			},
 		};
-		const html = render(<ActionsTab expId="e1" suite="coding-core" />);
+		const html = render(<ActionsTab openAll expId="e1" suite="coding-core" />);
 		expect(html).toMatch(/data-testid="actions-migrate-form-agent"[\s\S]*?<option value="agents\/codex.yaml" selected="">/);
 		expect(html).toMatch(
 			/value="gpt-6-luna"[^>]*data-testid="actions-migrate-form-from"|data-testid="actions-migrate-form-from"[^>]*value="gpt-6-luna"/,
@@ -167,7 +167,7 @@ describe("ActionsTab setups and Extend words (N66)", () => {
 		api.adaptive = { data: { decision: "score", more_evidence: null, extends: null } };
 		api.suites = { data: { suites: [] }, isLoading: false };
 		api.experiment = {};
-		const html = render(<ActionsTab expId="e1" />);
+		const html = render(<ActionsTab openAll expId="e1" />);
 		expect(html).toContain("Current result: score only (one setup)");
 		expect(html).not.toContain('data-testid="actions-extend-force"');
 		expect(html).toContain('data-testid="job-run-experiment.extend"');
@@ -177,6 +177,6 @@ describe("ActionsTab setups and Extend words (N66)", () => {
 			data: { decision: "regressed", more_evidence: null, extends: null },
 		};
 		api.experiment = {};
-		expect(render(<ActionsTab expId="e1" />)).toContain("Current result: B is worse");
+		expect(render(<ActionsTab openAll expId="e1" />)).toContain("Current result: B is worse");
 	});
 });

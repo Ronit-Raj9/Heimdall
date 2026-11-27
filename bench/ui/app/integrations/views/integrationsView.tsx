@@ -807,7 +807,8 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesLightQuery();
-	const files = useListExportsQuery(undefined, { pollingInterval: 5000, skipPollingIfUnfocused: true });
+	// Q-95: no polling; the export job refetches the list when it ends (JobRunButton onDone).
+	const files = useListExportsQuery();
 	const { t: tm } = useTranslation("w4m8");
 	const [deleteExport] = useDeleteExportMutation();
 	const [format, setFormat] = useState<IntegrationExportFormat>("otlp");

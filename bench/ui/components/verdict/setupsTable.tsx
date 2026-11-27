@@ -4,7 +4,26 @@ import type { Ratio, SetupsVerdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import "./hw09I18n";
+import "@/components/experiments/ufrcI18n";
+import { formatUsd2 } from "./armCost";
 import { formatPValue } from "./verdict.utils";
+
+type Translate = (key: string, opts?: Record<string, unknown>) => string;
+
+/** The most tasks any pair of setups shares: the tasks the setups were compared on. Pure. */
+export function sharedTasks(setups: Pick<SetupsVerdict, "pairs">): number {
+	return setups.pairs.reduce((most, pair) => Math.max(most, pair.tasks), 0);
+}
+
+/**
+ * The server's setups note in plain words (Q-140, M4-46): its text reads like a statistics paper
+ * (Holm, alpha, sign-flip), so the page says what it means; the raw note stays for statisticians.
+ * t is the ufrc namespace. Pure.
+ */
+export function plainSetupsNote(setups: Pick<SetupsVerdict, "pairs" | "separable" | "leader">, t: Translate): string {
+	const count = sharedTasks(setups);
+	return setups.separable ? t("setups.noteApart", { count, leader: setups.leader }) : t("setups.noteTooFew", { count });
+}
 
 /**
  * Every setup of a comparison of three or more (fix wave 3, N244): solved runs, the Holm-adjusted
@@ -16,14 +35,18 @@ export function SetupsTable({
 	arms,
 	naive,
 	names,
+	costs,
 }: {
 	setups: SetupsVerdict;
 	/** Every setup, in the order to show. */
 	arms: readonly string[];
 	naive: Record<string, Ratio>;
 	names?: Record<string, string>;
+	/** Q-141: the median cost per run of each setup (from the diagnostics), shown on the phone cards. */
+	costs?: Record<string, number | null>;
 }) {
 	const { t } = useTranslation("hw09");
+	const { t: tr } = useTranslation("ufrc");
 	const locale = getLocale();
 	const pOf = (arm: string): number | null => {
 		const pair = setups.pairs.find((p) => (p.arm_x === setups.leader && p.arm_y === arm) || (p.arm_y === setups.leader && p.arm_x === arm));
@@ -50,6 +73,11 @@ export function SetupsTable({
 								</span>
 								<span className="shrink-0 tabular-nums">{ratio ? `${ratio.num} / ${ratio.den}` : "-"}</span>
 							</div>
+							{costs?.[arm] != null && (
+								<span className="text-muted-foreground text-xs tabular-nums" data-testid={`verdict-setups-card-${arm}-cost`}>
+									{tr("setups.cardCost", { cost: formatUsd2(costs[arm] as number, locale) })}
+								</span>
+							)}
 							{!allTied && <span className="text-muted-foreground text-xs">{groupOf(arm)}</span>}
 							{broken.length > 0 && (
 								<span className="text-chart-error-ink text-xs font-medium">{t("setups.safetyBroken", { tasks: broken.join(", ") })}</span>
