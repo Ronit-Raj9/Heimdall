@@ -1,4 +1,6 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import "@/components/improvements/uf2bI18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { usePlanFirstLookMutation } from "@/lib/store/apis/connectApi";
 import { useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
@@ -6,6 +8,18 @@ import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { estimateMinutes } from "./connect.utils";
+
+/**
+ * The time and cost line of a first-look plan: minutes, and dollars when the plan sends an
+ * estimate_usd (the server does not yet; then only the time and "on your model key").
+ */
+export type FirstLookEstimate = { kind: "unknown" } | { kind: "time"; minutes: number } | { kind: "cost"; minutes: number; usd: string };
+
+export function firstLookEstimate(minutes: number, usd: number | undefined): FirstLookEstimate {
+	if (minutes <= 0) return { kind: "unknown" };
+	if (typeof usd === "number" && Number.isFinite(usd)) return { kind: "cost", minutes, usd: usd.toFixed(2) };
+	return { kind: "time", minutes };
+}
 
 /**
  * The line every first-look evaluation shows: the picked task count, too small for a verdict, never a
@@ -73,23 +87,38 @@ export function BareModelCard({
  */
 export function FirstLookLauncher({ agent }: { agent: string }) {
 	const { t } = useTranslation("connect");
+	const { t: tu } = useTranslation("uf2b");
 	const navigate = useNavigate();
+	const confirm = useConfirm();
 	const [plan, planState] = usePlanFirstLookMutation();
 	const [create, createState] = useCreateEvaluationMutation();
 	const [createBare, bareState] = useCreateEvaluationMutation();
 	const data = planState.data;
 	const start = async () => {
 		if (!data) return;
+		// Real tasks on the user's model key: never on one click. Phase B swaps in the shared PaidButton.
+		const ok = await confirm(tu("connect.firstLookConfirm"), {
+			title: tu("connect.firstLookConfirmTitle"),
+			confirmLabel: tu("connect.firstLookConfirmLabel"),
+		});
+		if (!ok) return;
 		const res = await create(data.evaluation);
 		if ("data" in res && res.data) void navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
 	};
 	const startBare = async () => {
 		if (!data?.bare_model) return;
+		const ok = await confirm(tu("connect.bareConfirm"), {
+			title: tu("connect.firstLookConfirmTitle"),
+			confirmLabel: tu("connect.firstLookConfirmLabel"),
+		});
+		if (!ok) return;
 		const res = await createBare(data.bare_model);
 		if ("data" in res && res.data) void navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
 	};
 	const minutes = data ? estimateMinutes(data.pick.estimate_s) : 0;
 	const ref = data?.reference;
+	// estimate_usd is not in the plan type yet; read it when a server sends it.
+	const est = firstLookEstimate(minutes, (data?.pick as { estimate_usd?: number } | undefined)?.estimate_usd);
 	return (
 		<div className="flex flex-col gap-3" data-testid="first-look">
 			{!data && (
@@ -112,7 +141,11 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 					</div>
 					<p className="text-muted-foreground text-sm">{data.pick.reason}</p>
 					<p className="text-muted-foreground text-sm">
-						{minutes > 0 ? t("firstLook.estimate", { minutes }) : t("firstLook.estimateUnknown")}
+						{est.kind === "cost"
+								? tu("connect.firstLookUsd", { minutes: est.minutes, usd: est.usd })
+								: est.kind === "time"
+									? t("firstLook.estimate", { minutes: est.minutes })
+									: t("firstLook.estimateUnknown")}
 					</p>
 					{ref && typeof ref.score === "number" && (
 						<p className="text-sm" data-testid="first-look-reference">

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { usePreviewEndpointMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useCreateSecretMutation } from "@/lib/store/apis/secretsApi";
+import { useCreateSecretMutation, useListSecretsQuery } from "@/lib/store/apis/secretsApi";
 import type { AgentFromTemplateRequest, AgentTemplate, EndpointTestResult, SentRequest, TemplateParam } from "@/lib/types/agentBuilder";
 import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem } from "@/lib/types/secrets";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { ChevronRight, CircleCheck, CircleX, KeyRound, Loader2 } from "lucide-re
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/agents/views/w4m1I18n";
+import "@/components/improvements/uf2bI18n";
 
 /**
  * Connect your agent (lane X10, J3 and J4): the form fields of the bring-your-own templates by kind
@@ -69,6 +70,84 @@ export function missingParams(tpl: AgentTemplate, params: Params): string[] {
 	return out;
 }
 
+/**
+ * What the form still needs, as the field labels a person sees. "Wrap my existing app" with neither a
+ * repository nor an image gets its either-or rule as one entry (wrapEither) instead of a label.
+ */
+export function missingFieldLabels(tpl: AgentTemplate, params: Params): { labels: string[]; wrapEither: boolean } {
+	const names = missingParams(tpl, params);
+	const wrapEither = tpl.id === "wrap-app" && !(params.repo_url ?? "").trim() && !(params.image ?? "").trim();
+	const labels = names
+		.filter((n) => !(wrapEither && n === "repo_url" && !tpl.params.find((p) => p.name === n)?.required))
+		.map((n) => tpl.params.find((p) => p.name === n)?.label ?? n);
+	return { labels: [...new Set(labels)], wrapEither };
+}
+
+/** A pasted value that looks like a real key rather than a secret name: an sk- prefix, or longer than 30 characters. */
+export function looksLikeKey(value: string): boolean {
+	const v = value.trim();
+	return /^sk-/i.test(v) || v.length > 30;
+}
+
+/**
+ * A field that holds a secret NAME: a select of the org's secrets when the list loads, so a person
+ * never pastes the key itself; otherwise a text box that warns when the value looks like a key.
+ */
+export function SecretNameField({
+	value,
+	onChange,
+	testId,
+	id,
+	placeholder,
+}: {
+	value: string;
+	onChange(v: string): void;
+	testId: string;
+	id?: string;
+	placeholder?: string;
+}) {
+	const { t: tu } = useTranslation("uf2b");
+	const list = useListSecretsQuery();
+	const names = list.data?.secrets.map((x) => x.name) ?? [];
+	if (names.length > 0) {
+		const options = value && !names.includes(value) ? [value, ...names] : names;
+		return (
+			<select
+				id={id}
+				className="border-input bg-card h-9 w-full rounded-md border px-3 font-mono text-sm"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				data-testid={testId}
+			>
+				<option value="">{tu("agent.secretPick")}</option>
+				{options.map((n) => (
+					<option key={n} value={n}>
+						{n}
+					</option>
+				))}
+			</select>
+		);
+	}
+	return (
+		<>
+			<Input
+				id={id}
+				value={value}
+				placeholder={placeholder}
+				className="font-mono"
+				autoComplete="off"
+				onChange={(e) => onChange(e.target.value)}
+				data-testid={testId}
+			/>
+			{looksLikeKey(value) && (
+				<span role="alert" className="text-chart-warning-ink text-sm" data-testid={`${testId}-looks-like-key`}>
+					{tu("agent.looksLikeKey")}
+				</span>
+			)}
+		</>
+	);
+}
+
 const FRAMEWORK_SIGNS: [string, RegExp][] = [
 	["langgraph", /langgraph|langchain/i],
 	["crewai", /crew[-_]?ai|\bcrew\b/i],
@@ -107,6 +186,7 @@ export function frameworkLabel(id: string): string {
 
 function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; onChange(v: string): void }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("uf2b");
 	const id = `param-${p.name}`;
 	if (p.kind === "bool") {
 		return (
@@ -151,6 +231,8 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 				data-testid={id}
 			/>
 		);
+	} else if (p.kind === "secret") {
+		control = <SecretNameField value={value} onChange={onChange} testId={id} placeholder={p.placeholder} />;
 	} else {
 		control = (
 			<Input
@@ -158,7 +240,6 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 				placeholder={p.placeholder}
 				required={p.required}
 				inputMode={p.kind === "number" ? "numeric" : undefined}
-				className={p.kind === "secret" ? "font-mono" : undefined}
 				autoComplete="off"
 				onChange={(e) => onChange(e.target.value)}
 				data-testid={id}
@@ -170,7 +251,8 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 			<label className="flex flex-col gap-1">
 				<span className="font-medium">
 					{p.label}
-					{p.required && <span className="text-muted-foreground"> *</span>}
+					{p.kind === "secret" && tu("agent.secretSuffix")}
+					{p.required && <span className="text-muted-foreground font-normal"> {tu("agent.required")}</span>}
 				</span>
 				{control}
 			</label>
@@ -578,7 +660,7 @@ export function EndpointPreviewView({
  */
 export const PULL_TEMPLATE: AgentTemplate = {
 	id: "pull",
-	name: "Your own code (pull mode)",
+	name: "Your own code",
 	category: "bring-your-own",
 	description: "Your agent runs in your own process and asks Heimdall for work. Nothing has to reach your network.",
 	adapter: "pull",

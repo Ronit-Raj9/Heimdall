@@ -40,7 +40,7 @@ describe("ImprovementsTable", () => {
 	it("explains how to start when there are none, the command line inside a disclosure with Copy", () => {
 		const html = renderToStaticMarkup(<ImprovementsTable rows={[]} admin />);
 		expect(html).toContain('data-testid="improvements-empty"');
-		expect(html).toContain("No improvement runs yet. Start one with New improvement run.");
+		expect(html).toContain("the improver keeps only changes that win on unseen tasks");
 		expect(html).toContain("Use the command line instead");
 		expect(html).toContain("heimdall improve create");
 		expect(html).toContain('data-testid="improvements-cli-copy"');

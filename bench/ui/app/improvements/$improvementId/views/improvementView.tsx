@@ -14,6 +14,7 @@ import {
 	useResumeImprovementMutation,
 	useStopImprovementMutation,
 } from "@/lib/store/apis/improveApi";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -30,6 +31,8 @@ export default function ImprovementView({ id }: { id: string }) {
 	const admin = canUse(useSession(), "admin");
 	const [continuing, setContinuing] = useState(false);
 	const d = q.data;
+	// Stop, resume and approve can fail after the click; show why below the header.
+	const actionError = stopState.error ?? resumeState.error ?? approveState.error;
 	const live = d && (d.status === "running" || d.status === "awaiting_approval" || d.status === "planned");
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="improvement-screen">
@@ -71,6 +74,11 @@ export default function ImprovementView({ id }: { id: string }) {
 					) : undefined
 				}
 			/>
+			{actionError ? (
+				<p role="alert" className="text-chart-error-ink text-sm" data-testid="improvement-action-error">
+					{getBenchErrorMessage(actionError)}
+				</p>
+			) : null}
 			{q.isLoading ? (
 				<BlockSkeleton rows={6} testId="improvement-loading" />
 			) : q.error || !d ? (

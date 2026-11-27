@@ -1,4 +1,6 @@
-import { LoadError, Section } from "@/components/runs/screenStates";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { LoadError } from "@/components/runs/screenStates";
+import { NewSecretInline, SecretNameField } from "@/app/agents_/new/views/connectForm";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +17,90 @@ import {
 import { useCreateInboxTokenMutation } from "@/lib/store/apis/liveinboxApi";
 import type { TraceConnectInfo, TraceDraft, TraceInferResult, TraceSetup } from "@/lib/types/connectTraces";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Radio } from "lucide-react";
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { Check, Copy, Radio, ShieldCheck, Upload } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import "@/components/improvements/uf2bI18n";
 import { useTranslation } from "react-i18next";
 import "@/app/agents/views/w4m1I18n";
 
 const POLL_MS = 5000;
+/** After this long with no trace, the waiting step says what to check. */
+export const STALE_MS = 2 * 60_000;
+const TOKEN_VAR = "$HEIMDALL_INGEST_TOKEN";
+
+/**
+ * The environment block as shown: with a token made on this page, the token filled in; without
+ * one, an export line for HEIMDALL_INGEST_TOKEN first, so nothing is copied with an unset variable.
+ */
+export function envBlock(env: string, token: string | null): { text: string; needsExport: boolean } {
+	if (token) return { text: withToken(env, token), needsExport: false };
+	if (!env.includes(TOKEN_VAR)) return { text: env, needsExport: false };
+	return { text: `export HEIMDALL_INGEST_TOKEN=<your hmi_ token>
+${env}`, needsExport: true };
+}
+
+/** A setup chip label "Name (frameworks)" split into the short name and the frameworks it covers. */
+export function setupChip(label: string): { name: string; covers: string } {
+	const m = /^(.*?)\s*\((.+)\)\s*$/.exec(label);
+	return m ? { name: m[1], covers: m[2] } : { name: label, covers: "" };
+}
+
+/** Which Connect field is wrong, first one first, or null when the request can be made. */
+export function connectProblem(edits: { id: string; url: string; authSecret: string }): "name" | "url" | "secret" | null {
+	if (!/^[a-z0-9][a-z0-9._-]{0,62}$/.test(edits.id.trim())) return "name";
+	if (!/^https?:\/\/\S+$/i.test(edits.url.trim())) return "url";
+	if (edits.authSecret.trim() && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(edits.authSecret.trim())) return "secret";
+	return null;
+}
+
+/**
+ * A numbered step of the page: a marker (filled once the step is done), the heading and the full
+ * description, never cut. Screen readers hear "Step 1 of 3" instead of a typed "1.".
+ */
+function StepSection({
+	n,
+	total,
+	done,
+	title,
+	description,
+	testId,
+	children,
+}: {
+	n: number;
+	total: number;
+	done: boolean;
+	title: string;
+	description?: ReactNode;
+	testId: string;
+	children: ReactNode;
+}) {
+	const { t } = useTranslation("uf2b");
+	return (
+		<section className="flex min-w-0 flex-col gap-3" data-testid={testId}>
+			<div className="flex min-w-0 items-start gap-3">
+				<span
+					aria-hidden="true"
+					data-testid={`${testId}-marker`}
+					data-done={done || undefined}
+					className={
+						"mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium " +
+						(done ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground")
+					}
+				>
+					{done ? <Check className="size-3.5" /> : n}
+				</span>
+				<div className="flex min-w-0 flex-col gap-0.5">
+					<h2 className="text-foreground text-base font-semibold tracking-tight">
+						<span className="sr-only">{t("traces.step", { n, total })}: </span>
+						{title}
+					</h2>
+					{description && <div className="text-muted-foreground max-w-prose text-sm">{description}</div>}
+				</div>
+			</div>
+			{children}
+		</section>
+	);
+}
 
 /**
  * Connect from traces (/agents/from-traces): the org's OTLP endpoint and setup lines, then the agent
@@ -35,21 +115,24 @@ export default function FromTracesView() {
 	const query = useGetConnectTracesQuery(undefined, { pollingInterval: fromFile ? 0 : POLL_MS, skipPollingIfUnfocused: true });
 	const info = query.data;
 	const draft = fromFile?.draft ?? info?.draft;
+	// Step 1 counts as done once a token was made here or traces arrived.
+	const [tokenMade, setTokenMade] = useState(false);
+	const total = draft && canWrite ? 3 : 2;
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="from-traces">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
 				icon={Radio}
-				breadcrumbs={[{ label: t("crumbAgents"), to: "/agents" }, { label: t("crumbNew"), to: "/agents/new" }, { label: t("title") }]}
 			/>
 			{query.isError ? (
 				<LoadError title={t("title")} error={query.error} onRetry={() => void query.refetch()} testId="from-traces-error" />
 			) : (
 				<>
-					{info && <EndpointSection info={info} />}
+					{info && <EndpointSection info={info} total={total} done={tokenMade || Boolean(draft)} onToken={() => setTokenMade(true)} />}
 					{draft ? (
 						<DraftSection
+							total={total}
 							draft={draft}
 							info={info}
 							fromFile={Boolean(fromFile)}
@@ -59,42 +142,74 @@ export default function FromTracesView() {
 							onClearFile={() => setFromFile(null)}
 						/>
 					) : (
-						<WaitingSection canWrite={canWrite} onInferred={setFromFile} />
+						<WaitingSection
+							canWrite={canWrite}
+							onInferred={setFromFile}
+							total={total}
+							checkedAt={(query as { fulfilledTimeStamp?: number }).fulfilledTimeStamp}
+						/>
 					)}
-					{draft && canWrite && <ConnectSection draft={draft} />}
+					{draft && canWrite && <ConnectSection draft={draft} total={total} />}
 				</>
 			)}
 		</div>
 	);
 }
 
-function CopyBlock({ label, text, testId }: { label: string; text: string; testId: string }) {
+function CopyBlock({ label, text, testId, single }: { label: string; text: string; testId: string; single?: boolean }) {
 	const { t } = useTranslation("connectTraces");
 	const [copied, setCopied] = useState(false);
 	return (
 		<div className="flex min-w-0 flex-col gap-1">
 			<div className="flex items-center justify-between gap-2">
-				<span className="text-muted-foreground text-xs font-medium">{label}</span>
-				<button
+				<span className="text-muted-foreground text-sm font-medium">{label}</span>
+				<Button
 					type="button"
-					className="text-primary text-xs font-medium"
+					size="sm"
+					variant="ghost"
+					className="min-h-8"
 					onClick={() => {
 						void navigator.clipboard?.writeText(text).then(() => setCopied(true));
 					}}
 					data-testid={`${testId}-copy`}
 				>
+					{copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
 					{copied ? t("endpoint.copied") : t("endpoint.copy")}
-				</button>
+				</Button>
 			</div>
-			<pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs whitespace-pre" data-testid={testId}>
-				{text}
-			</pre>
+			{single ? (
+				<pre className="bg-muted rounded-md p-3 text-xs break-all whitespace-pre-wrap" data-testid={testId}>
+					{text}
+				</pre>
+			) : (
+				// A right-edge fade says the line goes on; the block scrolls sideways on phones.
+				<div className="relative min-w-0">
+					<pre className="bg-muted overflow-x-auto rounded-md p-3 pr-8 text-xs whitespace-pre" data-testid={testId}>
+						{text}
+					</pre>
+					<span
+						aria-hidden="true"
+						className="from-muted pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-md bg-gradient-to-l to-transparent"
+					/>
+				</div>
+			)}
 		</div>
 	);
 }
 
-function EndpointSection({ info }: { info: TraceConnectInfo }) {
+function EndpointSection({
+	info,
+	total,
+	done,
+	onToken,
+}: {
+	info: TraceConnectInfo;
+	total: number;
+	done: boolean;
+	onToken: () => void;
+}) {
 	const { t } = useTranslation("connectTraces");
+	const { t: tu } = useTranslation("uf2b");
 	const { t: tm } = useTranslation("w4m1");
 	const session = useSession();
 	const [token, setToken] = useState<string | null>(null);
@@ -102,11 +217,27 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 	const [createToken, tokenState] = useCreateInboxTokenMutation();
 	const setup: TraceSetup | undefined = info.setup.find((s) => s.id === setupId) ?? info.setup[0];
 	const isAdmin = canUse(session, "admin");
+	const env = setup ? envBlock(setup.env, token) : undefined;
 	return (
-		<Section title={t("endpoint.title")} description={t("endpoint.description")} testId="from-traces-endpoint">
+		<StepSection
+			n={1}
+			total={total}
+			done={done}
+			title={t("endpoint.title")}
+			description={
+				<>
+					<p>{t("endpoint.description")}</p>
+					<p className="text-foreground mt-1 flex items-center gap-2 text-sm" data-testid="from-traces-privacy">
+						<ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+						{t("endpoint.privacy")}
+					</p>
+				</>
+			}
+			testId="from-traces-endpoint"
+		>
 			<div className="flex min-w-0 flex-col gap-4">
-				<CopyBlock label={t("endpoint.url")} text={info.endpoint} testId="from-traces-url" />
-				<p className="text-muted-foreground text-xs">{t("endpoint.auth", { hint: info.token_hint })}</p>
+				<CopyBlock label={t("endpoint.url")} text={info.endpoint} testId="from-traces-url" single />
+				<p className="text-sm">{t("endpoint.auth")}</p>
 				{info.hosted && (
 					<div className="flex flex-wrap items-center gap-3">
 						{isAdmin ? (
@@ -116,17 +247,20 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 								disabled={tokenState.isLoading || Boolean(token)}
 								onClick={async () => {
 									const res = await createToken({ label: "otel traces" });
-									if ("data" in res && res.data) setToken(res.data.secret);
+									if ("data" in res && res.data) {
+										setToken(res.data.secret);
+										onToken();
+									}
 								}}
 								data-testid="from-traces-make-token"
 							>
 								{t("endpoint.makeToken")}
 							</Button>
 						) : (
-							<span className="text-muted-foreground text-xs">{t("endpoint.tokenNeedsAdmin")}</span>
+							<span className="text-muted-foreground text-sm">{t("endpoint.tokenNeedsAdmin")}</span>
 						)}
 						{token && (
-							<span className="text-xs" data-testid="from-traces-token">
+							<span className="text-sm break-all" data-testid="from-traces-token">
 								{t("endpoint.tokenShown")} <code className="bg-muted rounded px-1">{token}</code>
 							</span>
 						)}
@@ -138,33 +272,48 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 						{tokenState.isError && <span className="text-destructive text-xs">{getBenchErrorMessage(tokenState.error)}</span>}
 					</div>
 				)}
-				<div className="flex flex-wrap gap-2" role="tablist">
-					{info.setup.map((s) => (
-						<button
-							key={s.id}
-							type="button"
-							role="tab"
-							aria-selected={s.id === setup?.id}
-							className={
-								"rounded-md border px-2 py-1 text-xs " +
-								(s.id === setup?.id ? "border-primary text-foreground font-medium" : "text-muted-foreground")
-							}
-							onClick={() => setSetupId(s.id)}
-							data-testid={`from-traces-setup-${s.id}`}
-						>
-							{s.label}
-						</button>
-					))}
+				<div className="flex flex-col gap-2">
+					<span className="text-sm font-medium" id="from-traces-libraries">
+						{tu("traces.libraries")}
+					</span>
+					<div className="flex flex-wrap gap-2" role="tablist" aria-labelledby="from-traces-libraries">
+						{info.setup.map((s) => (
+							<button
+								key={s.id}
+								type="button"
+								role="tab"
+								aria-selected={s.id === setup?.id}
+								className={
+									"min-h-8 rounded-md border px-3 py-1 text-sm " +
+									(s.id === setup?.id ? "border-primary text-foreground font-medium" : "text-muted-foreground")
+								}
+								onClick={() => setSetupId(s.id)}
+								data-testid={`from-traces-setup-${s.id}`}
+							>
+								{setupChip(s.label).name}
+							</button>
+						))}
+					</div>
+					{setup && setupChip(setup.label).covers && (
+						<p className="text-muted-foreground text-sm" data-testid="from-traces-setup-covers">
+							{tu("traces.worksWith", { list: setupChip(setup.label).covers })}
+						</p>
+					)}
 				</div>
 				{setup && (
 					<div className="flex min-w-0 flex-col gap-3">
 						{setup.install && <CopyBlock label={t("endpoint.install")} text={setup.install} testId="from-traces-install" />}
-						<CopyBlock label={t("endpoint.env")} text={withToken(setup.env, token)} testId="from-traces-env" />
+						{env?.needsExport && (
+							<p className="text-sm" data-testid="from-traces-env-note">
+								{tu("traces.envNoToken")} {t("endpoint.envHelp")}
+							</p>
+						)}
+						<CopyBlock label={t("endpoint.env")} text={env?.text ?? ""} testId="from-traces-env" />
 						{setup.code && <CopyBlock label={t("endpoint.code")} text={setup.code} testId="from-traces-code" />}
 					</div>
 				)}
 			</div>
-		</Section>
+		</StepSection>
 	);
 }
 
@@ -177,8 +326,26 @@ export function TraceFileError({ error }: { error: string }) {
 	);
 }
 
-function WaitingSection({ canWrite, onInferred }: { canWrite: boolean; onInferred: (r: TraceInferResult) => void }) {
+function WaitingSection({
+	canWrite,
+	onInferred,
+	total,
+	checkedAt,
+}: {
+	canWrite: boolean;
+	onInferred: (r: TraceInferResult) => void;
+	total: number;
+	checkedAt?: number;
+}) {
 	const { t } = useTranslation("connectTraces");
+	const { t: tu } = useTranslation("uf2b");
+	const fileRef = useRef<HTMLInputElement>(null);
+	const [stale, setStale] = useState(false);
+	useEffect(() => {
+		const timer = window.setTimeout(() => setStale(true), STALE_MS);
+		return () => window.clearTimeout(timer);
+	}, []);
+	const checked = checkedAt ? new Date(checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
 	const [infer, inferState] = useInferFromTraceFileMutation();
 	const [error, setError] = useState<string | null>(null);
 	const fileId = useId();
@@ -193,28 +360,51 @@ function WaitingSection({ canWrite, onInferred }: { canWrite: boolean; onInferre
 		else if ("error" in res) setError(getBenchErrorMessage(res.error));
 	};
 	return (
-		<Section title={t("waiting.title")} description={t("waiting.description")} testId="from-traces-waiting">
-			<div className="flex flex-col gap-2">
-				<span className="text-muted-foreground flex items-center gap-2 text-xs">
-					<span className="bg-primary size-2 animate-pulse rounded-full" aria-hidden />
-					{t("waiting.description")}
+		<StepSection n={2} total={total} done={false} title={t("waiting.title")} description={t("waiting.description")} testId="from-traces-waiting">
+			<div className="flex flex-col gap-4">
+				<span className="text-muted-foreground flex items-center gap-2 text-sm" aria-live="polite" data-testid="from-traces-waiting-status">
+					<span className="bg-primary size-2 rounded-full motion-safe:animate-pulse" aria-hidden />
+					{checked ? tu("traces.waitingChecked", { time: checked }) : tu("traces.waitingStatus")}
 				</span>
+				{stale && (
+					<p className="text-chart-warning-ink text-sm" role="status" data-testid="from-traces-stale">
+						{tu("traces.stale")}{" "}
+						<Link to="/inbox" className="text-primary underline underline-offset-2">
+							{tu("traces.staleLink")}
+						</Link>
+					</p>
+				)}
 				{canWrite && (
-					<label htmlFor={fileId} className="flex flex-col gap-1 text-xs">
-						<span className="text-muted-foreground">{t("waiting.orFile")}</span>
+					<div className="flex flex-col gap-2 border-t pt-4">
+						<h3 className="text-sm font-semibold">{tu("traces.fileTitle")}</h3>
+						<p className="text-muted-foreground text-sm">{t("waiting.orFile")}</p>
 						<input
+							ref={fileRef}
 							id={fileId}
 							type="file"
+							className="sr-only"
+							tabIndex={-1}
 							accept=".json,.pb,.bin,application/json,application/x-protobuf"
 							disabled={inferState.isLoading}
 							onChange={(e) => void onFile(e)}
 							data-testid="from-traces-file"
 						/>
-					</label>
+						<Button
+							type="button"
+							variant="outline"
+							className="w-fit"
+							disabled={inferState.isLoading}
+							onClick={() => fileRef.current?.click()}
+							data-testid="from-traces-file-button"
+						>
+							<Upload className="size-4" aria-hidden="true" />
+							{t("waiting.pickFile")}
+						</Button>
+					</div>
 				)}
 				{error && <TraceFileError error={error} />}
 			</div>
-		</Section>
+		</StepSection>
 	);
 }
 
@@ -229,6 +419,7 @@ function downloadYAML(text: string) {
 }
 
 export function DraftSection({
+	total = 2,
 	draft,
 	info,
 	fromFile,
@@ -237,6 +428,7 @@ export function DraftSection({
 	canWrite,
 	onClearFile,
 }: {
+	total?: number;
 	draft: TraceDraft;
 	info?: TraceConnectInfo;
 	fromFile: boolean;
@@ -246,9 +438,30 @@ export function DraftSection({
 	onClearFile: () => void;
 }) {
 	const { t } = useTranslation("connectTraces");
+	const { t: tu } = useTranslation("uf2b");
+	const confirm = useConfirm();
 	const [forget, forgetState] = useForgetConnectTracesMutation();
+	// M1-44 (lane S2) brings the shared InlineError; until then the failure shows as a plain alert line.
+	const [forgetError, setForgetError] = useState<string | null>(null);
+	const onForget = async () => {
+		const ok = await confirm(tu("traces.forgetConfirm"), {
+			title: tu("traces.forgetConfirmTitle"),
+			confirmLabel: tu("traces.forgetConfirmLabel"),
+			destructive: true,
+		});
+		if (!ok) return;
+		setForgetError(null);
+		try {
+			await forget().unwrap();
+		} catch (e) {
+			setForgetError(getBenchErrorMessage(e));
+		}
+	};
 	return (
-		<Section
+		<StepSection
+			n={2}
+			total={total}
+			done
 			title={t("draft.title")}
 			description={
 				fromFile
@@ -354,7 +567,7 @@ export function DraftSection({
 								size="sm"
 								variant="ghost"
 								disabled={forgetState.isLoading}
-								onClick={() => void forget()}
+								onClick={() => void onForget()}
 								data-testid="from-traces-forget"
 							>
 								{t("draft.forget")}
@@ -362,13 +575,19 @@ export function DraftSection({
 						)
 					)}
 				</div>
+				{forgetError && (
+					<p role="alert" className="text-chart-error-ink text-sm" data-testid="from-traces-forget-error">
+						{forgetError}
+					</p>
+				)}
 			</div>
-		</Section>
+		</StepSection>
 	);
 }
 
-function ConnectSection({ draft }: { draft: TraceDraft }) {
+function ConnectSection({ draft, total }: { draft: TraceDraft; total: number }) {
 	const { t } = useTranslation("connectTraces");
+	const { t: tu } = useTranslation("uf2b");
 	const navigate = useNavigate();
 	const [create, createState] = useCreateAgentFromTemplateMutation();
 	const template = draft.template || "http-url";
@@ -377,32 +596,38 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 	const [url, setURL] = useState(proposedURL);
 	const [authSecret, setAuthSecret] = useState("");
 	const ids = useId();
+	// The poll may bring a draft before or after the person edits: fill id and URL once, never over typing.
+	const filled = useRef(Boolean(draft.id || proposedURL));
 	useEffect(() => {
+		if (filled.current) return;
+		if (!draft.id && !proposedURL) return;
+		filled.current = true;
 		setID(draft.id);
 		setURL(proposedURL);
 	}, [draft.id, proposedURL]);
 	if (template === "wrap-app") {
 		return (
-			<Section title={t("connect.title")} description={t("connect.wrapHint")} testId="from-traces-connect">
+			<StepSection n={3} total={total} done={false} title={t("connect.title")} description={t("connect.wrapHint")} testId="from-traces-connect">
 				<Link
 					to="/agents/new"
 					search={{ template: "wrap-app" } as never}
-					className="text-primary text-xs font-medium underline underline-offset-2"
+					className="text-primary text-sm font-medium underline underline-offset-2"
 				>
 					{t("connect.openWrap")}
 				</Link>
-			</Section>
+			</StepSection>
 		);
 	}
 	const req = connectRequest(draft, { id, url, authSecret });
+	const problem = req ? null : connectProblem({ id, url, authSecret });
 	return (
-		<Section title={t("connect.title")} description={t("connect.description")} testId="from-traces-connect">
+		<StepSection n={3} total={total} done={false} title={t("connect.title")} description={t("connect.description")} testId="from-traces-connect">
 			<div className="flex max-w-xl flex-col gap-3">
-				<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-id`}>
+				<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-id`}>
 					<span className="font-medium">{t("connect.name")}</span>
 					<Input id={`${ids}-id`} value={id} onChange={(e) => setID(e.target.value)} data-testid="from-traces-id" />
 				</label>
-				<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-url`}>
+				<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-url`}>
 					<span className="font-medium">{template === "a2a-card" ? t("connect.urlCard") : t("connect.url")}</span>
 					<Input
 						id={`${ids}-url`}
@@ -413,17 +638,20 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 					/>
 				</label>
 				{template !== "a2a-card" && (
-					<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-secret`}>
+					<>
+					<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-secret`}>
 						<span className="font-medium">{t("connect.secret")}</span>
-						<Input
+						<SecretNameField
 							id={`${ids}-secret`}
 							value={authSecret}
 							placeholder="MY_AGENT_TOKEN"
-							onChange={(e) => setAuthSecret(e.target.value)}
-							data-testid="from-traces-secret"
+							onChange={setAuthSecret}
+							testId="from-traces-secret"
 						/>
 						<span className="text-muted-foreground">{t("connect.secretHint")}</span>
 					</label>
+					<NewSecretInline param="from-traces" onSaved={setAuthSecret} />
+					</>
 				)}
 				<div className="flex flex-wrap items-center gap-3">
 					<Button
@@ -437,7 +665,17 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 					>
 						{t("connect.submit")}
 					</Button>
-					{!req && <span className="text-muted-foreground text-xs">{t("connect.incomplete")}</span>}
+					{!req && (
+						<span className="text-muted-foreground text-sm" data-testid="from-traces-incomplete">
+							{problem === "name"
+								? tu("traces.missingName")
+								: problem === "url"
+									? tu("traces.missingUrl")
+									: problem === "secret"
+										? tu("traces.missingSecret")
+										: t("connect.incomplete")}
+						</span>
+					)}
 					{createState.isError && (
 						<span className="text-destructive text-xs" data-testid="from-traces-connect-error">
 							{t("connect.failed", { error: getBenchErrorMessage(createState.error) })}
@@ -445,6 +683,6 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 					)}
 				</div>
 			</div>
-		</Section>
+		</StepSection>
 	);
 }

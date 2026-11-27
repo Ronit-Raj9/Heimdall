@@ -4,9 +4,9 @@
 	"loadError": "Could not load improvement runs",
 	"empty": {
 		"title": "No improvement runs yet",
-		"message": "Start one from the command line with a spec that names your agent, a benchmark and the files the agent may change.",
+		"message": "Ask an organization admin to start one.",
 		"cli": "heimdall improve create -f improvements/my-agent.yaml -run",
-		"messageAdmin": "No improvement runs yet. Start one with New improvement run."
+		"messageAdmin": "Pick an agent and a benchmark; the improver keeps only changes that win on unseen tasks. Each round costs model calls."
 	},
 	"list": {
 		"name": "Run",
@@ -41,7 +41,7 @@
 	},
 	"split": {
 		"dev": "Practice tasks",
-		"audit": "Gate tasks",
+		"audit": "Decision tasks",
 		"sealed": "Held-out tasks"
 	},
 	"detail": {
@@ -55,7 +55,7 @@
 		"rejected": "Rejected",
 		"spend": "Total spend",
 		"gainPerUsd": "Gain per dollar",
-		"splits": "{{dev}} practice, {{audit}} gate and {{sealed}} held-out tasks; gate looks {{looks}} of {{max}}",
+		"splits": "{{dev}} practice, {{audit}} decision and {{sealed}} held-out tasks; decision checks used {{looks}} of {{max}}",
 		"stop": "Stop",
 		"stopConfirm": "Stop this improvement run? The current version stays as it is.",
 		"error": "Last error: {{error}}",
@@ -161,7 +161,7 @@
 		"budget": "Budget per round (dollars)",
 		"budgetError": "The budget must be above 0.",
 		"roundNote": "Each round runs the agent on practice, gate and held-out tasks of the benchmark and spends up to the round budget on the improver.",
-		"submit": "Create",
+		"submit": "Start run, up to ${{limit}}",
 		"cancel": "Cancel",
 		"cli": "Use the command line instead",
 		"copy": "Copy",

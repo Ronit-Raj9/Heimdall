@@ -36,6 +36,10 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false, isError: false }],
 }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err" }));
+vi.mock("@/lib/store/apis/secretsApi", () => ({
+	useCreateSecretMutation: () => [vi.fn(), { isLoading: false }],
+	useListSecretsQuery: () => ({ data: { secrets: [] } }),
+}));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
@@ -54,6 +58,13 @@ describe("FromTracesView", () => {
 		expect(html).toContain("Create an ingest token");
 		expect(html).toContain('data-testid="from-traces-waiting"');
 		expect(html).not.toContain('data-testid="from-traces-connect"');
+		// Fix wave X-22, M1-2, M2-92, M2-94: step markers, the privacy line on its own, an export line, an upload button.
+		expect(html).toContain('data-testid="from-traces-endpoint-marker"');
+		expect(html).toContain("Step 1 of 2");
+		expect(html).not.toContain("1. Send traces");
+		expect(html).toContain("It does not keep prompts, answers or tool arguments.");
+		expect(html).toContain("export HEIMDALL_INGEST_TOKEN=");
+		expect(html).toContain('data-testid="from-traces-file-button"');
 	});
 
 	it("shows the inferred agent with evidence, questions and the connect form", () => {
