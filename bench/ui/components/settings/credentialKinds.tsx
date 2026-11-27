@@ -1,6 +1,7 @@
 import "./uf8aI18n";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The four kinds of key and token, each on its own Settings tab. */
@@ -13,10 +14,22 @@ export type CredentialKind = (typeof CREDENTIAL_KINDS)[number];
  */
 export function CredentialKinds({ current }: { current: CredentialKind }) {
 	const { t } = useTranslation("uf8a");
+	// The rows mount only while the card is open: closed, its tab links would sit in the page
+	// unseen under the cards below (hidden but still hit by tests and focus tools).
+	const box = useRef<HTMLDivElement>(null);
+	const [open, setOpen] = useState(false);
+	useEffect(() => {
+		const d = box.current?.querySelector("details");
+		if (!d) return;
+		const on = () => setOpen(d.open);
+		d.addEventListener("toggle", on);
+		return () => d.removeEventListener("toggle", on);
+	}, []);
 	return (
+		<div ref={box} className="min-w-0">
 		<DetailsDisclosure label={t("kinds.title")} testId="credential-kinds">
 			<div className="bg-card overflow-hidden rounded-xl border">
-				<ul className="divide-y">
+				{open && <ul className="divide-y">
 					{CREDENTIAL_KINDS.map((kind) => (
 						<li
 							key={kind}
@@ -44,8 +57,9 @@ export function CredentialKinds({ current }: { current: CredentialKind }) {
 							</span>
 						</li>
 					))}
-				</ul>
+				</ul>}
 			</div>
 		</DetailsDisclosure>
+		</div>
 	);
 }

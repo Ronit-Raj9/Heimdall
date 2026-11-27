@@ -89,7 +89,7 @@ export default function UploadView() {
 	};
 
 	return (
-		<div className={cn(pageWidthClass("read"), "flex flex-col gap-6 p-6")} data-testid="upload-view">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="upload-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<div className="grid gap-3 sm:grid-cols-3" role="tablist" aria-label={t("title")}>
 				{KINDS.map(({ kind: k, icon: Icon }) => {

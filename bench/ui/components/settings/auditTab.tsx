@@ -374,7 +374,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 						/>
 						<Input
 							id={`${formId}-text`}
-							className="h-9 pl-8"
+							className="pl-8"
 							placeholder={t("settings.audit.filterTextPlaceholder")}
 							value={text}
 							onChange={(event) => setText(event.target.value)}
@@ -383,14 +383,14 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 					</div>
 				</div>
 				<div className="flex gap-2">
-					<Button type="submit" variant="outline" className="h-9" dataTestId="audit-apply">
+					<Button type="submit" variant="outline" className="h-(--control-h)" dataTestId="audit-apply">
 						{t("settings.audit.apply")}
 					</Button>
-					<Button type="button" variant="ghost" className="h-9" onClick={clear} dataTestId="audit-clear">
+					<Button type="button" variant="ghost" className="h-(--control-h)" onClick={clear} dataTestId="audit-clear">
 						{t("settings.audit.clear")}
 					</Button>
 				</div>
-				<label className="flex h-9 items-center gap-2 text-sm">
+				<label className="flex h-(--control-h) items-center gap-2 text-sm">
 					<input
 						type="checkbox"
 						checked={reads}
