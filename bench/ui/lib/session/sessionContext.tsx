@@ -35,6 +35,8 @@ export interface SessionInfo {
 	signupDomains?: string[];
 	/** A signed-in user: whether their email is verified; undefined for tokens, local mode and older servers. */
 	emailVerified?: boolean;
+	/** A signed-in user: whether the account has a password (false for GitHub-only); undefined when unknown. */
+	hasPassword?: boolean;
 }
 
 export const LOCAL_SESSION: SessionInfo = {
@@ -106,6 +108,7 @@ export function sessionFromMe({ me, meError, meLoading, config }: SessionSources
 			signedIn,
 			serverAdmin: me.server_admin === true,
 			emailVerified: kind === "user" && typeof me.email_verified === "boolean" ? me.email_verified : undefined,
+			hasPassword: kind === "user" && typeof me.has_password === "boolean" ? me.has_password : undefined,
 			...offers,
 		};
 	}
