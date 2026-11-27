@@ -12,6 +12,9 @@ import { ShowArchivedChip, useShowArchived } from "@/components/ui/showArchivedC
 import { archivedCountOf, useGetFindingsWithArchivedQuery } from "@/lib/store/apis/archiveApi";
 import { useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
 import { formatUsd } from "@/lib/money";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import { defaultInvestigation } from "@/components/findings/findingPlans";
+import "@/app/failures/views/ufrhI18n";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,6 +40,10 @@ export default function FindingsTab() {
 	const current = all.find((f) => f.id === selected) ?? null;
 	const noInvestigations = !investigations.isLoading && !investigations.error && investigationRows(investigations.data).length === 0;
 	// Nothing tracked and nothing investigated: one empty box with the one next step inside it (M7-25).
+	// With no comparison that has failed runs there is nothing to investigate: point at an evaluation, never at paid work (RFR-4).
+	const { t: r } = useTranslation("ufrh");
+	const experiments = useListExperimentsQuery().data?.experiments;
+	const nothingToAnalyse = experiments !== undefined && defaultInvestigation(experiments) === "";
 	const bothEmpty = !list.isLoading && !list.error && all.length === 0 && noInvestigations;
 	const findOut = (
 		<Button
@@ -59,6 +66,13 @@ export default function FindingsTab() {
 				<BlockSkeleton rows={4} testId="findings-loading" />
 			) : list.error ? (
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="findings-error" />
+			) : bothEmpty && nothingToAnalyse ? (
+				<EmptyState
+					title={r("findings.noRunsTitle")}
+					body={r("findings.noRunsBody")}
+					action={{ label: r("findings.noRunsAction"), to: "/evaluate" }}
+					testId="findings-empty-no-runs"
+				/>
 			) : bothEmpty ? (
 				<EmptyState
 					title={t("emptyTitle")}
