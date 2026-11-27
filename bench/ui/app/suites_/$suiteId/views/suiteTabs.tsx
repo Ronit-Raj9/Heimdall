@@ -61,7 +61,7 @@ export function SuiteExportTab({ suite }: { suite: SuiteSummary }) {
 						compact
 						icon={Download}
 						message={t("suites.importExport.notImported")}
-						action={{ label: t("suites.addSuite"), to: "/suites", search: { tab: "import" } }}
+						action={{ label: t("suites.addSuite"), to: "/suites/add" }}
 						testId="suite-not-imported"
 					/>
 				)}

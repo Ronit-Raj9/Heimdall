@@ -3,6 +3,7 @@
 	"subtitle": "Upload your OpenAPI file and your policy. Heimdall builds a copy of your app, a pinned model drafts tasks that test the policy, and each task is checked against the app copy before you review it.",
 	"breadcrumb": "Tasks from your API",
 	"entry": "Build tasks from your OpenAPI file and policy",
+	"costNote": "Uses your model key. Drafting usually costs under $0.05. Check and save is free.",
 	"readOnly": "You can look, but only members can start drafts, approve rules and review tasks.",
 	"steps": {
 		"upload": "Upload",
@@ -15,7 +16,7 @@
 		"title": "New draft",
 		"benchmark": "Benchmark id",
 		"benchmarkHelp": "A new benchmark, or one made here before for the same app.",
-		"app": "App id",
+		"app": "Tool prefix (for example shop)",
 		"appHelp": "The name of your app's tools, as the agent sees them (for example shop).",
 		"appTitle": "App name (optional)",
 		"spec": "OpenAPI file (version 3, YAML or JSON)",
@@ -39,12 +40,13 @@
 	},
 	"model": {
 		"title": "Model",
-		"description": "The model is pinned: every call goes through the gateway on your own model key, and the job stops at the cost cap.",
+		"description": "Uses your own model key. The job stops at the cost cap.",
 		"provider": "Provider",
 		"model": "Drafting model",
 		"pick": "Pick a model from your model keys.",
 		"maxUsd": "Cost cap (USD)",
-		"maxUsdHelp": "Leave empty for the default cap."
+		"maxUsdHelp": "Leave empty for the default cap ($5 on the hosted service).",
+		"maxUsdPlaceholder": "5.00 (default)"
 	},
 	"app": {
 		"title": "App copy",

@@ -18,9 +18,9 @@ describe("suiteDisplay", () => {
 		);
 	});
 
-	it("title-cases unknown built-in ids and ids without a summary", () => {
-		expect(suiteDisplayName("my_new-pack")).toBe("My New Pack");
-		expect(suiteDisplayName("my_new-pack", { builtin: true, source: "library" })).toBe("My New Pack");
+	it("shows unknown ids as they are, never title-cased (M3-34)", () => {
+		expect(suiteDisplayName("my_new-pack")).toBe("my_new-pack");
+		expect(suiteDisplayName("my_new-pack", { builtin: true, source: "library" })).toBe("my_new-pack");
 	});
 
 	it("shows a benchmark the team added exactly as its id was typed", () => {
@@ -44,7 +44,7 @@ describe("suiteDisplay", () => {
 		expect(plainDescription("Shell tasks imported in the Harbor shape: tests/test.sh writes a reward file. More.")).toBe(
 			"Shell tasks imported in the Harbor shape: writes a reward file.",
 		);
-		expect(plainDescription("skillsbench@1.0 through the harbor importer (suite hd-harbor-skills)")).toBe("Through the harbor importer");
+		expect(plainDescription("skillsbench@1.0 through the harbor importer (suite hd-harbor-skills)")).toBe(""); // M6-48: importer text is never a description
 		const long = plainDescription(`${"word ".repeat(40)}end.`);
 		expect(long.length).toBeLessThanOrEqual(93);
 		expect(long.endsWith("...")).toBe(true);

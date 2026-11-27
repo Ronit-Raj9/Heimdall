@@ -5,6 +5,7 @@ import { InventoryPanel, onboardColumns, onboardMapping } from "@/components/onb
 import { SourceBox, sourceGiven } from "@/components/onboard/sourceBox";
 import { SUITE_ID_RE, suggestSuiteId, suiteIdCheck } from "@/components/onboard/onboard.utils";
 import type { OnboardDraftSet, OnboardInventory } from "@/lib/types/onboard";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import AddBenchmarkView from "./addBenchmarkView";
@@ -15,6 +16,7 @@ vi.mock("@tanstack/react-router", () => ({
 			{children}
 		</a>
 	),
+	useBlocker: () => undefined,
 }));
 
 const { idleMutation } = vi.hoisted(() => ({ idleMutation: () => [() => undefined, { isLoading: false, error: undefined }] }));
@@ -101,7 +103,7 @@ const set: OnboardDraftSet = {
 
 describe("Add benchmark", () => {
 	it("renders the drop box first", () => {
-		const html = renderToStaticMarkup(<AddBenchmarkView />);
+		const html = renderToStaticMarkup(<NuqsTestingAdapter><AddBenchmarkView /></NuqsTestingAdapter>);
 		expect(html).toContain('data-testid="onboard-source"');
 		expect(html).toContain('data-testid="onboard-drop"');
 		expect(html).not.toContain("\u2014");

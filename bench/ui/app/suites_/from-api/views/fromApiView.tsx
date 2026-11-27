@@ -24,20 +24,22 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "
 import { useTranslation } from "react-i18next";
 import "@/app/gateway/views/w4intI18n";
 
+import "@/components/suites/uf6bI18n";
+import { appIdFrom, idProblems, maxUsdProblem, specTitle, suiteIdFrom } from "./fromApiIds";
+
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		appTasks: typeof import("@/locales/en/appTasks.json");
 	}
 }
 
-const ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const APP_RE = /^[a-z][a-z0-9_-]{0,31}$/;
 const KINDS: RuleKind[] = ["must", "must_not", "escalate", "info"];
 const field = "border-input bg-card rounded-md border px-3 py-2 text-sm";
 
 /** /suites/from-api: an OpenAPI file and a policy become a benchmark of support tasks against a copy of the app. */
 export default function FromApiView() {
 	const { t } = useTranslation("appTasks");
+	const { t: tb } = useTranslation("bench");
 	const session = useSession();
 	const writable = canUse(session, "member");
 	const list = useGetAppTaskDraftsQuery();
@@ -47,8 +49,11 @@ export default function FromApiView() {
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
-				breadcrumbs={[{ label: "Benchmarks", to: "/suites" }, { label: t("breadcrumb") }]}
+				breadcrumbs={[{ label: tb("suites.title"), to: "/suites" }, { label: t("breadcrumb") }]}
 			/>
+			<p className="text-muted-foreground -mt-3 text-sm" data-testid="from-api-cost-note">
+				{t("costNote")}
+			</p>
 			{!writable && (
 				<p role="note" className="text-muted-foreground text-sm" data-testid="from-api-readonly">
 					{t("readOnly")}
@@ -115,7 +120,19 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 	const [specName, setSpecName] = useState("");
 	const [policy, setPolicy] = useState("");
 	const [policyName, setPolicyName] = useState("");
-	const idsOk = ID_RE.test(suite) && APP_RE.test(app) && app !== "customer";
+	const { t: tu } = useTranslation("uf6b");
+	// M6-57: until typed, the two ids are drafted from the spec's info.title ("Shop API": shop, shop-support).
+	const [touched, setTouched] = useState({ suite: false, app: false });
+	const onSpec = (text: string) => {
+		setSpec(text);
+		const drafted = appIdFrom(specTitle(text));
+		if (!drafted) return;
+		if (!touched.app) setApp(drafted);
+		if (!touched.suite) setSuite(suiteIdFrom(touched.app ? app : drafted));
+		if (!title.trim()) setTitle(specTitle(text));
+	};
+	const problems = idProblems(suite, app);
+	const idsOk = problems.length === 0;
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();
 		if (!idsOk) return;
@@ -138,7 +155,11 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 						{t("new.benchmark")}
 						<Input
 							value={suite}
-							onChange={(e) => setSuite(e.target.value.trim())}
+							onChange={(e) => {
+								setTouched((x) => ({ ...x, suite: true }));
+								setSuite(e.target.value.trim());
+							}}
+							aria-invalid={(suite !== "" && problems.includes("benchmark")) || undefined}
 							placeholder="shop-support"
 							data-testid="from-api-suite"
 						/>
@@ -146,7 +167,16 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						{t("new.app")}
-						<Input value={app} onChange={(e) => setApp(e.target.value.trim())} placeholder="shop" data-testid="from-api-app" />
+						<Input
+							value={app}
+							onChange={(e) => {
+								setTouched((x) => ({ ...x, app: true }));
+								setApp(e.target.value.trim());
+							}}
+							aria-invalid={(app !== "" && (problems.includes("app") || problems.includes("appReserved"))) || undefined}
+							placeholder="shop"
+							data-testid="from-api-app"
+						/>
 						<span className="text-muted-foreground text-xs">{t("new.appHelp")}</span>
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
@@ -160,13 +190,13 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 					<input
 						type="file"
 						accept=".yaml,.yml,.json"
-						onChange={(e) => void readFile(e, (s, n) => (setSpec(s), setSpecName(n)))}
+						onChange={(e) => void readFile(e, (s, n) => (onSpec(s), setSpecName(n)))}
 						data-testid="from-api-spec-file"
 					/>
 					<textarea
 						className={`${field} h-40 font-mono text-xs`}
 						value={spec}
-						onChange={(e) => setSpec(e.target.value)}
+						onChange={(e) => onSpec(e.target.value)}
 						data-testid="from-api-spec"
 					/>
 				</label>
@@ -186,7 +216,13 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 						data-testid="from-api-policy"
 					/>
 				</label>
-				{(suite || app) && !idsOk && <p className="text-chart-error-ink text-xs">{t("new.invalidIds")}</p>}
+				{(suite || app) && !idsOk && (
+					<ul className="text-chart-error-ink flex flex-col gap-0.5 text-xs" data-testid="from-api-id-problems">
+						{problems.map((p) => (
+							<li key={p}>{tu(`fromApi.problem.${p}`)}</li>
+						))}
+					</ul>
+				)}
 				{error !== undefined && (
 					<p role="alert" className="text-chart-error-ink text-xs" data-testid="from-api-new-error">
 						{getBenchErrorMessage(error)}
@@ -244,6 +280,8 @@ export function DraftDetail({
 	const [picked, setPicked] = useState<PickedModel | null>(draft.model ?? null);
 	const keyState = usePickedKeyState(picked);
 	const [maxUsd, setMaxUsd] = useState("");
+	const { t: tu } = useTranslation("uf6b");
+	const badUsd = maxUsdProblem(maxUsd);
 	const usd = Number(maxUsd);
 	const modelParams = {
 		draft: draft.id,
@@ -252,7 +290,7 @@ export function DraftDetail({
 		model: picked?.model ?? "",
 		...(maxUsd && usd > 0 ? { max_usd: usd } : {}),
 	};
-	const modelOk = isPicked(picked) && keyState === "ok";
+	const modelOk = isPicked(picked) && keyState === "ok" && !badUsd;
 	const calls = draft.calls.reduce((n, c) => n + c.attempts, 0);
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="from-api-draft">
@@ -301,8 +339,21 @@ export function DraftDetail({
 						</div>
 						<label className="flex flex-col gap-1 text-sm">
 							{t("model.maxUsd")}
-							<Input value={maxUsd} inputMode="decimal" onChange={(e) => setMaxUsd(e.target.value.trim())} data-testid="from-api-max-usd" />
-							<span className="text-muted-foreground text-xs">{t("model.maxUsdHelp")}</span>
+							<Input
+								value={maxUsd}
+								inputMode="decimal"
+								placeholder={t("model.maxUsdPlaceholder")}
+								onChange={(e) => setMaxUsd(e.target.value.trim())}
+								aria-invalid={badUsd || undefined}
+								data-testid="from-api-max-usd"
+							/>
+							{badUsd ? (
+								<span className="text-chart-error-ink text-xs" role="alert" data-testid="from-api-max-usd-problem">
+									{tu("fromApi.problem.maxUsd")}
+								</span>
+							) : (
+								<span className="text-muted-foreground text-xs">{t("model.maxUsdHelp")}</span>
+							)}
 						</label>
 					</div>
 				</Section>
