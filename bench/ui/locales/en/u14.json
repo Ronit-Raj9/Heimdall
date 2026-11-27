@@ -49,7 +49,7 @@
 			"approver": "Write who approves this release.",
 			"blocked": "The result or the release rules say not to release. Tick Release anyway and give a reason to continue.",
 			"reason": "Write why you release anyway.",
-			"noneListed": "No comparison of two versions of your agent has finished yet. Model-only comparisons are not listed: switch models from a comparison's Model switch tab."
+			"noneListed": "No finished comparison of two versions yet."
 		},
 		"emptyNoComparison": "A release records which version won a comparison. Evaluate two versions first.",
 		"linkedFirst": "First record in the log",

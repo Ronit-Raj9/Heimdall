@@ -1,6 +1,6 @@
 import { decisionTone } from "@/components/verdict/verdict.utils";
 import { describe, expect, it } from "vitest";
-import { isUnseen, lastScanAt } from "./validityView";
+import { comparisonNames, isUnseen, lastScanAt } from "./validityView";
 
 describe("validity page helpers", () => {
 	it("finds the newest scan time and treats no stale rows as never scanned", () => {
@@ -29,5 +29,16 @@ describe("validity page helpers", () => {
 		};
 		expect(isUnseen(e, "u")).toBe(true);
 		expect(isUnseen({ ...e, seen_by: ["u"] }, "u")).toBe(false);
+	});
+});
+describe("comparisonNames (Q-78)", () => {
+	it("maps ids to names and skips rows named by their id", () => {
+		const m = comparisonNames([
+			{ exp_id: "exp_1", name: "codex v1 vs v2" },
+			{ exp_id: "exp_2", name: "exp_2" },
+		]);
+		expect(m.get("exp_1")).toBe("codex v1 vs v2");
+		expect(m.has("exp_2")).toBe(false);
+		expect(comparisonNames(undefined).size).toBe(0);
 	});
 });

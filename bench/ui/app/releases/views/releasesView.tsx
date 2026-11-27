@@ -1,12 +1,15 @@
 import { GovDialog } from "@/components/govern/govDialog";
 import { ReleaseActions } from "@/components/govern/releaseActions";
+import { liveReleases } from "@/components/govern/releaseAgent";
+import { versionName } from "@/components/releases/releaseEvidence";
 import { ReleasePanel } from "@/components/releases/releasePanel";
 import { LoadError } from "@/components/runs/screenStates";
-import { PageHeader } from "@/components/shell";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListExperimentsQuery, useListReleasesQuery } from "@/lib/store";
+import { useGetValidityQuery } from "@/lib/store/apis/validityApi";
+import { Link } from "@tanstack/react-router";
 import type { ReleaseRecord } from "@/lib/types/bench";
 import "@/components/canaries/uf7bI18n";
 import { Plus, Rocket } from "lucide-react";
@@ -18,21 +21,16 @@ import { ChainBadge, ReleaseCards } from "./releaseCards";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
- * What is live now (M7-77): the newest release of each agent, newest agent first, as
- * "codex v1 (released 21 Nov by ana)". Records without an agent version are skipped. Exported for tests.
+ * What is live now (M7-77, Q-16): the newest release of each agent, newest agent first, as
+ * "codex v1 (released 21 Nov by ana)". Reads liveReleases, so releases recorded from a comparison
+ * (agent_config_id only) count too. Exported for tests.
  */
 export function liveNow(releases: readonly ReleaseRecord[], t: (k: string, o?: Record<string, unknown>) => string): string[] {
-	const seen = new Set<string>();
-	const out: string[] = [];
-	const sorted = [...releases].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-	for (const r of sorted) {
-		if (!r.agent_id || !r.version || seen.has(r.agent_id)) continue;
-		seen.add(r.agent_id);
+	return liveReleases(releases).map(({ release: r, agent: a }) => {
 		const d = new Date(r.created_at);
 		const date = Number.isNaN(d.getTime()) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-		out.push(t("releases.liveOne", { name: `${r.agent_id} v${r.version}`, date, approver: r.approver || "-" }));
-	}
-	return out;
+		return t("releases.liveOne", { name: versionName(a.agent, a.version), date, approver: r.approver || "-" });
+	});
 }
 
 /** The releases screen: the hash-chained release log as a timeline, newest first; "New release" opens the record dialog. */
@@ -49,6 +47,7 @@ export default function ReleasesView() {
 	// X-110: with no comparison at all, "Record a release" leads nowhere, so the empty state points to an evaluation.
 	const noComparison = experiments.isSuccess && (experiments.data?.experiments ?? []).length === 0;
 	const live = liveNow(list, m as never);
+	const flipped = (useGetValidityQuery().data?.entries ?? []).filter((e) => e.flipped).length;
 	// M7-83: ?release=<id> (the copied link) scrolls to that record once the list is in.
 	const [releaseParam] = useQueryState("release", parseAsString);
 	useEffect(() => {
@@ -58,21 +57,20 @@ export default function ReleasesView() {
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="releases-screen">
-			<PageHeader
-				title={tu("releases.title")}
-				subtitle={tu("releases.subtitle")}
-				actions={
-					<Button onClick={() => setOpen(true)} data-testid="release-new">
-						<Plus className="size-4" aria-hidden="true" />
-						{tu("releases.new")}
-					</Button>
-				}
-			/>
-			{releases.isSuccess && (
-				<p className="-mt-4 text-sm" data-testid="releases-live-now">
-					<span className="font-medium">{m("releases.liveLabel")}</span> {live.length ? live.join("; ") : m("releases.liveNone")}
-				</p>
-			)}
+			{/* Q-71: the h1 and subtitle are the page's, above the tabs; this tab keeps its action row. */}
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				{releases.isSuccess ? (
+					<p className="min-w-0 text-sm" data-testid="releases-live-now">
+						<span className="font-medium">{m("releases.liveLabel")}</span> {live.length ? live.join("; ") : m("releases.liveNone")}
+					</p>
+				) : (
+					<span />
+				)}
+				<Button onClick={() => setOpen(true)} data-testid="release-new">
+					<Plus className="size-4" aria-hidden="true" />
+					{tu("releases.new")}
+				</Button>
+			</div>
 			<div className="grid grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start" data-testid="releases-layout">
 				<div className="flex min-w-0 flex-col gap-4">
 					<div className="flex flex-wrap items-center justify-between gap-2">
@@ -111,6 +109,10 @@ export default function ReleasesView() {
 					<p className="text-muted-foreground text-xs" data-testid="releases-disclaimer">
 						{t("releases.disclaimer")}
 					</p>
+					{/* Q-78: the validity ledger, reachable from where releases are judged. */}
+					<Link to="/validity" className="text-primary w-fit text-sm hover:underline" data-testid="releases-validity-link">
+						{flipped > 0 ? m("releases.validityLinkCount", { count: flipped }) : m("releases.validityLink")}
+					</Link>
 				</div>
 				<aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-0">
 					<ReleaseActions releases={list} onDone={() => void releases.refetch()} />

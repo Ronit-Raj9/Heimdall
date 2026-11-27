@@ -13,14 +13,15 @@ import {
 } from "@/lib/store/apis/schedulesApi";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
-import type { CanaryDefinition, CanaryNoiseFloor, SuiteSummary } from "@/lib/types/bench";
+import type { AgentSummary, CanaryDefinition, CanaryNoiseFloor, SuiteSummary } from "@/lib/types/bench";
 import type { AlertConfig, CanaryInitRequest } from "@/lib/types/schedules";
 import { useGetSchedulesQuery } from "@/lib/store/apis/schedulesApi";
-import { checkCost, HowOften, howOftenCron, howOftenOf, howOftenProblem, newHowOften, usd } from "@/components/canaries/howOften";
+import { type CheckCost, checkCost, HowOften, howOftenCron, howOftenOf, howOftenProblem, newHowOften } from "@/components/canaries/howOften";
+import { formatUsd } from "@/lib/money";
 import { runsPerDay } from "@/lib/utils/cron";
 import "@/components/canaries/uf7bI18n";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import "@/components/platform/ufintI18n";
 import i18n from "@/lib/i18n";
@@ -89,8 +90,11 @@ export interface CanaryFormFields {
 	force: boolean;
 }
 
-/** A new drift monitor: every day at 06:00 in the browser zone, all tasks, one model row to pick. */
-export function newCanaryFields(): CanaryFormFields {
+/**
+ * A new drift monitor: every day at 06:00 in the browser zone, all tasks, one model row to pick.
+ * agent (Q-50, "Watch this agent for drift") seeds the agent picked.
+ */
+export function newCanaryFields(agent = ""): CanaryFormFields {
 	const how = newHowOften();
 	return {
 		time: how.time,
@@ -99,7 +103,7 @@ export function newCanaryFields(): CanaryFormFields {
 		sensitivity: "",
 		alerts: [],
 		name: "",
-		agent: "",
+		agent,
 		suite: "",
 		tasksAll: true,
 		taskIds: [],
@@ -291,17 +295,38 @@ const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-
 const TASKS_SHOWN = 200;
 
 /**
+ * The cost line of a drift monitor (Q-34, Q-275): every amount through formatUsd, so the per-run,
+ * day and month figures and the confirm's cap round the same way; "Every hour" says when the
+ * daily limit stops it before 24 runs. Exported for tests.
+ */
+export function canaryCostLine(c: (k: string, o?: Record<string, unknown>) => string, cost: CheckCost, when: CanaryWhen): string {
+	const line = c("cost.line", { count: cost.runs, perRun: formatUsd(cost.perRun), day: formatUsd(cost.day), month: formatUsd(cost.month) });
+	return when === "hourly" && cost.runs < 24 ? `${c("cost.hourlyCapped", { count: cost.runs })} ${line}` : line;
+}
+
+/**
  * New drift canary: writes canaries/<name>.yaml through POST /canaries. With initial it edits that
  * drift monitor (PUT /canaries/{name}); the name is fixed.
  */
+/**
+ * The agent select's value for an agent ref (Q-50): the path of the agent whose id or path is ref
+ * ("codex" becomes agents/codex.yaml), else ref unchanged. Pure.
+ */
+export function agentPathFor(agents: readonly Pick<AgentSummary, "id" | "path">[], ref: string): string {
+	return agents.find((a) => a.id === ref || a.path === ref)?.path ?? ref;
+}
+
 export function NewCanaryForm({
 	onCreated,
 	onClose,
 	initial,
+	initialAgent,
 }: {
 	onCreated?(name: string): void;
 	onClose?(): void;
 	initial?: CanaryDefinition;
+	/** The agent to pick in a new monitor (?agent= of the page). */
+	initialAgent?: string;
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
@@ -319,7 +344,14 @@ export function NewCanaryForm({
 	const [msg, setMsg] = useState<string | null>(null);
 	const [serverProblems, setServerProblems] = useState<FieldProblem[]>([]);
 	const [taskFilter, setTaskFilter] = useState("");
-	const [f, setF] = useState<CanaryFormFields>(() => (initial ? canaryFormFields(initial) : newCanaryFields()));
+	const [f, setF] = useState<CanaryFormFields>(() => (initial ? canaryFormFields(initial) : newCanaryFields(initialAgent ?? "")));
+	// Q-50: once the agents are in, the seeded id ("codex") becomes the select's path value.
+	const agentRows = agents.data?.agents;
+	useEffect(() => {
+		if (!agentRows || !f.agent) return;
+		const path = agentPathFor(agentRows, f.agent);
+		if (path !== f.agent) setF((p) => ({ ...p, agent: path }));
+	}, [agentRows, f.agent]);
 	// The task list needs the picked benchmark's full entry (the light list carries no tasks): one
 	// benchmark from GET /suites/{id} (N194), only fetched once the user asks to pick some tasks.
 	const full = useGetSuiteQuery(f.suite.split("@")[0], { skip: f.tasksAll || !f.suite });
@@ -362,9 +394,9 @@ export function NewCanaryForm({
 			costNow &&
 			!(await confirm(i18n.t("canary.confirmBody", { ns: "ufint" }), {
 				title: i18n.t("canary.confirmTitle", { ns: "ufint", name: f.name }),
-				confirmLabel: c("canary.createUpTo", { day: usd(costNow.day) }),
+				confirmLabel: c("canary.createUpTo", { day: formatUsd(costNow.day) }),
 				costUsd: costNow.day,
-				costLine: c("cost.line", { count: costNow.runs, perRun: usd(costNow.perRun), day: usd(costNow.day), month: usd(costNow.month) }),
+				costLine: canaryCostLine(c as never, costNow, f.when),
 			}))
 		)
 			return;
@@ -660,7 +692,7 @@ export function NewCanaryForm({
 					</div>
 					{cost && (
 						<p className="text-muted-foreground text-xs" data-testid="canary-new-cost">
-							{c("cost.line", { count: cost.runs, perRun: usd(cost.perRun), day: usd(cost.day), month: usd(cost.month) })}
+							{canaryCostLine(c as never, cost, f.when)}
 						</p>
 					)}
 					{under("budget")}
@@ -683,7 +715,7 @@ export function NewCanaryForm({
 							onClick={() => void submit()}
 							data-testid="canary-new-submit"
 						>
-							{initial ? t("canary.save") : cost ? c("canary.createUpTo", { day: usd(cost.day) }) : t("canary.create")}
+							{initial ? t("canary.save") : cost ? c("canary.createUpTo", { day: formatUsd(cost.day) }) : t("canary.create")}
 						</Button>
 						{problems.length > 0 && (
 							<div className="text-muted-foreground flex flex-col gap-0.5 text-xs" data-testid="canary-new-missing">
@@ -700,7 +732,7 @@ export function NewCanaryForm({
 						{msg && <span data-testid="canary-new-msg">{msg}</span>}
 						{!initial && !f.smoke && Number(f.perRun) > 0 && (
 							<span className="text-muted-foreground basis-full" data-testid="canary-new-baseline-note">
-								{c("canary.baselineNote", { perRun: usd(Number(f.perRun)) })}
+								{c("canary.baselineNote", { perRun: formatUsd(Number(f.perRun)) })}
 							</span>
 						)}
 						{otherProblems.length > 0 && (

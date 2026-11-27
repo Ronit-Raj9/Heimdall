@@ -54,6 +54,8 @@
 		"line_other": "At most {{count}} runs a day, up to {{perRun}} a run, at most {{day}} a day and {{month}} a month.",
 		"lineLast_one": "At most {{count}} run a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
 		"lineLast_other": "At most {{count}} runs a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
+		"hourlyCapped_one": "Every hour, but the daily limit stops it after {{count}} run.",
+		"hourlyCapped_other": "Every hour, but the daily limit stops it after {{count}} runs.",
 		"unknown": "Price per run not known yet. The daily limit caps it at {{day}} a day and {{month}} a month."
 	},
 	"schedules": {
@@ -130,6 +132,8 @@
 		"liveNone": "none yet",
 		"liveOne": "{{name}} (released {{date}} by {{approver}})",
 		"evaluateAgent": "Evaluate an agent",
+		"validityLink": "Results affected by grader changes",
+		"validityLinkCount": "Results affected by grader changes ({{count}})",
 		"noNumbers": "No numbers were recorded with this release.",
 		"openComparison": "Open the comparison",
 		"copyLink": "Copy link to this release",
