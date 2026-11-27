@@ -660,6 +660,38 @@
 		content: " (" attr(href) ")";
 		font-size: 0.8em;
 	}
+	/* Evaluation, comparison and shared pages print as a clean report (M8-73). */
+	@page {
+		margin: 14mm;
+	}
+	[data-testid="shared-exports"],
+	[data-testid="toaster"],
+	[data-heimdall-dialog],
+	nav[aria-label] {
+		display: none !important;
+	}
+	table {
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+	tr,
+	[data-slot="card"],
+	section > h2,
+	section > h3 {
+		break-inside: avoid;
+	}
+	h2,
+	h3 {
+		break-after: avoid;
+	}
+	.overflow-x-auto,
+	.overflow-y-auto {
+		overflow: visible !important;
+		max-height: none !important;
+	}
+	* {
+		box-shadow: none !important;
+	}
 }
 
 /* Thin, quiet scrollbars in the frame. */

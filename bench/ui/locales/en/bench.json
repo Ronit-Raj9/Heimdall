@@ -2144,7 +2144,7 @@
 		"subtitle": "Re-run a small test on a schedule and warn you if your agent or model got worse.",
 		"loadError": "Could not load the drift monitors.",
 		"detailError": "Could not load drift monitor {{name}}.",
-		"empty": "No drift checks yet. Create one with the form below, then press Record baseline on it. (Terminal: heimdall canary init)",
+		"empty": "No drift monitors yet. Create one with the form below, then press Record baseline on it. (Terminal: heimdall canary init)",
 		"definitionError": "{{name}}: {{error}}",
 		"smoke": "practice mode (no real model, free)",
 		"unknown": "not known",
@@ -2284,7 +2284,7 @@
 	"inbox": {
 		"title": "Production failures",
 		"subtitle": "Each row is one kind of failure seen in production. Turn it into a new test task, reject it, or snooze it to decide later.",
-		"loadError": "Could not load the failure inbox.",
+		"loadError": "Could not load Production failures.",
 		"regressionTasks_one": "{{count}} new test task made from the inbox",
 		"regressionTasks_other": "{{count}} new test tasks made from the inbox",
 		"filters": {
@@ -2863,7 +2863,7 @@
 			"heldOutHint": "Tasks whose instruction and files are not served.",
 			"quarantined": "Quarantined",
 			"quarantinedHint": "Tasks kept out of new plans.",
-			"canary": "Scheduled check",
+			"canary": "Drift monitor",
 			"canarySet": "set",
 			"canaryNone": "none"
 		},
@@ -3656,7 +3656,7 @@
 			"grouping": "Sessions",
 			"groupingCounts": "{{id}} grouped by session id, {{gap}} grouped by pauses between requests ({{concurrent}} with requests at the same time)",
 			"privacy": "What is kept",
-			"privacyText": "{{rate}}% of sessions are scored and kept for {{days}} days. Only numbers and flags are kept; transcripts sent to the failure inbox have private data removed.",
+			"privacyText": "{{rate}}% of sessions are scored and kept for {{days}} days. Only numbers and flags are kept; transcripts sent to Production failures have private data removed.",
 			"judge": "AI judge"
 		},
 		"compare": {
@@ -3693,7 +3693,7 @@
 		"worst": {
 			"empty": "No failing sessions so far.",
 			"title": "Worst sessions",
-			"description": "Failing sessions, worst first. The worst ones from each read also go to the failure inbox, where you can turn them into new test tasks.",
+			"description": "Failing sessions, worst first. The worst ones from each read also go to Production failures, where you can turn them into new test tasks.",
 			"label": "Worst live sessions",
 			"notPushed": "not sent to the inbox",
 			"columns": {
@@ -3702,7 +3702,7 @@
 				"ended": "Ended",
 				"flags": "Problems found",
 				"requests": "Requests",
-				"inbox": "In failure inbox"
+				"inbox": "In Production failures"
 			}
 		}
 	},
@@ -3826,7 +3826,10 @@
 			"notApplicable": "Not applicable: {{reason}}.",
 			"fromTo": "A {{from}}, B {{to}}, difference {{total}}.",
 			"total": "Total",
-			"legend": "Parts sum to the total; a hatched bar is an unknown part's range"
+			"legend": "Parts sum to the total; a hatched bar is an unknown part's range",
+			"lead": "How much more or less each run of B costs than A, and which parts made the difference.",
+			"noMeasuring": "No judge or user simulator was used, so there are no extra measuring costs.",
+			"shapley": "The parts are split with an exact Shapley split: each part gets its average share over every order in which the changes could be applied."
 		},
 		"pareto": {
 			"title": "Cost against verified success",
@@ -3841,7 +3844,8 @@
 			"notPlaced": "not placed: {{reason}}",
 			"onFrontier": "on the frontier at {{x}}, {{y}}",
 			"dominated": "at {{x}}, {{y}}, dominated by {{by}}"
-		}
+		},
+		"switchLead": "Whether to switch from A to B, in one sentence, then the evidence below."
 	},
 	"visual": {
 		"title": "Visual grade",

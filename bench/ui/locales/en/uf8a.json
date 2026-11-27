@@ -69,8 +69,8 @@
 		"done": "Done",
 		"returnSaved": "Key saved.",
 		"returnAction": "Back to your evaluation",
-		"unavailableAdmin": "This server cannot save API keys yet. Admin: set HEIMDALL_MASTER_KEY and restart (see the hosting guide).",
-		"unavailableViewer": "This server cannot save API keys yet. The person who runs this server can turn it on.",
+		"unavailableAdmin": "This server cannot save model keys yet. Admin: set HEIMDALL_MASTER_KEY and restart (see the hosting guide).",
+		"unavailableViewer": "This server cannot save model keys yet. The person who runs this server can turn it on.",
 		"whoRuns": "See who runs this server",
 		"keyMissing": "No working {{provider}} key. Add one in Settings > Model keys.",
 		"keyMissingAction": "Add a {{provider}} key"

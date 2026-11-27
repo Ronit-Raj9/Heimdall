@@ -19,6 +19,7 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useSwitchOrgMutation: () => mutation(),
 	useLogoutMutation: () => mutation(),
 }));
+vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: undefined }) }));
 
 function at(pathname: string) {
 	routerState.location = { pathname, href: pathname, search: {} };

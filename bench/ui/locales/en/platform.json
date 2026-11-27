@@ -240,7 +240,7 @@
 				"lost": "Not responding"
 			},
 			"tokensTitle": "Worker tokens",
-			"tokensDescription": "A worker token lets a machine join one group of this organization. Workers get the API keys and secrets each run needs from Model keys and Secrets; without an org key they use their own environment. No machine of your own? Runs use the shared worker when this server offers one.",
+			"tokensDescription": "A worker token lets a machine join one group of this organization. Workers get the model keys and secrets each run needs from Model keys and Secrets; without an org key they use their own environment. No machine of your own? Runs use the shared worker when this server offers one.",
 			"poolLabel": "Group",
 			"poolPlaceholder": "default",
 			"create": "Create worker token",

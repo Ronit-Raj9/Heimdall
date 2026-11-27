@@ -27,7 +27,20 @@ export interface ConfirmOptions {
 /** A destructive confirmation must name what it deletes: the type a page lane moves to (X-104). */
 export type DestructiveConfirmOptions = ConfirmOptions & { destructive: true; title: string };
 
-export type ConfirmFn = (message: string, opts?: ConfirmOptions) => Promise<boolean>;
+/** A confirmation that is not destructive. */
+export type SafeConfirmOptions = Omit<ConfirmOptions, "destructive"> & { destructive?: false };
+
+/** What `confirm` takes (X-104): a destructive one must name what it deletes in its title. */
+export type StrictConfirmOptions = SafeConfirmOptions | DestructiveConfirmOptions;
+
+export interface ConfirmFn {
+	(message: string, opts?: StrictConfirmOptions): Promise<boolean>;
+	/**
+	 * @deprecated A destructive confirm must pass a title that names the thing (X-104). Kept only so
+	 * the callers listed in fixwave/notes/C0.md compile until their lanes add the title; remove then.
+	 */
+	(message: string, opts?: ConfirmOptions): Promise<boolean>;
+}
 
 interface PendingConfirm {
 	message: string;
@@ -84,7 +97,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	const storeRef = useRef<ConfirmStore | null>(null);
 	if (!storeRef.current) storeRef.current = createConfirmStore(setPending);
 	const store = storeRef.current;
-	const confirm = useCallback<ConfirmFn>((message, opts) => store.ask(message, opts), [store]);
+	const confirm: ConfirmFn = useCallback((message: string, opts?: ConfirmOptions) => store.ask(message, opts), [store]);
 	return (
 		<ConfirmContext.Provider value={confirm}>
 			{children}

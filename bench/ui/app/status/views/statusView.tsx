@@ -24,7 +24,7 @@ function when(iso?: string): string {
 /** /status: the public status page. Polls every 30 s; the server caches its checks for 15 s. */
 export default function StatusView() {
 	const { t } = useTranslation("status");
-	const q = useGetStatusPageQuery(undefined, { pollingInterval: 30_000 });
+	const q = useGetStatusPageQuery(undefined, { pollingInterval: 30_000, skipPollingIfUnfocused: true });
 
 	usePageTitle(t("page.title"));
 
