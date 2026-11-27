@@ -75,7 +75,7 @@ describe("run page helpers (lane 5a)", () => {
 		expect(uf5a.gates.names.insecure_code_added).toBe("Did not add insecure code");
 		expect(uf5a.page.rerun).toBe("Run this benchmark again (1 task)");
 		expect(uf5a.page.rerunHint).toContain("can be a different task of the same benchmark");
-		expect(JSON.stringify(uf3)).toContain("different task of the same benchmark");
+		expect(uf3.link.task).toContain("it can be a different task than {{task}}");
 		expect(uf5a.page.crumbRuns).toBe("Runs");
 	});
 });

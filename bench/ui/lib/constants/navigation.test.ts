@@ -142,7 +142,7 @@ describe("navigation", () => {
 		expect(pageTitle("/failures", { tab: "findings" })).toBe("Findings · Failures · Heimdall");
 		expect(pageTitle("/failures", { tab: "groups" })).toBe("Failure groups · Failures · Heimdall");
 		expect(pageTitle("/failures", { tab: "patterns" })).toBe("Failure patterns · Failures · Heimdall");
-		expect(pageTitle("/failures", { tab: "agents" })).toBe("By agent version · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "agents" })).toBe("Patterns by agent version · Failures · Heimdall");
 		expect(pageTitle("/failures", { tab: "clusters" })).toBe("Failure groups · Failures · Heimdall");
 		expect(pageTitle("/failures", { tab: "nope" })).toBe("Failures · Heimdall");
 		expect(pageTitle("/evaluate")).toBe("Evaluate an agent · Heimdall");
