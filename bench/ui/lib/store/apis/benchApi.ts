@@ -45,6 +45,7 @@ import type {
 	VerdictResponse,
 	WorkersResponse,
 } from "@/lib/types/bench";
+import type { ExperimentRow, PageFields, RunFailureFields, RunTitleFields } from "@/lib/types/serverFields";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, FIXTURE_PAIRS, detectFixtureMode, fixtureRefusal, resolveFixture, scopeFixture } from "./fixtures";
 import { notifyPlanLimit } from "@/lib/billing/planLimit";
@@ -264,6 +265,45 @@ export function normalizeWorkers(raw: unknown): WorkersResponse {
  * GET /suites/{id}/health with null lists and maps (Go nil) read as empty, so the suite page never
  * has to tell null from none.
  */
+/** getRun's argument: a run id, or the id with `failure: true` to add the failure group. */
+export interface GetRunArgs {
+	runId: string;
+	failure?: boolean;
+}
+
+export function runArgs(arg: string | GetRunArgs): GetRunArgs {
+	return typeof arg === "string" ? { runId: arg } : arg;
+}
+
+/** getSuiteHealth's argument: a suite id, or the id with the task ids to keep. */
+export interface SuiteHealthArgs {
+	suite: string;
+	tasks?: readonly string[];
+}
+
+export function healthArgs(arg: string | SuiteHealthArgs): SuiteHealthArgs {
+	return typeof arg === "string" ? { suite: arg } : arg;
+}
+
+/** listExperiments' optional parameters (G3). Unset ones are left out of the request. */
+export interface ListExperimentsParams {
+	arm_stats?: boolean;
+	limit?: number;
+	offset?: number;
+	q?: string;
+}
+
+/** The search parameters of a listExperiments call: only set ones; arm_stats as "1". Pure. */
+export function listExperimentsSearch(params: ListExperimentsParams | void): Record<string, string | number> {
+	const out: Record<string, string | number> = {};
+	if (!params) return out;
+	if (params.arm_stats) out.arm_stats = "1";
+	if (typeof params.limit === "number") out.limit = params.limit;
+	if (typeof params.offset === "number") out.offset = params.offset;
+	if (params.q && params.q.trim()) out.q = params.q.trim();
+	return out;
+}
+
 export function normalizeSuiteHealth(raw: unknown): SuiteHealthResponse {
 	const body = (raw ?? {}) as SuiteHealthResponse;
 	const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
@@ -367,8 +407,13 @@ export const benchApi = createApi({
 		}),
 
 		// Experiments
-		listExperiments: builder.query<ExperimentListResponse, void>({
-			query: () => "/experiments",
+		// A plain call asks the whole list. arm_stats adds per-setup numbers (M4-66); limit, offset and q
+		// page and search on the server (G3: the answer then has total). Same LIST tag either way.
+		listExperiments: builder.query<ExperimentListResponse & { experiments: ExperimentRow[] } & PageFields, ListExperimentsParams | void>({
+			query: (params) => {
+				const search = listExperimentsSearch(params);
+				return Object.keys(search).length > 0 ? { url: "/experiments", params: search } : "/experiments";
+			},
 			providesTags: [{ type: "BenchExperiment", id: "LIST" }],
 		}),
 		planExperiment: builder.mutation<PlanResponse, Experiment>({
@@ -440,9 +485,14 @@ export const benchApi = createApi({
 			},
 			providesTags: [{ type: "BenchRun", id: "LIST" }],
 		}),
-		getRun: builder.query<RunResponse, string>({
-			query: (runId) => `/runs/${id(runId)}`,
-			providesTags: (_result, _error, runId) => [{ type: "BenchRun", id: runId }],
+		// A string asks the run; { runId, failure: true } also asks its failure group (M5-1, G1) in the same
+		// request, so a failed run needs no second call. Both share the run's tag.
+		getRun: builder.query<RunResponse & RunTitleFields & RunFailureFields, string | GetRunArgs>({
+			query: (arg) => {
+				const { runId, failure } = runArgs(arg);
+				return failure ? `/runs/${id(runId)}?failure=1` : `/runs/${id(runId)}`;
+			},
+			providesTags: (_result, _error, arg) => [{ type: "BenchRun", id: runArgs(arg).runId }],
 		}),
 		getRunEvents: builder.query<RunEventsResponse, string>({
 			query: (runId) => `/runs/${id(runId)}/events`,
@@ -508,10 +558,15 @@ export const benchApi = createApi({
 			providesTags: (_result, _error, { suite, task }) => [{ type: "BenchSuites", id: `${suite}/${task}` }],
 		}),
 		// Suite health from sealed runs across experiments. 503 when the server has no run store.
-		getSuiteHealth: builder.query<SuiteHealthResponse, string>({
-			query: (suite) => `/suites/${id(suite)}/health`,
+		// A string asks the whole report; { suite, tasks } keeps only those tasks (G1, M6-5).
+		getSuiteHealth: builder.query<SuiteHealthResponse, string | SuiteHealthArgs>({
+			query: (arg) => {
+				const { suite, tasks } = healthArgs(arg);
+				const url = `/suites/${id(suite)}/health`;
+				return tasks && tasks.length > 0 ? { url, params: { tasks: tasks.join(",") } } : url;
+			},
 			transformResponse: (raw: unknown) => normalizeSuiteHealth(raw),
-			providesTags: (_result, _error, suite) => [{ type: "BenchSuites", id: `${suite}/health` }],
+			providesTags: (_result, _error, arg) => [{ type: "BenchSuites", id: `${healthArgs(arg).suite}/health` }],
 		}),
 		getAgents: builder.query<AgentsResponse, void>({
 			query: () => "/agents",
