@@ -112,19 +112,22 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 	const error = createState.error ?? readState.error;
 
 	return (
-		<div className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-4" data-testid="platform-import">
-			<div className="flex min-w-0 items-start gap-3">
-				<span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
-					<CloudDownload className="text-muted-foreground size-4" aria-hidden="true" />
-				</span>
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<h3 className="text-sm font-semibold">{t("title")}</h3>
-					<p className="text-muted-foreground text-xs">{t("subtitle")}</p>
+		<div id="platform-import" className="bg-card flex min-w-0 scroll-mt-4 flex-col gap-4 rounded-xl border p-4" data-testid="platform-import">
+			<div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+				<div className="flex min-w-0 flex-1 items-start gap-3">
+					<span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
+						<CloudDownload className="text-muted-foreground size-4" aria-hidden="true" />
+					</span>
+					<div className="flex min-w-0 flex-1 flex-col gap-1">
+						<h3 className="text-sm font-semibold">{t("title")}</h3>
+						<p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+					</div>
 				</div>
 				<Button
 					type="button"
 					variant="outline"
 					size="sm"
+					className="self-start sm:ml-auto"
 					onClick={() => setOpen(!open)}
 					aria-expanded={open}
 					data-testid="platform-import-toggle"
@@ -133,7 +136,7 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 				</Button>
 			</div>
 			{open && (
-				<div className="flex flex-col gap-4" data-testid="platform-import-form">
+				<div className="flex flex-col gap-4 border-t pt-4" data-testid="platform-import-form">
 					{platforms.isError && (
 						<p role="alert" className="text-destructive text-sm">
 							{getBenchErrorMessage(platforms.error)}

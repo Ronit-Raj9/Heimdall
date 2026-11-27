@@ -4,28 +4,30 @@
 	"crumbAgents": "Agents",
 	"crumbNew": "New agent",
 	"endpoint": {
-		"title": "1. Send traces",
-		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works. Only what is needed to find your agent is kept: names, models, tools called, routes. Never prompts, answers or tool arguments.",
+		"title": "Send traces",
+		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works.",
+		"privacy": "Heimdall keeps names, models, tools called and routes. It does not keep prompts, answers or tool arguments.",
 		"url": "Traces endpoint",
-		"auth": "Authorization: Bearer with {{hint}}",
+		"auth": "Send your ingest token in the Authorization header. Create one with the button below.",
 		"makeToken": "Create an ingest token",
 		"tokenShown": "Copy this token now. It is shown once and is already filled in below.",
 		"tokenNeedsAdmin": "An org admin creates ingest tokens.",
 		"install": "Install",
 		"env": "Environment",
+		"envHelp": "Set HEIMDALL_INGEST_TOKEN to the token from Create an ingest token above.",
 		"code": "Code",
 		"copy": "Copy",
 		"copied": "Copied"
 	},
 	"waiting": {
-		"title": "2. Waiting for the first trace",
+		"title": "Waiting for the first trace",
 		"description": "This page checks every few seconds. Run your agent once with the settings above.",
-		"orFile": "Or infer from an OTLP export file (JSON or protobuf). Nothing is kept.",
-		"pickFile": "Infer from a file",
+		"orFile": "Heimdall reads the file to propose your agent. Nothing is kept.",
+		"pickFile": "Upload an OTLP export (JSON or protobuf)",
 		"fileError": "{{error}}"
 	},
 	"draft": {
-		"title": "2. What your traces show",
+		"title": "What your traces show",
 		"received": "{{traces}} traces, {{spans}} spans kept, {{exports}} exports received",
 		"fromFile": "From the file you picked (not kept)",
 		"confidence": "Confidence: {{level}}",
@@ -51,7 +53,7 @@
 		"yamlHint": "Commit it as .heimdall/agent.yaml; the CLI reads it: heimdall agent file push"
 	},
 	"connect": {
-		"title": "3. Connect this agent",
+		"title": "Connect this agent",
 		"description": "The connect test then proves it: Heimdall sends a real request and checks the answer.",
 		"name": "Agent name",
 		"url": "Endpoint URL",

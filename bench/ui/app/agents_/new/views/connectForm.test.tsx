@@ -29,7 +29,10 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useTestEndpointMutation: () => [vi.fn(), { isLoading: false }],
 	usePreviewEndpointMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
+vi.mock("@/lib/store/apis/secretsApi", () => ({
+	useCreateSecretMutation: () => [vi.fn(), { isLoading: false }],
+	useListSecretsQuery: () => ({ data: { secrets: [] } }),
+}));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => role.admin, useSession: () => ({}) }));
 
 const http: AgentTemplate = {

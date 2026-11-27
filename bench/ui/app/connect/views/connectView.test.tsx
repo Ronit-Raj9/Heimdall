@@ -102,7 +102,7 @@ describe("connect result", () => {
 		expect(html).toContain("The check code did not come back, so Heimdall does not know where the answer is yet.");
 		expect(canSave(cand, false)).toBe(false);
 		expect(canSave(cand, true)).toBe(true);
-		expect(renderToStaticMarkup(<MappingPreview candidate={cand} />)).not.toContain("own request and answer shape");
+		expect(renderToStaticMarkup(<MappingPreview candidate={cand} />)).not.toContain("already uses Heimdall");
 	});
 
 	it("a proven candidate enables Save and shows how sure", () => {
@@ -112,7 +112,7 @@ describe("connect result", () => {
 		expect(html).toContain("90% sure");
 		expect(html).not.toContain("did not come back");
 		expect(canSave(cand, false)).toBe(true);
-		expect(renderToStaticMarkup(<MappingPreview candidate={cand} />)).toContain("own request and answer shape");
+		expect(renderToStaticMarkup(<MappingPreview candidate={cand} />)).toContain("already uses Heimdall");
 	});
 });
 

@@ -10,7 +10,7 @@
 		"limitError": "The spending limit must be above 0.",
 		"ideas": "Ideas per round",
 		"ideasError": "Pick 1 to 8 ideas per round.",
-		"improver": "Improver: Heimdall reflect-edit 1.1.0, on the agent's own model"
+		"improver": "Heimdall rewrites the files using your agent's model"
 	},
 	"preset": {
 		"small": "Small",

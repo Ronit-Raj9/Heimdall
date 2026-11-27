@@ -10,7 +10,8 @@ import { WhyDisabled, firstReason } from "@/components/ui/whyDisabled";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentPlatformsQuery, useImportAgentFromPlatformMutation } from "@/lib/store/apis/agentImportApi";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
 	useDetectAgentMutation,
 	useGetConnectCatalogQuery,
@@ -29,8 +30,9 @@ import type {
 	ConnectVerifyStatus,
 } from "@/lib/types/connect";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CircleCheck, Plug } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CircleCheck, Info, Plug } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import "@/components/improvements/uf2bI18n";
 import { useTranslation } from "react-i18next";
 import {
 	VERIFY_POLL_MS,
@@ -57,6 +59,21 @@ import { SecretCapture } from "./secretCapture";
 import { VerifyRows } from "./verifyRows";
 
 const NO_PLATFORM = "none";
+
+/** Example inputs the chips under the paste box fill in, one per kind Heimdall detects. */
+export const CONNECT_EXAMPLES = [
+	{ key: "exampleUrl", value: "https://bot.example.com/chat" },
+	{ key: "exampleCurl", value: `curl -X POST https://bot.example.com/chat -H "Content-Type: application/json" -d '{"message":"hi"}'` },
+	{ key: "exampleImage", value: "ghcr.io/example/agent:1" },
+] as const;
+
+/**
+ * The name to show after a detect: the suggestion, unless the user already typed one of their own
+ * (anything other than the starting name or the previous suggestion).
+ */
+export function nameAfterDetect(current: string, previousSuggestion: string, suggestion: string): string {
+	return current === "my-agent" || current === previousSuggestion || current.trim() === "" ? suggestion : current;
+}
 
 /** N105: how sure, only for a proven candidate; otherwise why it is not proven yet. */
 export function CandidateStatus({ cand }: { cand: ConnectCandidate }) {
@@ -122,8 +139,14 @@ export function PlatformCatalogNote({ label, loading, error }: { label: string; 
  */
 export default function ConnectView() {
 	const { t } = useTranslation("connect");
+	const { t: tu } = useTranslation("uf2b");
 	const navigate = useNavigate();
 	const catalog = useGetConnectCatalogQuery();
+	// Existing agent ids, so the name check says "already exists" before Save fails.
+	const agentsQ = useGetAgentsQuery();
+	const takenIds = useMemo(() => new Set((agentsQ.data?.agents ?? []).map((a) => a.id)), [agentsQ.data]);
+	const lastSuggestion = useRef("");
+	const [emptyPress, setEmptyPress] = useState(false);
 	const [input, setInput] = useState("");
 	const [platform, setPlatform] = useState(NO_PLATFORM);
 	const [probeSecrets, setProbeSecrets] = useState<Record<string, string>>({});
@@ -132,7 +155,7 @@ export default function ConnectView() {
 	const [cand, setCand] = useState<ConnectCandidate | undefined>();
 	const [name, setName] = useState("my-agent");
 	// Why the name cannot be saved, shown under the box and under Save (p02-3); "" when it can.
-	const nameProblem = agentNameProblem(name, new Set());
+	const nameProblem = agentNameProblem(name, takenIds);
 	const saveWhy = firstReason(nameProblem);
 	const [save, saveState] = useSaveConnectedAgentMutation();
 	const [saved, setSaved] = useState<ConnectSaveResponse | undefined>();
@@ -151,6 +174,11 @@ export default function ConnectView() {
 	}, [polling, verifyDone]);
 
 	const runDetect = async (secrets: Record<string, string> = probeSecrets) => {
+		if (!input.trim() && platform === NO_PLATFORM) {
+			setEmptyPress(true);
+			return;
+		}
+		setEmptyPress(false);
 		setSaved(undefined);
 		setInline(undefined);
 		setJobId(undefined);
@@ -160,7 +188,9 @@ export default function ConnectView() {
 		if ("data" in res && res.data) {
 			setDet(res.data);
 			setCand(bestCandidate(res.data));
-			setName(suggestedName(res.data));
+			const suggestion = suggestedName(res.data);
+			setName((cur) => nameAfterDetect(cur, lastSuggestion.current, suggestion));
+			lastSuggestion.current = suggestion;
 		}
 	};
 
@@ -262,23 +292,34 @@ export default function ConnectView() {
 			<section className="bg-card flex flex-col gap-3 rounded-xl border p-5" data-testid="connect-paste">
 				{!importable && (
 					<>
-						<label className="text-sm font-medium" htmlFor="connect-input">
-							{t("paste.label")}
-						</label>
+						<h2 className="text-base font-semibold tracking-tight">
+							<label htmlFor="connect-input">{t("paste.label")}</label>
+						</h2>
+						<p className="text-muted-foreground text-sm" id="connect-input-help">
+							{tu("connect.help")}
+						</p>
 						<textarea
 							id="connect-input"
 							className="border-input bg-card focus-visible:ring-ring/40 min-h-24 w-full rounded-md border px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2"
 							placeholder={t("paste.placeholder")}
 							value={input}
-							onChange={(e) => setInput(e.target.value)}
+							onChange={(e) => {
+								setInput(e.target.value);
+								setEmptyPress(false);
+							}}
+							aria-describedby="connect-input-help"
 							spellCheck={false}
 							data-testid="connect-input"
 						/>
 					</>
 				)}
-				<div className="flex flex-wrap items-center gap-3">
+				<div className="flex flex-wrap items-end gap-3">
+					<div className="flex min-w-0 flex-col gap-1">
+						<label className="text-sm font-medium" id="connect-platform-label">
+							{t("paste.platform")}
+						</label>
 					<Select value={platform} onValueChange={choosePlatform}>
-						<SelectTrigger className="min-w-56" aria-label={t("paste.platform")}>
+						<SelectTrigger className="w-full min-w-0 sm:min-w-56" aria-labelledby="connect-platform-label">
 							<SelectValue placeholder={t("paste.platform")} />
 						</SelectTrigger>
 						<SelectContent>
@@ -290,10 +331,10 @@ export default function ConnectView() {
 							))}
 						</SelectContent>
 					</Select>
+					</div>
 					{showDetectButton(platform, importable, importPlatforms, NO_PLATFORM) && (
 						<Button
 							onClick={() => void runDetect()}
-							disabled={!input.trim() && platform === NO_PLATFORM}
 							isLoading={detectState.isLoading}
 							data-testid="connect-detect"
 						>
@@ -308,15 +349,73 @@ export default function ConnectView() {
 						error={importPlatforms.isError ? getBenchErrorMessage(importPlatforms.error) : undefined}
 					/>
 				)}
+				{emptyPress && (
+					<p role="alert" className="text-chart-error-ink text-sm" data-testid="connect-empty-press">
+						{tu("connect.emptyPress")}
+					</p>
+				)}
 				{importable ? (
 					<ConnectPlatformForm key={importable.id} platform={importable} />
 				) : (
-					<p className="text-muted-foreground text-xs">{t("paste.hint")}</p>
+					<p className="text-muted-foreground flex items-center gap-1 text-sm">
+						{t("paste.hint")}
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									type="button"
+									className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded"
+									aria-label={tu("connect.userAgent")}
+								>
+									<Info className="size-3.5" aria-hidden="true" />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent>{tu("connect.userAgent")}</TooltipContent>
+						</Tooltip>
+					</p>
 				)}
 				{!importable && detectState.error ? (
 					<p className="text-chart-error-ink text-sm">{getBenchErrorMessage(detectState.error)}</p>
 				) : null}
 			</section>
+
+			{!det && !importable && (
+				<section className="flex flex-col gap-4" data-testid="connect-next">
+					<div className="flex flex-col gap-2">
+						<h2 className="text-sm font-semibold">{tu("connect.stepsTitle")}</h2>
+						<ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+							{(["step1", "step2", "step3"] as const).map((k, i) => (
+								<li key={k} className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+									<span
+										className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+										aria-hidden="true"
+									>
+										{i + 1}
+									</span>
+									<span>{tu(`connect.${k}`)}</span>
+								</li>
+							))}
+						</ol>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="text-muted-foreground text-sm">{tu("connect.examples")}</span>
+						{CONNECT_EXAMPLES.map((ex) => (
+							<Button
+								key={ex.key}
+								type="button"
+								size="sm"
+								variant="outline"
+								onClick={() => {
+									setInput(ex.value);
+									setEmptyPress(false);
+								}}
+								data-testid={`connect-example-${ex.key}`}
+							>
+								{tu(`connect.${ex.key}`)}
+							</Button>
+						))}
+					</div>
+				</section>
+			)}
 
 			{det && (
 				<Section title={titleText} testId="connect-result">
@@ -339,7 +438,7 @@ export default function ConnectView() {
 						))}
 						<details className="text-sm" data-testid="connect-probes">
 							<summary className="text-muted-foreground cursor-pointer text-xs">
-								{t("result.probes", { from: det.from, count: det.probes.length })}
+								{t("result.probes", { count: det.probes.length })}
 							</summary>
 							<ul className="mt-2 flex flex-col gap-1 font-mono text-xs">
 								{det.probes.map((p, i) => (
@@ -418,7 +517,7 @@ export default function ConnectView() {
 								<Input
 									value={name}
 									onChange={(e) => setName(e.target.value.toLowerCase())}
-									className="w-64"
+									className="w-full sm:w-64"
 									aria-invalid={nameProblem !== "" || undefined}
 									aria-describedby={nameProblem ? "connect-name-problem" : undefined}
 									data-testid="connect-name"

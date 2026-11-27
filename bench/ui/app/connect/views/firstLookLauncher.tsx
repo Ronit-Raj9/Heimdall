@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import "@/components/improvements/uf2bI18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { usePlanFirstLookMutation } from "@/lib/store/apis/connectApi";
 import { useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
@@ -6,6 +8,34 @@ import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { estimateMinutes } from "./connect.utils";
+
+/**
+ * The estimate_usd a first-look plan may carry (G1: POST /connect/first-look?estimate=1 adds
+ * {"low","high","known","reason"} to the response). Older servers send nothing; a bare number on
+ * the pick is still read.
+ */
+export type FirstLookUsd = number | { low?: number; high?: number; known?: boolean; reason?: string } | null | undefined;
+
+/** The upper dollar estimate of a plan, or undefined when the server did not send a known one. */
+export function firstLookUsd(raw: FirstLookUsd): number | undefined {
+	if (typeof raw === "number") return Number.isFinite(raw) ? raw : undefined;
+	if (!raw || raw.known === false) return undefined;
+	const v = typeof raw.high === "number" ? raw.high : raw.low;
+	return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * The time and cost line of a first-look plan: minutes, and dollars when the plan sends an
+ * estimate_usd (otherwise only the time and "on your model key").
+ */
+export type FirstLookEstimate = { kind: "unknown" } | { kind: "time"; minutes: number } | { kind: "cost"; minutes: number; usd: string };
+
+export function firstLookEstimate(minutes: number, usd: FirstLookUsd): FirstLookEstimate {
+	if (minutes <= 0) return { kind: "unknown" };
+	const v = firstLookUsd(usd);
+	if (v !== undefined) return { kind: "cost", minutes, usd: v.toFixed(2) };
+	return { kind: "time", minutes };
+}
 
 /**
  * The line every first-look evaluation shows: the picked task count, too small for a verdict, never a
@@ -34,11 +64,12 @@ export function BareModelCard({
 }: {
 	spec?: EvaluationSpec;
 	reason?: string;
-	onStart: () => void;
+	onStart: () => Promise<unknown> | void;
 	loading?: boolean;
 	error?: string;
 }) {
 	const { t } = useTranslation("connect");
+	const { t: tu } = useTranslation("uf2b");
 	if (!spec) {
 		return reason ? (
 			<p className="text-muted-foreground text-sm" data-testid="first-look-bare-none">
@@ -57,9 +88,16 @@ export function BareModelCard({
 				})}
 			</p>
 			<div>
-				<Button variant="outline" onClick={onStart} isLoading={loading} data-testid="first-look-bare-start">
-					{loading ? t("firstLook.starting") : t("firstLook.bareStart")}
-				</Button>
+				<PaidButton
+					variant="outline"
+					verb={t("firstLook.bareStart")}
+					capUsd={null}
+					confirm="always"
+					confirmText={tu("connect.bareConfirm")}
+					onConfirm={onStart}
+					isLoading={loading}
+					testId="first-look-bare-start"
+				/>
 			</div>
 			{error ? <p className="text-chart-error-ink text-sm">{error}</p> : null}
 		</div>
@@ -73,6 +111,7 @@ export function BareModelCard({
  */
 export function FirstLookLauncher({ agent }: { agent: string }) {
 	const { t } = useTranslation("connect");
+	const { t: tu } = useTranslation("uf2b");
 	const navigate = useNavigate();
 	const [plan, planState] = usePlanFirstLookMutation();
 	const [create, createState] = useCreateEvaluationMutation();
@@ -80,6 +119,7 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 	const data = planState.data;
 	const start = async () => {
 		if (!data) return;
+		// Real tasks on the user's model key: PaidButton asks first (confirm="always").
 		const res = await create(data.evaluation);
 		if ("data" in res && res.data) void navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
 	};
@@ -90,6 +130,11 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 	};
 	const minutes = data ? estimateMinutes(data.pick.estimate_s) : 0;
 	const ref = data?.reference;
+	// estimate_usd is not in the plan type: read it, as optional, from the response or the pick.
+	const rawUsd =
+		(data as { estimate_usd?: FirstLookUsd } | undefined)?.estimate_usd ??
+		(data?.pick as { estimate_usd?: FirstLookUsd } | undefined)?.estimate_usd;
+	const est = firstLookEstimate(minutes, rawUsd);
 	return (
 		<div className="flex flex-col gap-3" data-testid="first-look">
 			{!data && (
@@ -112,7 +157,11 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 					</div>
 					<p className="text-muted-foreground text-sm">{data.pick.reason}</p>
 					<p className="text-muted-foreground text-sm">
-						{minutes > 0 ? t("firstLook.estimate", { minutes }) : t("firstLook.estimateUnknown")}
+						{est.kind === "cost"
+								? tu("connect.firstLookUsd", { minutes: est.minutes, usd: est.usd })
+								: est.kind === "time"
+									? t("firstLook.estimate", { minutes: est.minutes })
+									: t("firstLook.estimateUnknown")}
 					</p>
 					{ref && typeof ref.score === "number" && (
 						<p className="text-sm" data-testid="first-look-reference">
@@ -121,15 +170,22 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 					)}
 					<FirstLookNote tasks={data.pick.tasks} />
 					<div>
-						<Button onClick={() => void start()} isLoading={createState.isLoading} data-testid="first-look-start">
-							{createState.isLoading ? t("firstLook.starting") : t("firstLook.start")}
-						</Button>
+						<PaidButton
+							verb={tu("connect.firstLookVerb")}
+							capUsd={null}
+							estimateUsd={firstLookUsd(rawUsd) ?? null}
+							confirm="always"
+							confirmText={tu("connect.firstLookConfirm")}
+							onConfirm={start}
+							isLoading={createState.isLoading}
+							testId="first-look-start"
+						/>
 					</div>
 					{createState.error ? <p className="text-chart-error-ink text-sm">{getBenchErrorMessage(createState.error)}</p> : null}
 					<BareModelCard
 						spec={data.bare_model}
 						reason={data.bare_model_reason}
-						onStart={() => void startBare()}
+						onStart={startBare}
 						loading={bareState.isLoading}
 						error={bareState.error ? getBenchErrorMessage(bareState.error) : undefined}
 					/>

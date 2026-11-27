@@ -6,15 +6,22 @@ import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
 import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { type ImprovementSpecBody, useCreateImprovementMutation, useEstimateImprovementMutation } from "@/lib/store/apis/improveApi";
-import i18n from "@/lib/i18n";
 import type { ImprovementEstimate } from "@/lib/types/improve";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { Dialog } from "@/components/ui/dialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import type { SuiteSummary } from "@/lib/types/bench";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 import { EstimateCard, estimateBlock } from "./estimateCard";
 import { PRESETS, type PresetName, PresetPicker } from "./presetPicker";
 import "./w45impI18n";
+import "./uf2bI18n";
 
 /** The improvement name rule the server enforces (improve/spec.go nameRe). */
 export const IMPROVEMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -116,6 +123,48 @@ export function createBlock(f: ImprovementForm, estimate: ImprovementEstimate | 
 	return estimateBlock(estimate);
 }
 
+/**
+ * The name the form suggests when an agent is picked: <agent>-improve-<yyyymmdd>, cut to the
+ * 63 characters the server accepts and without a trailing dash.
+ */
+export function defaultImprovementName(agent: string, now: Date = new Date()): string {
+	const y = now.getFullYear();
+	const m = String(now.getMonth() + 1).padStart(2, "0");
+	const d = String(now.getDate()).padStart(2, "0");
+	const slug = agent.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "");
+	const suffix = `-improve-${y}${m}${d}`;
+	return `${slug.slice(0, 63 - suffix.length).replace(/-+$/, "")}${suffix}`.replace(/^-+/, "");
+}
+
+/** One benchmark in the picker: the value sent (<id>@<version>), the text shown, and whether it can be picked. */
+export interface SuiteChoice {
+	value: string;
+	label: string;
+	/** True for a benchmark with no ready task: listed under "Not ready yet", not pickable. */
+	notReady?: boolean;
+}
+
+/**
+ * The benchmark picker's options: the benchmark name and its task count, the version only when two
+ * versions of one benchmark are listed, sorted by value. A benchmark the server says has no ready
+ * task is marked not ready.
+ */
+export function suiteChoices(
+	suites: readonly (Pick<SuiteSummary, "id" | "version"> & Partial<Pick<SuiteSummary, "task_count" | "ready_known" | "ready_task_ids">>)[],
+): SuiteChoice[] {
+	const versions = new Map<string, number>();
+	for (const s of suites) versions.set(s.id, (versions.get(s.id) ?? 0) + 1);
+	return suites
+		.map((s) => {
+			const name = (versions.get(s.id) ?? 0) > 1 ? `${s.id} ${s.version}` : s.id;
+			const label =
+				typeof s.task_count === "number" ? i18n.t("improve.suiteOption", { ns: "uf2b", name, count: s.task_count }) : name;
+			const notReady = s.ready_known === true && (s.ready_task_ids ?? []).length === 0;
+			return { value: `${s.id}@${s.version}`, label, notReady };
+		})
+		.sort((a, b) => a.value.localeCompare(b.value));
+}
+
 /** The command line equivalent, with a Copy button. */
 export function ImprovementCli({ testId }: { testId: string }) {
 	const { t } = useTranslation("improve");
@@ -156,8 +205,8 @@ export interface NewImprovementFormProps {
 	onChange(next: ImprovementForm): void;
 	/** The org's own agents, by id. */
 	agents: readonly string[];
-	/** Benchmarks as <id>@<version>. */
-	suites: readonly string[];
+	/** Benchmarks as <id>@<version>, or as picker choices with their shown text. */
+	suites: readonly (string | SuiteChoice)[];
 	/** The picked agent's files map paths; undefined while they load or with no agent picked. */
 	agentFiles?: readonly string[];
 	/** The picked agent's model, for the improver line. */
@@ -169,8 +218,19 @@ export interface NewImprovementFormProps {
 	busy?: boolean;
 	/** The server's refusal, shown under the form. */
 	error?: string;
-	onSubmit(): void;
+	onSubmit(): void | Promise<unknown>;
 	onCancel(): void;
+}
+
+/** The spending limit as dollars for the paid button; null when not a positive number yet. */
+export function limitUsd(limit: string): number | null {
+	const n = Number(limit);
+	return limit.trim() !== "" && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** True once the person changed anything from the empty form (the leave guard asks then). */
+export function improvementFormDirty(f: ImprovementForm): boolean {
+	return JSON.stringify(f) !== JSON.stringify(newForm());
 }
 
 /** The dialog's form (A2.9), without data fetching. Exported for tests. */
@@ -191,32 +251,38 @@ export function NewImprovementForm({
 }: NewImprovementFormProps) {
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
-	const ids = useId();
+	const { t: tu } = useTranslation("uf2b");
+	const choices: SuiteChoice[] = suites.map((s) => (typeof s === "string" ? { value: s, label: s } : s));
+	const readyChoices = choices.filter((c) => !c.notReady);
+	const notReadyChoices = choices.filter((c) => c.notReady);
 	const problems = improvementFormProblems(form);
 	const block = createBlock(form, estimate, estimating);
 	const set = (patch: Partial<ImprovementForm>) => onChange({ ...form, ...patch });
 	const toggle = (path: string, on: boolean) => set({ files: on ? [...form.files, path].sort() : form.files.filter((p) => p !== path) });
 	const pickPreset = (preset: PresetName) => set({ preset, limit: String(PRESETS[preset].limit) });
-	const selectClass = "border-input bg-card h-9 rounded-md border px-2 text-sm";
+	const selectClass = "border-input bg-card h-9 w-full rounded-md border px-2 text-sm";
+	// The name suggested for the last picked agent: replaced on the next pick only while not edited.
+	const suggested = useRef("");
+	const pickAgent = (agent: string) => {
+		const patch: Partial<ImprovementForm> = { agent, files: [] };
+		if (agent && (form.name === "" || form.name === suggested.current)) {
+			suggested.current = defaultImprovementName(agent);
+			patch.name = suggested.current;
+		}
+		set(patch);
+	};
 	return (
 		<form
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby={`${ids}-title`}
-			className="bg-card text-card-foreground flex max-h-[90vh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-lg border p-5 text-left shadow-lg"
-			data-testid="new-improvement-dialog"
+			aria-label={t("create.title")}
+			className="flex flex-col gap-4 text-left"
+			data-testid="new-improvement-form"
 			onSubmit={(e) => {
+				// Enter never starts paid work: only the Start button (which asks first) does.
 				e.preventDefault();
-				if (!block && !busy) onSubmit();
 			}}
 		>
-			<div>
-				<h2 id={`${ids}-title`} className="text-lg font-semibold">
-					{t("create.title")}
-				</h2>
-				<p className="text-muted-foreground text-sm">{t("create.description")}</p>
-			</div>
-			<label className="flex flex-col gap-1 text-xs">
+			<ImprovementCli testId="new-improvement-cli" />
+			<label className="flex flex-col gap-1 text-sm">
 				<span className="text-foreground font-medium">{t("create.name")}</span>
 				<Input
 					value={form.name}
@@ -225,13 +291,14 @@ export function NewImprovementForm({
 					autoFocus
 					data-testid="new-improvement-name"
 				/>
+				<span className="text-muted-foreground text-xs">{tu("improve.nameHelp")}</span>
 				{form.name.length > 0 && problems.includes("name") && (
 					<span className="text-chart-error-ink" data-testid="new-improvement-name-error">
 						{t("create.nameError")}
 					</span>
 				)}
 			</label>
-			<label className="flex flex-col gap-1 text-xs">
+			<label className="flex flex-col gap-1 text-sm">
 				<span className="text-foreground font-medium">{t("create.agent")}</span>
 				{agents.length === 0 ? (
 					<span className="text-muted-foreground" data-testid="new-improvement-no-agents">
@@ -241,7 +308,7 @@ export function NewImprovementForm({
 					<select
 						className={selectClass}
 						value={form.agent}
-						onChange={(e) => set({ agent: e.target.value, files: [] })}
+						onChange={(e) => pickAgent(e.target.value)}
 						data-testid="new-improvement-agent"
 					>
 						<option value="">{t("create.agentPick")}</option>
@@ -253,7 +320,7 @@ export function NewImprovementForm({
 					</select>
 				)}
 			</label>
-			<label className="flex flex-col gap-1 text-xs">
+			<label className="flex flex-col gap-1 text-sm">
 				<span className="text-foreground font-medium">{t("create.benchmark")}</span>
 				<select
 					className={selectClass}
@@ -262,14 +329,23 @@ export function NewImprovementForm({
 					data-testid="new-improvement-suite"
 				>
 					<option value="">{t("create.benchmarkPick")}</option>
-					{suites.map((s) => (
-						<option key={s} value={s}>
-							{s}
+					{readyChoices.map((c) => (
+						<option key={c.value} value={c.value}>
+							{c.label}
 						</option>
 					))}
+					{notReadyChoices.length > 0 && (
+						<optgroup label={tu("improve.notReadyGroup")} data-testid="new-improvement-suite-not-ready">
+							{notReadyChoices.map((c) => (
+								<option key={c.value} value={c.value} disabled title={tu("improve.notReadyTitle")}>
+									{c.label}
+								</option>
+							))}
+						</optgroup>
+					)}
 				</select>
 			</label>
-			<fieldset className="flex flex-col gap-1 text-xs" data-testid="new-improvement-files">
+			<fieldset className="flex flex-col gap-1 text-sm" data-testid="new-improvement-files">
 				<legend className="text-foreground mb-1 font-medium">{tw("form.surfaces")}</legend>
 				<label className="flex items-center gap-2">
 					<input
@@ -299,7 +375,7 @@ export function NewImprovementForm({
 			<PresetPicker value={form.preset} onChange={pickPreset} />
 			{form.preset === "custom" && (
 				<div className="flex flex-wrap gap-3">
-					<label className="flex w-28 flex-col gap-1 text-xs">
+					<label className="flex w-28 flex-col gap-1 text-sm">
 						<span className="text-foreground font-medium">{t("create.rounds")}</span>
 						<Input
 							type="number"
@@ -311,7 +387,7 @@ export function NewImprovementForm({
 							data-testid="new-improvement-rounds"
 						/>
 					</label>
-					<label className="flex w-36 flex-col gap-1 text-xs">
+					<label className="flex w-36 flex-col gap-1 text-sm">
 						<span className="text-foreground font-medium">{tw("form.ideas")}</span>
 						<Input
 							type="number"
@@ -327,7 +403,7 @@ export function NewImprovementForm({
 			)}
 			{problems.includes("rounds") && <span className="text-chart-error-ink text-xs">{t("create.roundsError")}</span>}
 			{problems.includes("ideas") && <span className="text-chart-error-ink text-xs">{tw("form.ideasError")}</span>}
-			<label className="flex w-64 flex-col gap-1 text-xs">
+			<label className="flex w-full flex-col gap-1 text-sm sm:w-64">
 				<span className="text-foreground font-medium">{tw("form.limit")}</span>
 				<Input
 					type="number"
@@ -339,13 +415,15 @@ export function NewImprovementForm({
 				/>
 			</label>
 			{problems.includes("limit") && <span className="text-chart-error-ink text-xs">{tw("form.limitError")}</span>}
-			<EstimateCard estimate={estimate} loading={estimating} error={estimateError} model={model} waiting={problems.length > 0} />
 			{error && (
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="new-improvement-error">
 					{error}
 				</p>
 			)}
-			<div className="flex flex-wrap items-center justify-end gap-2">
+			{/* Sticky footer: the estimate stays right above the paid Start button however long the form is. */}
+			<div className="bg-card sticky bottom-0 -mx-6 -mb-6 flex flex-col gap-3 border-t px-6 pt-3 pb-6" data-testid="new-improvement-footer">
+				<EstimateCard estimate={estimate} loading={estimating} error={estimateError} model={model} waiting={problems.length > 0} />
+				<div className="flex flex-wrap items-center justify-end gap-2">
 				{block && (
 					<span className="text-muted-foreground mr-auto text-xs" data-testid="new-improvement-reason">
 						{block}
@@ -354,11 +432,19 @@ export function NewImprovementForm({
 				<Button type="button" variant="ghost" onClick={onCancel} data-testid="new-improvement-cancel">
 					{t("create.cancel")}
 				</Button>
-				<Button type="submit" disabled={block !== undefined || busy} title={block} data-testid="new-improvement-submit">
-					{t("create.submit")}
-				</Button>
+				<PaidButton
+					verb={tu("improve.startVerb")}
+					capUsd={limitUsd(form.limit)}
+					confirm="always"
+					confirmText={tu("improve.confirmText")}
+					disabled={block !== undefined || busy}
+					isLoading={busy}
+					title={block}
+					onConfirm={onSubmit}
+					testId="new-improvement-submit"
+				/>
+				</div>
 			</div>
-			<ImprovementCli testId="new-improvement-cli" />
 		</form>
 	);
 }
@@ -371,18 +457,20 @@ export function NewImprovementForm({
  */
 export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const navigate = useNavigate();
-	const [form, setForm] = useState<ImprovementForm>(newForm);
+	const { t } = useTranslation("improve");
+	const { t: tu } = useTranslation("uf2b");
+	// Kept in the session while open, so a reload or a slip of the Back button does not lose it.
+	const [form, setForm, clearDraft] = useFormDraft<ImprovementForm>("newImprovement", newForm());
+	const [open, setOpen] = useState(true);
+	// Off once the run is created, so opening the new run does not ask "Leave this page?".
+	const [sent, setSent] = useState(false);
+	useLeaveGuard(!sent && improvementFormDirty(form));
 	const agentsQ = useGetAgentsQuery();
 	// The picker needs only each benchmark id and version: the light list never waits for a pack load.
 	const suitesQ = useGetSuitesLightQuery();
 	const config = useGetAgentConfigQuery(form.agent, { skip: !form.agent });
 	const [create, state] = useCreateImprovementMutation();
 	const [estimate, est] = useEstimateImprovementMutation();
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
 	const complete = improvementFormProblems(form).length === 0;
 	const body = complete ? JSON.stringify(improvementSpec(form)) : "";
 	// The estimate shown must be for the current form: a newer change makes it stale until it answers.
@@ -398,11 +486,16 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const current = asked === body && est.originalArgs !== undefined && JSON.stringify(est.originalArgs) === body;
 	const estimating = complete && (!current || est.isLoading);
 	const agents = splitAgents((agentsQ.data?.agents ?? []) as AgentWithCaps[]).own.map((a) => a.id);
-	const suites = (suitesQ.data?.suites ?? []).map((s) => `${s.id}@${s.version}`).sort();
+	const suites = suiteChoices(suitesQ.data?.suites ?? []);
 	const agentFiles = form.agent && config.data && !config.isFetching ? (config.data.fields.files ?? []) : undefined;
 	const submit = async () => {
+		// The run spends the organization's model keys: PaidButton asked first (confirm="always").
 		try {
 			const run = await create(improvementSpec(form)).unwrap();
+			flushSync(() => {
+				setSent(true);
+				clearDraft();
+			});
 			onClose();
 			void navigate({ to: "/improvements/$improvementId", params: { improvementId: run.id } });
 		} catch {
@@ -410,7 +503,18 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 		}
 	};
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="new-improvement-backdrop">
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				setOpen(next);
+				if (!next) onClose();
+			}}
+			title={t("create.title")}
+			description={t("create.description")}
+			closeLabel={tu("improve.close")}
+			size="lg"
+			testId="new-improvement-dialog"
+		>
 			<NewImprovementForm
 				form={form}
 				onChange={setForm}
@@ -423,9 +527,9 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 				estimateError={current && est.error ? getBenchErrorMessage(est.error) : undefined}
 				busy={state.isLoading}
 				error={state.error ? getBenchErrorMessage(state.error) : undefined}
-				onSubmit={() => void submit()}
+				onSubmit={submit}
 				onCancel={onClose}
 			/>
-		</div>
+		</Dialog>
 	);
 }

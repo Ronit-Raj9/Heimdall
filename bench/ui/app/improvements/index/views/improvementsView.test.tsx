@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ImprovementsView, { ImprovementsTable } from "./improvementsView";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/improveApi")>()),
 	useGetImprovementsQuery: () => okQuery({ improvements: [] }),
@@ -40,7 +40,7 @@ describe("ImprovementsTable", () => {
 	it("explains how to start when there are none, the command line inside a disclosure with Copy", () => {
 		const html = renderToStaticMarkup(<ImprovementsTable rows={[]} admin />);
 		expect(html).toContain('data-testid="improvements-empty"');
-		expect(html).toContain("No improvement runs yet. Start one with New improvement run.");
+		expect(html).toContain("the improver keeps only changes that win on unseen tasks");
 		expect(html).toContain("Use the command line instead");
 		expect(html).toContain("heimdall improve create");
 		expect(html).toContain('data-testid="improvements-cli-copy"');

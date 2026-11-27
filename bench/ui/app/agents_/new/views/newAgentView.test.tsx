@@ -77,7 +77,11 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	usePreviewEndpointMutation: () => [vi.fn(), { isLoading: false }],
 	usePutAgentConfigMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
+vi.mock("@/lib/store/apis/secretsApi", () => ({
+	useCreateSecretMutation: () => [vi.fn(), { isLoading: false }],
+	useListSecretsQuery: () => ({ data: { secrets: [] } }),
+}));
+vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({ data: { keys: [] } }) }));
 let agentIds = ["taken"];
 vi.mock("@/lib/store/apis/benchApi", () => ({
 	getBenchErrorMessage: () => "err",
@@ -88,6 +92,7 @@ vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession:
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
+	useBlocker: () => undefined,
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 
@@ -175,7 +180,10 @@ describe("NewAgentView", () => {
 	it("says the limit and the real file the name is saved as", () => {
 		agentIds = [];
 		const html = render("?template=plain-loop");
-		expect(html).toContain("up to 63 characters. Saved as agents/my-plain-loop.yaml.");
+		// Fix wave M2-78: the help gives the rule; the id it is saved as has its own line.
+		expect(html).toContain("up to 63 characters.");
+		expect(html).toContain("Saved as my-plain-loop");
+		expect(html).not.toContain("agents/my-plain-loop.yaml");
 		agentIds = ["taken"];
 	});
 });
