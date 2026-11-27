@@ -55,7 +55,7 @@ means `/experiments/<id>`; its tabs are named in the table.
 | `judge calibrate` / `label` / `status` | Suites, Calibration (`/calibration`) | web | |
 | `k8s` | Settings > Operations, **Kubernetes status** (job `k8s.status`) | partial | gateway, image load and cleanup are cluster operator tasks |
 | `leaderboard` | Benchmark > Leaderboard | web | |
-| `livescore init` / `pull` / `compare` / `status` | Production > Live traffic, **Set up live scoring**, **Pull now**, **Recompute comparison** | web | |
+| `livescore init` / `pull` / `compare` / `status` | Production > Live scoring, **Set up live scoring**, **Pull now**, **Recompute comparison** | web | |
 | `matrix` | Experiment page, Matrix tab (three or more arms) | web | |
 | `mcp scan` | Agent page, Tools tab (MCP section) | partial | servers are edited on the web; the sandboxed admission scan is CLI only for now |
 | `migrate` / `migrate report` | Experiment page, Actions tab, **Compare models** (job `experiment.migrate`); Migration tab | web | |
