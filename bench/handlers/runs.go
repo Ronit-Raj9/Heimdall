@@ -222,7 +222,11 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	// The output kind by the run list's rule, so the page never guesses "diff".
-	out.Output = loadRunOutputKind(ctx, h.suites, rv.Slot)
+	out.Output, out.TaskTitle = loadRunSuiteFacts(ctx, h.suites, rv.Slot)
+	out.SuiteTitle = suiteTitle(rv.Slot.Suite)
+	if string(ctx.QueryArgs().Peek("failure")) == "1" && rv.Run.Outcome != schemas.OutcomePass {
+		out.Failure = runFailureGroup(ctx, h.index, rv)
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(h.withDebugAllowed(ctx, rv, out)))
 }
 

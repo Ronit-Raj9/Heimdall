@@ -184,6 +184,26 @@ type RunDetail struct {
 	// Output is the run's output kind (diff, answer, state, artifact), by
 	// the rule the run list uses; empty when the suite could not be read.
 	Output string `json:"output,omitempty"`
+
+	// SuiteTitle is the benchmark's name from the catalog; empty when the
+	// catalog has no title for the suite. TaskTitle is the task's title
+	// from its suite; empty when the suite could not be read.
+	SuiteTitle string `json:"suite_title,omitempty"`
+	TaskTitle  string `json:"task_title,omitempty"`
+
+	// Failure is the run's failure group, the same signature the failure
+	// groups page uses. Only sent on request (?failure=1) for a run that did
+	// not pass and whose evaluation could be grouped.
+	Failure *RunFailureGroup `json:"failure,omitempty"`
+}
+
+// RunFailureGroup is the failure group of one run within its evaluation.
+type RunFailureGroup struct {
+	Signature string `json:"signature"`
+	Title     string `json:"title"`
+	Text      string `json:"text,omitempty"` // the normalized error line, when there is one
+	Count     int    `json:"count"`          // runs of the same evaluation with this signature, this run included
+	ExpID     string `json:"exp_id"`
 }
 
 // RunDebugAllowed says which debug actions a run allows (RunDetail

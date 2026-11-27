@@ -43,14 +43,22 @@ func runOutputKindFor(facts suiteFacts, task string) string {
 // when there is no suite source or the suite does not load in time. An empty
 // kind is left out of the answer, never guessed.
 func loadRunOutputKind(ctx context.Context, suites SuiteSource, slot schemas.Slot) string {
+	kind, _ := loadRunSuiteFacts(ctx, suites, slot)
+	return kind
+}
+
+// loadRunSuiteFacts loads the suite of one run once and gives its output
+// kind and the task's title; both "" when the suite does not load in time.
+func loadRunSuiteFacts(ctx context.Context, suites SuiteSource, slot schemas.Slot) (kind, taskTitle string) {
 	if suites == nil || slot.Suite == "" {
-		return ""
+		return "", ""
 	}
 	one, cancel := context.WithTimeout(ctx, runListSuiteBudget)
 	defer cancel()
 	s, err := suites.LoadSuite(one, slot.Suite)
 	if err != nil || s == nil {
-		return ""
+		return "", ""
 	}
-	return runOutputKindFor(suiteFactsOf(s), slot.Task)
+	facts := suiteFactsOf(s)
+	return runOutputKindFor(facts, slot.Task), facts.titles[slot.Task]
 }

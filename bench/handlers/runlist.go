@@ -38,6 +38,11 @@ type RunListRow struct {
 	Grading   string          `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
 	Task      string          `json:"task"`
 	TaskTitle string          `json:"task_title,omitempty"` // the task's title from its suite; empty when the suite could not be loaded or the task has none
+	// SuiteTitle is the benchmark's catalog title; empty when the catalog has
+	// none. ExpName is the name of the evaluation or comparison the run
+	// belongs to (its frozen plan); empty when it has none.
+	SuiteTitle string `json:"suite_title,omitempty"`
+	ExpName    string `json:"exp_name,omitempty"`
 	Arm       string          `json:"arm"`
 	Condition string          `json:"condition"`
 	Trial     int             `json:"trial"`
@@ -215,6 +220,9 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		for _, rv := range h.index.Runs(expID) {
 			row := runListRow(rv, suiteInfo)
 			armFacts(&row, rv, m, versions)
+			if m != nil {
+				row.ExpName = strings.TrimSpace(m.Experiment.Name)
+			}
 			all = append(all, row)
 			views[row.RunID] = rv
 		}
@@ -500,7 +508,7 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 		RunID: rv.Run.RunID, ExpID: cmp.Or(rv.Run.ExpID, rv.Slot.ExpID), PairID: cmp.Or(rv.Run.PairID, rv.Slot.PairID),
 		Suite: rv.Slot.Suite, Task: rv.Slot.Task, Arm: rv.Slot.Arm, Condition: rv.Slot.Condition, Trial: rv.Slot.Trial,
 		Attempt: rv.Run.Attempt, Counted: rv.Slot.Counted, Sealed: rv.Sealed, Outcome: rv.Run.Outcome, Y: rv.Run.Y,
-		ConfigID: rv.Run.Agent.ConfigID, SealedAt: rv.Run.Timing.Sealed,
+		ConfigID: rv.Run.Agent.ConfigID, SealedAt: rv.Run.Timing.Sealed, SuiteTitle: suiteTitle(rv.Slot.Suite),
 	}
 	if t := rv.Run.Timing.Started; !t.IsZero() {
 		row.Started = &t
