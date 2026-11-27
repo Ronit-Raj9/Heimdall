@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FindingsTab from "./findingsTab";
 
-const state = vi.hoisted(() => ({ list: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ list: {} as Record<string, unknown>, experiments: [] as unknown[] }));
 
 vi.mock("nuqs", () => ({
 	parseAsString: {},
@@ -15,8 +15,8 @@ vi.mock("nuqs", () => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({ children, params, hash }: { children: React.ReactNode; params: { runId: string }; hash?: string }) => (
-		<a href={`/runs/${params.runId}${hash ? `#${hash}` : ""}`}>{children}</a>
+	Link: ({ children, params, hash }: { children: React.ReactNode; params?: { runId: string }; hash?: string }) => (
+		<a href={`/runs/${params?.runId}${hash ? `#${hash}` : ""}`}>{children}</a>
 	),
 	// The "Show archived" switch reads and writes ?archived=1.
 	useSearch: () => ({}),
@@ -25,7 +25,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
-	useListExperimentsQuery: () => ({ data: { experiments: [] } }),
+	useListExperimentsQuery: () => ({ data: { experiments: state.experiments } }),
 	useGetExperimentQuery: () => ({ data: undefined }),
 }));
 
@@ -138,8 +138,22 @@ describe("Findings tab", () => {
 		expect(renderToStaticMarkup(<FindingDetail finding={reopened} onClose={() => undefined} />)).toContain("finding-reopened");
 	});
 
+	it("with no failed runs anywhere, points to an evaluation and offers no paid work (RFR-4)", () => {
+		const html = renderToStaticMarkup(<FindingsTab />);
+		expect(html).toContain("Run an evaluation first");
+		expect(html).toContain("Evaluate an agent");
+		expect(html).not.toContain("Find out why");
+	});
+
+	it("with a comparison that has failed runs, the empty state offers Find out why with its cap", () => {
+		state.experiments = [{ exp_id: "e_1", name: "e1", slots: { failed: 2 } }];
+		const html = renderToStaticMarkup(<FindingsTab />);
+		state.experiments = [];
+		expect(html).toContain("No tracked failures yet");
+		expect(html).toContain("Find out why (paid, up to $1.00 by default)");
+	});
+
 	it("lists findings with their state badge, and says so when there are none", () => {
-		expect(renderToStaticMarkup(<FindingsTab />)).toContain("No tracked failures yet");
 		state.list = {
 			isLoading: false,
 			data: { mode: "live", findings: [base], counts: { open: 1 } },

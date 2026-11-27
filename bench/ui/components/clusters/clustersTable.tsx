@@ -8,8 +8,12 @@ import type { ClusterSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, GitCommitHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { formatShare, isClusterScope, shownItems } from "./clusters.utils";
+import { faultLabel, formatShare, isClusterScope, shownItems } from "./clusters.utils";
 import "@/app/inbox/views/uf7aI18n";
+import "@/app/failures/views/ufrhI18n";
+
+/** Task and agent links: at least 24 px tall and centred, so a hit target is never under 24 px (M7-35). Exported for tests. */
+export const LINK_TARGET = "inline-flex min-h-6 items-center text-sm";
 
 /** Outcomes a title made of the outcome alone reads as a sentence for. */
 const OUTCOME_SENTENCES = ["fail", "timeout", "crash", "budget", "refusal"] as const;
@@ -89,6 +93,13 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 	const { t: tb } = useTranslation("agentBoard");
 	const locale = getLocale();
 	const sentence = (o: (typeof OUTCOME_SENTENCES)[number]) => tb(`clusterOutcome.${o}`);
+	const { t: te } = useTranslation("evaluations");
+	const { t: tr } = useTranslation("ufrh");
+	const fault = (value: string) =>
+		faultLabel(value, tr("clusters.faultNone"), (f) => {
+			const label = te(`fault.${f}` as never, { defaultValue: "" }) as string;
+			return label || undefined;
+		});
 
 	return (
 		<>
@@ -136,7 +147,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 											</div>
 											{plainClusterTitle(clusterTitle(cluster, sentence)) !== clusterTitle(cluster, sentence) && (
 												<span
-													className="text-muted-foreground font-mono text-xs leading-6 break-all"
+													className="text-muted-foreground font-mono text-sm leading-6 break-all"
 													data-testid={`clusters-raw-${cluster.signature}`}
 												>
 													{clusterTitle(cluster, sentence)}
@@ -144,12 +155,12 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 											)}
 											<CopyId
 												value={cluster.signature}
-												className="text-muted-foreground text-xs font-normal"
+												className="text-muted-foreground text-sm font-normal"
 												testId={`clusters-id-${cluster.signature}`}
 											/>
 											{cluster.after_config_change && (
 												<span
-													className="text-warning-ink inline-flex items-center gap-1 text-xs font-medium"
+													className="text-warning-ink inline-flex items-center gap-1 text-sm font-medium"
 													data-testid={`clusters-after-change-${cluster.signature}`}
 												>
 													<GitCommitHorizontal className="size-3" aria-hidden="true" />
@@ -180,12 +191,12 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 										<CompactList items={cluster.agents} kind="agent" />
 									</TableCell>
 									<TableCell className="align-top">
-										<CompactList items={cluster.conditions} />
+										<CompactList items={cluster.conditions} format={fault} />
 									</TableCell>
 									<TableCell className="align-top">
 										<CompactList items={cluster.experiments} />
 									</TableCell>
-									<TableCell className="text-muted-foreground align-top text-xs whitespace-nowrap">
+									<TableCell className="text-muted-foreground align-top text-sm whitespace-nowrap">
 										{formatDateTime(cluster.last_seen, locale) ?? "-"}
 									</TableCell>
 									<TableCell className="text-right align-top">
@@ -199,7 +210,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 											onClick={toggle}
 											data-testid={`clusters-show-${cluster.signature}`}
 											className={cn(
-												"focus-visible:ring-(--focus) inline-flex cursor-pointer items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium transition-colors focus-visible:ring-2",
+												"focus-visible:ring-(--focus) inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-sm border px-2 py-1 text-sm font-medium transition-colors focus-visible:ring-2",
 												open ? "border-primary bg-primary/10" : "hover:bg-accent",
 											)}
 										>
@@ -255,7 +266,7 @@ function ClusterCards({ clusters, selected, onSelect }: ClustersTableProps) {
 							</span>
 							<ClusterScopeBadge scope={cluster.scope} />
 							{shown.length > 0 && (
-								<span className="text-muted-foreground font-mono text-xs leading-6 break-all">
+								<span className="text-muted-foreground font-mono text-sm leading-6 break-all">
 									{shown.join(", ")}
 									{more > 0 ? ` ${t("clusters.table.more", { count: more })}` : ""}
 								</span>
@@ -294,29 +305,39 @@ export function ClusterScopeBadge({ scope, testId }: { scope: string; testId?: s
  * The first two items in mono, then "+N more" with every item in the title. Tasks ("suite/task")
  * and agents are links to their pages.
  */
-function CompactList({ items, kind }: { items: readonly string[] | null | undefined; kind?: "task" | "agent" }) {
+function CompactList({
+	items,
+	kind,
+	format,
+}: {
+	items: readonly string[] | null | undefined;
+	kind?: "task" | "agent";
+	/** A label for a plain item (the Fault column); links keep the id. */
+	format?: (item: string) => string;
+}) {
 	const { t } = useTranslation("bench");
 	const { shown, more } = shownItems(items);
-	if (shown.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+	if (shown.length === 0) return <span className="text-muted-foreground text-sm">-</span>;
 	return (
 		<ul className="flex flex-col gap-0.5" title={more > 0 ? (items ?? []).join("\n") : undefined}>
 			{shown.map((item) => (
-				<li key={item} className="font-mono text-xs leading-6 break-all">
-					<CompactItem item={item} kind={kind} />
+				<li key={item} className="font-mono text-sm leading-6 break-all">
+					{format ? format(item) : <CompactItem item={item} kind={kind} />}
 				</li>
 			))}
-			{more > 0 && <li className="text-muted-foreground text-xs leading-6">{t("clusters.table.more", { count: more })}</li>}
+			{more > 0 && <li className="text-muted-foreground text-sm leading-6">{t("clusters.table.more", { count: more })}</li>}
 		</ul>
 	);
 }
 
 /** One list item: a task "suite/task" or an agent id as a link, anything else as text. */
 function CompactItem({ item, kind }: { item: string; kind?: "task" | "agent" }) {
-	if (kind === "agent") return <EntityLink kind="agent" id={item} className="text-xs" />;
+	// Links are at least 24 px tall so they are easy to hit (M7-35).
+	if (kind === "agent") return <EntityLink kind="agent" id={item} className={LINK_TARGET} />;
 	const slash = item.indexOf("/");
 	if (kind === "task" && slash > 0) {
 		return (
-			<EntityLink kind="task" id={item.slice(slash + 1)} suite={item.slice(0, slash)} className="text-xs">
+			<EntityLink kind="task" id={item.slice(slash + 1)} suite={item.slice(0, slash)} className={LINK_TARGET}>
 				{item}
 			</EntityLink>
 		);

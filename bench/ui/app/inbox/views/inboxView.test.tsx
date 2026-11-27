@@ -25,6 +25,16 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useGetJobQuery: () => ({ data: undefined }),
 }));
 
+// The test task count is a router link (M7-15); these tests render without a router.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@tanstack/react-router")>()),
+	Link: ({ children, to, params: _p, ...rest }: { children?: unknown; to: string; params?: unknown }) => (
+		<a href={to} {...(rest as object)}>
+			{children as never}
+		</a>
+	),
+}));
+
 const noop = () => {};
 const base: InboxBodyProps = {
 	data: INBOX_LIST_FIXTURE,

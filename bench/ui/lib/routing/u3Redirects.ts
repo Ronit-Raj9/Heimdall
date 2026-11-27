@@ -57,14 +57,25 @@ const INBOX_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
 	triage: "patterns",
 	patterns: "patterns",
 	agents: "agents",
+	tracked: "findings",
 };
 
-/** Old /why-agents-fail tab ids; a missing or unknown tab gives the per-agent view. */
+/**
+ * Old /why-agents-fail tab ids. At cc04f6abb its "patterns" tab showed failure patterns per agent
+ * version, which is the agents tab now; "Failure patterns" on /failures is the old /inbox triage.
+ */
 const WHY_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
-	patterns: "patterns",
+	patterns: "agents",
 	groups: "groups",
+	clusters: "groups",
 	agents: "agents",
+	findings: "findings",
+	tracked: "findings",
+	production: "production",
+	inbox: "production",
+	triage: "patterns",
 };
+
 
 /** /inbox?tab=&state=&source=&item=&q=&finding=... becomes /failures with the matching tab, every other key kept. */
 export function inboxRedirect(search: RouteSearch): RedirectTarget {
