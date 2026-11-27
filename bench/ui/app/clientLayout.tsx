@@ -1,4 +1,4 @@
-import { BenchHeader } from "@/components/benchHeader";
+import { BenchHeader, EmergencyStopBanner } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
 import { PlanLimitPrompt } from "@/components/billing/planLimitPrompt";
 import { AuthShell } from "@/components/platform/authShell";
@@ -122,6 +122,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 				<BenchSidebar drawerOpen={navOpen} onDrawerClose={closeNav} />
 				<div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
 					<BenchHeader onOpenNav={openNav} navOpen={navOpen} />
+					<EmergencyStopBanner />
 					<div
 						className="bg-background mx-0 min-h-0 min-w-0 flex-1 overflow-auto border-t [scrollbar-gutter:stable] md:mr-2 md:mb-2 md:rounded-xl md:border md:shadow-(--shadow-card)"
 						data-bench-content

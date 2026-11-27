@@ -220,7 +220,7 @@ describe("SettingsView", () => {
 			"account",
 		])
 			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		expect(html).toContain("API keys, workers and files for Acme Agents, and who can use it.");
+		expect(html).toContain("Model keys, workers and files for Acme Agents, and who can use it.");
 		expect(html).toContain('data-testid="settings-members"');
 	});
 	it("reads the tab from the URL, API keys by default, workers as the Workers tab", () => {

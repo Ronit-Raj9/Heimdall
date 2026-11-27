@@ -5,6 +5,6 @@ const route = getRouteApi("/login");
 
 // Composition only. The screen lives in views/.
 export default function LoginPage() {
-	const { return_to, error } = route.useSearch();
-	return <LoginView returnTo={return_to} oauthError={error} />;
+	const { return_to, error, reason } = route.useSearch();
+	return <LoginView returnTo={return_to} oauthError={error} expired={reason === "expired"} />;
 }

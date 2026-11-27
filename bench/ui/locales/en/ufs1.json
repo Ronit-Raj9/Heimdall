@@ -19,5 +19,8 @@
 		"rounds": "Round 1 41%, round 2 48%, round 3 48%, round 4 55%",
 		"kept": "Kept: added a retry rule to the prompt (+7 on unseen tasks)",
 		"rejected": "Rejected: longer system prompt (-2)"
+	},
+	"emergencyStop": {
+		"banner": "Emergency stop is on: new runs are stopped for every organization."
 	}
 }

@@ -83,10 +83,13 @@ Hashes, paths, lock state and versions belong here, not on the card. For a small
 ## Empty, error, loading
 
 ```tsx
-import { EmptyState } from "@/components/ui/emptyState";
+import { EmptyState } from "@/components/shell/emptyState";
 
-<EmptyState icon={PlayCircle} title="No runs yet" description="Start a run to see results here." action={<Button>New run</Button>} />;
+<EmptyState icon={PlayCircle} title="No runs yet" body="Start a run to see results here." action={{ label: "New run", to: "/evaluate" }} />;
 ```
+
+EmptyState lives in `@/components/shell/emptyState`; its props are `title` and `body` (the old
+`message` is read as `body`).
 
 `compact` for use inside a card. For failed requests use `LoadError` and for loading use
 `BlockSkeleton` from `components/runs/screenStates.tsx`; `Skeleton` is the raw block.
@@ -103,6 +106,9 @@ import { Toolbar, ToolbarSpacer, FilterChips } from "@/components/ui/toolbar";
 </Toolbar>;
 ```
 
+- `Input` width rule: `size="number"` for a short number (a count, a budget), `size="id"` for an
+  id or a short name, `size="full"` (the default) for free text and search. Never set a fixed
+  pixel width on an input.
 - `Card interactive` adds the hover lift for clickable cards. Cards are `rounded-xl` with a soft border.
 - `Table` headers are sticky (inside a height-capped container); keep 5-6 columns, right-align
   numbers with `className="text-right"`, put status in a `StatusPill`.

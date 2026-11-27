@@ -46,6 +46,13 @@ describe("ImprovementsTable", () => {
 		expect(html).toContain('data-testid="improvements-cli-copy"');
 		expect(html).not.toContain("bifrost-bench");
 	});
+
+	it("puts New improvement run in the empty state for an admin only", () => {
+		const admin = renderToStaticMarkup(<ImprovementsTable rows={[]} admin onCreate={() => undefined} />);
+		expect(admin).toContain("New improvement run");
+		const member = renderToStaticMarkup(<ImprovementsTable rows={[]} onCreate={() => undefined} />);
+		expect(member).not.toContain("New improvement run");
+	});
 });
 
 describe("ImprovementsView", () => {

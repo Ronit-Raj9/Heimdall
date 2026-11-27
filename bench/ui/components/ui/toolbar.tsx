@@ -126,29 +126,28 @@ export function FilterSelect({ label, options, value, onChange, allLabel = "All"
 	return (
 		<label
 			data-slot="filter-select"
-			className={cn(
-				"border-input bg-card hover:border-ring/50 focus-within:ring-(--focus) relative inline-flex h-8 shrink-0 items-center rounded-md border text-sm shadow-xs transition-colors focus-within:ring-2",
-				disabled && "opacity-50",
-				className,
-			)}
+			className={cn("inline-flex shrink-0 items-center gap-1.5 text-sm", disabled && "opacity-50", className)}
 		>
-			<span className="text-muted-foreground pointer-events-none pl-2.5 text-xs">{label}</span>
-			<select
-				aria-label={label}
-				value={value ?? ""}
-				disabled={disabled}
-				onChange={(e) => onChange(e.target.value || null)}
-				data-testid={testId}
-				className="text-foreground h-full max-w-48 cursor-pointer appearance-none truncate bg-transparent pr-7 pl-1.5 text-sm font-medium outline-none disabled:cursor-not-allowed"
-			>
-				<option value="">{allLabel}</option>
-				{choices.map((o) => (
-					<option key={o.value} value={o.value}>
-						{o.label}
-					</option>
-				))}
-			</select>
-			<ChevronDown className="text-muted-foreground pointer-events-none absolute right-2 size-3.5" aria-hidden="true" />
+			{/* The label sits outside the box, so it reads as a label and not as part of the value (M4-72). */}
+			<span className="text-muted-foreground text-xs">{label}</span>
+			<span className="border-input bg-card hover:border-ring/50 focus-within:ring-(--focus) relative inline-flex h-8 items-center rounded-md border shadow-xs transition-colors focus-within:ring-2">
+				<select
+					aria-label={label}
+					value={value ?? ""}
+					disabled={disabled}
+					onChange={(e) => onChange(e.target.value || null)}
+					data-testid={testId}
+					className="text-foreground h-full max-w-48 cursor-pointer appearance-none truncate bg-transparent pr-7 pl-2.5 text-sm font-medium outline-none disabled:cursor-not-allowed"
+				>
+					<option value="">{allLabel}</option>
+					{choices.map((o) => (
+						<option key={o.value} value={o.value}>
+							{o.label}
+						</option>
+					))}
+				</select>
+				<ChevronDown className="text-muted-foreground pointer-events-none absolute right-2 size-3.5" aria-hidden="true" />
+			</span>
 		</label>
 	);
 }

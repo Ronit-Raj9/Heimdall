@@ -49,6 +49,13 @@ describe("LoginView", () => {
 		expect(render(<LoginView />, signedOutSession())).toContain("Too many attempts.");
 	});
 
+	it("says the session ended when the redirect carries reason expired", () => {
+		const html = render(<LoginView returnTo="/runs" expired />, signedOutSession());
+		expect(html).toContain('data-testid="login-expired"');
+		expect(html).toContain("Your session ended. Sign in again to go back to /runs.");
+		expect(render(<LoginView returnTo="/runs" />, signedOutSession())).not.toContain("login-expired");
+	});
+
 	it("explains a GitHub sign-in that did not complete", () => {
 		expect(render(<LoginView oauthError="github" />, signedOutSession())).toContain("GitHub sign-in did not complete.");
 		expect(render(<LoginView oauthError="signup_not_allowed" />, signedOutSession())).toContain("sign-up is not open here");

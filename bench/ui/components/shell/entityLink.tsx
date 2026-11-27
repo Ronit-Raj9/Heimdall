@@ -84,6 +84,8 @@ export interface EntityLinkProps {
 	short?: number;
 	className?: string;
 	testId?: string;
+	/** -1 keeps the link out of the Tab order (a row that is itself focusable, M7-36). */
+	tabIndex?: number;
 }
 
 /**
@@ -91,7 +93,7 @@ export interface EntityLinkProps {
  * so ids are always clickable and always lead to the same place. With nothing to link to (a task
  * without its suite) it renders the id as plain mono text.
  */
-export function EntityLink({ kind, id, suite, children, short, className, testId }: EntityLinkProps) {
+export function EntityLink({ kind, id, suite, children, short, className, testId, tabIndex }: EntityLinkProps) {
 	const { t } = useTranslation("bench");
 	const target = entityTarget(kind, id, { suite });
 	const shown = children ?? (short && id.length > short ? `${id.slice(0, short)}…` : id);
@@ -111,6 +113,7 @@ export function EntityLink({ kind, id, suite, children, short, className, testId
 			params={target.params as never}
 			search={target.search as never}
 			title={label}
+			tabIndex={tabIndex}
 			aria-label={children === undefined && shown !== id ? label : undefined}
 			className={cn(
 				mono && "font-mono text-[0.92em]",

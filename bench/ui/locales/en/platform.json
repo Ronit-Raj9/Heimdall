@@ -49,7 +49,7 @@
 		"switchOrg": "Switch organization",
 		"switching": "Switching organization",
 		"switchError": "Could not switch organization: {{error}}",
-		"account": "Account",
+		"account": "Password",
 		"signedInAs": "Signed in as",
 		"viaToken": "Access token",
 		"settings": "Settings",
@@ -120,7 +120,7 @@
 	},
 	"settings": {
 		"title": "Settings",
-		"subtitle": "API keys, workers and files for {{org}}, and who can use it.",
+		"subtitle": "Model keys, workers and files for {{org}}, and who can use it.",
 		"localTitle": "Settings",
 		"localBody": "This server runs in local mode: one organization, and changes need the write token. Members, access tokens and the activity log come with hosted mode.",
 		"tabs": {
@@ -182,7 +182,7 @@
 		},
 		"tokens": {
 			"title": "Access tokens",
-			"description": "Access keys for scripts, CI pipelines and the SDKs. A token can do only what its role and scope allow. Send it in the Authorization: Bearer header to the API at /api/v1.",
+			"description": "Tokens that let scripts, CI and the SDK call Heimdall. Most people do not need one. Send it in the Authorization: Bearer header to the API at /api/v1.",
 			"name": "Name",
 			"namePlaceholder": "ci-release-gate",
 			"role": "Role",
@@ -240,7 +240,7 @@
 				"lost": "Not responding"
 			},
 			"tokensTitle": "Worker tokens",
-			"tokensDescription": "A worker token lets a machine join one group of this organization. Workers get the API keys and secrets each run needs from Models & keys and Secrets; without an org key they use their own environment. No machine of your own? Runs use the shared worker when this server offers one.",
+			"tokensDescription": "A worker token lets a machine join one group of this organization. Workers get the API keys and secrets each run needs from Model keys and Secrets; without an org key they use their own environment. No machine of your own? Runs use the shared worker when this server offers one.",
 			"poolLabel": "Group",
 			"poolPlaceholder": "default",
 			"create": "Create worker token",

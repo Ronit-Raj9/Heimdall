@@ -50,7 +50,7 @@ describe("SuiteTaskTable", () => {
     expect(row(html, "p02")).toMatch(
       /data-tone="warn">.*Not ready: files changed/,
     );
-    expect(row(html, "p03")).toMatch(/data-tone="bad">.*Not ready/);
+    expect(row(html, "p03")).toMatch(/data-tone="bad">.*Check failed/);
     expect(row(html, "p03")).toContain("9 of 10 checks passed");
     expect(row(html, "p01")).toContain(">proprietary<");
     expect(row(html, "p01")).toContain("3 files, 5 required");

@@ -84,7 +84,7 @@ describe("OpsTab", () => {
 		const html = render(<OpsTab suite={s} />);
 		expect(html).not.toContain("In use");
 		expect(html).toMatch(/data-testid="suite-ops-task-t1"[\s\S]*?Not frozen yet/);
-		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Not ready/);
+		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Check failed/);
 		expect(html).toContain("Paused: flaky");
 	});
 });

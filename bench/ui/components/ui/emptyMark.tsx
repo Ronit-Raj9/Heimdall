@@ -18,7 +18,7 @@ export function EmptyMark({ label, hint, className, testId }: EmptyMarkProps) {
 	return (
 		<span
 			data-slot="empty-mark"
-			className={cn("text-muted-foreground/70 inline-flex cursor-default items-center", className)}
+			className={cn("text-muted-foreground inline-flex cursor-default items-center", className)}
 			title={hint ?? label}
 			data-testid={testId}
 		>

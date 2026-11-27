@@ -18,9 +18,19 @@ function go(path: string) {
  * Sign in with email and password, or GitHub when the server has it. Comes back to return_to (a
  * path on this site) afterwards. In local mode there is nothing to sign in to, and the page says so.
  */
-export default function LoginView({ returnTo, oauthError }: { returnTo?: string; oauthError?: string }) {
+export default function LoginView({
+	returnTo,
+	oauthError,
+	expired,
+}: {
+	returnTo?: string;
+	oauthError?: string;
+	/** The tab was signed in before: say the session ended (X-96). */
+	expired?: boolean;
+}) {
 	const { t } = useTranslation("platform");
 	const { t: tu } = useTranslation("u19");
+	const { t: ts2 } = useTranslation("ufs2");
 	const session = useSession();
 	const target = safeReturnTo(returnTo);
 	const [email, setEmail] = useState("");
@@ -60,6 +70,12 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 	return (
 		<div className="flex flex-col gap-6" data-testid="login-screen">
 			<AuthHeading title={tu("login.title")} subtitle={tu("login.subtitle")} />
+			{expired && (
+				<p className="bg-muted/50 text-foreground flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm" role="status" data-testid="login-expired">
+					<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{ts2("login.expired", { page: target })}
+				</p>
+			)}
 			{session.github && (
 				<div className="flex flex-col gap-5">
 					<GithubPrimary returnTo={target} />

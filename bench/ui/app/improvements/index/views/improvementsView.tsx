@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
-import { FeatureHero } from "@/components/inbox/featureHero";
+import { EmptyState } from "@/components/shell/emptyState";
 import { StatusPill } from "@/components/ui/statusPill";
 import { badgeKey, points, stateTone, statusTone, usd, verdictTone } from "@/components/improvements/improve.utils";
 import "@/components/improvements/w45impI18n";
@@ -46,27 +46,32 @@ export default function ImprovementsView() {
 			) : list.error || !list.data ? (
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="improvements-error" />
 			) : (
-				<ImprovementsTable rows={list.data.improvements} admin={admin} />
+				<ImprovementsTable rows={list.data.improvements} admin={admin} onCreate={() => setCreating(true)} />
 			)}
 		</section>
 	);
 }
 
 /** The loaded list, or the empty state. Exported for tests. */
-export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSummary[]; admin?: boolean }) {
+export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: ImprovementSummary[]; admin?: boolean; onCreate?: () => void }) {
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
 	if (rows.length === 0) {
+		// The shared empty state (M2-109): admins get the New improvement run action; the command
+		// line stays inside its own disclosure below.
 		return (
-			<FeatureHero
-				icon={TrendingUp}
-				title={t("empty.title")}
-				message={admin ? t("empty.messageAdmin") : t("empty.message")}
-				testId="improvements-empty"
-			>
+			<div className="flex flex-col items-center gap-4">
+				<EmptyState
+					icon={TrendingUp}
+					title={t("empty.title")}
+					body={admin ? t("empty.messageAdmin") : t("empty.message")}
+					action={admin && onCreate ? { label: t("create.open"), onClick: onCreate } : undefined}
+					testId="improvements-empty"
+					className="w-full"
+				/>
 				<ImprovementExample />
 				<ImprovementCli testId="improvements-cli" />
-			</FeatureHero>
+			</div>
 		);
 	}
 	return (

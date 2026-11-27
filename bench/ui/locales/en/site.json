@@ -168,7 +168,7 @@
 					"Provider keys are encrypted at rest with AES-256-GCM under a server master key that is never stored with the database.",
 					"A key is shown once when you add it and never returned by the API again.",
 					"Keys are handed to the worker only for the evaluation that needs them, and only for your organization's runs.",
-					"You can delete a key at any time from Models and keys."
+					"You can delete a key at any time from Settings > Model keys."
 				]
 			},
 			"isolation": {

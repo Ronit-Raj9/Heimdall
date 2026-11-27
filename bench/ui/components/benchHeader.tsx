@@ -7,9 +7,13 @@ import { Button } from "@/components/ui/button";
 import { BENCH_NAV_GROUPS, activeNavItem, ownPageTitle } from "@/lib/constants/navigation";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
+import { useGetPoolStatusQuery } from "@/lib/store/apis/sharedpoolApi";
 import { launchAvailable } from "@/lib/types/bench";
+import type { PoolStatus } from "@/lib/types/sharedpool";
+import type { SessionInfo } from "@/lib/session/sessionContext";
+import "@/components/ui/ufs1I18n";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronRight, Menu, Moon, Plus, Sun } from "lucide-react";
+import { ChevronRight, Menu, Moon, OctagonAlert, Plus, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 
@@ -82,6 +86,33 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 		</header>
 	);
 }
+/** True when the server-wide emergency stop is on and the visitor is signed in on a hosted install. Exported for tests. */
+export function emergencyStopOn(session: Pick<SessionInfo, "authMode" | "signedIn">, pool: Pick<PoolStatus, "kill_switch"> | undefined): boolean {
+	return session.authMode === "hosted" && session.signedIn && pool?.kill_switch === true;
+}
+
+/**
+ * The red line under the header on every page while the emergency stop is on (M8-57), so nobody
+ * wonders why runs do not start. Reads GET /pool (every member may); a failed read shows nothing.
+ */
+export function EmergencyStopBanner() {
+	const { t } = useTranslation("ufs1");
+	const session = useSession();
+	const skip = session.authMode !== "hosted" || !session.signedIn;
+	const pool = useGetPoolStatusQuery(undefined, { skip, pollingInterval: 60_000 });
+	if (!emergencyStopOn(session, pool.data)) return null;
+	return (
+		<div
+			role="alert"
+			className="bg-destructive text-primary-foreground flex items-center gap-2 px-4 py-1.5 text-sm font-medium"
+			data-testid="emergency-stop-banner"
+		>
+			<OctagonAlert className="size-4 shrink-0" aria-hidden="true" />
+			{t("emergencyStop.banner")}
+		</div>
+	);
+}
+
 /**
  * Where the user is: the section, then the page (a link back to the page's list when deeper).
  * Below sm only the page shows. Paths no entry owns (an auth page) show nothing.

@@ -1539,7 +1539,7 @@
 				"sealMismatch": "Files were changed after saving: do not trust this run"
 			},
 			"metricsDescription": "Each number says how sure Heimdall is about it. A striped cell means not known, never zero.",
-			"gatesDescription": "Safety checks run on this run when it was saved. A check that fired fails the run.",
+			"gatesDescription": "Safety checks made when this run was saved. A check that fires fails the run.",
 			"gateFired": "Fired (run failed this check)",
 			"gateClear": "Passed",
 			"receiptsDescription": "How far the injected problem got, step by step.",
@@ -1706,7 +1706,7 @@
 			"label": "Comparison",
 			"placeholder": "Pick a comparison"
 		},
-		"newExperiment": "New comparison"
+		"newExperiment": "Evaluate an agent"
 	},
 	"clusters": {
 		"subtitle": "Failed test runs from all your comparisons, grouped by how they failed.",
@@ -2182,7 +2182,7 @@
 		},
 		"metric": {
 			"verified_success": "Tasks solved",
-			"cost_usd": "Cost per run",
+			"cost_usd": "Average cost per run",
 			"tokens": "Tokens per run",
 			"latency_ms": "Model response time",
 			"format_errors": "Format errors"
@@ -2313,7 +2313,7 @@
 		},
 		"table": {
 			"title": "Failures",
-			"description": "One row per kind of failure. Pick a row to read what happened (private data removed) and decide what to do.",
+			"description": "",
 			"label": "Failures in the inbox",
 			"columns": {
 				"title": "Request",
@@ -2349,12 +2349,12 @@
 		},
 		"empty": {
 			"title": "No failures in the inbox yet.",
-			"pull": "Failures arrive when you press Pull now, when a tool sends them with an access token (below), or when you run this in a terminal:",
+			"pull": "Failures arrive when you press Pull now, when a tool sends them with an ingest token (below), or when you run this in a terminal:",
 			"sources": "Where failures come from is listed in {{file}}. Each pull continues where the last one stopped.",
 			"docs": "How it works: {{doc}}.",
 			"filtered": "No failures with this status.",
 			"filteredSource": "No failures from this place with this status.",
-			"first": "No production failures yet. Connect a source to pull them in, or send them in with an access token.",
+			"first": "No production failures yet. Connect a source to pull them in, or send them in with an ingest token.",
 			"firstAction": "Connect a source",
 			"filteredState": "No failures with status {{state}}. Show all ({{count}})"
 		},
@@ -2393,8 +2393,8 @@
 			"suggestedValue": "{{kind}} task in benchmark {{suite}}",
 			"suggestedNoSuite": "{{kind}} task, no benchmark suggested",
 			"flagged": "Why it was flagged",
-			"redacted": "Removed before saving: {{list}}. Only how many were removed is kept, never the values.",
-			"preview": "What happened (private data removed)",
+			"redacted": "Removed before saving: {{list}}. Heimdall keeps the request, the answer and the tool calls; it removes keys, tokens, emails, phone numbers, long numbers and home folder names. Names and street addresses are not removed.",
+			"preview": "What happened (keys, tokens, emails and phone numbers removed)",
 			"previewHint": "Plain text exactly as saved, up to 16 KiB.",
 			"previewEmpty": "No log text was saved for this failure.",
 			"signature": "Failure fingerprint",
@@ -2440,7 +2440,7 @@
 				"kindHint": "Suggested: {{kind}}.",
 				"taskId": "Task name (optional)",
 				"taskIdPlaceholder": "made up for you if empty",
-				"submit": "Turn this failure into a task"
+				"submit": "Add task to the benchmark"
 			},
 			"rejectForm": {
 				"reason": "Reason",
@@ -2601,14 +2601,14 @@
 			"kind": "Kind",
 			"difficulty": "Difficulty",
 			"capability": "Skill tested",
-			"status": "Ready?",
+			"status": "Status",
 			"all": "All",
 			"reset": "Reset filters"
 		},
 		"status": {
 			"admitted": "Ready",
 			"stale": "Not ready: files changed",
-			"draft": "Not ready",
+			"draft": "Check failed",
 			"not_locked": "Not frozen yet",
 			"quarantined": "Paused",
 			"retired": "Retired",
@@ -3412,7 +3412,7 @@
 		},
 		"runs": {
 			"title": "Human reviews",
-			"description": "Reviews of each setup's run. They count only when \"Human reviewed\" scores are selected."
+			"description": "Human reviews of this run. They change the score only when the Human reviewed score is selected."
 		}
 	},
 	"routing": {
@@ -3733,6 +3733,7 @@
 			"passk": "pass^k",
 			"costPerSuccess": "Cost per verified success",
 			"costPerRun": "Median cost per run",
+			"avgCostPerRun": "Average cost per run",
 			"tokens": "Median tokens",
 			"wall": "Median wall s",
 			"steps": "Median steps",
@@ -3805,7 +3806,7 @@
 				"model": "Model (served)",
 				"runs": "Graded runs (verified)",
 				"perRun": "Average cost per run",
-				"perSuccess": "Cost per verified success",
+				"perSuccess": "Cost per solved task",
 				"cacheNeutral": "Cost if nothing were cached",
 				"cacheRead": "Cache read share",
 				"turns": "Model turns per run",
