@@ -13,9 +13,9 @@ import (
 // Share link rules (UI fix wave D1, decision 7):
 //   - a link that never expires (expires_in_days 0) is admin only; the
 //     default expiry is 7 days (sharelinks.DefaultExpiryDays);
-//   - GET /shares without kind or target (every link of the organization)
-//     is admin only; the filtered list the share dialog reads answers as
-//     before;
+//   - GET /shares without both kind and target (every link of the
+//     organization, or of every item of a kind) is admin only; the list of
+//     one item the share dialog reads answers as before;
 //   - a viewer never gets a link's token, path or url in a list;
 //   - a shared comparison (verdict) names who made the link, by display
 //     name only.
@@ -25,7 +25,7 @@ import (
 
 const (
 	shareNeverRefusal = "Only an org owner or admin may make a link that never expires. Pick an expiry of 1 to 365 days."
-	shareListRefusal  = "Only an org owner or admin may list every share link of the organization. Name the item with kind and target."
+	shareListRefusal  = "Only an org owner or admin may list every share link of the organization. Name the item with both kind and target."
 )
 
 func shareAdmin(ctx *fasthttp.RequestCtx) bool {
