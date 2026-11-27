@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { CircleDollarSign } from "lucide-react";
-import { useId, useState, type ComponentProps } from "react";
+import { useBusyGuard } from "@/lib/hooks/useBusyGuard";
+import { useId, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -28,6 +29,11 @@ export interface PaidButtonProps extends Omit<ComponentProps<typeof Button>, "on
 	confirm?: PaidConfirmMode;
 	/** One more sentence for the dialog. */
 	confirmText?: string;
+	/**
+	 * Replaces the cap part of the label when the server has no cap of its own (M5-5): a rerun says
+	 * "Rerun (same budget as before)" instead of "(uses your model key)". The dialog keeps the cost line.
+	 */
+	capText?: string;
 	/** Where the estimate shows: a line under the button (default) or the button's tooltip (row actions). */
 	estimateAt?: "below" | "title";
 	testId: string;
@@ -41,7 +47,8 @@ export function needsPaidConfirm(mode: PaidConfirmMode, capUsd: number | null): 
 }
 
 /** The button label: "Run failure test, up to $5.00", or "... (uses your model key)" when no cap is known. */
-export function paidLabel(t: Translate, verb: string, capUsd: number | null): string {
+export function paidLabel(t: Translate, verb: string, capUsd: number | null, capText?: string): string {
+	if (capText) return `${verb} (${capText})`;
 	return capUsd === null ? t("labelUnknown", { verb }) : t("label", { verb, cap: formatUsd(capUsd) });
 }
 
@@ -69,6 +76,7 @@ export function PaidButton({
 	onConfirm,
 	confirm = "auto",
 	confirmText,
+	capText,
 	estimateAt = "below",
 	testId,
 	disabled,
@@ -78,29 +86,25 @@ export function PaidButton({
 }: PaidButtonProps) {
 	const { t } = useTranslation("paid");
 	const ask = useConfirm();
-	const [busy, setBusy] = useState(false);
+	// One start per press: a second click while the work is being started does nothing (M7-73).
+	const { busy, run } = useBusyGuard();
 	const estimateId = useId();
 	const tr = t as unknown as Translate;
-	const label = paidLabel(tr, verb, capUsd);
+	const label = paidLabel(tr, verb, capUsd, capText);
 	const estimate = paidEstimate(tr, estimateRuns, estimateUsd);
 
-	const click = async () => {
-		if (busy) return;
-		if (needsPaidConfirm(confirm, capUsd)) {
-			const ok = await ask([estimate, confirmText].filter(Boolean).join(" ") || tr("costsMoney"), {
-				title: tr("confirm.title", { verb }),
-				confirmLabel: capUsd === null ? tr("confirm.okUnknown", { verb }) : tr("confirm.ok", { verb, cap: formatUsd(capUsd) }),
-				costUsd: capUsd,
-			});
-			if (!ok) return;
-		}
-		setBusy(true);
-		try {
+	const click = () =>
+		run(async () => {
+			if (needsPaidConfirm(confirm, capUsd)) {
+				const ok = await ask([estimate, confirmText].filter(Boolean).join(" ") || tr("costsMoney"), {
+					title: tr("confirm.title", { verb }),
+					confirmLabel: capUsd === null ? tr("confirm.okUnknown", { verb }) : tr("confirm.ok", { verb, cap: formatUsd(capUsd) }),
+					costUsd: capUsd,
+				});
+				if (!ok) return;
+			}
 			await onConfirm();
-		} finally {
-			setBusy(false);
-		}
-	};
+		});
 
 	const button = (
 		<Button

@@ -1,0 +1,16 @@
+{
+	"combobox": {
+		"placeholder": "Type to search",
+		"empty": "Nothing matches the search.",
+		"loading": "Loading the list...",
+		"error": "Could not load the list.",
+		"retry": "Retry",
+		"none": "No choices yet.",
+		"clear": "Clear the choice",
+		"open": "Show the list",
+		"hiddenTests": "{{count}} test items hidden. Type \"test\" to see them."
+	},
+	"leave": {
+		"noDraft": "What you changed here is not saved."
+	}
+}
