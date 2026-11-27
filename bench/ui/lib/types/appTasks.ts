@@ -129,4 +129,6 @@ export interface AppTasksWriteResult {
 	created: boolean;
 	tasks: AppWritten[];
 	next: string;
+	/** The readiness check queued after the write (D4 9 gap 1); absent when it could not be queued. */
+	readiness_job?: string;
 }

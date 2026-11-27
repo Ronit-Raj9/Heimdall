@@ -22,6 +22,7 @@ import type { AppPlan, AppRule, AppTasksDraft, AppTasksDraftSummary, ListedAppTa
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/gateway/views/w4intI18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -583,12 +584,26 @@ function WriteSection({ draft, onChanged }: { draft: ListedAppTasksDraft; onChan
 				</p>
 			)}
 			{data && <p className="text-sm">{t("write.done", { suite: data.suite })}</p>}
+			{data?.readiness_job && <ReadinessLine jobId={data.readiness_job} />}
 			<div>
 				<Button isLoading={isLoading} disabled={!judgeOk} onClick={() => void submit()} dataTestId="from-api-write-submit">
 					{t("write.submit", { count: draft.plans.length })}
 				</Button>
 			</div>
 		</Section>
+	);
+}
+
+/** After the write, the readiness check that proves the tasks on a worker, with a link to its job (D4 9 gap 1). */
+export function ReadinessLine({ jobId }: { jobId: string }) {
+	const { t } = useTranslation("w4int");
+	return (
+		<p className="text-sm" data-testid="from-api-readiness">
+			{t("appTasks.proving")}{" "}
+			<Link to="/jobs/$jobId" params={{ jobId }} className="text-primary underline-offset-2 hover:underline">
+				{t("appTasks.openJob")}
+			</Link>
+		</p>
 	);
 }
 

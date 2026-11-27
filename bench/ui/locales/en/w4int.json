@@ -40,5 +40,9 @@
 		"installed": "Imported as {{folder}}. Its safety scan let it in.",
 		"blocked": "Imported as {{folder}}, but its safety scan blocked it, so the agent does not use it. Open the agent's Tools tab to see why.",
 		"failed": "The skill was not imported."
+	},
+	"appTasks": {
+		"proving": "Proving the tasks on a worker. This takes a few minutes.",
+		"openJob": "Open the job"
 	}
 }
