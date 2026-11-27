@@ -326,6 +326,14 @@ function CopyButton({ text, testId, label }: { text: string; testId: string; lab
  */
 export const INBOX_TOKEN_ENV = "HEIMDALL_INBOX_TOKEN";
 
+/**
+ * The server's next step for the inbox webhook in this screen's words: the token here is the inbox
+ * token; "ingest token" names only the trace ingest token on the From traces screen (R7-2). Pure.
+ */
+export function inboxNextStep(next: string): string {
+	return next.replace(/\bingest tokens?\b/gi, (m) => (m.toLowerCase().endsWith("s") ? "inbox tokens" : "inbox token"));
+}
+
 /** The webhook setup: ingest URL, token variable, next step, curl example and sources.yaml snippet. Exported for tests. */
 export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 	const { t } = useTranslation("liveinbox");
@@ -370,7 +378,7 @@ export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 				</ol>
 				{info.next && (
 					<p data-testid="inbox-webhook-next">
-						<span className="text-foreground font-medium">{t("inbox.webhook.next")}:</span> {info.next}
+						<span className="text-foreground font-medium">{t("inbox.webhook.next")}:</span> {inboxNextStep(info.next)}
 					</p>
 				)}
 				{info.sources_snippet && (

@@ -23,7 +23,7 @@ describe("ClustersFilters", () => {
 	const html = renderToStaticMarkup(<ClustersFilters {...props} />);
 
 	it("labels every control and the group", () => {
-		for (const label of [">Benchmark<", ">Agent<", ">Comparisons<", ">Since<", ">Smallest group shown<", ">Runs<"]) expect(html).toContain(label);
+		for (const label of [">Benchmark<", ">Agent<", ">Comparisons<", ">Since<", ">Smallest group shown<", ">Which runs<"]) expect(html).toContain(label);
 		expect(html).toContain('aria-label="Filters"');
 		// A labelled field: the label points at the input.
 		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Benchmark<\/label><input[^>]*id="\1"/);
@@ -31,7 +31,10 @@ describe("ClustersFilters", () => {
 
 	it("shows the URL values in the fields", () => {
 		expect(html).toContain('data-testid="clusters-filter-suite" value="coding-core"');
-		expect(html).toContain('data-testid="clusters-filter-exp" value="e_1,e_2"');
+		// The comparisons are a pick list now (M7-38): both URL ids are ticked and the summary counts them.
+		expect(html).toMatch(/data-testid="clusters-filter-exp-option-e_1" checked=""/);
+		expect(html).toMatch(/data-testid="clusters-filter-exp-option-e_2" checked=""/);
+		expect(html).toContain(">2 comparisons<");
 		expect(html).toMatch(/type="number"[^>]*data-testid="clusters-filter-min" value="2"/);
 	});
 
@@ -43,7 +46,10 @@ describe("ClustersFilters", () => {
 
 	it("suggests agents and experiments from the list", () => {
 		expect(html).toContain('<option value="codex-default">');
-		expect(html).toContain('<option value="e_2">');
+		expect(html).toContain('data-testid="clusters-filter-exp-option-e_2"');
+		// With no experiment list the comparisons stay a text field with suggestions.
+		const text = renderToStaticMarkup(<ClustersFilters {...props} experimentOptions={[]} />);
+		expect(text).toContain('data-testid="clusters-filter-exp" value="e_1,e_2"');
 	});
 
 	it("disables every control while loading", () => {

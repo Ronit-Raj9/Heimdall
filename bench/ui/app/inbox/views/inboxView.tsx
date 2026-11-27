@@ -96,12 +96,15 @@ export function InboxTab() {
 					onItem={(next) => void setItemId(next)}
 					manageSources={data.mode === "live"}
 					onSourcesChanged={() => void list.refetch()}
+					// Live: the sources table sits in the folded Integrations block below (M7-5).
+					showSources={data.mode !== "live"}
 					panel={
 						itemId ? <InboxItemPanel key={itemId} itemId={itemId} suites={data.suites ?? []} onClose={() => void setItemId(null)} /> : null
 					}
 				/>
 			)}
-			{data?.mode === "live" && (hasOpen || bulkSeen) && (
+			{/* While one item is open its Turn into task form is the one submit; the bulk form waits until it closes (R7-4). */}
+			{data?.mode === "live" && (hasOpen || bulkSeen) && !itemId && (
 				<Collapsible icon={ListChecks} title={g("bulk.title")} hint={g("bulk.hint")} testId="inbox-bulk">
 					<InboxBulkAccept items={data.items ?? []} suites={data.suites ?? []} />
 				</Collapsible>
@@ -115,6 +118,10 @@ export function InboxTab() {
 					defaultOpen={(data.sources ?? []).length === 0}
 					testId="inbox-integrations"
 				>
+					<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
+						<InboxSourcesTable sources={data.sources ?? []} manage onChanged={() => void list.refetch()} blocked={blocked} />
+						{(data.sources ?? []).length > 0 && <InboxConnectAnotherLink />}
+					</Section>
 					<InboxPullSetup check={ready?.inbox} hosted={ready?.hosted} />
 					<InboxWebhook />
 				</Collapsible>
@@ -144,6 +151,17 @@ export interface InboxBodyProps {
 	/** The search text (?q=) and its setter; the list narrows to items holding it (M7-13). */
 	q?: string;
 	onQ?: (q: string | null) => void;
+	/** Show the "Where failures come from" table under the list; off when the page folds it into Integrations (M7-5). Default true. */
+	showSources?: boolean;
+}
+
+/** The benchmark that holds most of the test tasks made from the inbox, for the count's link (M7-15); null with none. Exported for tests. */
+export function regressionSuite(items: readonly InboxItem[] | null | undefined): string | null {
+	const counts = new Map<string, number>();
+	for (const it of items ?? []) if (it.task?.suite) counts.set(it.task.suite, (counts.get(it.task.suite) ?? 0) + 1);
+	let best: string | null = null;
+	for (const [suite, n] of counts) if (best === null || n > (counts.get(best) ?? 0)) best = suite;
+	return best;
 }
 
 /** How many sources and the newest pull, for the one line of the folded setup; null with no source. Exported for tests. */
@@ -181,6 +199,7 @@ export function InboxBody({
 	blockedSources,
 	q = "",
 	onQ = () => undefined,
+	showSources = true,
 }: InboxBodyProps) {
 	const { t } = useTranslation("bench");
 	const { t: w } = useTranslation("w4m7");
@@ -216,11 +235,7 @@ export function InboxBody({
 						testId="inbox-items"
 						actions={
 							<div className="flex flex-wrap items-center gap-3">
-								<span className="text-muted-foreground text-sm" data-testid="inbox-regression-tasks">
-									{t("inbox.regressionTasks", {
-										count: data.regression_tasks ?? 0,
-									})}
-								</span>
+								<RegressionTasksCount count={data.regression_tasks ?? 0} suite={regressionSuite(data.items)} />
 								<SessionImport
 									onImported={(id) => {
 										onFilter("new");
@@ -285,11 +300,36 @@ export function InboxBody({
 					{panel ?? (items.length > 0 ? <EmptyNote testId="inbox-select-item">{t("inbox.detail.select")}</EmptyNote> : null)}
 				</div>
 			)}
-			<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
-				<InboxSourcesTable sources={sources} manage={manageSources} onChanged={onSourcesChanged} blocked={blockedSources} />
-				{manageSources && sources.length > 0 && <InboxConnectAnotherLink />}
-			</Section>
+			{showSources && (
+				<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
+					<InboxSourcesTable sources={sources} manage={manageSources} onChanged={onSourcesChanged} blocked={blockedSources} />
+					{manageSources && sources.length > 0 && <InboxConnectAnotherLink />}
+				</Section>
+			)}
 		</div>
+	);
+}
+
+/** "5 new test tasks made from the inbox", a link to the benchmark that holds them when one is known (M7-15). */
+function RegressionTasksCount({ count, suite }: { count: number; suite: string | null }) {
+	const { t } = useTranslation("bench");
+	const text = t("inbox.regressionTasks", { count });
+	if (count === 0 || !suite) {
+		return (
+			<span className="text-muted-foreground text-sm" data-testid="inbox-regression-tasks">
+				{text}
+			</span>
+		);
+	}
+	return (
+		<Link
+			to="/suites/$suiteId"
+			params={{ suiteId: suite }}
+			className="text-primary text-sm font-medium underline underline-offset-2"
+			data-testid="inbox-regression-tasks"
+		>
+			{text}
+		</Link>
 	);
 }
 

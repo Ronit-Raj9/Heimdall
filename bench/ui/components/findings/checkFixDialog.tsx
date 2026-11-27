@@ -2,6 +2,7 @@ import "@/app/inbox/views/w443I18n";
 
 import { Button } from "@/components/ui/button";
 import { PaidButton } from "@/components/ui/paidButton";
+import { formatUsd } from "@/lib/money";
 import { notify } from "@/lib/notify";
 import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { useRerunFindingMutation, type Finding } from "@/lib/store/apis/findingsApi";
@@ -33,14 +34,15 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 	const armValue = arm || (arms.length === 1 ? arms[0] : "");
 	const n = finding.tasks.length;
 	const estimate = rerunEstimate(n, trials, source);
-	const usd = estimate.usd === null ? null : estimate.usd.toFixed(2);
+	// One helper for the label and the confirm, so both name the same rounded number.
+	const usd = estimate.usd === null ? null : formatUsd(estimate.usd).replace(/^\$/, "");
 	const ask =
 		usd === null
 			? t("checkFix.askUnknown", { runs: estimate.runs, n, trials })
 			: t("checkFix.ask", { runs: estimate.runs, n, trials, usd });
 
-	// Paid work: PaidButton asks first (auto: a rerun has no cap, so it always asks), naming the runs and the estimate (M7-26). A rerun has
-	// no server cap, so the label says it uses the model key.
+	// Paid work: PaidButton always asks first, naming the runs and the estimate (M7-26). The label
+	// names the estimate as its amount (owner decision 1: the label always shows a dollar figure).
 	const start = async () => {
 		const res = await rerun({
 			id: finding.id,
@@ -124,10 +126,10 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 				<PaidButton
 					size="sm"
 					verb={t("checkFix.verb")}
-					capUsd={null}
+					capUsd={estimate.usd}
 					estimateRuns={estimate.runs}
 					estimateUsd={estimate.usd}
-					confirm="auto"
+					confirm="always"
 					kind="form"
 					confirmText={ask}
 					disabled={!expId || !armValue || state.isLoading}

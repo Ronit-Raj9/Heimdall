@@ -11,9 +11,13 @@ import { Button } from "@/components/ui/button";
 import { ShowArchivedChip, useShowArchived } from "@/components/ui/showArchivedChip";
 import { archivedCountOf, useGetFindingsWithArchivedQuery } from "@/lib/store/apis/archiveApi";
 import { useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
+import { formatUsd } from "@/lib/money";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/** The cap the investigate dialog starts with (its capText default); the outer button names it (R7-5). */
+export const INVESTIGATION_START_CAP_USD = 1;
 
 /**
  * The Findings tab of the inbox: /inbox?tab=findings&finding=. Tracked failures with their state,
@@ -41,7 +45,7 @@ export default function FindingsTab() {
 			onClick={() => setInvestigating(true)}
 			data-testid="findings-find-out-why"
 		>
-			{t("investigations.findOutPaid")}
+			{t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) })}
 		</Button>
 	);
 
@@ -59,7 +63,7 @@ export default function FindingsTab() {
 				<EmptyState
 					title={t("emptyTitle")}
 					body={t("emptyBody")}
-					action={investigating ? undefined : { label: t("investigations.findOutPaid"), onClick: () => setInvestigating(true) }}
+					action={investigating ? undefined : { label: t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) }), onClick: () => setInvestigating(true) }}
 					testId="findings-empty"
 				/>
 			) : all.length === 0 ? (

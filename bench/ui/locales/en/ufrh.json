@@ -1,0 +1,10 @@
+{
+	"clusters": {
+		"whichRuns": "Which runs",
+		"faultNone": "None",
+		"expAll": "every comparison",
+		"expPicked_one": "{{count}} comparison",
+		"expPicked_other": "{{count}} comparisons",
+		"expClear": "Clear"
+	}
+}
