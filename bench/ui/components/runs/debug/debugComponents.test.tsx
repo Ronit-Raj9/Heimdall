@@ -173,7 +173,7 @@ describe("debug on a server that cannot hold model calls (N212)", () => {
 		expect(tagOf(html, "run-debug-breakpoints-reason")).toBeNull();
 		expect(tagOf(render(<RunDebugActions detail={{ ...d, sealed: false }} />), "run-debug-breakpoints-reason")).not.toBeNull();
 		expect(html).toContain(
-			"Pausing before model calls needs a worker this server controls. On this server, use Replay or Fork from a step.",
+			"Pausing needs a worker this server controls. Use Replay or Fork.",
 		);
 	});
 	it("offers Debug where breakpoints work, and on an older server that does not say", () => {
@@ -223,8 +223,8 @@ describe("fork and breakpoint dialogs (N214)", () => {
 	});
 	it("the dialogs state what the start costs", () => {
 		expect(i18n.t("fork.cost", { ns: "runDebug", call: 4 })).toBe(
-			"Calls before call 4 replay from the recording for free; later calls go to the model and cost money.",
+			"Calls before 4 replay free. Later calls cost money.",
 		);
-		expect(i18n.t("debugDialog.cost", { ns: "runDebug" })).toContain("costs money");
+		expect(i18n.t("debugDialog.cost", { ns: "runDebug" })).toContain("costs money.");
 	});
 });

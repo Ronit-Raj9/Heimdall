@@ -25,9 +25,9 @@ describe("Replay asks first (M5-2)", () => {
 	});
 
 	it("the confirm text says what it does, that it is free, never counted and creates a debug run", () => {
-		expect(en.actions.replayConfirm).toContain("costs nothing");
+		expect(en.actions.replayConfirm).toContain("free");
 		expect(en.actions.replayConfirm).toContain("never counts toward results");
-		expect(en.actions.replayConfirm).toContain("creates a new debug run");
+		expect(en.actions.replayConfirm).toContain("new debug run");
 		expect(en.actions.replayStart).toBe("Start replay");
 		expect(en.actions.replayCancel).toBe("Cancel");
 	});
@@ -38,7 +38,7 @@ describe("worker note (M5-14)", () => {
 	it("is a line only on a live run; on a finished run it moves into the Replay tooltip", () => {
 		const done = render(<RunDebugActions detail={detail(true, allowed)} />);
 		expect(done).not.toContain("run-debug-breakpoints-reason");
-		expect(done).toContain("Pausing before model calls needs a worker");
+		expect(done).toContain("Pausing needs a worker");
 		const live = render(<RunDebugActions detail={detail(false, allowed)} />);
 		expect(live).toContain("run-debug-breakpoints-reason");
 	});

@@ -725,7 +725,7 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 			{detail.run.debug?.from_run && <TraceDiff runId={runId} otherRunId={detail.run.debug.from_run} />}
 			{detail.sessions && detail.sessions.length > 0 && <SessionsTimeline sessions={detail.sessions} arm={arm} />}
 			{detail.tool_calls && detail.tool_calls.length > 0 && <ToolCallTable calls={detail.tool_calls} arm={arm} />}
-			<Section title={t("runs.gateway.title")} description={t("runs.gateway.description")} testId="run-gateway">
+			<Section title={t("runs.gateway.title")} testId="run-gateway">
 				{events.isLoading ? (
 					<BlockSkeleton rows={4} testId="run-gateway-loading" />
 				) : events.error || !events.data ? (
@@ -750,7 +750,7 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 function ThroughBifrostSection({ runId, arm }: { runId: string; arm: string }) {
 	const { t } = useTranslation("throughBifrost");
 	return (
-		<Section title={t("title")} description={t("description")} testId="run-through-bifrost">
+		<Section title={t("title")} testId="run-through-bifrost">
 			<CardContent className="rounded-sm border px-4 py-4">
 				<RunThroughBifrost runId={runId} arm={arm} />
 			</CardContent>
@@ -763,7 +763,7 @@ function EvidenceTab({ detail }: { detail: RunDetail }) {
 	const runId = detail.run.run_id;
 	return (
 		<div className="flex flex-col gap-8" data-testid="run-evidence">
-			<Section title={t("runs.evidence.title")} description={t("runs.evidence.description")} testId="run-evidence-status">
+			<Section title={t("runs.evidence.title")} testId="run-evidence-status">
 				<Card className="py-0 shadow-none">
 					<CardContent className="px-4 py-4">
 						<RunEvidenceStatus detail={detail} arm={detail.slot.arm} />
@@ -771,7 +771,7 @@ function EvidenceTab({ detail }: { detail: RunDetail }) {
 				</Card>
 			</Section>
 			{detail.receipts.length > 0 && (
-				<Section title={t("receipts.title")} description={t("runs.page.receiptsDescription")} testId="run-receipts">
+				<Section title={t("receipts.title")} testId="run-receipts">
 					<RunReceiptPanel runId={runId} probeId={detail.slot.condition} onClose={() => undefined} />
 				</Section>
 			)}

@@ -37,7 +37,7 @@ describe("first divergence panel", () => {
 		expect(html).toContain("$0.25");
 		expect(html).toContain("not known");
 		expect(html).toContain("Final result, checked by the task&#x27;s tests: base Solved, cand Not solved.");
-		expect(html).toContain("This is the first difference we saw, not a proven cause.");
+		expect(html).toContain("First difference seen. Not proven as the cause.");
 	});
 
 	it("uses the outcome badge word for a timeout, not Failed (M4-62)", () => {

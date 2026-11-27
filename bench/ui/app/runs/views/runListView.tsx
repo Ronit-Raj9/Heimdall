@@ -9,7 +9,7 @@ export default function RunListView() {
 	const { t } = useTranslation("u12");
 	return (
 		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="run-list-screen">
-			<PageHeader title={t("runs.title")} subtitle={t("runs.subtitle")} />
+			<PageHeader title={t("runs.title")} />
 			<RunsTable />
 		</div>
 	);

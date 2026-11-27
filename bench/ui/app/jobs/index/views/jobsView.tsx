@@ -126,7 +126,7 @@ export default function JobsView() {
 			className={cn("flex w-full min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")}
 			data-testid="jobs-screen"
 		>
-			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+			<PageHeader title={t("title")} />
 
 			<div className="flex flex-wrap items-end gap-3" data-testid="jobs-filters">
 				<div className="flex flex-col gap-1 text-xs">

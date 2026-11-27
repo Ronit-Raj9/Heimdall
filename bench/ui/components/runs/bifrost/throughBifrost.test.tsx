@@ -87,11 +87,11 @@ describe("ThroughBifrost", () => {
 	});
 	it("says which path applied the faults", () => {
 		const plugin = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "plugin" }} arm="A" />);
-		expect(plugin).toContain("1 (inside Bifrost, by the Heimdall plugin)");
+		expect(plugin).toContain("1 by the plugin");
 		const proxy = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "proxy" }} arm="A" />);
-		expect(proxy).toContain("1 (by the fault proxy behind Bifrost)");
+		expect(proxy).toContain("1 by the proxy");
 		const mixed = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "mixed" }} arm="A" />);
-		expect(mixed).toContain("1 (some by the plugin, some by the proxy)");
+		expect(mixed).toContain("1 by plugin and proxy");
 		const none = renderToStaticMarkup(<ThroughBifrost data={{ ...data, faults: 0, fault_path: undefined }} arm="A" />);
 		expect(none).not.toContain("by the");
 	});

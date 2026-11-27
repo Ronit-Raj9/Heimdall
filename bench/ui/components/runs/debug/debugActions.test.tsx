@@ -28,7 +28,7 @@ describe("debug actions of a fault run (N133)", () => {
 		const html = render(<RunDebugActions detail={d} />);
 		expect(html).toContain("run-replay");
 		expect(html).not.toContain('data-testid="run-debug"');
-		expect(html).toContain("Fork and Debug need a run without a fault. This run ran under Model partly down.");
+		expect(html).toContain("Fork and Debug need a run without a fault. This one had Model partly down.");
 	});
 	it("offers nothing for a tool-fault run and says why", () => {
 		const d = detail("heimdall-broken-tool", { replay: false, fork: false, reason: "x" });
@@ -46,6 +46,6 @@ describe("debug actions of a fault run (N133)", () => {
 	});
 	it("the replay banner names the source run's fault", () => {
 		const html = render(<DebugBanner debug={{ mode: "replay", from_run: "r_0", from_condition: "heimdall-model-brownout" }} />);
-		expect(html).toContain("The source run ran under Model partly down: its fault answers are replayed as recorded.");
+		expect(html).toContain("Source ran under Model partly down. Its fault answers are replayed.");
 	});
 });

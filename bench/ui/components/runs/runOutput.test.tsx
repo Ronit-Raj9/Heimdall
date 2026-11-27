@@ -59,7 +59,7 @@ describe("RunOutput", () => {
 		const html = renderToStaticMarkup(<RunOutput detail={detail({})} arm="B" />);
 		expect(diffQuery).toHaveBeenCalledWith("r_1");
 		expect(html).toContain('data-testid="diff-B-none"');
-		expect(html).toContain("The agent changed no files, so there is no diff.");
+		expect(html).toContain("No file changes.");
 		expect(html).not.toContain("Could not load the diff");
 	});
 });

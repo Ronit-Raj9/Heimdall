@@ -105,7 +105,7 @@ describe("job log", () => {
 	});
 	it("says when lines were dropped and when there are none yet", () => {
 		const html = render(<JobLogPanel log={{ ...liveLog, lines: [], dropped: 120 }} active />);
-		expect(html).toContain("120 earlier lines were hidden");
+		expect(html).toContain("120 earlier lines hidden");
 		expect(html).toContain('data-testid="job-log-empty"');
 		expect(html).toContain('role="log"');
 	});

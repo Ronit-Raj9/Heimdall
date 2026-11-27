@@ -102,12 +102,12 @@ export function AgentsPanel({ data, arm, initialExpanded }: AgentsPanelProps) {
 				/>
 			</SubSection>
 
-			<SubSection title={t("runs.agents.tree.title")} description={t("runs.agents.tree.description")}>
+			<SubSection title={t("runs.agents.tree.title")}>
 				<AgentTree members={data.members} tree={data.tree} arm={arm} />
 				{data.members.length > 0 && <AgentTable members={data.members} arm={arm} />}
 			</SubSection>
 
-			<SubSection title={t("runs.agents.handoffs.title")} description={t("runs.agents.handoffs.description")}>
+			<SubSection title={t("runs.agents.handoffs.title")}>
 				<HandoffList handoffs={data.handoffs} arm={arm} initialExpanded={initialExpanded} />
 			</SubSection>
 
@@ -128,12 +128,12 @@ export function AgentsPanel({ data, arm, initialExpanded }: AgentsPanelProps) {
 	);
 }
 
-function SubSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function SubSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-2.5">
 			<div className="flex flex-col gap-0.5">
 				<h3 className="text-foreground text-[13px] font-semibold tracking-tight">{title}</h3>
-				<p className="text-muted-foreground max-w-prose text-xs leading-relaxed">{description}</p>
+				{description ? <p className="text-muted-foreground max-w-prose text-xs leading-relaxed">{description}</p> : null}
 			</div>
 			{children}
 		</div>

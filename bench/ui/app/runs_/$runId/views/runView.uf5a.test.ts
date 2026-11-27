@@ -73,9 +73,9 @@ describe("run page helpers (lane 5a)", () => {
 
 	it("names the last gate and says the rerun link runs the benchmark, like the wizard banner (F3-16, R3-3)", () => {
 		expect(uf5a.gates.names.insecure_code_added).toBe("Did not add insecure code");
-		expect(uf5a.page.rerun).toBe("Run this benchmark again (1 task)");
-		expect(uf5a.page.rerunHint).toContain("can be a different task of the same benchmark");
-		expect(uf3.link.task).toContain("it can be a different task than {{task}}");
+		expect(uf5a.page.rerun).toBe("Rerun 1 task");
+		expect(uf5a.page.rerunHint).toContain("1 task of this benchmark, maybe a different task");
+		expect(uf3.link.task).toContain("It may not be {{task}}.");
 		expect(uf5a.page.crumbRuns).toBe("Runs");
 	});
 });

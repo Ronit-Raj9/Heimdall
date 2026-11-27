@@ -41,7 +41,7 @@ describe("MetricStrip", () => {
 		expect(html).toContain("Model calls incl. retries");
 		expect(html).toContain("Actions Heimdall saw");
 		expect(html).toContain('data-testid="run-metric-help-steps"');
-		expect(html).toContain("Not counted here: failed turns");
+		expect(html).toContain("Tool calls excluded");
 		expect(html.indexOf("Model replies")).toBeLessThan(html.indexOf("Model calls that failed"));
 		expect(html.indexOf("Actions Heimdall saw")).toBeLessThan(html.indexOf("Tool uses"));
 	});
@@ -56,11 +56,11 @@ describe("MetricStrip", () => {
 			tool_traffic_unparsed: obs(1),
 		};
 		const html = renderToStaticMarkup(<MetricStrip lanes={[{ arm: "A", metrics }]} kinds={kinds} />);
-		expect(html).toContain("Tool uses Heimdall saw run");
+		expect(html).toContain("Tools seen running");
 		expect(html).toContain("Seen by the tool relay");
 		expect(html).toContain("Only a reply came back");
-		expect(html).toContain("does not prove the tool ran");
-		expect(html).toContain("Tool traffic Heimdall could not read");
+		expect(html).toContain("Does not prove the tool ran");
+		expect(html).toContain("Unreadable tool traffic");
 		expect(html).not.toContain("Seen only inside the agent's box");
 	});
 });

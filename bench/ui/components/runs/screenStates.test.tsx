@@ -36,7 +36,7 @@ describe("LoadError", () => {
 
 	it("says why in plain words and keeps the server text in Details", () => {
 		const html = render(<LoadError title="Could not load" error={broken} testId="x-error" />);
-		expect(html).toContain("A server error; it was logged.");
+		expect(html).toContain("If it keeps failing, copy the details for support.");
 		expect(html).toContain("Details from the server");
 		expect(html).not.toContain("500");
 	});

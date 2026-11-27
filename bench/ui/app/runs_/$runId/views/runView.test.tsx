@@ -47,7 +47,7 @@ describe("run overview stats (N28)", () => {
 	it("calls the steps metric Model turns and explains the count", () => {
 		const html = render(<RunStatCards detail={detail()} />);
 		expect(html).toContain("Model turns");
-		expect(html).toContain("The Step by step tab also counts tool uses and commands.");
+		expect(html).toContain("Step by step also counts tools.");
 	});
 });
 

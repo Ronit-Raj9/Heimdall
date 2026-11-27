@@ -45,7 +45,7 @@ describe("fork banner (N247)", () => {
 		);
 		expect(
 			render(<View debug={{ mode: "fork", from_run: "r_0", call: 2 }} calls={[{ call: 2, status: 200, action: "pass" }]} />),
-		).toContain("Fork of run r_0 from model call 2 (no change).");
+		).toContain("Fork of run r_0 from model call 2, unchanged");
 	});
 	it("keeps the plain sentence for an old fork whose edit is not known", () => {
 		const html = render(<banner.DebugBanner debug={{ mode: "fork", from_run: "r_0", call: 4 }} />);

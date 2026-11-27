@@ -285,7 +285,7 @@ export function TraceView({
 								id === "mismatches"
 									? tt("mismatches.hint")
 									: id === "tools"
-										? tw("trace.toolsHint")
+										? tw("trace.toolsHint") || undefined
 										: id === "errors" && toolErrors > 0
 											? tt("errorsHint", { count: toolErrors })
 											: undefined

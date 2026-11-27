@@ -22,7 +22,7 @@ describe("RunList", () => {
 		search.value = {};
 		list.value = { runs: [], total: 0 };
 		const html = render(<RunList expId="e_1" running />);
-		expect(html).toContain("Runs show up here as they finish. This comparison is still running.");
+		expect(html).toContain("Still running. Runs appear as they finish.");
 		expect(html).not.toContain("/experiments/new");
 	});
 	it("past the last page says so, offers the last page and keeps the pager", () => {

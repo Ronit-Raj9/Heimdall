@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BlamePanel } from "./blamePanel";
 
-const JUDGE = "LLM-judge blame is not offered: best published step-level accuracy is 14%.";
+const JUDGE = "LLM-judge blame off. Best step accuracy is 14%.";
 
 const proven: Blame = {
 	version: "1.0.0",

@@ -42,7 +42,7 @@
 		"copied": "Copied",
 		"more": "More",
 		"rerun": "Rerun 1 task",
-		"rerunHint": "Opens Evaluate with 1 task, maybe another one. Nothing starts until you confirm the cost.",
+		"rerunHint": "Opens Evaluate with 1 task of this benchmark, maybe a different task. Nothing starts until you confirm the cost.",
 		"details": "Run facts and metrics",
 		"setupB": "Setup {{arm}}: {{value}}",
 		"suite": "Benchmark {{name}}"
