@@ -360,6 +360,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "kind", Description: "Only this kind"}, {Name: "status", Description: "queued, running, succeeded, failed or cancelled"},
 		{Name: "target", Description: "Only jobs on this target, e.g. exp:<id> or suite:<id>"}, {Name: "limit", Description: "1..500, default 50"},
 		{Name: "before", Description: "Page: jobs created before this job id (next of the previous page)"},
+		{Name: "q", Description: "Only jobs whose kind, target or id contains this text, ignoring case (at most 200 characters)"},
 		{Name: "fields", Description: "count: answer only count (at most 1000, with more true past it) of the jobs the other filters match"}}},
 	{Method: "POST", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Queue a job: suite.lint, suite.lock, suite.admit, agent.check, index.rebuild or experiment.regate, params validated per kind, paths inside the org's project folder (member)",
 		Auth: AuthWrite, Request: JobCreate{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
