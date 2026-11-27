@@ -92,7 +92,7 @@ export interface ReplayInboxResult {
 }
 
 /** Shadow replay (handlers/replays_w447.go). Replays start with POST /jobs kind replay.run. */
-export const replaysApi = benchApi.enhanceEndpoints({ addTagTypes: ["ReplaySettings", "Replays"] }).injectEndpoints({
+export const replaysApi = benchApi.enhanceEndpoints({ addTagTypes: ["ReplaySettings", "Replays", "Jobs"] }).injectEndpoints({
 	endpoints: (builder) => ({
 		getReplaySettings: builder.query<ReplaySettings, void>({
 			query: () => "/replays/settings",
@@ -117,8 +117,30 @@ export const replaysApi = benchApi.enhanceEndpoints({ addTagTypes: ["ReplaySetti
 			}),
 			invalidatesTags: (_r, error, { id }) => (error ? [] : [{ type: "Replays", id }]),
 		}),
+		/**
+		 * Stops a running replay (M1-53): a replay is a replay.run job, so this asks the job to cancel
+		 * (POST /jobs/{id}/cancel). No more paid calls start after the answer; the view says
+		 * "Nothing more is charged." (toast:stopped).
+		 */
+		cancelReplay: builder.mutation<{ id: string; status?: string; cancel_requested?: boolean }, string>({
+			query: (jobId) => ({ url: `/jobs/${encodeURIComponent(jobId)}/cancel`, method: "POST" }),
+			invalidatesTags: (_r, error, jobId) =>
+				error
+					? []
+					: [
+							"Replays",
+							{ type: "Jobs", id: jobId },
+							{ type: "Jobs", id: "LIST" },
+						],
+		}),
 	}),
 });
 
-export const { useGetReplaySettingsQuery, usePutReplaySettingsMutation, useGetReplaysQuery, useGetReplayQuery, useReplayToInboxMutation } =
-	replaysApi;
+export const {
+	useGetReplaySettingsQuery,
+	usePutReplaySettingsMutation,
+	useGetReplaysQuery,
+	useGetReplayQuery,
+	useReplayToInboxMutation,
+	useCancelReplayMutation,
+} = replaysApi;

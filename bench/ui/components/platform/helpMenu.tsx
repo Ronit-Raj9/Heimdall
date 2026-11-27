@@ -1,3 +1,4 @@
+import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
 import "@/components/platform/fw23I18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -31,6 +32,9 @@ export function HelpMenu({ defaultOpen = false }: HelpMenuProps) {
 	const [open, setOpen] = useState(defaultOpen);
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
+	// Focus moves into the menu on open; arrows, Home and End move between items (M1-39).
+	const menuRef = useRef<HTMLDivElement>(null);
+	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
 
 	useEffect(() => {
@@ -63,13 +67,15 @@ export function HelpMenu({ defaultOpen = false }: HelpMenuProps) {
 				aria-controls={open ? menuId : undefined}
 				aria-label={t("help.label")}
 				title={t("help.label")}
-				className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+				className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-(--focus) flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
 				data-testid="header-help"
 			>
 				<CircleHelp className="size-4" aria-hidden="true" />
 			</button>
 			{open && (
 				<div
+					ref={menuRef}
+					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={t("help.label")}

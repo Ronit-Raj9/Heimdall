@@ -23,7 +23,7 @@
 		"close": "Close"
 	},
 	"schedules": {
-		"heroTitle": "Run tests automatically",
+		"heroTitle": "",
 		"heroMessage": "Pick a comparison, a time and a daily spending limit. Heimdall starts it for you.",
 		"heroAction": "Add a schedule",
 		"newAction": "Add schedule",
