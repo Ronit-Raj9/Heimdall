@@ -4,6 +4,7 @@ import (
 	"github.com/valyala/fasthttp"
 
 	"github.com/maximhq/bifrost/bench/clusters"
+	"github.com/maximhq/bifrost/bench/plaintext"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -38,5 +39,8 @@ func runFailureGroup(ctx *fasthttp.RequestCtx, index ReadIndex, rv *RunView) *sc
 			out.Title = c.Title
 		}
 	}
+	// text and title are not plainServed field names, and both come from a
+	// worker's error output: clean them here, like the run's part failures.
+	out.Text, out.Title = plaintext.Hosted(out.Text), plaintext.Hosted(out.Title)
 	return out
 }
