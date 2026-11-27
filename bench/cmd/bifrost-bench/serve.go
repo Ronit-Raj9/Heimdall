@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/attribution"
@@ -314,6 +315,8 @@ type analyzerAdapter struct {
 	// once; without it each request found no matching saved analysis and
 	// saved its own identical copy.
 	locks *sync.Map
+	// rebuilds, when set, counts the index rebuilds (tests).
+	rebuilds *atomic.Int64
 }
 
 func (x analyzerAdapter) Analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, error) {
@@ -322,11 +325,20 @@ func (x analyzerAdapter) Analyze(ctx context.Context, expID, gradeSource string)
 		mu.(*sync.Mutex).Lock()
 		defer mu.(*sync.Mutex).Unlock()
 	}
-	an, _, err := x.a.analyzeView(ctx, expID, gradeSource)
+	an, _, saved, err := x.a.analyzeViewSaved(ctx, expID, gradeSource)
 	if err != nil {
 		return nil, err
 	}
-	_ = x.ix.Rebuild(ctx)
+	// Only a newly saved analysis changes what the index lists. Returning the
+	// identical saved one wrote nothing, and a full rebuild reads every run of
+	// every experiment of the organization (it held a finished evaluation's
+	// Score tab for over 25 s, DG_performance).
+	if saved {
+		if x.rebuilds != nil {
+			x.rebuilds.Add(1)
+		}
+		_ = x.ix.Rebuild(ctx)
+	}
 	return an, nil
 }
 

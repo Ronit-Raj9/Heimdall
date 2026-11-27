@@ -306,24 +306,37 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 // returned instead of writing another, so browsing a page never piles up
 // analysis folders (audit 4-B-07).
 func (a *app) analyzeView(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, []byte, error) {
-	return a.analyzeOpt(ctx, expID, gradeSource, "", true)
+	an, report, _, err := a.analyzeViewSaved(ctx, expID, gradeSource)
+	return an, report, err
+}
+
+// analyzeViewSaved is analyzeView that also says whether it saved a new
+// analysis folder (false when an identical saved one was returned), so the
+// serve analyzer rebuilds the index only when the store changed.
+func (a *app) analyzeViewSaved(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, []byte, bool, error) {
+	return a.analyzeOptSaved(ctx, expID, gradeSource, "", true)
 }
 
 func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride string, reuse bool) (*schemas.Analysis, []byte, error) {
+	an, report, _, err := a.analyzeOptSaved(ctx, expID, gradeSource, policyOverride, reuse)
+	return an, report, err
+}
+
+func (a *app) analyzeOptSaved(ctx context.Context, expID, gradeSource, policyOverride string, reuse bool) (*schemas.Analysis, []byte, bool, error) {
 	m, err := a.store.LoadManifest(ctx, expID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if gradeSource == "" {
 		gradeSource = schemas.GradeSourceOriginal
 	}
 	runs, err := a.store.SealedRuns(ctx, expID, gradeSource)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load sealed runs: %w", err)
+		return nil, nil, false, fmt.Errorf("load sealed runs: %w", err)
 	}
 	an, err := a.releaseVerdict(ctx, m, runs, policyOverride)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
@@ -334,27 +347,27 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	}
 	an.GradeSource = gradeSource
 	if an.InputsDigest, err = utils.AnalysisInputsDigest(runs); err != nil {
-		return nil, nil, fmt.Errorf("digest analysis inputs: %w", err)
+		return nil, nil, false, fmt.Errorf("digest analysis inputs: %w", err)
 	}
 	// A one-setup score run has no candidate to release, so no release
 	// policy applies: its checks would all target a setup B that does not
 	// exist and block (N61). Stored analyses keep their old result.
 	if an.Verdict.Decision != schemas.DecisionScore {
 		if an.Policy, err = a.releasePolicy(m, an, verdict.DecisionRuns(m, runs), policyOverride); err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 	}
 	var md strings.Builder
 	for _, r := range a.reg.Reporters {
 		if r.GetName() == "markdown" {
 			if err := r.Write(ctx, an, m, &md); err != nil {
-				return nil, nil, fmt.Errorf("write report: %w", err)
+				return nil, nil, false, fmt.Errorf("write report: %w", err)
 			}
 		}
 	}
 	sec, err := a.gateSourceSection(ctx, m, gradeSource, runs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("gate source: %w", err)
+		return nil, nil, false, fmt.Errorf("gate source: %w", err)
 	}
 	report := insertSection(md.String(), sec)
 	report = a.reviewSummary(ctx, an, runs, report) // human review: counts and report section (review.go)
@@ -365,13 +378,13 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	report = a.judgeCalibrationSection(an, report)
 	if reuse {
 		if same := a.sameAnalysis(an, report); same != nil {
-			return same, []byte(report), nil
+			return same, []byte(report), false, nil
 		}
 	}
 	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(report)}); err != nil {
-		return nil, nil, fmt.Errorf("save analysis: %w", err)
+		return nil, nil, false, fmt.Errorf("save analysis: %w", err)
 	}
-	return an, []byte(report), nil
+	return an, []byte(report), true, nil
 }
 
 // releaseVerdict is the release verdict of m over its counted runs, with no
