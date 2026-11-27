@@ -36,6 +36,11 @@ export function cleanRule(r: BehaviourRule): BehaviourRule {
 	return out;
 }
 
+/** Whether a rule can be saved: it has a name and its first step matches something. */
+export function ruleComplete(r: BehaviourRule): boolean {
+	return r.title.trim() !== "" && cleanSelector(r.a) !== undefined;
+}
+
 /** The next free id of the form my_check_N. */
 export function newRuleId(rules: BehaviourRule[]): string {
 	const taken = new Set(rules.map((r) => r.id));
@@ -86,7 +91,13 @@ export function BehaviourEditor({
 }) {
 	const { t } = useTranslation("w441");
 	const [rules, setRules] = useState<BehaviourRule[]>(initial);
+	const [tried, setTried] = useState(false);
 	const update = (i: number, next: Partial<BehaviourRule>) => setRules((rs) => rs.map((r, j) => (j === i ? { ...r, ...next } : r)));
+	const incomplete = rules.some((r) => !ruleComplete(r));
+	const save = () => {
+		setTried(true);
+		if (!incomplete) onSave(rules.map(cleanRule));
+	};
 	return (
 		<div className="flex flex-col gap-4 text-sm" data-testid="behaviour-editor">
 			<h3 className="font-medium">{t("editor.title")}</h3>
@@ -134,6 +145,11 @@ export function BehaviourEditor({
 					</div>
 				</div>
 			))}
+			{tried && incomplete && (
+				<p className="text-destructive text-xs" role="alert" data-testid="behaviour-editor-incomplete">
+					{t("editor.needNameAndStep")}
+				</p>
+			)}
 			{error && (
 				<p className="text-destructive text-xs" data-testid="behaviour-editor-error">
 					{error}
@@ -148,7 +164,7 @@ export function BehaviourEditor({
 				>
 					{t("editor.add")}
 				</Button>
-				<Button size="sm" disabled={saving} onClick={() => onSave(rules.map(cleanRule))} data-testid="behaviour-editor-save">
+				<Button size="sm" disabled={saving} onClick={save} data-testid="behaviour-editor-save">
 					{t("editor.save")}
 				</Button>
 				<Button size="sm" variant="ghost" onClick={onCancel}>

@@ -2,14 +2,33 @@ import type { AdapterFaultEvidence, RunDetail } from "@/lib/types/bench";
 import { useTranslation } from "react-i18next";
 import { TraceDownloadLink } from "./runTraceLink";
 import { TraceQualityDetails } from "./traceQuality";
+import "./uf5aI18n";
 
 /**
  * One run's evidence: the quality and the parts the evidence contract expects, the canonical
  * hashes, trace quality, tool calls requested against executed, adapter fault instrumentation and
  * the trace download. Shared by the run page's Evidence tab and the pair comparison.
  */
+/** True when the run recorded none of the evidence this block lists (no contract, no hashes, no fault record). */
+export function evidenceIsEmpty(detail: Pick<RunDetail, "evidence_contract" | "canonical" | "adapter_fault">): boolean {
+	return !detail.evidence_contract && !detail.canonical && !detail.adapter_fault;
+}
+
 export function RunEvidenceStatus({ detail, arm }: { detail: RunDetail; arm: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf5a");
+	// M4-59: a setup with no recorded evidence gets one line and the trace link, not eight "unknown" rows.
+	if (evidenceIsEmpty(detail)) {
+		return (
+			<div className="flex flex-col gap-2 text-sm" data-testid={`runs-evidence-${arm}`}>
+				<p className="text-muted-foreground text-xs" data-testid={`runs-evidence-empty-${arm}`}>
+					{tu("evidence.empty")}
+				</p>
+				<TraceQualityDetails arm={arm} trace={detail.run.agent.trace_diagnostics} />
+				<TraceDownloadLink runId={detail.run.run_id} arm={arm} sealed={detail.sealed} sealError={detail.seal_error} />
+			</div>
+		);
+	}
 	const unknown = t("runs.evidence.unknown");
 	const none = t("runs.evidence.none");
 	const canonical = detail.canonical;

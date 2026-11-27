@@ -7,7 +7,7 @@ import { Bug, Rewind } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/runs/views/w4m4I18n";
-import { BreakpointDialog, StartedNote, errorText } from "./debugDialogs";
+import { BreakpointDialog, ReplayDialog, StartedNote, errorText, startDebugRun } from "./debugDialogs";
 
 /**
  * The debug actions a run allows (N133). The server computes them with the rule its debug routes apply
@@ -72,12 +72,12 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 	const [start, state] = useStartDebugRunMutation();
 	const [started, setStarted] = useState<DebugRunResponse | null>(null);
 	const [debugOpen, setDebugOpen] = useState(false);
+	const [replayOpen, setReplayOpen] = useState(false);
 	const allowed = debugAllowed(detail);
 	const runId = detail.run.run_id;
-	const replay = async () => {
-		const res = await start({ runId, mode: "replay", body: {} });
-		if ("data" in res && res.data) setStarted(res.data);
-	};
+	// A finished run cannot take breakpoints anyway: the worker note belongs to a live run only.
+	const workerNote = allowed.fork && !allowed.breakpoints;
+	const live = !detail.sealed;
 	return (
 		<div className="flex flex-col items-end gap-1">
 			<div className="flex items-center gap-2">
@@ -85,10 +85,8 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 					<Button
 						variant="outline"
 						size="sm"
-						title={t("actions.replayHint")}
-						onClick={() => void replay()}
-						isLoading={state.isLoading}
-						disabled={state.isLoading}
+						title={workerNote && !live ? `${t("actions.replayHint")} ${t("actions.breakpointsNeedWorker")}` : t("actions.replayHint")}
+						onClick={() => setReplayOpen(true)}
 						dataTestId="run-replay"
 					>
 						<Rewind aria-hidden="true" />
@@ -103,7 +101,7 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 				)}
 			</div>
 			<DebugFaultReason detail={detail} />
-			{allowed.fork && !allowed.breakpoints && (
+			{workerNote && live && (
 				<p className="text-muted-foreground max-w-sm text-right text-xs" data-testid="run-debug-breakpoints-reason">
 					{t("actions.breakpointsNeedWorker")}
 				</p>
@@ -114,6 +112,14 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 				</p>
 			) : null}
 			<StartedNote started={started} />
+			{replayOpen && (
+				<ReplayDialog
+					open
+					onClose={() => setReplayOpen(false)}
+					busy={state.isLoading}
+					onConfirm={() => startDebugRun(() => start({ runId, mode: "replay", body: {} }), setStarted, () => setReplayOpen(false))}
+				/>
+			)}
 			{debugOpen && <BreakpointDialog runId={runId} open onClose={() => setDebugOpen(false)} onStarted={setStarted} />}
 		</div>
 	);

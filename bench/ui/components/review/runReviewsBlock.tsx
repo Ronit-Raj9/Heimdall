@@ -1,4 +1,4 @@
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { useGetRunReviewsQuery } from "@/lib/store/apis/benchApi";
 import { useTranslation } from "react-i18next";
 import { ReviewTimeline } from "./reviewTimeline";
@@ -17,6 +17,10 @@ export function RunReviewsBlock({ runId, testId = "run-reviews" }: { runId: stri
 				testId={`${testId}-error`}
 			/>
 		);
+	}
+	// M5-8, M4-59: the outcome pills mean something only once a review exists; with none, one short line.
+	if (reviews.data.reviews.length === 0 && reviews.data.problems.length === 0) {
+		return <EmptyNote testId={`${testId}-empty`}>{t("review.timeline.empty")}</EmptyNote>;
 	}
 	return <ReviewTimeline data={reviews.data} testId={testId} />;
 }

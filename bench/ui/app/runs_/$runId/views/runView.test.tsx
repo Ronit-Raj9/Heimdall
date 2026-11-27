@@ -51,6 +51,15 @@ describe("run overview stats (N28)", () => {
 	});
 });
 
+describe("run overview stats beside the pair (M5-21)", () => {
+	it("shows the other setup's value as a muted line, and tiles have no hover shadow (X-40)", () => {
+		const other = { arm: "B", metrics: { cost_usd: { state: "observed", v: 0.0034 } }, run: { timing: {} } } as never;
+		const html = render(<RunStatCards detail={detail()} others={[other]} />);
+		expect(html).toContain("Setup B: $0.0034");
+		expect(html).not.toContain("hover:shadow-md");
+	});
+});
+
 describe("stepParam (N51)", () => {
 	it("keeps a positive whole step only", () => {
 		expect(stepParam({ step: 4 })).toBe(4);

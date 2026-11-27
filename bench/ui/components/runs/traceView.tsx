@@ -16,6 +16,8 @@ import { StepInspector } from "./debug/stepInspector";
 import { AgentEventsLine, ObserverStatusLine } from "./stepTimeline";
 import { clipText, stepTime } from "./stepTimeline.utils";
 import "@/app/runs/views/w4m4I18n";
+import { getLocale } from "@/lib/i18n";
+import type { ToolCall } from "@/lib/types/bench";
 import {
 	TRACE_FILTERS,
 	filterCounts,
@@ -33,6 +35,23 @@ import {
 	type TraceFilter,
 	type TraceKind,
 } from "./traceView.utils";
+
+/** Steps in recorded order (seq), so a model turn comes before the tool calls it asked for. */
+export function bySeq(steps: readonly StepRecord[]): StepRecord[] {
+	return [...steps].sort((a, b) => a.seq - b.seq);
+}
+
+/** Tool server rows answered with an error (status 400 or more, or flagged), protocol rows included. */
+export function toolErrorCount(calls: readonly ToolCall[] | undefined): number {
+	return (calls ?? []).filter((c) => c.is_error || (c.status ?? 0) >= 400).length;
+}
+
+/** A step's clock time in the user's locale and time zone, like the lists; the raw text when it does not parse. */
+export function localStepTime(ts: string, locale = getLocale()): string {
+	const date = new Date(ts);
+	if (Number.isNaN(date.getTime())) return stepTime(ts);
+	return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
 
 /** Poll interval of a live (unsealed) run's trace. */
 export const LIVE_POLL_MS = 2000;
@@ -66,6 +85,8 @@ export function RunTraceView({
 	canFork = false,
 	canBreak,
 	initialStep,
+	query,
+	onQueryChange,
 }: {
 	runId: string;
 	arm: string;
@@ -76,6 +97,9 @@ export function RunTraceView({
 	canBreak?: boolean;
 	/** N51: the step a link asked for (?step=), selected and scrolled into view once. */
 	initialStep?: number;
+	/** M5-24: the search text, kept in the page URL (?tq=) by the page. */
+	query?: string;
+	onQueryChange?: (q: string) => void;
 }) {
 	const { t } = useTranslation("bench");
 	const poll = {
@@ -105,6 +129,9 @@ export function RunTraceView({
 			canFork={canFork}
 			canBreak={breakpoints}
 			initialStep={initialStep}
+			query={query}
+			onQueryChange={onQueryChange}
+			toolErrors={toolErrorCount(run.data?.tool_calls)}
 		/>
 	);
 }
@@ -124,6 +151,11 @@ export interface TraceViewProps {
 	canBreak?: boolean;
 	/** N51: select this step on open (all steps shown) and scroll it into view once; a seq not in the trace is ignored. */
 	initialStep?: number;
+	/** M5-24: a controlled search text (the page keeps it in the URL); left out, the trace keeps its own. */
+	query?: string;
+	onQueryChange?: (q: string) => void;
+	/** M5-11: tool calls the tool server answered with an error; the Errors chip counts at least these. */
+	toolErrors?: number;
 }
 
 /**
@@ -143,6 +175,9 @@ export function TraceView({
 	canFork = true,
 	canBreak = true,
 	initialStep,
+	query: queryProp,
+	onQueryChange,
+	toolErrors = 0,
 }: TraceViewProps) {
 	const { t } = useTranslation("runTrace");
 	const { t: tb } = useTranslation("bench");
@@ -150,10 +185,19 @@ export function TraceView({
 	const { t: td } = useTranslation("runDebug");
 	const { t: tw } = useTranslation("w4m4");
 	const [filter, setFilter] = useState<TraceFilter>(initialStep ? "all" : initialFilter);
-	const [query, setQuery] = useState("");
+	const [ownQuery, setOwnQuery] = useState(queryProp ?? "");
+	const query = queryProp ?? ownQuery;
+	const setQuery = (q: string) => {
+		setOwnQuery(q);
+		onQueryChange?.(q);
+	};
 	const [autoScroll, setAutoScroll] = useState(true);
-	const counts = useMemo(() => filterCounts(data.steps), [data.steps]);
-	const visible = useMemo(() => filterTrace(data.steps, filter, query), [data.steps, filter, query]);
+	const ordered = useMemo(() => bySeq(data.steps), [data.steps]);
+	const counts = useMemo(() => {
+		const c = filterCounts(ordered);
+		return { ...c, errors: Math.max(c.errors, toolErrors) };
+	}, [ordered, toolErrors]);
+	const visible = useMemo(() => filterTrace(ordered, filter, query), [ordered, filter, query]);
 	const usage = useMemo(() => usageByRequest(events), [events]);
 	const callMap = useMemo(() => callsByRequest(calls), [calls]);
 	const [selected, setSelected] = useState<number | null>(initialStep ?? null);
@@ -221,7 +265,15 @@ export function TraceView({
 							type="button"
 							aria-pressed={filter === id}
 							onClick={() => setFilter(id)}
-							title={id === "mismatches" ? tt("mismatches.hint") : id === "tools" ? tw("trace.toolsHint") : undefined}
+							title={
+								id === "mismatches"
+									? tt("mismatches.hint")
+									: id === "tools"
+										? tw("trace.toolsHint")
+										: id === "errors" && toolErrors > 0
+											? tt("errorsHint", { count: toolErrors })
+											: undefined
+							}
 							data-testid={`trace-filter-${id}`}
 							className={cn(
 								"focus-visible:ring-ring/50 inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
@@ -432,7 +484,7 @@ function TraceRow({
 					</span>
 				</span>
 				<span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs tabular-nums">
-					{step.duration_ms !== undefined && step.duration_ms !== null ? formatDuration(step.duration_ms) : stepTime(step.ts)}
+					{step.duration_ms !== undefined && step.duration_ms !== null ? formatDuration(step.duration_ms) : localStepTime(step.ts)}
 				</span>
 			</button>
 			{io && (

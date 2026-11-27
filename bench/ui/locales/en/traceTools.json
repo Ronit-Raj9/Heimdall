@@ -60,5 +60,6 @@
 	"mismatches": {
 		"chip": "Mismatches",
 		"hint": "Steps where two records of the run disagree, such as the agent's own stream and the gateway log. They are not errors of the agent: hover a row to read the difference."
-	}
+	},
+	"errorsHint": "Counts steps that failed and tool calls the tool server answered with an error ({{count}}). The tool call errors are listed under Tool calls below."
 }

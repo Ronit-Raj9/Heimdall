@@ -1,6 +1,10 @@
 {
 	"actions": {
 		"replay": "Replay",
+		"replayConfirmTitle": "Replay this run",
+		"replayConfirm": "Runs this task again from its recording: the agent gets the same model answers. No model is called, so it costs nothing, and the replay never counts toward results. It creates a new debug run.",
+		"replayStart": "Start replay",
+		"replayCancel": "Cancel",
 		"replayHint": "Replay this run's model calls from its recording. No model is called, so it costs nothing. The replay never counts toward results.",
 		"debug": "Debug",
 		"debugHint": "Rerun live and pause at chosen model calls.",

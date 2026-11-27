@@ -1,3 +1,4 @@
+import { Dialog } from "@/components/ui/dialog";
 import { GovDialog } from "@/components/govern/govDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { useStartDebugRunMutation } from "@/lib/store/apis/runDebugApi";
 import type { DebugRunResponse, DivergencePolicy } from "@/lib/types/runDebug";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { parseCallList, parseNames } from "./debug.utils";
 
@@ -23,11 +24,16 @@ function errorText(err: unknown): string | undefined {
 /** The result line after a debug run starts: its experiment id and a link to it. */
 export function StartedNote({ started }: { started: DebugRunResponse | null }) {
 	const { t } = useTranslation("runDebug");
+	const openRef = useRef<HTMLAnchorElement>(null);
+	// The dialog that started the run has closed: move focus to the new run's link.
+	useEffect(() => {
+		if (started) openRef.current?.focus();
+	}, [started]);
 	if (!started) return null;
 	return (
 		<p className="text-chart-success-ink text-sm" data-testid="debug-started">
 			{t("actions.started", { id: started.exp_id })}{" "}
-			<Link className="underline" to="/experiments/$expId" params={{ expId: started.exp_id }}>
+			<Link ref={openRef} className="underline" to="/experiments/$expId" params={{ expId: started.exp_id }}>
 				{t("actions.open")}
 			</Link>
 		</p>
@@ -49,6 +55,45 @@ export async function startDebugRun(
 	onStarted?.(res.data);
 	onClose();
 	return true;
+}
+
+/**
+ * Confirms a replay before it starts (M5-2): says what it does, that it is free and never counted, and
+ * that it creates a new debug run. Nothing starts until "Start replay"; Cancel starts nothing.
+ */
+export function ReplayDialog({
+	open,
+	onClose,
+	onConfirm,
+	busy,
+}: {
+	open: boolean;
+	onClose(): void;
+	onConfirm(): unknown;
+	busy?: boolean;
+}) {
+	const { t } = useTranslation("runDebug");
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={(next) => !next && onClose()}
+			title={t("actions.replayConfirmTitle")}
+			description={t("actions.replayConfirm")}
+			closeLabel={t("fork.close")}
+			size="sm"
+			testId="replay-dialog"
+			footer={
+				<>
+					<Button variant="outline" onClick={onClose} dataTestId="replay-cancel">
+						{t("actions.replayCancel")}
+					</Button>
+					<Button onClick={() => void onConfirm()} disabled={busy} isLoading={busy} dataTestId="replay-start">
+						{t("actions.replayStart")}
+					</Button>
+				</>
+			}
+		/>
+	);
 }
 
 type ForkChange = "response" | "message" | "none";
