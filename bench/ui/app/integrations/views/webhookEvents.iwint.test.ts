@@ -17,7 +17,7 @@ describe("webhook events", () => {
 		const offered = eventsFor("json");
 		for (const e of serverEvents()) {
 			expect(offered, e).toContain(e);
-			expect(i18n.t(`webhooks.eventNames.${e}`, { ns: "integrations" }), e).not.toContain("eventNames");
+			expect(String(i18n.t(`webhooks.eventNames.${e}` as never, { ns: "integrations" } as never)), e).not.toContain("eventNames");
 		}
 	});
 	it("lets a PagerDuty hook page on a paused improvement run", () => {
