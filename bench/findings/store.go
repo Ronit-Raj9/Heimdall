@@ -61,6 +61,11 @@ type Finding struct {
 	Fix        *FixProof `json:"fix,omitempty"`
 	Reruns     []string  `json:"reruns,omitempty"` // experiment ids started from this finding
 	History    []Event   `json:"history"`
+	// Experiment and Arm are the comparison and setup the finding's failed
+	// runs came from (SetOrigin), so a fix rerun need not ask for them.
+	// Empty on findings made before they existed or without such a run.
+	Experiment string    `json:"experiment,omitempty"`
+	Arm        string    `json:"arm,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
