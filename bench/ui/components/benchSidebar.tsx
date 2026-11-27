@@ -124,8 +124,8 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 					"bg-sidebar hidden shrink-0 flex-col gap-2 px-2.5 py-3 md:flex md:min-h-0",
 					"transition-[width] duration-200 ease-(--ease-out)",
 					form === "rail" && "md:w-[3.75rem]",
-					form === "auto" && "md:w-[3.75rem] xl:w-52",
-					form === "full" && "md:w-52",
+					form === "auto" && "md:w-[3.75rem] xl:w-60",
+					form === "full" && "md:w-60",
 				)}
 				data-testid="bench-sidebar"
 				data-state={form === "auto" ? "auto" : form === "rail" ? "collapsed" : "expanded"}
@@ -137,7 +137,7 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 					type="button"
 					onClick={toggle}
 					className={cn(
-						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-7 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
+						"text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center gap-2.5 rounded-md px-2.5 text-xs transition-colors",
 						"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 						form === "rail" && "justify-center px-0",
 						form === "auto" && "justify-center px-0 xl:justify-start xl:px-2.5",
@@ -315,7 +315,7 @@ function NavLink({
 			aria-current={active ? "page" : undefined}
 			onClick={onNavigate}
 			className={cn(
-				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-7 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
+				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
 				"focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-2.5",
