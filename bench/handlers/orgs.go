@@ -363,7 +363,14 @@ func (h *OrgsHandler) getAudit(ctx *fasthttp.RequestCtx) {
 	q.Cursor = string(ctx.QueryArgs().Peek("cursor"))
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	rows, next, err := h.orgs.Audit(wctx, o.ID, q)
+	var rows []AuditRow
+	var next string
+	var err error
+	if text := strings.TrimSpace(string(ctx.QueryArgs().Peek("q"))); text != "" {
+		rows, next, err = auditSearch(wctx, h.orgs, o.ID, q, text)
+	} else {
+		rows, next, err = h.orgs.Audit(wctx, o.ID, q)
+	}
 	if err != nil {
 		h.sendErr(ctx, "audit log", err)
 		return
