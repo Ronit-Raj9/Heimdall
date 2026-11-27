@@ -3,7 +3,7 @@ import { SetupCard, Step } from "@/components/inbox/featureHero";
 import { Bird, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ModelPicker } from "@/components/models/modelPicker";
+import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import {
 	errorMessage,
 	errorProblems,
@@ -276,7 +276,8 @@ export function canaryFormProblems(
 	if (!f.agent.trim()) out.push({ field: "agent", key: "canary.problem.agent" });
 	if (!f.suite.trim()) out.push({ field: "suite", key: "canary.problem.suite" });
 	if (!f.tasksAll && f.taskIds.length === 0) out.push({ field: "tasks", key: "canary.problem.tasks" });
-	if (!f.targets.some((r) => r.model.trim() !== "")) out.push({ field: "targets", key: "canary.problem.targets" });
+	// R6-7: every row needs a model; an empty row blocks Create rather than being dropped quietly.
+	if (f.targets.length === 0 || f.targets.some((r) => r.model.trim() === "")) out.push({ field: "targets", key: "canary.problem.targets" });
 	const cronIssue = howOftenProblem({ ...f, time: f.time ?? "06:00", weekday: f.weekday ?? 1, timezone: f.timezone ?? "UTC" });
 	if (cronIssue === "empty") out.push({ field: "schedule", key: "canary.problem.cron" });
 	else if (cronIssue === "invalid") out.push({ field: "schedule", key: "canary.problem.cronInvalid" });
@@ -543,13 +544,14 @@ export function NewCanaryForm({
 					<div className="flex w-full min-w-0 flex-1 flex-col gap-1">
 						<span className="text-muted-foreground">
 							{c("canary.modelN", { n: i + 1 })}
-							{i > 0 && !row.model && ` (${c("canary.pickModel")})`}
+							{!row.model && ` (${c("canary.pickModel")})`}
 						</span>
-						<ModelPicker
-							// Only the first row takes the server default; an added row starts empty (M7-58).
-							value={row.provider || row.model ? { provider: row.provider, model: row.model } : i === 0 ? null : { provider: "", model: "" }}
+						<GroupedModelPicker
+							// Every row starts empty ("Choose a model", R6-7); Create waits until each row has one.
+							value={row.provider || row.model ? { provider: row.provider, model: row.model } : null}
 							onChange={(v) => setRow(i, { provider: v.provider, model: v.model })}
 							testId={`canary-new-model-${i}`}
+							label={c("canary.modelN", { n: i + 1 })}
 						/>
 					</div>
 					{f.targets.length > 1 && (
