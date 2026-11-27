@@ -3,9 +3,9 @@ import { hasFinishedEvaluation, homeUsageRange, monthStartUTC, queryState, setup
 
 describe("Home set-up card and spend range (fix wave lane 2a)", () => {
 	it("ticks each set-up step from what the org has (M2-10)", () => {
-		const steps = setupSteps({ keys: true, agent: false, evaluation: false, finished: false });
-		expect(steps.map((s) => s.id)).toEqual(["keys", "agent", "evaluate", "report"]);
-		expect(steps.map((s) => s.done)).toEqual([true, false, false, false]);
+		const steps = setupSteps({ keys: true, agent: false, benchmark: false, evaluation: false, finished: false });
+		expect(steps.map((s) => s.id)).toEqual(["keys", "agent", "benchmark", "evaluate", "report"]);
+		expect(steps.map((s) => s.done)).toEqual([true, false, false, false, false]);
 		expect(steps[0]).toMatchObject({ to: "/settings", search: { tab: "keys" } });
 		expect(steps[1].to).toBe("/agents/new");
 	});

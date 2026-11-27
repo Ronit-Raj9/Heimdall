@@ -83,12 +83,16 @@
 	},
 	"onboarding": {
 		"title": "Set up Heimdall",
-		"body": "Four steps to your agent's first report card. This card stays until one evaluation has finished.",
+		"body": "Five steps to your agent's first report card. This card stays until one evaluation has finished.",
 		"viewer": "Nothing has been tested yet. See who can run tests in Members.",
 		"done": "Done",
+		"first": "First: {{step}}",
+		"preparing_one": "{{count}} benchmark being prepared",
+		"preparing_other": "{{count}} benchmarks being prepared",
 		"steps": {
 			"keys": "Add a model key",
 			"agent": "Pick or add an agent",
+			"benchmark": "Get a benchmark ready",
 			"evaluate": "Run your first evaluation",
 			"report": "Read the report card"
 		}
