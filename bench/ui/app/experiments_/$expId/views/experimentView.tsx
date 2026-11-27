@@ -405,33 +405,34 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 			{!notStarted && <RunControlsPanel expId={expId} state={st.state} />}
 
-			<div className="relative min-w-0">
-				{moreTabs.length > 0 && (
-					// The strip's More menu (M4-15) sits at the strip's right end; the strip keeps room for it.
-					<div className="bg-background absolute top-0 right-0 z-10 flex h-9 items-center pl-1" data-testid="experiment-more-views">
-						<DropdownMenu
-							label={tu("header.moreViewsLabel")}
-							align="end"
-							testId="experiment-more-views-menu"
-							items={moreTabs.map((tab) => ({
-								id: tab.id,
-								label: tab.label,
-								to: "/experiments/$expId",
-								params: { expId },
-								search: { tab: tab.id },
-								testId: `experiment-more-${tab.id}`,
-							}))}
-							trigger={(p) => (
-								<Button {...p} variant="ghost" size="sm" className="gap-1" dataTestId="experiment-more-views-button">
-									{tu("header.moreViews")}
-									<ChevronDown aria-hidden="true" />
-								</Button>
-							)}
-						/>
-					</div>
-				)}
+			<div className="min-w-0">
 				<RouteTabs
-					className={moreTabs.length > 0 ? "[&_[role=tablist]]:pr-24" : undefined}
+					// M4-14, M4-15: the More views menu sits in the strip's trailing slot, outside its fade.
+					trailing={
+						moreTabs.length > 0 ? (
+							<div className="flex h-9 items-center pl-1" data-testid="experiment-more-views">
+								<DropdownMenu
+									label={tu("header.moreViewsLabel")}
+									align="end"
+									testId="experiment-more-views-menu"
+									items={moreTabs.map((tab) => ({
+										id: tab.id,
+										label: tab.label,
+										to: "/experiments/$expId",
+										params: { expId },
+										search: { tab: tab.id },
+										testId: `experiment-more-${tab.id}`,
+									}))}
+									trigger={(p) => (
+										<Button {...p} variant="ghost" size="sm" className="gap-1" dataTestId="experiment-more-views-button">
+											{tu("header.moreViews")}
+											<ChevronDown aria-hidden="true" />
+										</Button>
+									)}
+								/>
+							</div>
+						) : undefined
+					}
 					tabs={tabs}
 					defaultTab={defaultExperimentTab(arms.length)}
 					label={t("experiments.page.tabsLabel")}

@@ -4,6 +4,7 @@ import { ActionCard } from "@/components/experiments/compareActionCard";
 import { FollowUpJob } from "@/components/experiments/followUpJob";
 import { groupFaults } from "@/app/evaluate/views/step4Setup";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
 import { getBenchErrorMessage, useGetExperimentQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
@@ -268,16 +269,7 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 							/>
 						</label>
 						{decision && !open && !broken && (
-							<label className="flex items-center gap-2 text-sm">
-								<input
-									type="checkbox"
-									className="size-4"
-									checked={force}
-									onChange={(e) => setForce(e.target.checked)}
-									data-testid="actions-extend-force"
-								/>
-								{t("extend.force")}
-							</label>
+							<Checkbox checked={force} onChange={setForce} label={t("extend.force")} testId="actions-extend-force" />
 						)}
 					</>
 				)}
@@ -353,16 +345,15 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 										<span className="text-muted-foreground text-xs font-medium">{g.group}</span>
 										<div className="flex flex-wrap gap-x-4 gap-y-2">
 											{g.faults.map((f) => (
-												<label key={f.id} className={chip} title={f.help}>
-													<input
-														type="checkbox"
-														className="size-4"
+												<span key={f.id} title={f.help}>
+													<Checkbox
+														className={chip}
 														checked={faults.includes(f.id)}
 														onChange={() => setFaults((cur) => flip(cur, f.id))}
-														data-testid={`actions-fault-${f.id}`}
+														label={<span className="text-xs">{f.label}</span>}
+														testId={`actions-fault-${f.id}`}
 													/>
-													<span className="text-xs">{f.label}</span>
-												</label>
+												</span>
 											))}
 										</div>
 									</div>
@@ -378,16 +369,14 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 							<fieldset className="flex flex-wrap gap-x-4 gap-y-2 text-sm" data-testid="actions-probe-own">
 								<legend className="mb-1 text-sm font-medium">{t("probe.own")}</legend>
 								{probes.map((p) => (
-									<label key={p.id} className={chip}>
-										<input
-											type="checkbox"
-											className="size-4"
-											checked={picked.includes(p.id)}
-											onChange={() => setPicked((cur) => flip(cur, p.id))}
-											data-testid={`actions-probe-${p.id}`}
-										/>
-										<span className="font-mono text-xs">{p.id}</span>
-									</label>
+									<Checkbox
+										key={p.id}
+										className={chip}
+										checked={picked.includes(p.id)}
+										onChange={() => setPicked((cur) => flip(cur, p.id))}
+										label={<span className="font-mono text-xs">{p.id}</span>}
+										testId={`actions-probe-${p.id}`}
+									/>
 								))}
 							</fieldset>
 						)}

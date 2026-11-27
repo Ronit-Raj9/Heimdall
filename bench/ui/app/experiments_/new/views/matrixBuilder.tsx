@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "@tanstack/react-router";
 import "@/app/leaderboard/views/uf4bI18n";
 import { suiteRef } from "./experimentFormSchema";
@@ -388,16 +389,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								<Plus aria-hidden="true" />
 								{t("fields.addModel")}
 							</Button>
-							<label className="flex items-center gap-2 text-xs">
-								<input
-									type="checkbox"
-									className="accent-primary"
-									checked={v.allowUnpriced}
-									onChange={(e) => set("allowUnpriced", e.target.checked)}
-									data-testid="builder-allow-unpriced"
-								/>
-								{t("fields.allowUnpriced")}
-							</label>
+							<Checkbox
+								className="text-xs"
+								checked={v.allowUnpriced}
+								onChange={(on) => set("allowUnpriced", on)}
+								label={t("fields.allowUnpriced")}
+								testId="builder-allow-unpriced"
+							/>
 						</div>
 					</SubSection>
 				</Step>
@@ -490,13 +488,12 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 						<ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
 					</summary>
 					<div className="flex flex-col gap-5 border-t px-5 py-5">
-						<label className="flex items-start gap-2 text-sm">
-							<input
-								type="checkbox"
-								className="accent-primary mt-1"
-								checked={v.adaptive}
-								onChange={(e) => {
-									const on = e.target.checked;
+						<Checkbox
+							checked={v.adaptive}
+							label={t("fields.adaptive")}
+							hint={t("fields.adaptiveHint")}
+							testId="builder-adaptive"
+							onChange={(on) => {
 									setV((prev) => ({
 										...prev,
 										adaptive: on,
@@ -504,13 +501,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 										adaptiveMin: 1,
 									}));
 								}}
-								data-testid="builder-adaptive"
-							/>
-							<span className="flex flex-col">
-								{t("fields.adaptive")}
-								<span className="text-muted-foreground text-xs">{t("fields.adaptiveHint")}</span>
-							</span>
-						</label>
+						/>
 						{v.adaptive && (
 							<Field label={t("fields.adaptiveMin")} error={shown.adaptiveMin}>
 								{(id) => (
@@ -530,22 +521,17 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								<span className="text-xs font-medium">{t("fields.probes")}</span>
 								<div className="flex flex-wrap gap-1.5">
 									{suite!.probes.map((p) => (
-										<label
+										<Checkbox
 											key={p}
 											className={cn(
-												"flex cursor-pointer items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-xs",
+												"items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-xs",
 												v.probes.includes(p) && "border-primary bg-primary/10",
 											)}
-										>
-											<input
-												type="checkbox"
-												className="accent-primary"
-												checked={v.probes.includes(p)}
-												onChange={(e) => toggleProbe(p, e.target.checked)}
-												data-testid={`builder-probe-${p}`}
-											/>
-											{p}
-										</label>
+											checked={v.probes.includes(p)}
+											onChange={(on) => toggleProbe(p, on)}
+											label={p}
+											testId={`builder-probe-${p}`}
+										/>
 									))}
 								</div>
 								<p className="text-muted-foreground text-[11px]">{t("fields.probesHint")}</p>

@@ -46,7 +46,8 @@ import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import "@/app/leaderboard/views/uf4bI18n";
 import { cheaperArm } from "@/components/verdict/armCost";
-import { type ArmStat, type ExperimentRow, useListExperimentsWithStatsQuery } from "./experimentListApi";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import type { ArmStat, ExperimentRow } from "@/lib/types/serverFields";
 import { useTranslation } from "react-i18next";
 
 const SUITE_ICONS: readonly [RegExp, LucideIcon][] = [
@@ -146,6 +147,8 @@ export function stateMatches(state: string, filter: string | null | undefined): 
 	const choice = STATUSES.find((c) => c.states[0] === filter);
 	return choice ? choice.states.includes(state as ExperimentState) : state === filter;
 }
+
+const ARM_STATS = { arm_stats: true } as const;
 
 /** True when a row is still running or analyzing, so the list is worth polling. Pure. */
 export function listHasRunning(rows: readonly Pick<ExperimentStatus, "state">[] | undefined): boolean {
@@ -256,7 +259,7 @@ export function ExperimentBoard() {
 	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
 	// M4-79, M1-62: refresh every 15 s while a row runs, never when nothing does.
 	const [anyRunning, setAnyRunning] = useState(false);
-	const list = useListExperimentsWithStatsQuery(undefined, { pollingInterval: anyRunning ? 15_000 : 0, skipPollingIfUnfocused: true });
+	const list = useListExperimentsQuery(ARM_STATS, { pollingInterval: anyRunning ? 15_000 : 0, skipPollingIfUnfocused: true });
 	const runningNow = listHasRunning(list.data?.experiments);
 	useEffect(() => setAnyRunning(runningNow), [runningNow]);
 	const [filters, setFilters] = useQueryStates(
