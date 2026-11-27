@@ -292,7 +292,7 @@ type EvaluationChild struct {
 	Status       string `json:"status"`
 	Skipped      string `json:"skipped,omitempty"`
 	// Cause names why Skipped happened, for the page: image_missing,
-	// worker_refused or no_worker (engine.FailureCause); empty when unknown.
+	// worker_refused or no_worker (FailureCause); empty when unknown.
 	// Set on answers from Skipped.
 	Cause string `json:"cause,omitempty"`
 	// SkippedTasks are tasks left out of this benchmark alone (quarantined);

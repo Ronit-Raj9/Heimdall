@@ -26,3 +26,10 @@ func TestFailureCause(t *testing.T) {
 		t.Fatal("nil error has a cause")
 	}
 }
+
+// TestNoRunnerTextMatchesErr: schemas.FailureCause knows ErrNoRunner's text.
+func TestNoRunnerTextMatchesErr(t *testing.T) {
+	if got := FailureCause("dispatch: " + ErrNoRunner.Error()); got != CauseNoWorker {
+		t.Fatalf("ErrNoRunner text reads %q", got)
+	}
+}

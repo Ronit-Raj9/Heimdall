@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/maximhq/bifrost/bench/benchcatalog"
-	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/forecast"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -216,7 +215,7 @@ func TestEvaluationChildCause(t *testing.T) {
 		{Benchmark: "b"},
 	}}
 	fillChildCauses(ev)
-	if ev.Children[0].Cause != engine.CauseImageMissing || ev.Children[1].Cause != "" {
+	if ev.Children[0].Cause != schemas.CauseImageMissing || ev.Children[1].Cause != "" {
 		t.Fatalf("causes %+v", ev.Children)
 	}
 }
