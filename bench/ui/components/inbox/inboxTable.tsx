@@ -168,7 +168,11 @@ export function InboxTable({ items, selectedId, onSelect, compact = false }: Inb
 									<TableCell className={cn("text-xs", col("task"))} data-testid={`inbox-task-${item.id}`}>
 										{item.task ? (
 											<div className="flex flex-col items-start gap-1">
-												<span className="font-mono">
+												{/* One line that ends in an ellipsis inside its column; the full text is in the title. */}
+												<span
+													className="block max-w-64 truncate font-mono"
+													title={t("inbox.table.acceptedAs", { suite: item.task.suite, task: item.task.id })}
+												>
 													{t("inbox.table.acceptedAs", {
 														suite: item.task.suite,
 														task: item.task.id,
