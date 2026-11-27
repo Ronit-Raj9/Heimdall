@@ -115,6 +115,13 @@ func TestGatewayEffect404ForPlainComparison(t *testing.T) {
 	if st != 404 || !strings.Contains(out, "this comparison is not a Bifrost feature test") {
 		t.Fatalf("%d %s", st, out)
 	}
+	st, out = secretsCall(h, "GET", APIPrefix+"/experiments/e_plain/gateway-effect?optional=1", "")
+	if st != 200 || !strings.Contains(out, `"effect":null`) {
+		t.Fatalf("optional: %d %s", st, out)
+	}
+	if st, _ := secretsCall(h, "GET", APIPrefix+"/experiments/e_missing/gateway-effect?optional=1", ""); st != 404 {
+		t.Fatalf("missing comparison with optional: %d", st)
+	}
 	if st, _ := secretsCall(h, "GET", APIPrefix+"/experiments/e_missing/gateway-effect", ""); st != 404 {
 		t.Fatalf("missing comparison: %d", st)
 	}

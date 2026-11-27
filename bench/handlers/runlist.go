@@ -37,6 +37,7 @@ type RunListRow struct {
 	Output    string          `json:"output,omitempty"`  // diff | answer | state | artifact; empty when the suite could not be loaded
 	Grading   string          `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
 	Task      string          `json:"task"`
+	TaskTitle string          `json:"task_title,omitempty"` // the task's title from its suite; empty when the suite could not be loaded or the task has none
 	Arm       string          `json:"arm"`
 	Condition string          `json:"condition"`
 	Trial     int             `json:"trial"`
@@ -461,6 +462,7 @@ type suiteFacts struct {
 	grading string
 	tasks   map[string]string // task id -> output kind, only for tasks that set their own
 	probes  map[string]string // probe id -> fault name (runFault)
+	titles  map[string]string // task id -> task title, only for tasks that have one
 }
 
 // runListSuiteBudget is how long the runs list waits for one suite.
@@ -523,6 +525,7 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 		row.Track = facts.track
 		row.Grading = facts.grading
 		row.Output = runOutputKindFor(facts, rv.Slot.Task)
+		row.TaskTitle = facts.titles[rv.Slot.Task]
 	}
 	return row
 }

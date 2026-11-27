@@ -166,6 +166,9 @@ func TestConnectTracesDraft(t *testing.T) {
 	if !strings.Contains(info.Setup[0].Env, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="+info.Endpoint) || !strings.Contains(info.Setup[2].Env, "TRACELOOP_BASE_URL="+info.Base) {
 		t.Fatalf("setup %+v", info.Setup)
 	}
+	if info.TokenEnv != "HEIMDALL_INGEST_TOKEN" || !strings.Contains(info.Setup[0].Env, "$"+info.TokenEnv) {
+		t.Fatalf("token env %q", info.TokenEnv)
+	}
 	if _, err := agentinfer.NewStore(root).Add(mustSpans(t), fasthttpNow()); err != nil {
 		t.Fatal(err)
 	}
