@@ -544,7 +544,7 @@
 			"problems": {
 				"badId": "Use letters, digits, '.', '_' or '-' for the re-score name, starting with a letter or digit.",
 				"reservedId": "original and reviewed are reserved names. Pick another.",
-				"needLock": "Give the lock file path, relative to the project folder.",
+				"needLock": "Give the benchmark lock file path, relative to the project folder.",
 				"badLock": "The task list path must be relative to the project folder.",
 				"longNote": "The note is longer than 2000 characters."
 			},

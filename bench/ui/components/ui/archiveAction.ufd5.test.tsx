@@ -112,7 +112,7 @@ describe("Show archived switch", () => {
 		expect(render(<ShowArchivedChip count={2} on={false} onChange={() => undefined} />)).toContain('aria-pressed="false"');
 	});
 	it("says what archive means, in plain words", () => {
-		expect(en.archive.body).toBe("Hidden from lists. Nothing is deleted, numbers do not change, and you can bring it back.");
+		expect(en.archive.body).toBe("Hidden from lists. Nothing is deleted. You can bring it back.");
 		for (const v of [...Object.values(en.archive), ...Object.values(en.monitorDelete)]) expect(v).not.toMatch(/[–—]/);
 	});
 });

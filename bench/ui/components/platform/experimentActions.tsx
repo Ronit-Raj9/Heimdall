@@ -160,6 +160,25 @@ export function RegradeAction({
 		[dispatch, expId],
 	);
 	const succeeded = Boolean(job && (job.status === "succeeded" || (finished?.id === job.id && finished.status === "succeeded")));
+	const dialog = open ? (
+		<RegradeDialog
+			expId={expId}
+			isLoading={state.isLoading}
+			onClose={close}
+			onSubmit={(body) => {
+				setShowLog(true);
+				void regrade({ exp_id: expId, ...body });
+				setOpen(false);
+			}}
+		/>
+	) : null;
+	// Under a More menu with nothing started yet, only the dialog renders: no empty box in the header.
+	if (hideButton && !job && !state.error)
+		return (
+			<RoleGate min="member" fallback={null}>
+				{dialog}
+			</RoleGate>
+		);
 	return (
 		<RoleGate min="member" fallback={null}>
 			<div className="flex min-w-0 flex-col items-end gap-2" data-testid="regrade-action">
@@ -211,18 +230,7 @@ export function RegradeAction({
 						)}
 					</div>
 				)}
-				{open && (
-					<RegradeDialog
-						expId={expId}
-						isLoading={state.isLoading}
-						onClose={close}
-						onSubmit={(body) => {
-							setShowLog(true);
-							void regrade({ exp_id: expId, ...body });
-							setOpen(false);
-						}}
-					/>
-				)}
+				{dialog}
 			</div>
 		</RoleGate>
 	);

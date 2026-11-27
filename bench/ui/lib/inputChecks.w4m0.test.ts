@@ -16,7 +16,7 @@ describe("idProblem (wave 4)", () => {
 	it("asks for an empty id and explains a bad one", () => {
 		expect(idProblem("  ", "benchmark id")).toBe("Enter the benchmark id.");
 		expect(idProblem("Bad Id", "benchmark id")).toBe(
-			"The benchmark id can use lower-case letters, digits, dots, dashes and underscores, and must start with a letter or digit.",
+			"The benchmark id can use lowercase letters, digits, dots, dashes and underscores. Start with a letter or digit.",
 		);
 		expect(idProblem("-x", "benchmark id")).not.toBeNull();
 	});

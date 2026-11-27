@@ -66,14 +66,14 @@ describe("JobsDrawer", () => {
 		expect(recent).toContain("Benchmark check");
 		expect(recent).toContain('data-testid="job-status-failed"');
 		expect(recent).toContain("refused the connection");
-		expect(html).toContain("Background work in Acme Agents that is running now or finished recently.");
+		expect(html).not.toContain("Background work");
 	});
 
 	it("says when nothing runs and when nothing finished", () => {
 		const html = render(<JobsDrawer jobs={[]} isLoading={false} onRetry={() => undefined} onClose={() => undefined} />);
 		expect(html).toContain("Nothing is running.");
 		expect(html).toContain("No finished jobs yet.");
-		expect(html).toContain("Background work on this server that is running now or finished recently.");
+		expect(html).not.toContain("Background work");
 	});
 
 	it("shows loading and errors", () => {

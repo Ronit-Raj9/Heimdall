@@ -48,7 +48,7 @@
 		"suite": "Benchmark id",
 		"suiteHint": "A new id creates a private benchmark; an existing one adds tasks to it.",
 		"suiteInvalid": "1 to 64 lowercase letters, digits, . _ or -. Start with a letter or digit.",
-		"suiteBuiltin": "{{id}} is a built-in benchmark. Pick another id.",
+		"suiteBuiltin": "{{id}} is the name of a built-in benchmark. Pick another id.",
 		"suiteExisting": "Adds tasks to your benchmark {{id}} ({{count}} tasks now).",
 		"suiteNew": "Creates a new private benchmark {{id}}.",
 		"grader": "How answers are graded",

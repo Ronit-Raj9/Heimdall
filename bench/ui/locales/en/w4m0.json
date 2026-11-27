@@ -8,7 +8,7 @@
 	"inputs": {
 		"whole": "Enter a whole number from {{min}} to {{max}}.",
 		"idEmpty": "Enter the {{what}}.",
-		"idFormat": "The {{what}} uses lowercase letters, digits, dots, dashes, underscores. Start with a letter or digit."
+		"idFormat": "The {{what}} can use lowercase letters, digits, dots, dashes and underscores. Start with a letter or digit."
 	},
 	"session": {
 		"busy": "Server busy. Wait, then press Retry."

@@ -236,7 +236,12 @@ export function Combobox({
 
 	const activeId = open && flat[active] ? `${id}-opt-${active}` : undefined;
 	return (
-		<div ref={root} className={cn("relative flex min-w-0 flex-col gap-1.5", className)} data-testid={testId}>
+		<div
+			ref={root}
+			// Below sm the box takes the full width like every other form control, whatever width the caller set.
+			className={cn("relative flex min-w-0 flex-col gap-1.5", className, "max-sm:w-full max-sm:max-w-none")}
+			data-testid={testId}
+		>
 			<label htmlFor={`${id}-input`} className={cn("text-sm font-medium", hideLabel && "sr-only")}>
 				{label}
 			</label>
@@ -269,7 +274,7 @@ export function Combobox({
 					onFocus={openList}
 					onClick={() => !open && openList()}
 					onKeyDown={onKeyDown}
-					className="-my-px h-[calc(100%+2px)] w-full min-w-0 flex-1 rounded-md bg-transparent pl-3 text-base outline-none placeholder:text-neutral-500 disabled:cursor-not-allowed md:text-sm"
+					className="h-full w-full min-w-0 flex-1 rounded-md bg-transparent pl-3 text-sm outline-none placeholder:text-neutral-500 disabled:cursor-not-allowed"
 					data-testid={`${testId}-input`}
 				/>
 				<span className="flex shrink-0 items-center gap-0.5 pr-1">

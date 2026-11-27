@@ -23,6 +23,7 @@ import {
 import i18n from "@/lib/i18n";
 import { pageTitleOverride } from "@/lib/routing/pageTitle";
 import "@/app/failures/views/ufd2I18n";
+import "@/components/ui/ufv0I18n";
 
 export type BenchNavGroupId = "home" | "test" | "results" | "benchmarks" | "production" | "bottom";
 
@@ -278,6 +279,8 @@ export function ownPageTitle(pathname: string): string | null {
 	if (fw23) return i18n.t(fw23, { ns: "fw23" });
 	const w4 = W4_PAGE_TITLES[path];
 	if (w4) return i18n.t(w4, { ns: "w4m0" });
+	// /compare sits under Runs (or Comparisons) in the sidebar but is its own page.
+	if (path === "/compare") return i18n.t("titles.compare", { ns: "ufv0" });
 	return null;
 }
 

@@ -57,7 +57,7 @@ describe("unknown tab in the address (N76)", () => {
 		const html = page("?tab=bogus");
 		expect(html).toContain('data-active="report-card"');
 		expect(html).toContain('data-testid="route-tabs-unknown"');
-		expect(html).toContain("This page has no bogus tab, so Report card is shown.");
+		expect(html).toContain("No bogus tab here. Showing Report card.");
 		expect(html).toContain('role="status"');
 	});
 

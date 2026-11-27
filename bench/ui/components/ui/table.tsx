@@ -18,6 +18,11 @@ interface TableProps extends React.ComponentProps<"table"> {
 	 * for screen readers only and a cell shows its `label` before its value. Off by default.
 	 */
 	stack?: boolean;
+	/**
+	 * false: no fixed max height on the scrolling box (from stickyColumns or scrollY), so a short
+	 * table, for example rows opened from a fold, shows whole. On by default.
+	 */
+	capHeight?: boolean;
 }
 
 /** The classes of a stacked table below sm (see TableProps.stack). Pure, exported for tests. */
@@ -59,7 +64,7 @@ function pinLeadingColumns(table: HTMLTableElement, count: number) {
 	}
 }
 
-function Table({ className, containerClassName, stickyColumns = 0, scrollY = false, stack = false, ...props }: TableProps) {
+function Table({ className, containerClassName, stickyColumns = 0, scrollY = false, stack = false, capHeight = true, ...props }: TableProps) {
 	const containerRef = React.useRef<HTMLDivElement>(null);
 	// Fade the edge that hides columns (X-95); pinned leading columns never fade.
 	useScrollEdges(containerRef, { start: stickyColumns <= 0 });
@@ -111,8 +116,8 @@ function Table({ className, containerClassName, stickyColumns = 0, scrollY = fal
 				"relative w-full overflow-x-auto overscroll-x-contain",
 				// A pinned table also caps its height near the viewport, so a long one scrolls inside
 				// itself and keeps its header row in view.
-				stickyColumns > 0 && "max-h-[max(24rem,calc(100dvh-10rem))] overflow-y-auto",
-				scrollY && "max-h-[70vh] overflow-y-auto",
+				capHeight && stickyColumns > 0 && "max-h-[max(24rem,calc(100dvh-10rem))] overflow-y-auto",
+				capHeight && scrollY && "max-h-[70vh] overflow-y-auto",
 				containerClassName,
 			)}
 			tabIndex={isScrollable ? 0 : undefined}

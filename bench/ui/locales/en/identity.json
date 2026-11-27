@@ -18,7 +18,7 @@
 	"banner": {
 		"title": "Confirm your email address",
 		"bodyEmail": "Link sent to {{email}}. Until confirmed, you cannot create API tokens, invite people or create organizations.",
-		"bodyLog": "This server sends no email. The link for {{email}} is in the server log. Until confirmed, you cannot create API tokens, invite people or create organizations.",
+		"bodyLog": "This server sends no email. Ask your admin for the link for {{email}}. It is in the server log. Until confirmed, you cannot create API tokens, invite people or create organizations.",
 		"resend": "Send a new link",
 		"sentEmail": "A new link is on its way to {{email}}.",
 		"sentLog": "A new link is in the server log. Check with your admin.",

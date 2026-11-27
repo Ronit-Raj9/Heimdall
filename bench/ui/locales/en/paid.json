@@ -8,7 +8,7 @@
 	"confirm": {
 		"title": "{{verb}}?",
 		"body": "This can spend up to {{cap}} on your model keys.",
-		"bodyUnknown": "Warning: this spends on your model key. No cap or estimate set.",
+		"bodyUnknown": "Warning: this spends money on your model key. No cap or estimate set.",
 		"bodyEstimate": "About {{usd}} for {{runs}} runs.",
 		"bodyEstimateUsd": "About {{usd}}.",
 		"bodyEstimateRuns": "About {{runs}} runs.",

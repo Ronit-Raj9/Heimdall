@@ -49,7 +49,7 @@ describe("organization reset banner", () => {
 		const html = render(<OrgResetBanner />, hostedSession());
 		expect(html).toContain('data-testid="org-reset-banner"');
 		expect(html).toContain('role="status"');
-		expect(html).toContain("This tab was showing an organization you can no longer open, so it now shows Acme Agents.");
+		expect(html).toContain("You can no longer open the organization this tab showed. It now shows Acme Agents.");
 		expect(html).toContain("Close");
 	});
 });

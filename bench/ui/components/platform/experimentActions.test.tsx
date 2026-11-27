@@ -174,7 +174,7 @@ describe("re-score name", () => {
 		const html = render(
 			<RegradeDialog expId="e_1" initial={{ ...EMPTY_REGRADE_FORM, id: "zz-test-rescore" }} onSubmit={() => {}} onClose={() => {}} />,
 		);
-		expect(html).toContain("re-score name zz-test-rescore: use lower-case letters, digits and _ only, for example zz_test_rescore");
+		expect(html).toContain("Re-score name zz-test-rescore: use lower-case letters, digits and _ only.");
 		expect(html).toContain('data-testid="regrade-id-fix"');
 		expect(html).toContain("Use zz_test_rescore");
 	});

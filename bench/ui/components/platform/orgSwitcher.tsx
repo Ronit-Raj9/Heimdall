@@ -1,4 +1,4 @@
-import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
+import { MenuLayer, useMenuKeyboard, useMenuPlacement } from "@/components/ui/dropdownMenu";
 import "@/components/platform/fw23I18n";
 import { RoleBadge } from "@/components/platform/badges";
 import { CreateOrgDialog } from "@/components/platform/createOrgDialog";
@@ -40,11 +40,14 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
 	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
+	const menuStyle = useMenuPlacement(open, triggerRef, menuRef, "start");
 
 	useEffect(() => {
 		if (!open) return;
 		const onPointer = (event: PointerEvent) => {
-			if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+			// The menu lives in the body layer, so a press inside it is not outside.
+			const target = event.target as Node;
+			if (rootRef.current && !rootRef.current.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
 		};
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
@@ -118,14 +121,16 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 			</button>
 			{session.role && <RoleBadge role={session.role} className={cn("hidden lg:inline-flex")} />}
 			{open && (
+				<MenuLayer>
 				<div
 					ref={menuRef}
+					style={menuStyle}
 					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={tf("orgs.menu")}
 					className={cn(
-						"bg-popover text-popover-foreground absolute top-10 left-0 z-50 w-72 origin-top-left rounded-lg border p-1 shadow-(--shadow-pop)",
+						"bg-popover text-popover-foreground z-50 w-72 origin-top-left rounded-lg border p-1 shadow-(--shadow-pop)",
 						"animate-in fade-in-0 zoom-in-95 duration-150",
 					)}
 					data-testid="org-menu"
@@ -168,6 +173,7 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 						{tf("orgs.create")}
 					</button>
 				</div>
+				</MenuLayer>
 			)}
 			{state.error && (
 				<span role="alert" className="text-chart-error-ink truncate text-xs" data-testid="org-switch-error">

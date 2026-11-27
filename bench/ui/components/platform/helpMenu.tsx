@@ -1,4 +1,4 @@
-import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
+import { MenuLayer, useMenuKeyboard, useMenuPlacement } from "@/components/ui/dropdownMenu";
 import "@/components/platform/fw23I18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -36,11 +36,14 @@ export function HelpMenu({ defaultOpen = false }: HelpMenuProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
 	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
+	const menuStyle = useMenuPlacement(open, triggerRef, menuRef, "end");
 
 	useEffect(() => {
 		if (!open) return;
 		const onPointer = (event: PointerEvent) => {
-			if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+			// The menu lives in the body layer, so a press inside it is not outside.
+			const target = event.target as Node;
+			if (rootRef.current && !rootRef.current.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
 		};
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
@@ -73,14 +76,16 @@ export function HelpMenu({ defaultOpen = false }: HelpMenuProps) {
 				<CircleHelp className="size-4" aria-hidden="true" />
 			</button>
 			{open && (
+				<MenuLayer>
 				<div
 					ref={menuRef}
+					style={menuStyle}
 					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={t("help.label")}
 					className={cn(
-						"bg-popover text-popover-foreground absolute top-10 right-0 z-50 w-56 origin-top-right rounded-lg border p-1 shadow-(--shadow-pop)",
+						"bg-popover text-popover-foreground z-50 w-56 origin-top-right rounded-lg border p-1 shadow-(--shadow-pop)",
 						"animate-in fade-in-0 zoom-in-95 duration-150",
 					)}
 					data-testid="help-menu"
@@ -100,6 +105,7 @@ export function HelpMenu({ defaultOpen = false }: HelpMenuProps) {
 						</Link>
 					))}
 				</div>
+				</MenuLayer>
 			)}
 		</div>
 	);

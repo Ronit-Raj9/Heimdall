@@ -1,4 +1,4 @@
-import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
+import { MenuLayer, useMenuKeyboard, useMenuPlacement } from "@/components/ui/dropdownMenu";
 import { RoleBadge } from "@/components/platform/badges";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
@@ -37,11 +37,16 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 	const menuRef = useRef<HTMLDivElement>(null);
 	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
+	const menuStyle = useMenuPlacement(open, triggerRef, menuRef, "end");
+	const errorRef = useRef<HTMLParagraphElement>(null);
+	const errorStyle = useMenuPlacement(Boolean(orgSwitch.error), triggerRef, errorRef, "end");
 
 	useEffect(() => {
 		if (!open) return;
 		const onPointer = (event: PointerEvent) => {
-			if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+			// The menu lives in the body layer, so a press inside it is not outside.
+			const target = event.target as Node;
+			if (rootRef.current && !rootRef.current.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
 		};
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
@@ -97,14 +102,16 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 				)}
 			</button>
 			{open && (
+				<MenuLayer>
 				<div
 					ref={menuRef}
+					style={menuStyle}
 					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={t("header.account")}
 					className={cn(
-						"bg-popover text-popover-foreground absolute top-10 right-0 z-50 w-64 origin-top-right rounded-lg border p-1 shadow-(--shadow-pop)",
+						"bg-popover text-popover-foreground z-50 w-64 origin-top-right rounded-lg border p-1 shadow-(--shadow-pop)",
 						"animate-in fade-in-0 zoom-in-95 duration-150",
 					)}
 					data-testid="user-menu"
@@ -192,15 +199,20 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 						{t("header.signOut")}
 					</button>
 				</div>
+				</MenuLayer>
 			)}
 			{orgSwitch.error && (
+				<MenuLayer>
 				<p
+					ref={errorRef}
+					style={errorStyle}
 					role="alert"
-					className="text-chart-error-ink bg-popover absolute top-10 right-0 z-50 w-64 rounded-md border px-2.5 py-1.5 text-xs"
+					className="text-chart-error-ink bg-popover z-50 w-64 rounded-md border px-2.5 py-1.5 text-xs"
 					data-testid="user-menu-switch-error"
 				>
 					{tf("account.switchError", { error: getBenchErrorMessage(orgSwitch.error) })}
 				</p>
+				</MenuLayer>
 			)}
 			{creating && <CreateOrgDialog onClose={() => setCreating(false)} />}
 		</div>

@@ -9,6 +9,7 @@ import {
 	useLayoutEffect,
 	useRef,
 	useState,
+	type CSSProperties,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	type RefObject,
@@ -326,4 +327,47 @@ function useSafePathname(): string | null {
 		// Rendered without a router (an isolated component test).
 		return null;
 	}
+}
+/**
+ * The shared menu layer for a menu that keeps its own markup (header and sidebar menus): the panel
+ * goes into document.body with fixed position from menuPosition, so it is always on top and inside
+ * the window. Before mount (static markup in tests) it renders in place.
+ */
+export function MenuLayer({ children }: { children: ReactNode }) {
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
+	return mounted ? portal(children) : children;
+}
+
+/** Fixed position for a MenuLayer panel next to its trigger; hidden until measured. */
+export function useMenuPlacement(
+	open: boolean,
+	triggerRef: RefObject<HTMLElement | null>,
+	menuRef: RefObject<HTMLElement | null>,
+	align: "start" | "end" = "end",
+): CSSProperties {
+	const [pos, setPos] = useState<MenuPosition | null>(null);
+	const place = useCallback(() => {
+		const b = triggerRef.current;
+		const m = menuRef.current;
+		if (!b || !m) return;
+		setPos(menuPosition(b.getBoundingClientRect(), m.getBoundingClientRect(), window.innerWidth, window.innerHeight, align));
+	}, [align, triggerRef, menuRef]);
+	useLayoutEffect(() => {
+		if (!open) {
+			setPos(null);
+			return;
+		}
+		// Again after the layer mounted, so the panel can be measured.
+		const id = requestAnimationFrame(place);
+		place();
+		window.addEventListener("resize", place);
+		window.addEventListener("scroll", place, true);
+		return () => {
+			cancelAnimationFrame(id);
+			window.removeEventListener("resize", place);
+			window.removeEventListener("scroll", place, true);
+		};
+	}, [open, place]);
+	return pos ? { position: "fixed", top: pos.top, left: pos.left } : { position: "fixed", top: 0, left: 0, visibility: "hidden" };
 }

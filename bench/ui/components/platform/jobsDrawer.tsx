@@ -217,7 +217,6 @@ export interface JobsDrawerProps {
 /** The jobs drawer: running and queued jobs first, then recent ones. A right-side shared Dialog (focus trapped, Escape or the scrim closes it). */
 export function JobsDrawer({ jobs, isLoading, error, onRetry, onClose }: JobsDrawerProps) {
 	const { t } = useTranslation("platform");
-	const session = useSession();
 	const { active, recent } = splitJobs(jobs);
 
 	return (
@@ -226,9 +225,6 @@ export function JobsDrawer({ jobs, isLoading, error, onRetry, onClose }: JobsDra
 			onOpenChange={(next) => !next && onClose()}
 			side="right"
 			title={t("jobs.drawerTitle")}
-			description={
-				<span className="text-xs">{session.org ? t("jobs.drawerSubtitle", { org: session.org.name }) : t("jobs.drawerSubtitleLocal")}</span>
-			}
 			closeLabel={t("jobs.close")}
 			testId="jobs-drawer"
 		>

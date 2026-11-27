@@ -15,11 +15,11 @@ describe("transportErrorText (wave 4, p07-4 and p10-3)", () => {
 	it("says a plain-text 413 is a file too large", () => {
 		expect(
 			transportErrorText({ status: "PARSING_ERROR", originalStatus: 413, data: "Request Entity Too Large", error: "SyntaxError: x" }),
-		).toBe("This file is larger than the server accepts.");
+		).toBe("File too large for the server.");
 	});
 	it("says a plain-text 502 could not be read, with its status", () => {
 		const text = transportErrorText({ status: "PARSING_ERROR", originalStatus: 502, data: "Bad Gateway", error: "SyntaxError: x" });
-		expect(text).toBe("The server sent an answer this page could not read (status 502). Try again.");
+		expect(text).toBe("Unreadable server answer (status 502). Try again.");
 	});
 	it("is null for a JSON answer", () => {
 		expect(transportErrorText({ status: 400, data: { error: { message: "bad name" } } })).toBeNull();
@@ -49,7 +49,7 @@ describe("getBenchErrorMessage with transport errors (wave 4, p07-4 and p10-3)",
 			data: "too large",
 			error: "SyntaxError: Unexpected token",
 		});
-		expect(text).toBe("This file is larger than the server accepts.");
+		expect(text).toBe("File too large for the server.");
 	});
 	it("still gives the server's message for a JSON 400", () => {
 		expect(getBenchErrorMessage({ status: 400, data: { error: { message: "bad name" } } })).toBe("bad name");

@@ -134,8 +134,9 @@ export function RouteTabs({ tabs, defaultTab, param, history, label, children, c
 			ref={list}
 			aria-label={label}
 			className={cn(
-				"bench-no-scrollbar -mx-1 flex min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1",
-				trailing ? "-mb-px flex-1" : "border-border border-b",
+				"bench-no-scrollbar flex min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain",
+				// With a trailing slot the strip ends at the slot's edge and keeps its own end padding, so the last tab is never under it.
+				trailing ? "-mb-px -ml-1 flex-1 pr-3 pl-1" : "border-border -mx-1 border-b px-1",
 			)}
 		>
 			{visible.map((tab) => (

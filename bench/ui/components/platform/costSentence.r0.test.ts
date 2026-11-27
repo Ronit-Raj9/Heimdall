@@ -14,7 +14,7 @@ describe("costSentence", () => {
 		expect(costSentence(t, null, { estimateUsd: 2, limitText: "It stops at 10 minutes." })).toBe("About $2.00. It stops at 10 minutes.");
 	});
 	it("warns only when nothing limits the spend", () => {
-		expect(costSentence(t, null)).toMatch(/^Warning: .*no cap or estimate/);
+		expect(costSentence(t, null)).toMatch(/^Warning: .*No cap or estimate/);
 		expect(costSentence(t, undefined)).toBeNull();
 	});
 });

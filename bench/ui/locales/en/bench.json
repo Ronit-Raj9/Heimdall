@@ -4067,7 +4067,7 @@
 			"home": "Agents, running work and what needs you.",
 			"agents": "Versions, report cards and setup.",
 			"leaderboard": "Rank, cost and fault tolerance per version.",
-			"improvements": "Prompt and skill changes, kept when they win.",
+			"improvements": "Prompt and skill changes, kept when they win on unseen tasks.",
 			"evaluations": "Report cards per version and model.",
 			"experiments": "Two setups on the same tasks.",
 			"failureTests": "How your agent copes with faults.",

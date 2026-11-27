@@ -32,7 +32,7 @@ describe("VerifyEmailBanner", () => {
 	it("says what stays locked and offers a new link", () => {
 		const html = render(<VerifyEmailBanner />, unverified());
 		expect(html).toContain('data-testid="verify-banner"');
-		expect(html).toContain("We sent a link to ada@acme.dev");
+		expect(html).toContain("Link sent to ada@acme.dev");
 		expect(html).toContain("not create API tokens, invite people or create organizations");
 		expect(html).toContain('data-testid="verify-resend"');
 	});
@@ -41,7 +41,7 @@ describe("VerifyEmailBanner", () => {
 		api.config = okQuery({ auth_mode: "hosted", github: false, email_delivery: "log" });
 		const html = render(<VerifyEmailBanner />, unverified());
 		expect(html).toContain('data-delivery="log"');
-		expect(html).toContain("Check with your admin");
+		expect(html).toContain("Ask your admin for the link");
 	});
 
 	it("confirms a resend", () => {

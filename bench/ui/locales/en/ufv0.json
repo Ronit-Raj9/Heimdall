@@ -3,5 +3,8 @@
 		"notRecorded_one": "{{count}} more not recorded for this run",
 		"notRecorded_other": "{{count}} more not recorded for this run",
 		"hide": "Hide"
+	},
+	"titles": {
+		"compare": "Compare runs"
 	}
 }
