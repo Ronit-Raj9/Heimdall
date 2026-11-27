@@ -30,10 +30,10 @@ export function AddChooser({ current, className }: { current?: AddEntryId; class
 							<span className="text-muted-foreground text-xs text-pretty">{t(`chooser.${e.id}.needs`)}</span>
 						</Link>
 						{e.id === "failures" && (
-							// M6-32: traces kept in another platform are imported from the Import tab.
+							// M6-32: traces kept in another platform are imported through the catalog importers.
 							<Link
 								to="/suites"
-								search={{ tab: "import" } as never}
+								search={{ tab: "catalog" } as never}
 								className="text-muted-foreground hover:text-foreground px-3 text-xs underline underline-offset-2"
 								data-testid="add-chooser-platform-import"
 							>

@@ -77,8 +77,8 @@ describe("U3 redirects", () => {
 		});
 	});
 
-	it("sends /imports to the Import tab of Benchmarks", () => {
-		expect(importsRedirect()).toEqual({ to: "/suites", search: { tab: "import" } });
+	it("sends /imports straight to the Catalog tab of Benchmarks", () => {
+		expect(importsRedirect()).toEqual({ to: "/suites", search: { tab: "catalog" } });
 	});
 
 	it("sends /calibration?suite=X to that suite's Calibration tab, and to the list without one", () => {

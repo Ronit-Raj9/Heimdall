@@ -61,7 +61,6 @@ export interface BenchNavItem {
 		| "shell.nav.suites"
 		| "shell.nav.labelling"
 		| "shell.nav.whyAgentsFail"
-		| "shell.nav.inbox"
 		| "shell.nav.scheduledChecks"
 		| "shell.nav.live"
 		| "shell.nav.gateway"

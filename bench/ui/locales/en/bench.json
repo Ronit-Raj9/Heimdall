@@ -2282,7 +2282,6 @@
 		}
 	},
 	"inbox": {
-		"title": "Production failures",
 		"subtitle": "Each row is one kind of failure seen in production. Turn it into a new test task, reject it, or snooze it to decide later.",
 		"loadError": "Could not load Production failures.",
 		"regressionTasks_one": "{{count}} new test task made from the inbox",
@@ -2472,13 +2471,6 @@
 			"editMe": "Files to edit (marked EDIT ME)",
 			"next": "Next steps",
 			"warnings": "Warnings"
-		},
-		"pageSubtitle": "Failures from your production logs, ready to turn into new test tasks.",
-		"tabs": {
-			"label": "Ways to look at failures",
-			"inbox": "Production failures",
-			"clusters": "Failure groups",
-			"triage": "Failure patterns"
 		}
 	},
 	"notFound": {
@@ -4063,7 +4055,6 @@
 			"releases": "Releases",
 			"settings": "Settings",
 			"monitors": "Safety rule tests",
-			"inbox": "Production failures",
 			"gateway": "Gateway",
 			"docs": "Guides"
 		},

@@ -2,8 +2,7 @@
 	"suites": {
 		"label": "Benchmark views",
 		"mine": "My benchmarks",
-		"catalog": "Catalog",
-		"import": "Import"
+		"catalog": "Catalog"
 	},
 	"scheduled": {
 		"label": "Scheduled check views",

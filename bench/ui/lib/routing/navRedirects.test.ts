@@ -28,7 +28,7 @@ describe("navRedirects", () => {
 
 	it("folds catalog and import into Benchmarks", () => {
 		expect(catalogRedirect()).toEqual({ to: "/suites", search: { tab: "catalog" } });
-		expect(importTabRedirect()).toEqual({ to: "/suites", search: { tab: "import" } });
+		expect(importTabRedirect()).toEqual({ to: "/suites", search: { tab: "catalog" } });
 	});
 
 	it("keeps /suites/add as the Add benchmark page, not the Import tab", () => {

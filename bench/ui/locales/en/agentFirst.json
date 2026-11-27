@@ -7,7 +7,7 @@
 			"setup": "Setup",
 			"tools": "Tools",
 			"checks": "Readiness check",
-			"compareModels": "Compare models",
+			"compareModels": "Compare 3 to 6 models",
 			"pullRequests": "Pull requests"
 		},
 		"noVersion": "No saved version",
@@ -20,7 +20,7 @@
 			"check": "Readiness check",
 			"custom": "Custom comparison",
 			"monitor": "Monitor this agent",
-			"compareModels": "Compare models for this agent",
+			"compareModels": "Compare 3 to 6 models for this agent",
 			"monitorDrift": "Watch this agent for drift"
 		}
 	},
@@ -136,13 +136,6 @@
 		"choose": "Choose an agent"
 	},
 	"why": {
-		"title": "Failures",
-		"subtitle": "Where each version of your agent breaks: loops, saying done too early, ignored errors. Every number links to example runs.",
-		"tabs": {
-			"label": "Failure views",
-			"patterns": "Failure patterns",
-			"groups": "Failure groups"
-		},
 		"unsaved": "Unsaved config",
 		"runFailureTest": "Run a failure test",
 		"pick": "Choose an agent to see its failure patterns per version.",

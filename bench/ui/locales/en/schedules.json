@@ -125,7 +125,7 @@
 		},
 		"perRun": "Spending limit per check (USD)",
 		"perDay": "Spending limit per day (USD)",
-		"smoke": "Practice mode (no real model, free)",
+		"smoke": "Practice mode (a scripted model answers instead of your models: no model cost, and it cannot find real drift)",
 		"force": "Replace an existing drift monitor with this name",
 		"create": "Create drift monitor",
 		"created": "Drift monitor {{name}} created. Next: record its baseline (the reference result later checks are compared with).",
@@ -158,7 +158,7 @@
 		"noSchedulePause": "This drift monitor runs only when you press Check now, so there is nothing to pause.",
 		"unknown": "No drift monitor is called {{name}}. It may have been deleted.",
 		"showAll": "Show all drift monitors",
-		"baselineConfirmNoCap": "Record a new baseline for this drift monitor? This runs it once in practice mode, for free."
+		"baselineConfirmNoCap": "Record a new baseline for this drift monitor? This runs it once in practice mode: a scripted model answers, so there is no model cost."
 	},
 	"noTickerAction": "Set up a drift monitor instead",
 	"paused": "Paused",

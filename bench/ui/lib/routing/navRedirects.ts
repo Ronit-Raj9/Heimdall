@@ -38,9 +38,9 @@ export function catalogRedirect(search: RouteSearch = {}): RedirectTarget {
 	return asTab("/suites", "catalog", search);
 }
 
-/** /imports: the Import tab of Benchmarks. /suites/add is no longer redirected (see addBenchmarkTarget). */
+/** /imports: the Catalog tab of Benchmarks (the Import tab is gone; its importers are catalog entries). /suites/add is no longer redirected (see addBenchmarkTarget). */
 export function importTabRedirect(): RedirectTarget {
-	return { to: "/suites", search: { tab: "import" } };
+	return { to: "/suites", search: { tab: "catalog" } };
 }
 
 /** /suites/add is the Add benchmark page (lane Z20), its own route, not a redirect to the Import tab. */

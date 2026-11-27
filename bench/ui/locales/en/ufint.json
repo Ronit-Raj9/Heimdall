@@ -17,7 +17,7 @@
 		"confirmTitle": "Start drift monitor {{name}}?",
 		"confirmBody": "It runs on its schedule until you turn it off, and each run uses your model key.",
 		"runConfirm": "Run this drift monitor now? It runs once and can spend up to ${{usd}}.",
-		"runConfirmNoCap": "Run this drift monitor now? It runs once in practice mode, for free."
+		"runConfirmNoCap": "Run this drift monitor now? It runs once in practice mode: a scripted model answers, so there is no model cost."
 	},
 	"redTeam": {
 		"admitConfirm": "Run the readiness check of every task in {{suite}}? It plays fixed attacks on a worker and calls no model."

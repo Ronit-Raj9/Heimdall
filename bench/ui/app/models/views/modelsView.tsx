@@ -910,7 +910,7 @@ function KeyForm({
 			setValue("");
 			setFieldValues({});
 			onSaved();
-			// The test is a paid call, so it waits for its own press; without a stored key back, close.
+			// The test waits for its own press (it asks the provider for its model list); without a stored key back, close.
 			if (r?.key && canTest) setStored(r.key);
 			else onDone();
 		} catch {

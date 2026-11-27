@@ -58,7 +58,7 @@ Tip: anywhere in the app, a word with a dotted underline has an explanation. Hov
 - **Infrastructure error (not counted)** (technical: `aborted_infra`). The run broke before the agent could work; it is retried.
 - **Perfect reference agent** (technical: `oracle`). An agent that applies the known correct solution. Used to check that a task can be solved.
 - **Do-nothing agent** (technical: `noop agent`). An agent that does nothing. Used to check that a task cannot be passed for free.
-- **Practice mode (no real model, free)** (technical: `synthetic / scripted model`). Runs with a scripted stand-in model instead of a real one. Free, good for trying things, not real results.
+- **Practice mode (no real model, free)** (technical: `synthetic / scripted model`). Runs with a scripted stand-in model instead of a real one. No model cost, good for trying things, not real results. The agent check, the readiness check and practice drift monitors use it; there is no practice evaluation on the hosted site.
 
 ## Production and release
 

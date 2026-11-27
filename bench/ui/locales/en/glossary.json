@@ -42,7 +42,7 @@
 		"policy": { "term": "policy", "label": "Release rule", "tip": "A rule a new agent version must pass before it can be released." },
 		"release": { "term": "release", "label": "Release record", "tip": "A saved record that an agent version shipped, with the evidence behind it." },
 		"calibration": { "term": "calibration", "label": "Grader accuracy check", "tip": "Compares the grader's marks with human marks to see how often it is right." },
-		"synthetic": { "term": "synthetic / scripted model", "label": "Practice mode (no real model, free)", "tip": "Runs with a scripted stand-in model instead of a real one. Free, good for trying things, not real results." },
+		"synthetic": { "term": "synthetic / scripted model", "label": "Practice mode (no real model, free)", "tip": "Runs with a scripted stand-in model instead of a real one. No model cost, good for trying things, not real results. There is no practice evaluation on the hosted site." },
 		"oracle": { "term": "oracle", "label": "Perfect reference agent", "tip": "An agent that applies the known correct solution. Used to check that a task can be solved." },
 		"noop": { "term": "noop agent", "label": "Do-nothing agent", "tip": "An agent that does nothing. Used to check that a task cannot be passed for free." },
 		"capabilities": { "term": "capabilities", "label": "Skills tested", "tip": "The kinds of ability a benchmark checks, such as coding, browsing or tool use." },
