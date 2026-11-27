@@ -21,6 +21,6 @@
 	"newSuite": {
 		"taken": "A benchmark with this id already exists. Pick another id, or",
 		"open": "open {{id}}",
-		"builtin": "{{id}} is a built-in benchmark. Pick another id."
+		"builtin": "{{id}} is the name of a built-in benchmark. Pick another id."
 	}
 }

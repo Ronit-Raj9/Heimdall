@@ -252,8 +252,9 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 	}
 	req.ID = strings.TrimSpace(req.ID)
 	if isReservedSuiteID(h.suites, req.ID) {
-		// Fix wave 3, N265: a taken id is a conflict, said plainly.
-		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, req.ID+" is a built-in benchmark. Pick another id.")
+		// Fix wave 3, N265: a taken id is a conflict, said plainly, in the
+		// one sentence of N46 (draft and publish say the same).
+		sendReservedSuiteID(ctx, h.mode, req.ID)
 		return
 	}
 	if req.Template == "" {

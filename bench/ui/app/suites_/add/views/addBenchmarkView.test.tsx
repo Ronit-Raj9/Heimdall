@@ -247,7 +247,7 @@ describe("Add benchmark plan checks", () => {
 
 	it("refuses a built-in benchmark id", () => {
 		const html = panel("coding-core");
-		expect(html).toContain("coding-core is a built-in benchmark and cannot be changed. Pick a new id.");
+		expect(html).toContain("coding-core is the name of a built-in benchmark. Pick another id.");
 		expect(draftDisabled(html)).toBe(true);
 	});
 

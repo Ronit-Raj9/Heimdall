@@ -195,7 +195,7 @@ func TestCreateSuiteRefusesTakenID(t *testing.T) {
 		t.Fatalf("taken id: %d %s", code, body)
 	}
 	code, body = c.do(t, "POST", "/suites", []byte(`{"id":"coding-core","template":"qa","blank":true}`), nil)
-	if code != 409 || !strings.Contains(string(body), "coding-core is a built-in benchmark. Pick another id.") {
+	if code != 409 || !strings.Contains(string(body), "coding-core is the name of a built-in benchmark. Pick another id.") {
 		t.Fatalf("built-in id: %d %s", code, body)
 	}
 }
