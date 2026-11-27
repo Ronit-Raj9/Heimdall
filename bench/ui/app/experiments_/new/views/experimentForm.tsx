@@ -134,13 +134,16 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 	const [started, setStarted] = useState(false);
 	useLeaveGuard(formState.isDirty && !started);
 	// Q-150: the typed input is kept as a draft beside the leave guard; a reload puts it back as changed fields.
-	useDraftSync(FORM_DRAFT_KEY, values, formState.isDirty, started);
+	// The restore runs before the sync effect, which would otherwise drop the draft on the first, clean render.
 	useEffect(() => {
 		const draft = draftOr<Partial<ExperimentFormValues>>(FORM_DRAFT_KEY, {});
 		for (const k of Object.keys(draft) as (keyof ExperimentFormValues)[]) setValue(k, draft[k] as never, { shouldDirty: true });
 		// Once, on mount: later defaults fill only untouched fields (above).
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// A created comparison (even one whose start failed) ends the draft, so a reopened form starts clean.
+	useDraftSync(FORM_DRAFT_KEY, values, formState.isDirty, started || Boolean(actionError?.createdId));
 
 	const stale = planned !== null && planIsStale(planned.experiment, values, ready);
 	// N43: after a Plan press, every field still to fix is named next to the button.
