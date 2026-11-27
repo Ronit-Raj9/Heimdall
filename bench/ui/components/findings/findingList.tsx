@@ -1,6 +1,9 @@
 import "@/app/inbox/views/w443I18n";
 
 import type { Finding } from "@/lib/store/apis/findingsApi";
+import { FindingArchiveMenu, FindingArchivedPill } from "@/components/findings/findingArchiveMenu";
+import { ARCHIVED_ROW_CLASS } from "@/components/ui/showArchivedChip";
+import { isArchived } from "@/lib/store/apis/archiveApi";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -60,37 +63,46 @@ export function FindingList({
 					<th className="py-2 pr-3 font-medium">{t("list.state")}</th>
 					<th className="py-2 pr-3 font-medium">{t("list.source")}</th>
 					<th className="py-2 pr-3 font-medium">{t("list.tasks")}</th>
-					<th className="py-2 font-medium">{t("list.changed")}</th>
+					<th className="py-2 pr-3 font-medium">{t("list.changed")}</th>
+					<th className="py-2 font-medium">
+						<span className="sr-only">{t("list.actions")}</span>
+					</th>
 				</tr>
 			</thead>
 			<tbody>
 				{findings.map((f) => (
 					<tr
 						key={f.id}
-						className={cn("border-border/60 border-t", selected === f.id && "bg-accent/50")}
+						className={cn("border-border/60 border-t", selected === f.id && "bg-accent/50", isArchived(f) && ARCHIVED_ROW_CLASS)}
 						data-testid={`finding-row-${f.id}`}
 					>
 						<td className="py-2 pr-3">
-							{/* A real link, so a finding can be opened in a new tab or shared (M7-32). */}
-							<a
-								href={findingHref(f.id)}
-								className="text-primary text-left hover:underline"
-								onClick={(e) => {
-									if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-									e.preventDefault();
-									onSelect(f.id);
-								}}
-								data-testid={`finding-link-${f.id}`}
-							>
-								{f.title}
-							</a>
+							<span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+								{/* A real link, so a finding can be opened in a new tab or shared (M7-32). */}
+								<a
+									href={findingHref(f.id)}
+									className="text-primary text-left hover:underline"
+									onClick={(e) => {
+										if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+										e.preventDefault();
+										onSelect(f.id);
+									}}
+									data-testid={`finding-link-${f.id}`}
+								>
+									{f.title}
+								</a>
+								<FindingArchivedPill finding={f} />
+							</span>
 						</td>
 						<td className="py-2 pr-3">
 							<FindingStateBadge state={f.state} />
 						</td>
 						<td className="py-2 pr-3">{t(`sources.${f.source}`)}</td>
 						<td className="py-2 pr-3 tabular-nums">{f.tasks.length}</td>
-						<td className="text-muted-foreground py-2">{new Date(f.updated_at).toLocaleDateString()}</td>
+						<td className="text-muted-foreground py-2 pr-3">{new Date(f.updated_at).toLocaleDateString()}</td>
+						<td className="py-2 text-right">
+							<FindingArchiveMenu finding={f} />
+						</td>
 					</tr>
 				))}
 			</tbody>

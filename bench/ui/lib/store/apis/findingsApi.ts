@@ -58,6 +58,8 @@ export interface Finding {
 	arm?: string;
 	created_at: string;
 	updated_at: string;
+	/** Set when the finding is archived: hidden from the list unless "Show archived" is on. */
+	archived_at?: string | null;
 }
 
 export type FindingsListResponse = WithMode<{

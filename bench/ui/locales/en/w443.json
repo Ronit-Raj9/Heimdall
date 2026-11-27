@@ -29,7 +29,8 @@
 		"state": "State",
 		"source": "Source",
 		"tasks": "Tasks",
-		"changed": "Last change"
+		"changed": "Last change",
+		"actions": "Actions"
 	},
 	"detail": {
 		"saw": "What we saw",

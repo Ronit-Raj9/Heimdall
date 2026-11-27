@@ -8,7 +8,9 @@ import { InvestigationList, investigationRows } from "@/components/findings/inve
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
-import { useGetFindingsQuery, useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
+import { ShowArchivedChip, useShowArchived } from "@/components/ui/showArchivedChip";
+import { archivedCountOf, useGetFindingsWithArchivedQuery } from "@/lib/store/apis/archiveApi";
+import { useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,7 +21,9 @@ import { useTranslation } from "react-i18next";
  */
 export default function FindingsTab() {
 	const { t } = useTranslation("w443");
-	const list = useGetFindingsQuery();
+	// Archived findings stay out unless "Show archived" is on (?archived=1); nothing is deleted.
+	const [showArchived, setShowArchived] = useShowArchived();
+	const list = useGetFindingsWithArchivedQuery({ archived: showArchived ? "include" : undefined });
 	const investigations = useGetInvestigationsQuery();
 	const [selected, setSelected] = useQueryState("finding", parseAsString);
 	const [investigating, setInvestigating] = useState(false);
@@ -43,7 +47,10 @@ export default function FindingsTab() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="findings-tab">
-			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
+				<ShowArchivedChip count={archivedCountOf(list.data)} on={showArchived} onChange={setShowArchived} testId="findings-show-archived" />
+			</div>
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="findings-loading" />
 			) : list.error ? (

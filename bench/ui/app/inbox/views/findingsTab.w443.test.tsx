@@ -18,6 +18,9 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, params, hash }: { children: React.ReactNode; params: { runId: string }; hash?: string }) => (
 		<a href={`/runs/${params.runId}${hash ? `#${hash}` : ""}`}>{children}</a>
 	),
+	// The "Show archived" switch reads and writes ?archived=1.
+	useSearch: () => ({}),
+	useNavigate: () => () => undefined,
 }));
 
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
@@ -28,6 +31,14 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 
 const { mutation } = vi.hoisted(() => ({
 	mutation: () => [() => Promise.resolve({}), { isLoading: false }],
+}));
+
+// The list reads through the archive-aware query (phase D decision 6).
+vi.mock("@/lib/store/apis/archiveApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/archiveApi")>()),
+	useGetFindingsWithArchivedQuery: () => state.list,
+	useArchiveObjectMutation: mutation,
+	useUnarchiveObjectMutation: mutation,
 }));
 
 vi.mock("@/lib/store/apis/findingsApi", () => ({
@@ -137,6 +148,18 @@ describe("Findings tab", () => {
 		expect(html).toContain("Skips the tests");
 		expect(html).toContain("finding-state-open");
 		expect(html).toContain("Find out why");
+	});
+
+	it("shows the Show archived switch, and an archived finding with its pill and row menu", () => {
+		state.list = {
+			isLoading: false,
+			data: { mode: "live", findings: [base, { ...base, id: "fnd-000000000002", archived_at: "2026-11-20T10:00:00Z" }], counts: { open: 2 } },
+		};
+		const html = renderToStaticMarkup(<FindingsTab />);
+		expect(html).toContain('data-testid="findings-show-archived"');
+		expect(html).toContain("Show archived");
+		expect(html).toContain('data-testid="finding-archived-fnd-000000000002"');
+		expect(html).not.toContain('data-testid="finding-archived-fnd-000000000001"');
 	});
 
 	it("reads the investigation list in either answer shape", () => {
