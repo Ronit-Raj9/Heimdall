@@ -72,17 +72,23 @@ describe("EvaluationWorkerPicker", () => {
 		});
 		const member = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"));
 		expect(member).toContain('data-testid="eval-worker-only"');
-		expect(member).toContain("Runs go to: Shared worker. It runs 2 at a time.");
+		expect(member).toContain("Runs on: Shared worker. It runs 2 at a time.");
 		expect(member).toContain("An admin can add a worker on the Workers page.");
 		expect(member).not.toContain("<select");
 		const admin = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("admin"));
 		expect(admin).toContain('href="/settings?tab=runners"');
-		expect(admin).toContain("Add a worker");
+		expect(admin).toContain("Change on the Workers page");
 		expect(admin).not.toContain("An admin can add a worker");
 		q.target = okQuery({ target: "shared", choices: [{ ...view.choices[0], current: true, per_evaluation: true }] });
 		expect(render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"))).toContain(
-			"Runs go to: Shared worker.</",
+			"Runs on: Shared worker.</",
 		);
+	});
+
+	it("names a single platform as 'Runs on: Modal, a fresh sandbox per run' (Q-250)", () => {
+		q.target = okQuery({ target: view.choices.find((c) => c.kind === "platform")!.target, choices: [{ ...view.choices.find((c) => c.kind === "platform")!, current: true, per_evaluation: true, slots: 0 }] });
+		const html = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"));
+		expect(html).toContain(`Runs on: ${view.choices.find((c) => c.kind === "platform")!.title}, a fresh sandbox per run.`);
 	});
 
 	it("lists every choice when there are several", () => {

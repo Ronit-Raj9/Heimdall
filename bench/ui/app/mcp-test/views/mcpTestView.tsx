@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import "@/components/platform/fw23I18n";
 import { PageHeader } from "@/components/shell";
 import { useFormDraft } from "@/lib/hooks/useFormDraft";
@@ -520,7 +521,7 @@ export function McpTestView() {
 		}
 	};
 	return (
-		<section className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-6" data-testid="mcp-test-screen">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-6")} data-testid="mcp-test-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

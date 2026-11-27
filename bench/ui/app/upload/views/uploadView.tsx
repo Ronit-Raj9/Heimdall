@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell/pageHeader";
@@ -88,7 +89,7 @@ export default function UploadView() {
 	};
 
 	return (
-		<div className="mx-auto flex w-full max-w-[1000px] flex-col gap-6 p-6" data-testid="upload-view">
+		<div className={cn(pageWidthClass("read"), "flex flex-col gap-6 p-6")} data-testid="upload-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<div className="grid gap-3 sm:grid-cols-3" role="tablist" aria-label={t("title")}>
 				{KINDS.map(({ kind: k, icon: Icon }) => {

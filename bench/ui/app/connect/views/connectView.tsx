@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { ImportFound, importedAgentName, importRequest, missingImportFields } from "@/app/agents_/new/views/platformImport";
 import { PlatformFields, suggestedPlatformSecrets } from "@/components/connect/platformFields";
 import { agentNameProblem } from "@/components/agents/agentName";
@@ -282,7 +284,7 @@ export default function ConnectView() {
 	const verified = verify && verifyDone && connectionOK(verify.rows) && verify.status === "succeeded";
 
 	return (
-		<div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6" data-testid="connect-screen">
+		<div className={cn(pageWidthClass("read"), "flex flex-col gap-6")} data-testid="connect-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

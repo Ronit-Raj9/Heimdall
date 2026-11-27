@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { BillingUsageSection } from "@/components/billing/billingUsageSection";
 import { EmptyState, PageHeader, useEmbedded } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,7 @@ export default function UsageView() {
 	const preset = presetOf(range);
 
 	return (
-		<div className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="usage-view">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="usage-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<div className="flex flex-wrap items-end gap-3" data-testid="usage-controls">
 				<Segmented

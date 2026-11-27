@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ export default function MaximFailuresView() {
 	const active = batchId || list.data?.batches[0]?.id || "";
 	const steps = ["pull", "cluster", "draft", "review", "ready"] as const;
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="maxim-failures-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="maxim-failures-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<ol className="grid gap-2 text-sm sm:grid-cols-5" data-testid="maxim-steps">
 				{steps.map((s, i) => (
@@ -128,7 +129,7 @@ function PullForm({ onPulled }: { onPulled(id: string): void }) {
 						.catch((err: unknown) => setError(apiErrorMessage(err, t("filter.pull"))));
 				}}
 			>
-				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="font-medium">{t("filter.evaluators")}</span>
 						<Input value={form.evaluators} onChange={(e) => set({ evaluators: e.target.value })} data-testid="maxim-filter-evaluators" />

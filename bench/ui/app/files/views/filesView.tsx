@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { FileEditor } from "@/components/projectfs/fileEditor";
 import { FILES_NS } from "@/components/projectfs/i18n";
 import { SyncCard } from "@/components/projectfs/syncCard";
@@ -113,7 +114,7 @@ export default function FilesView() {
 	const crumbs = dir ? dir.split("/") : [];
 
 	return (
-		<div className={cn("mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="files-view">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="files-view">
 			{/* The action sits beside the header, not inside it, so a narrow screen stacks them instead of squeezing the title. */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<PageHeader title={t("title")} subtitle={t("subtitle")} className="mb-0 min-w-0 flex-1" />

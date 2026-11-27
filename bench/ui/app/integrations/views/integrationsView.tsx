@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import "@/components/platform/fw23I18n";
 import { useBusyGuard } from "@/lib/hooks/useBusyGuard";
 import { useConfirm } from "@/components/platform/confirmDialog";
@@ -301,7 +302,7 @@ export default function IntegrationsView() {
 	// X-55: inside Settings the tab already has the page padding, so the view adds none of its own.
 	const embedded = useEmbedded();
 	return (
-		<div className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="integrations-view">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="integrations-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{/* X-52: a real tab strip (Radix: arrow keys, tabpanel and aria-controls), one line with a status dot each. */}
 			<Tabs value={tab} onValueChange={(v) => setTab(v as IntegrationTab)} className="min-w-0 gap-4">

@@ -107,9 +107,9 @@
 		"evalLabel": "This evaluation runs on",
 		"whereRunsGo": "where runs go",
 		"notForOne": "set it as where runs go on the Workers page",
-		"onlyOne": "Runs go to: {{label}}.",
-		"onlyOneSlots": "Runs go to: {{label}}. It runs {{n}} at a time.",
-		"addWorker": "Add a worker",
+		"onlyOne": "Runs on: {{label}}.",
+		"onlyOneSlots": "Runs on: {{label}}. It runs {{n}} at a time.",
+		"addWorker": "Change on the Workers page",
 		"askAdmin": "An admin can add a worker on the Workers page."
 	},
 	"shared": {
