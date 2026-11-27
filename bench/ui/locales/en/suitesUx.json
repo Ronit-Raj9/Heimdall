@@ -69,7 +69,7 @@
 		"builtin": "Benchmarks",
 		"builtinHint": "Full real benchmarks, ready to run.",
 		"org": "Added by your team",
-		"practice": "Practice examples (small, made-up data)"
+		"practice": "Test benchmarks (left by automated checks)"
 	},
 	"builtIn": "Built in",
 	"builtinReadOnly": "Built-in benchmark, read-only",

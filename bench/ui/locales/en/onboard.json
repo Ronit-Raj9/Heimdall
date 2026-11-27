@@ -18,6 +18,7 @@
 		"found": "Recognised as",
 		"pick": "Read it as",
 		"cannotDraft": "Recognised, but it cannot become tasks here yet",
+		"openapiNext": "Continue on Tasks from your API with this spec.",
 		"nothing": "Give a link, a file or pasted rows."
 	},
 	"found": {
@@ -27,12 +28,13 @@
 		"samples": "First rows (e-mail addresses and phone numbers hidden)",
 		"warnings": "Warnings",
 		"needs": "Needs",
-		"estimate": "About {{tasks}} tasks and {{runs}} readiness runs. Readiness runs replay fixed answers on a worker with no model, so they cost nothing. Drafting makes no model call.",
+		"estimate": "About {{tasks}} tasks and {{runs}} readiness runs. Readiness runs replay fixed answers on a worker with no model, so they cost nothing and take about {{minutes}} min. Drafting makes no model call.",
 		"estimateJudge": "Rubric grading adds {{judge}} judge calls, paid on your own model key.",
 		"noSamples": "No sample to show."
 	},
 	"plan": {
 		"name": "Name",
+		"more": "More options",
 		"nameHint": "Shown in lists. The id below is made from it until you change the id yourself.",
 		"suite": "Benchmark id",
 		"suiteHint": "A new id creates a private benchmark; an existing one adds tasks to it.",

@@ -21,7 +21,9 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import type { AppPlan, AppRule, AppTasksDraft, AppTasksDraftSummary, ListedAppTasksDraft, RuleKind } from "@/lib/types/appTasks";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/ufrfI18n";
 import "@/app/gateway/views/w4intI18n";
 
 import "@/components/suites/uf6bI18n";
@@ -110,6 +112,16 @@ async function readFile(e: ChangeEvent<HTMLInputElement>, set: (text: string, na
 	if (f) set(await f.text(), f.name);
 }
 
+/** Q-36: the file name for a spec read from a link, "shop.yaml" from "https://x/api/shop.yaml?v=1". */
+export function specNameFromUrl(url: string): string {
+	try {
+		const last = new URL(url).pathname.split("/").filter(Boolean).pop();
+		return last ?? "";
+	} catch {
+		return "";
+	}
+}
+
 function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 	const { t } = useTranslation("appTasks");
 	const [create, { isLoading, error }] = useCreateAppTaskDraftMutation();
@@ -121,6 +133,7 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 	const [policy, setPolicy] = useState("");
 	const [policyName, setPolicyName] = useState("");
 	const { t: tu } = useTranslation("uf6b");
+	const { t: tr } = useTranslation("ufrf");
 	// M6-57: until typed, the two ids are drafted from the spec's info.title ("Shop API": shop, shop-support).
 	const [touched, setTouched] = useState({ suite: false, app: false });
 	const onSpec = (text: string) => {
@@ -131,6 +144,25 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 		if (!touched.suite) setSuite(suiteIdFrom(touched.app ? app : drafted));
 		if (!title.trim()) setTitle(specTitle(text));
 	};
+	// Q-36: the Add a benchmark wizard links here with ?spec=<address>; read it once and fill the spec.
+	const [specUrl] = useQueryState("spec", parseAsString);
+	const [specUrlError, setSpecUrlError] = useState(false);
+	useEffect(() => {
+		if (!specUrl || !/^https?:\/\//i.test(specUrl)) return;
+		let live = true;
+		fetch(specUrl)
+			.then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+			.then((text) => {
+				if (!live) return;
+				onSpec(text);
+				setSpecName(specNameFromUrl(specUrl));
+			})
+			.catch(() => live && setSpecUrlError(true));
+		return () => {
+			live = false;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [specUrl]);
 	const problems = idProblems(suite, app);
 	const idsOk = problems.length === 0;
 	const submit = async (e: FormEvent) => {
@@ -187,6 +219,11 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 				<label className="flex flex-col gap-1 text-sm">
 					{t("new.spec")}
 					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
+					{specUrlError && specUrl && (
+						<span role="note" className="text-xs" data-testid="from-api-spec-url-error">
+							{tr("fromApi.specUrlError", { url: specUrl })}
+						</span>
+					)}
 					<input
 						type="file"
 						accept=".yaml,.yml,.json"

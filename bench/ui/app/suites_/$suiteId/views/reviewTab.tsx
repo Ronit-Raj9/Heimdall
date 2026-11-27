@@ -119,7 +119,6 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 	const [ops, setOps] = useState<AssistOp[]>(
 		judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"],
 	);
-	const { t: tm } = useTranslation("hw15");
 	const { t: tf } = useTranslation("uf6a");
 	const queue = useGetGeneratedTasksQuery(suite.id);
 	const [picked, setPicked] = useState<PickedModel | null>(null);
@@ -151,10 +150,10 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 				{ASSIST_OPS.map((op) => {
 					const off = !judged && (op === "rubric" || op === "criterion_wrong");
 					return (
-						<label key={op} className={cn("flex items-start gap-2 text-sm", off && "opacity-50")}>
+						<label key={op} className={cn("flex min-h-11 items-center gap-2 text-sm", off && "opacity-50")}>
 							<input
 								type="checkbox"
-								className="mt-0.5 size-4 shrink-0"
+								className="size-4 shrink-0"
 								checked={ops.includes(op) && !off}
 								disabled={off}
 								onChange={() => toggle(op)}
@@ -200,11 +199,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 						onDone={onDone}
 					/>
 				</div>
-			) : (
-				<p className="text-muted-foreground text-xs" data-testid="suite-review-need-model">
-					{tm("pickModel")}
-				</p>
-			)}
+			) : null /* Q-198: the model field's hint already says to pick a model from your model keys. */}
 			{result && <AssistSummary result={result} t={t} />}
 		</Section>
 	);
@@ -519,9 +514,10 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 					</select>
 				</Field>
 			</div>
-			<label className="flex items-center gap-2 text-sm">
+			<label className="flex min-h-11 items-center gap-2 text-sm">
 				<input
 					type="checkbox"
+					className="size-4 shrink-0"
 					checked={confirmPublic}
 					onChange={(e) => {
 						setConfirmPublic(e.target.checked);

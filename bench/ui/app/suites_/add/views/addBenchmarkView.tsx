@@ -37,6 +37,11 @@ import {
 } from "./addBenchmarkState";
 
 /** How often a draft is read again while its readiness checks or publish run. */
+/** Q-269: ask before leaving only when the user typed plan edits that no saved draft holds yet. */
+export function leaveGuarded(s: { edited: boolean; drafted: boolean }): boolean {
+	return s.edited && !s.drafted;
+}
+
 export const DRAFT_POLL_MS = 5000;
 
 /** What a new source clears: the recognised chips, the found result and the draft (wave 4, p10-4). */
@@ -88,7 +93,10 @@ export default function AddBenchmarkView() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-	useLeaveGuard(!!input && !setId);
+	// Q-269: the source itself is kept as a draft and looked at again on return, so only plan edits
+	// the user typed ask before leaving; the app's own next-step links clear the flag first.
+	const [edited, setEdited] = useState(false);
+	useLeaveGuard(leaveGuarded({ edited, drafted: !!setId }));
 
 	const look = async (inp: OnboardInput, source?: string) => {
 		setError("");
@@ -104,6 +112,7 @@ export default function AddBenchmarkView() {
 			const found = await inspect({ input: inp, source: source ?? det.matches[0].source }).unwrap();
 			setInv(found);
 			setPlan(found.suggest);
+			setEdited(false);
 		} catch (e) {
 			setMatches([]);
 			setError(getBenchErrorMessage(e));
@@ -141,6 +150,7 @@ export default function AddBenchmarkView() {
 		try {
 			const set = await createDraft({ input, plan }).unwrap();
 			setSetId(set.id);
+			setEdited(false);
 			keep(null);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
@@ -152,6 +162,7 @@ export default function AddBenchmarkView() {
 		setMatches([]);
 		setInv(null);
 		setPlan(null);
+		setEdited(false);
 		setSetId(null);
 		setError("");
 		keep(null);
@@ -177,7 +188,17 @@ export default function AddBenchmarkView() {
 			</Section>
 			{inv && plan && !setId && (
 				<Section title={t("steps.found")} testId="onboard-step-found">
-					<InventoryPanel inv={inv} plan={plan} onPlan={setPlan} onDraft={() => void onDraft()} busy={draftState.isLoading} />
+					<InventoryPanel
+						inv={inv}
+						plan={plan}
+						onPlan={(p) => {
+							setPlan(p);
+							setEdited(true);
+						}}
+						onLeave={() => setEdited(false)}
+						onDraft={() => void onDraft()}
+						busy={draftState.isLoading}
+					/>
 				</Section>
 			)}
 			{setId && <DraftSteps id={setId} />}

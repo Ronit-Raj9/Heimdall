@@ -13,6 +13,7 @@ import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/on
 import type { RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
@@ -49,8 +50,14 @@ export function estimateLine(
 	const { tasks, readiness_runs: runs, judge_calls: judge } = inv.estimate;
 	if (tasks === 0) return "";
 	if (grader === "judge") return w4m5Text("estimate.judge", { tasks, runs });
-	const line = tx("found.estimate", { tasks, runs });
+	// Q-57: about ten readiness runs a minute, so the line also gives the time.
+	const line = tx("found.estimate", { tasks, runs, minutes: readinessMinutes(runs) });
 	return judge > 0 ? `${line} ${tx("found.estimateJudge", { judge })}` : line;
+}
+
+/** Q-57: the minutes the free readiness runs take, about ten a minute, at least one. */
+export function readinessMinutes(runs: number): number {
+	return Math.max(1, Math.ceil(runs / 10));
 }
 
 /** Where a source that cannot become tasks here is built instead (M2-112, M6-50): OpenAPI and GitHub. */
@@ -58,6 +65,14 @@ export function builderLink(kind: string): string | null {
 	if (kind === "openapi") return "/suites/from-api";
 	if (kind === "github") return "/suites/new";
 	return null;
+}
+
+/**
+ * Q-36: the search the builder link carries. An OpenAPI link goes to Tasks from your API with the
+ * spec's address, so that page opens with the spec filled in; a file or pasted text has no address.
+ */
+export function builderSearch(kind: string, source: string): { spec: string } | undefined {
+	return kind === "openapi" && /^https?:\/\//i.test(source.trim()) ? { spec: source.trim() } : undefined;
 }
 
 /** A whole number inside [min, max] (M2-112b). */
@@ -146,12 +161,15 @@ export function InventoryPanel({
 	plan,
 	onPlan,
 	onDraft,
+	onLeave,
 	busy,
 }: {
 	inv: OnboardInventory;
 	plan: OnboardPlan;
 	onPlan(p: OnboardPlan): void;
 	onDraft(): void;
+	/** Called before the app's own next-step link navigates, so the page drops its leave guard (Q-269). */
+	onLeave?(): void;
 	busy: boolean;
 }) {
 	const { t } = useTranslation("onboard");
@@ -255,10 +273,18 @@ export function InventoryPanel({
 					className="border-chart-info/50 bg-chart-info/10 rounded-sm border px-3 py-2 text-sm"
 					data-testid="onboard-cannot-draft"
 				>
-					<span className="font-medium">{t("source.cannotDraft")}.</span> {inv.next}
+					{inv.kind === "openapi" ? (
+						t("source.openapiNext")
+					) : (
+						<>
+							<span className="font-medium">{t("source.cannotDraft")}.</span> {inv.next}
+						</>
+					)}
 					{builderLink(inv.kind) && (
 						<Link
 							to={builderLink(inv.kind) as never}
+							search={builderSearch(inv.kind, inv.source) as never}
+							onClick={() => flushSync(() => onLeave?.())}
 							className="text-primary mt-2 block font-medium underline-offset-4 hover:underline"
 							data-testid="onboard-builder-link"
 						>
@@ -344,39 +370,45 @@ export function InventoryPanel({
 								</select>
 							</label>
 						)}
-						<label className="flex flex-col gap-1 text-xs">
-							<span className="font-medium">{t("plan.limit")}</span>
-							<Input
-								type="number"
-								min={1}
-								max={500}
-								value={plan.limit ?? ""}
-								onChange={(e) => set({ limit: e.target.value ? clampInt(Number(e.target.value), 1, 500) : undefined })}
-								className="w-28"
-								data-testid="onboard-plan-limit"
-							/>
-						</label>
-						<label className="flex flex-col gap-1 text-xs">
-							<span className="font-medium">{t("plan.heldOut")}</span>
-							<Input
-								type="number"
-								min={0}
-								max={100}
-								value={plan.held_out?.pct ?? 0}
-								onChange={(e) => set({ held_out: { pct: clampInt(Number(e.target.value) || 0, 0, 100), seed: plan.held_out?.seed || 1 } })}
-								className="w-24"
-								data-testid="onboard-plan-heldout"
-							/>
-							<span className="text-muted-foreground max-w-xs">{t("plan.heldOutHint")}</span>
-							{(plan.held_out?.pct ?? 0) > 0 && inv.estimate.tasks > 0 && (
-								<span className="max-w-xs" data-testid="onboard-plan-heldout-line">
-									{t("plan.heldOutLine", {
-										pct: plan.held_out.pct,
-										...heldOutCount(plan.held_out.pct, Math.min(plan.limit || inv.estimate.tasks, inv.estimate.tasks)),
-									})}
-								</span>
-							)}
-						</label>
+						{/* Q-119: how many tasks and the held-out share are extras, folded under More options. */}
+						<details className="w-full" data-testid="onboard-plan-more">
+							<summary className="text-primary min-h-11 cursor-pointer py-2 text-xs font-medium">{t("plan.more")}</summary>
+							<div className="flex flex-wrap gap-3 pt-1">
+								<label className="flex flex-col gap-1 text-xs">
+									<span className="font-medium">{t("plan.limit")}</span>
+									<Input
+										type="number"
+										min={1}
+										max={500}
+										value={plan.limit ?? ""}
+										onChange={(e) => set({ limit: e.target.value ? clampInt(Number(e.target.value), 1, 500) : undefined })}
+										className="w-28"
+										data-testid="onboard-plan-limit"
+									/>
+								</label>
+								<label className="flex flex-col gap-1 text-xs">
+									<span className="font-medium">{t("plan.heldOut")}</span>
+									<Input
+										type="number"
+										min={0}
+										max={100}
+										value={plan.held_out?.pct ?? 0}
+										onChange={(e) => set({ held_out: { pct: clampInt(Number(e.target.value) || 0, 0, 100), seed: plan.held_out?.seed || 1 } })}
+										className="w-24"
+										data-testid="onboard-plan-heldout"
+									/>
+									<span className="text-muted-foreground max-w-xs">{t("plan.heldOutHint")}</span>
+									{(plan.held_out?.pct ?? 0) > 0 && inv.estimate.tasks > 0 && (
+										<span className="max-w-xs" data-testid="onboard-plan-heldout-line">
+											{t("plan.heldOutLine", {
+												pct: plan.held_out.pct,
+												...heldOutCount(plan.held_out.pct, Math.min(plan.limit || inv.estimate.tasks, inv.estimate.tasks)),
+											})}
+										</span>
+									)}
+								</label>
+							</div>
+						</details>
 					</div>
 					{rows && (inv.columns?.length ?? 0) > 0 && (
 						<div data-testid="onboard-plan-mapping">
