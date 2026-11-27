@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/findings"
 	"github.com/maximhq/bifrost/bench/improve"
@@ -339,5 +340,53 @@ func TestSharedPageHidesArchiveMark(t *testing.T) {
 		if _, ok := v["archived_by"]; ok {
 			t.Fatalf("%s keeps archived_by", part)
 		}
+	}
+}
+
+// TestArchiveRoleInHandler: the handler itself checks the role of every
+// archive route, so a router without the policy table (as here) still
+// refuses a viewer everywhere and a member on the admin routes, and writes
+// nothing.
+func TestArchiveRoleInHandler(t *testing.T) {
+	r, root, idx := archiveTestRouter(t, nil)
+	saveEval(t, root, "ev_done", schemas.EvaluationCancelled)
+	runID := idx.runs[0].Run.RunID
+	fid := findings.IDOf("cluster:role")
+	if err := findings.Open(root).Update(func(all []findings.Finding) ([]findings.Finding, error) {
+		return append(all, findings.Finding{ID: fid, Key: "cluster:role", Title: "x", Source: "cluster", Origin: "rule", State: findings.StateOpen}), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	imp := router.New()
+	NewImproveHandler(testMode, &fakeImprove{list: []improve.Summary{{ID: "imp_done", Status: improve.StatusDone}}}, nil).WithArchiveRoot(root).RegisterRoutes(imp)
+	admin := []string{"/evaluations/ev_done", "/experiments/" + testExp, "/runs/" + runID}
+	for _, verb := range []string{"/archive", "/unarchive"} {
+		for _, p := range admin {
+			for _, role := range []auth.Role{auth.RoleViewer, auth.RoleMember} {
+				if res := shareCallAs(r, "POST", APIPrefix+p+verb, nil, role); res.StatusCode() != 403 {
+					t.Fatalf("%s %s%s: %d %s", role, p, verb, res.StatusCode(), res.Body())
+				}
+			}
+		}
+		for _, role := range []auth.Role{auth.RoleViewer, auth.RoleMember} {
+			if res := shareCallAs(imp, "POST", APIPrefix+"/improvements/imp_done"+verb, nil, role); res.StatusCode() != 403 {
+				t.Fatalf("%s improvement%s: %d %s", role, verb, res.StatusCode(), res.Body())
+			}
+		}
+		if res := shareCallAs(r, "POST", APIPrefix+"/findings/"+fid+verb, nil, auth.RoleViewer); res.StatusCode() != 403 {
+			t.Fatalf("viewer finding%s: %d %s", verb, res.StatusCode(), res.Body())
+		}
+	}
+	if _, err := os.Stat(archivePath(root)); !os.IsNotExist(err) {
+		t.Fatalf("a refused archive wrote the sidecar: %v", err)
+	}
+	if ev, _ := evalstore.Open(root).Load("ev_done"); ev.IsArchived() {
+		t.Fatal("a refused archive marked the evaluation")
+	}
+	if res := shareCallAs(r, "POST", APIPrefix+"/findings/"+fid+"/archive", nil, auth.RoleMember); res.StatusCode() != 200 {
+		t.Fatalf("member finding: %d %s", res.StatusCode(), res.Body())
+	}
+	if res := shareCallAs(r, "POST", APIPrefix+"/experiments/"+testExp+"/archive", nil, auth.RoleAdmin); res.StatusCode() != 200 {
+		t.Fatalf("admin comparison: %d %s", res.StatusCode(), res.Body())
 	}
 }
