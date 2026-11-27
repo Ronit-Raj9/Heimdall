@@ -125,7 +125,7 @@ export function ScenarioRowsImport({ suite, writable }: { suite: SuiteSummary; w
 			<p className="text-muted-foreground max-w-3xl text-xs">{t("scenarios.help")}</p>
 			<div className="flex flex-wrap items-end gap-3">
 				<Field label={t("scenarios.file")}>
-					<input type="file" accept=".csv,.tsv,.jsonl,.ndjson,.json" onChange={onFile} className="text-sm" data-testid="suite-build-scenarios-file" />
+					<input type="file" accept=".csv,.tsv,.jsonl,.ndjson,.json" onChange={onFile} className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent" data-testid="suite-build-scenarios-file" />
 				</Field>
 				<Field label={t("scenarios.format")}>
 					<select className={selectClass} value={format} onChange={(e) => (setFormat(e.target.value as "csv" | "jsonl"), reset())}>
@@ -282,7 +282,7 @@ export function MockFromOpenAPI({ suite, writable }: { suite: SuiteSummary; writ
 			<p className="text-muted-foreground max-w-3xl text-xs">{t("mock.help")}</p>
 			<div className="flex flex-wrap items-end gap-3">
 				<Field label={t("mock.file")}>
-					<input type="file" accept=".yaml,.yml,.json" onChange={onFile} className="text-sm" data-testid="suite-build-mock-file" />
+					<input type="file" accept=".yaml,.yml,.json" onChange={onFile} className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent" data-testid="suite-build-mock-file" />
 				</Field>
 				<Field label={t("mock.id")} hint={t("mock.idHint")}>
 					<Input

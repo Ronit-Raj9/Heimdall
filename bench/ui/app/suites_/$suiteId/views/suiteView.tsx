@@ -199,7 +199,7 @@ function SuiteBody({
 	const noneReady = !builtin && !suite.error && suite.task_count > 0 && suite.admitted_count === 0;
 
 	return (
-		<section className="flex w-full min-w-0 flex-col gap-4 sm:gap-8" data-testid="suite-screen">
+		<section className="flex w-full min-w-0 flex-col gap-4 sm:gap-6" data-testid="suite-screen">
 			<PageHeader
 				title={
 					// M6-16: the h1 holds the name only; the id and version line sits under it in the subtitle.

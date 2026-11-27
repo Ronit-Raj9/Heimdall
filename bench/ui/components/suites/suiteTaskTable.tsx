@@ -79,7 +79,7 @@ export function SuiteTaskTable({
 							data-state={selected === task.id ? "selected" : undefined}
 							className={cn(selected === task.id && "bg-muted/60")}
 						>
-							<TableCell className="max-w-[14rem] align-top break-words whitespace-normal sm:max-w-80 sm:min-w-48">
+							<TableCell className="max-w-[14rem] align-middle break-words whitespace-normal sm:max-w-80 sm:min-w-48 lg:max-w-[36rem]">
 								<button
 									type="button"
 									onClick={() => onOpen(task.id)}
@@ -87,24 +87,24 @@ export function SuiteTaskTable({
 									aria-label={t("suites.tasks.open", {
 										task: `${task.id}: ${task.title}`,
 									})}
-									className="focus-visible:ring-(--focus) group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
+									className="focus-visible:ring-(--focus) group flex max-w-full min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
 									data-testid={`suites-task-open-${task.id}`}
 								>
-									<span className="text-foreground text-sm font-medium break-words group-hover:underline">{task.title || task.id}</span>
+									<span className="text-foreground line-clamp-2 text-sm font-medium break-words group-hover:underline lg:line-clamp-1" title={task.title || task.id}>{task.title || task.id}</span>
 									{/* M6-4: the id prints once when the title is the id. */}
 									{task.title && task.title !== task.id && (
-										<span className="text-muted-foreground font-mono text-xs break-all">{task.id}</span>
+										<span className="text-muted-foreground max-w-full truncate font-mono text-xs">{task.id}</span>
 									)}
 								</button>
 								{isHeldOut(task) && <HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} className="mt-1" />}
 							</TableCell>
-							{moreColumns && <TableCell className="align-top font-mono text-xs">{task.kind}</TableCell>}
+							{moreColumns && <TableCell className="align-middle font-mono text-xs">{task.kind}</TableCell>}
 							{kindOfWork && (
-								<TableCell className="align-top text-xs">
+								<TableCell className="align-middle text-xs">
 									<TaskCategoryCell suiteId={suiteId} taskId={task.id} label={categories.labels?.[task.id]} canEdit={categories.canEdit} />
 								</TableCell>
 							)}
-							<TableCell className={cn("align-top text-xs", wideOnly)}>
+							<TableCell className={cn("align-middle text-xs", wideOnly)}>
 								{/* M6-6: difficulty is plain grey text; only the status is a pill. */}
 								{task.difficulty ? (
 									<span className="text-muted-foreground text-xs">
@@ -119,7 +119,7 @@ export function SuiteTaskTable({
 								)}
 							</TableCell>
 							{moreColumns && (
-								<TableCell className="max-w-64 align-top whitespace-normal">
+								<TableCell className="max-w-64 align-middle whitespace-normal">
 									{task.capabilities.length > 0 ? (
 										<span className="flex flex-wrap gap-1">
 											{task.capabilities.map((capability) => (
@@ -133,7 +133,7 @@ export function SuiteTaskTable({
 									)}
 								</TableCell>
 							)}
-							<TableCell className="align-top">
+							<TableCell className="align-middle">
 								{/* M6-2: the badge says "Not checked yet" itself; the count line shows only once a check ran. */}
 								<span className="flex flex-col items-start gap-1">
 									<AdmissionBadge task={task} testId={`suites-task-admission-${task.id}`} />
@@ -148,7 +148,7 @@ export function SuiteTaskTable({
 								</span>
 							</TableCell>
 							{moreColumns && (
-								<TableCell className="align-top text-xs" data-testid={`suites-task-license-${task.id}`}>
+								<TableCell className="align-middle text-xs" data-testid={`suites-task-license-${task.id}`}>
 									{license ? (
 										<span className="font-mono">{license}</span>
 									) : (
@@ -157,7 +157,7 @@ export function SuiteTaskTable({
 								</TableCell>
 							)}
 							{moreColumns && (
-								<TableCell className="text-muted-foreground text-right align-top text-xs tabular-nums">
+								<TableCell className="text-muted-foreground text-right align-middle text-xs tabular-nums">
 									{t("suites.tasks.hiddenTestsCell", {
 										files: task.hidden_test_files,
 										required: task.required_tests,
@@ -165,7 +165,7 @@ export function SuiteTaskTable({
 								</TableCell>
 							)}
 							{health && (
-								<TableCell className={cn("max-w-72 align-top whitespace-normal", wideOnly)}>
+								<TableCell className={cn("max-w-72 align-middle whitespace-normal", wideOnly)}>
 									<TaskHealthCell task={task} health={health} />
 								</TableCell>
 							)}
@@ -195,7 +195,7 @@ function RedactedRow({
 	const { t } = useTranslation("bench");
 	return (
 		<TableRow data-testid={`suites-task-row-${task.id}`} data-redacted="true">
-			<TableCell className="max-w-[14rem] align-top break-words whitespace-normal sm:max-w-80 sm:min-w-48">
+			<TableCell className="max-w-[14rem] align-middle break-words whitespace-normal sm:max-w-80 sm:min-w-48 lg:max-w-[36rem]">
 				<span className="flex flex-col items-start gap-1">
 					<span className="text-foreground font-mono text-xs">{task.id}</span>
 					<HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} />
@@ -203,20 +203,20 @@ function RedactedRow({
 			</TableCell>
 			<TableCell
 				colSpan={moreColumns ? (kindOfWork ? 4 : 3) : 1}
-				className={cn("text-muted-foreground align-top text-xs whitespace-normal", !moreColumns && "hidden sm:table-cell")}
+				className={cn("text-muted-foreground align-middle text-xs whitespace-normal", !moreColumns && "hidden sm:table-cell")}
 			>
 				{t("suiteHealth.heldOutRow")}
 			</TableCell>
-			<TableCell className="align-top">
+			<TableCell className="align-middle">
 				<AdmissionBadge task={task} testId={`suites-task-admission-${task.id}`} />
 			</TableCell>
 			{moreColumns && (
-				<TableCell colSpan={2} className="text-muted-foreground align-top text-xs">
+				<TableCell colSpan={2} className="text-muted-foreground align-middle text-xs">
 					{t("suiteHealth.withheld")}
 				</TableCell>
 			)}
 			{health && (
-				<TableCell className="hidden max-w-72 align-top whitespace-normal sm:table-cell">
+				<TableCell className="hidden max-w-72 align-middle whitespace-normal sm:table-cell">
 					<TaskHealthCell task={task} health={health} />
 				</TableCell>
 			)}

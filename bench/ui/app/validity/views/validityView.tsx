@@ -48,11 +48,11 @@ export function comparisonNames(experiments: readonly { exp_id: string; name?: s
 function ComparisonLink({ id, names }: { id: string; names: Map<string, string> }) {
 	const name = names.get(id);
 	return (
-		<span className="flex min-w-0 flex-col">
-			<Link to="/experiments/$expId" params={{ expId: id }} className="text-primary break-words hover:underline">
+		<span className="flex min-w-0 max-w-80 flex-col">
+			<Link to="/experiments/$expId" params={{ expId: id }} className="text-primary truncate hover:underline" title={name ?? id}>
 				{name ?? id}
 			</Link>
-			{name && <span className="text-muted-foreground font-mono text-xs break-all">{id}</span>}
+			{name && <span className="text-muted-foreground truncate font-mono text-xs" title={id}>{id}</span>}
 		</span>
 	);
 }
@@ -95,7 +95,7 @@ function ChangedTable({ entries, user, names }: { entries: ValidityEntry[]; user
 								<span className={cn("font-medium", TONE_TEXT[decisionTone(e.after.decision)])}>{word(e.after.decision)}</span>
 							</span>
 						</TableCell>
-						<TableCell className="text-muted-foreground">{e.note ?? ""}</TableCell>
+						<TableCell className="text-muted-foreground min-w-56 whitespace-normal">{e.note ?? ""}</TableCell>
 					</TableRow>
 				))}
 			</TableBody>

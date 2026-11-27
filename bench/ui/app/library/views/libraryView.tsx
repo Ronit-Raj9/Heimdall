@@ -100,7 +100,7 @@ export default function LibraryView() {
 									aria-pressed={pack === p.id}
 									onClick={() => void setPack(p.id || null)}
 									className={cn(
-										"rounded-full border px-3 py-1 text-[13px] transition-colors",
+										"inline-flex h-(--control-h) items-center rounded-full max-sm:h-10 border px-3 text-[13px] transition-colors",
 										pack === p.id
 											? "bg-foreground text-background border-foreground"
 											: "bg-card text-muted-foreground hover:text-foreground",
@@ -118,7 +118,7 @@ export default function LibraryView() {
 								onChange={(e) => setQuery(e.target.value)}
 								placeholder={t("library.search")}
 								aria-label={t("library.search")}
-								className="bg-card h-9 pl-8"
+								className="bg-card pl-8"
 								data-testid="library-search"
 							/>
 						</div>
@@ -128,7 +128,7 @@ export default function LibraryView() {
 							{t("library.noMatch")}
 						</p>
 					) : (
-						<ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3" data-testid="library-list">
+						<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3" data-testid="library-list">
 							{shown.map((b) => (
 								<BenchmarkCard key={b.id} b={b} packs={lib.data?.packs ?? []} canOpen={canOpen} />
 							))}
@@ -151,7 +151,7 @@ function BenchmarkCard({ b, packs, canOpen }: { b: PublicBenchmark; packs: Publi
 	const packName = (id: string) => packs.find((p) => p.id === id)?.name ?? id;
 	const grading = b.grading === "verified" ? t("library.verified") : b.grading === "judged" ? t("library.judged") : undefined;
 	return (
-		<li className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid={`library-benchmark-${b.id}`}>
+		<li className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5" data-testid={`library-benchmark-${b.id}`}>
 			<div className="flex flex-col gap-1">
 				<div className="flex flex-wrap items-baseline justify-between gap-2">
 					<h2 className="font-semibold">
@@ -173,7 +173,7 @@ function BenchmarkCard({ b, packs, canOpen }: { b: PublicBenchmark; packs: Publi
 							</>
 						)}
 					</h2>
-					<span className="text-muted-foreground font-mono text-xs">{b.id}</span>
+					<span className="text-muted-foreground min-w-0 truncate font-mono text-xs">{b.id}</span>
 				</div>
 				{b.description && <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">{b.description}</p>}
 				{b.error && (
