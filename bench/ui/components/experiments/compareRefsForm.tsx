@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { costSentence } from "@/components/platform/confirmDialog";
 import { Input } from "@/components/ui/input";
 import { paidLabel } from "@/components/ui/paidButton";
@@ -82,8 +83,7 @@ export function CompareRefsForm({
 	const params = needRepo ? null : built;
 	const same = refA.trim() !== "" && refA.trim() === refB.trim();
 	const problem = compareRefsProblem({ trials, budget });
-	const field = "flex flex-col gap-1 text-sm";
-	const select = "border-input bg-background h-9 rounded-md border px-2 text-sm";
+	const field = "flex flex-col gap-1.5 text-sm";
 	const pickRepo = (full: string) => {
 		setRepo(full);
 		const r = repos.data?.repos.find((x) => x.full_name === full);
@@ -100,9 +100,9 @@ export function CompareRefsForm({
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className={field} htmlFor={`${uid}-agent`}>
 					{t("compare.agent")}
-					<select
+					<NativeSelect
 						id={`${uid}-agent`}
-						className={select}
+						wrapperClassName="w-full"
 						value={agent}
 						onChange={(e) => setAgent(e.target.value)}
 						data-testid={`${testId}-agent`}
@@ -113,7 +113,7 @@ export function CompareRefsForm({
 								{a.id}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 					{agents.isSuccess && list.length === 0 && (
 						<Link to="/agents" className="text-xs underline">
 							{t("compare.noAgents")}
@@ -140,9 +140,9 @@ export function CompareRefsForm({
 				<label className={`${field} sm:col-span-2`} htmlFor={`${uid}-repo`}>
 					{t("compare.repo")}
 					{connected ? (
-						<select
+						<NativeSelect
 							id={`${uid}-repo`}
-							className={select}
+							wrapperClassName="w-full"
 							value={repo}
 							onChange={(e) => pickRepo(e.target.value)}
 							data-testid={`${testId}-repo`}
@@ -155,7 +155,7 @@ export function CompareRefsForm({
 									{r.full_name}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					) : (
 						<span className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid={`${testId}-connect`}>
 							<span>{hosted ? t("compare.connectHosted") : t("compare.connectHint")}</span>

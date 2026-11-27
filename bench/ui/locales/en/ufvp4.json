@@ -1,0 +1,7 @@
+{
+	"list": {
+		"moreFilters": "More filters",
+		"moreFiltersOn": "More filters ({{count}})",
+		"moreFiltersLabel": "More filters for comparisons"
+	}
+}

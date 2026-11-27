@@ -148,7 +148,8 @@ describe("ExperimentBoard", () => {
 		expect(html).not.toContain("experiment-row-e_eval_child");
 		expect(html).not.toContain("experiment-row-e_practice");
 		expect(html).toContain("experiment-row-e_named");
-		expect(html).toContain("Show 3 system runs");
+		// Round 3: the system runs switch sits in the bar's "More filters" menu with Agent and Model.
+		expect(html).toContain("More filters");
 		expect(html).toContain("Showing 2 of 2");
 		url.all = "1";
 		const every = render(<ExperimentBoard />);
@@ -156,7 +157,7 @@ describe("ExperimentBoard", () => {
 		expect(every).toContain("experiment-row-e_admit_acme_safety_5e8q");
 		expect(every).toContain("experiment-row-e_eval_child");
 		expect(every).toContain("experiment-row-e_practice");
-		expect(tagOf(every, "experiment-show-system")).toContain("checked");
+		expect(every).toContain("More filters (1)");
 	});
 	it("has a New comparison button and says where evaluation benchmarks live", () => {
 		const html = render(<ExperimentListView />);

@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { migrateParams } from "@/lib/types/experimentActions";
@@ -40,15 +41,15 @@ export function MigrateForm({
 		if (a?.model && !from) setFrom(a.model);
 	};
 	const params = migrateParams({ agent, suite, from, to, trials, budget });
-	const field = "flex flex-col gap-1 text-sm";
+	const field = "flex flex-col gap-1.5 text-sm";
 	return (
 		<div className="flex flex-col gap-3" data-testid={testId}>
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className={field} htmlFor={`${uid}-agent`}>
 					{t("migrate.agent")}
-					<select
+					<NativeSelect
 						id={`${uid}-agent`}
-						className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+						wrapperClassName="w-full"
 						value={agent}
 						onChange={(e) => pickAgent(e.target.value)}
 						data-testid={`${testId}-agent`}
@@ -59,7 +60,7 @@ export function MigrateForm({
 								{a.id}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 					{agents.isSuccess && list.length === 0 && <span className="text-muted-foreground text-xs">{t("migrate.noAgents")}</span>}
 				</label>
 				<label className={field} htmlFor={`${uid}-suite`}>
