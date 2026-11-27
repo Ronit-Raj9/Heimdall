@@ -1,4 +1,6 @@
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { useGetAgentsQuery } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -26,7 +28,7 @@ export default function AgentsView() {
 		{ id: "frameworks", label: tu("tabs.frameworks") },
 	];
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="agents-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="agents-screen">
 			<PageHeader
 				title={t("agents.title")}
 				subtitle={tu("subtitle")}

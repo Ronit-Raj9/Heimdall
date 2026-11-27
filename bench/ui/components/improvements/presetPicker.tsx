@@ -23,7 +23,7 @@ export function PresetPicker({ value, onChange }: { value: PresetName; onChange(
 	const { t } = useTranslation("w45imp");
 	return (
 		<fieldset className="flex flex-col gap-1 text-xs" data-testid="new-improvement-preset">
-			<legend className="text-foreground mb-1 font-medium">{t("form.size")}</legend>
+			<legend className="text-foreground mb-1 text-sm font-medium">{t("form.size")}</legend>
 			<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
 				{PRESET_NAMES.map((name) => {
 					const p = PRESETS[name];

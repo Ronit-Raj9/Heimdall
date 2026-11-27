@@ -7,6 +7,9 @@ import type { ExperimentStatus } from "@/lib/types/bench";
 export const CAP_MIN = 0.1;
 export const CAP_MAX = 5;
 
+/** The cap the investigate dialog starts with; the outer "Find out why" button names the same number (R7-5). */
+export const INVESTIGATION_START_CAP_USD = 1;
+
 /** The cap as typed, held inside the bounds; text that is not a number reads as the lowest cap. */
 export function clampCap(raw: string | number): number {
 	const n = Number(raw);

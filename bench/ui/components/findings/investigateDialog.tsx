@@ -7,7 +7,7 @@ import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CAP_MAX, CAP_MIN, clampCap, defaultInvestigation, investigableExperiments } from "./findingPlans";
+import { CAP_MAX, CAP_MIN, INVESTIGATION_START_CAP_USD, clampCap, defaultInvestigation, investigableExperiments } from "./findingPlans";
 
 const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 text-sm";
 
@@ -23,7 +23,7 @@ export function InvestigateDialog({ onDone }: { onDone: () => void }) {
 	const experiments = useMemo(() => investigableExperiments(raw ?? []), [raw]);
 	const [expId, setExpId] = useState("");
 	const [touched, setTouched] = useState(false);
-	const [capText, setCapText] = useState("1");
+	const [capText, setCapText] = useState(String(INVESTIGATION_START_CAP_USD));
 	const [create, state] = useCreateJobMutation();
 	const [started, setStarted] = useState(false);
 	const cap = clampCap(capText);

@@ -1,4 +1,5 @@
 import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step5Launch";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { budgetLine } from "@/app/evaluate/views/budgetAdvice";
 import { compatFor, compatibilityMap, incompatibleReason, keepRunnable } from "@/app/evaluate/views/step3Benchmarks";
 import { suiteDisplayName } from "@/components/suites/suiteDisplay";
@@ -458,7 +459,7 @@ export default function FailureTestsView() {
 
 	return (
 		// On phones the Run bar is fixed to the bottom of the screen (Q-296): the padding keeps the page's end above it.
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8 pb-40 sm:pb-0" data-testid="failure-tests-screen">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8 pb-40 sm:pb-0")} data-page-width="read" data-testid="failure-tests-screen">
 			<PageHeader title={t("ft.title")} subtitle={t("ft.subtitle")} />
 
 			{noAgents ? (

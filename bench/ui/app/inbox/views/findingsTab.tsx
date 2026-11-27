@@ -17,10 +17,11 @@ import { defaultInvestigation } from "@/components/findings/findingPlans";
 import "@/app/failures/views/ufrhI18n";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
+import { INVESTIGATION_START_CAP_USD } from "@/components/findings/findingPlans";
 import { useTranslation } from "react-i18next";
 
-/** The cap the investigate dialog starts with (its capText default); the outer button names it (R7-5). */
-export const INVESTIGATION_START_CAP_USD = 1;
+// One constant for the dialog's starting cap and the outer button's label (R7-5); re-exported for tests.
+export { INVESTIGATION_START_CAP_USD } from "@/components/findings/findingPlans";
 
 /**
  * The Findings tab of the inbox: /inbox?tab=findings&finding=. Tracked failures with their state,

@@ -1,5 +1,7 @@
 import { agentNameProblem } from "@/components/agents/agentName";
-import { ModelPicker, type ModelRef, type ProviderId } from "@/components/models/modelPicker";
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import type { ModelRef, ProviderId } from "@/components/models/modelPicker";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -357,7 +359,7 @@ export default function NewAgentView() {
 	const error = createState.error ?? putState.error ?? dryRunState.error;
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="agents-new-screen">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8")} data-page-width="read" data-testid="agents-new-screen">
 			<PageHeader
 				title={t("new.title")}
 				subtitle={t("new.subtitle")}
@@ -502,11 +504,12 @@ export default function NewAgentView() {
 								) : (
 									<div className="flex flex-col gap-1 text-sm">
 										<span className="font-medium">{t("new.model")}</span>
-										<ModelPicker
+										{/* The shared grouped combobox (RK Q-149): one searchable box, providers as groups with their key state. */}
+										<GroupedModelPicker
 											value={model}
 											onChange={setModel}
-											purpose="agent"
-											allowedProviders={tpl.providers as ProviderId[]}
+											providers={tpl.providers?.length ? tpl.providers : undefined}
+											label={t("new.model")}
 											testId="agent-model"
 										/>
 										<span className="text-muted-foreground text-xs">

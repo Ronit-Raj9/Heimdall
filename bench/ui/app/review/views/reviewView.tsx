@@ -39,7 +39,7 @@ export default function ReviewView() {
 	const selectedExp = defaultPickerExperiment(picker.options, exp);
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-8" data-testid="review-screen">
+		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="review-screen">
 			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{tu("review.subtitle")}</span>} />
 			<div className="flex flex-wrap items-end gap-3">
 				<ExperimentSelect

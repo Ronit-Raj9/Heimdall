@@ -1,4 +1,6 @@
 import { CopyAgentDialog } from "@/components/agents/copyAgentDialog";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { DeleteAgentDialog } from "@/components/agents/deleteAgentDialog";
 import "@/components/agents/fw13I18n";
 import type { OverflowMenuItem } from "@/components/agents/overflowMenu";
@@ -201,7 +203,7 @@ export default function AgentDetailView() {
 	];
 	if (!agentLoading && !agent) {
 		return (
-			<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-4" data-testid="agent-detail-screen">
+			<section className={cn(pageWidthClass("dash"), "flex flex-col gap-4")} data-page-width="dash" data-testid="agent-detail-screen">
 				<EmptyNote testId="agent-not-found">{tn("agentNotFound.text", { id: agentId })}</EmptyNote>
 				<div>
 					<Button asChild size="sm" variant="outline">
@@ -214,7 +216,7 @@ export default function AgentDetailView() {
 		);
 	}
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="agent-detail-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="agent-detail-screen">
 			<PageHeader
 				// The heading is the agent's name only (M2-30): the avatar sits before it, hidden from
 				// screen readers, and the version chip sits beside it with the check pill.

@@ -1,4 +1,6 @@
 import { LoadError, BlockSkeleton } from "@/components/runs/screenStates";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PaidButton } from "@/components/ui/paidButton";
 import { PageHeader } from "@/components/shell";
@@ -174,7 +176,7 @@ export default function ReplaysView() {
 	// FR-13: until a replay can run, the setup steps come first and the form stays folded.
 	const blocked = settings.data !== undefined && (missing.off || missing.noSource);
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="replays-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="replays-screen">
 			<PageHeader title={t("page.title")} subtitle={t("page.intro")} />
 			{id ? (
 				<ReplayRun id={id} onBack={() => void setId(null)} />

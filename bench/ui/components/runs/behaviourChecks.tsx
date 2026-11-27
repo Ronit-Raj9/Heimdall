@@ -1,4 +1,5 @@
 import "./w441I18n";
+import "./ufw2I18n";
 
 import { BehaviourEditor, saveErrorText } from "@/components/runs/behaviourEditor";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
@@ -48,6 +49,7 @@ export function noRunsChecked(perArm: Record<string, { runs: number }>): boolean
 
 function BehaviourRow({ r, title, runId, hideReason }: { r: RuleResult; title: string; runId: string; hideReason?: boolean }) {
 	const { t } = useTranslation("w441");
+	const { t: tw } = useTranslation("ufw2");
 	return (
 		<li className="flex flex-col gap-1" data-testid={`behaviour-run-${r.rule_id}`}>
 			<div className="flex flex-wrap items-center gap-2">
@@ -55,6 +57,12 @@ function BehaviourRow({ r, title, runId, hideReason }: { r: RuleResult; title: s
 				<StatusWord result={r} />
 				{r.status === "unknown" && r.reason && !hideReason && <span className="text-muted-foreground text-xs">{r.reason}</span>}
 			</div>
+			{/* Q-260: this check reads the agent's steps; an error only the tool proxy saw is not one of them. */}
+			{r.rule_id === "ignores_tool_error" && (
+				<p className="text-muted-foreground text-xs" data-testid="behaviour-proxy-errors-note">
+					{tw("behaviour.proxyErrorsNote")}
+				</p>
+			)}
 			{r.status === "fired" &&
 				(r.hits ?? []).map((h, i) => (
 					<div key={i} className="flex flex-wrap items-center gap-2 pl-4 font-mono text-xs">
