@@ -115,7 +115,6 @@ export function MatrixReport({ matrix, onCondition }: MatrixReportProps) {
 			{(rows.length > 1 || (!matrix.separable && matrix.note)) && (
 				<Disclosure
 					title={tu("verdict.forStatisticians")}
-					description={tu("matrix.statsHint")}
 					defaultOpen={anyPairBelow(pairs, matrix.alpha)}
 					testId="matrix-statistics"
 				>

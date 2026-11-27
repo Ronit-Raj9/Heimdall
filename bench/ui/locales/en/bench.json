@@ -349,7 +349,7 @@
 	},
 	"leaderboard": {
 		"title": "Leaderboard",
-		"subtitle": "Ranked by tasks solved. Top group ties with the leader.",
+		"subtitle": "Ranked by tasks solved. Top group cannot be told apart from the leader.",
 		"banner": "Practice data. No real model, not real results.",
 		"bannerHint": "",
 		"loadError": "Could not load the leaderboard.",
@@ -1637,7 +1637,7 @@
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
-		"facts": "{{suite}}, {{tasks}} shared tasks, alpha {{alpha}}",
+		"facts": "{{suite}}, {{tasks}} shared tasks, luck chance below {{alpha}}",
 		"notSeparable": "Cannot separate",
 		"synthetic": "Synthetic data. These numbers are not findings.",
 		"openVerdict": "Open verdict",
@@ -3175,7 +3175,7 @@
 		}
 	},
 	"trends": {
-		"subtitle": "Each agent's results across comparisons.",
+		"subtitle": "",
 		"loadError": "Could not load the trends.",
 		"resetFilters": "Reset filters",
 		"unknown": "not measured",
@@ -3654,7 +3654,7 @@
 			"title": "New version {{candidate}} compared with current version {{baseline}}",
 			"description": "Result at score {{threshold}} and {{pairs}} pairs. False alarm under {{alpha}} over {{signals}} signals, any check rate.",
 			"counts": "{{candidate}} sessions on the new version, {{baseline}} on the current version.",
-			"restarts": "Restarted {{count}} times. Counts sessions after the last restart.",
+			"restarts": "Restarted {{count}} times. Each restart counts only sessions after it.",
 			"label": "Live comparison, one row per signal",
 			"needPairs": "needs {{count}} more pairs of sessions",
 			"columns": {

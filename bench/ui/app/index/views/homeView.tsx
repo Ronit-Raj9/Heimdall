@@ -146,14 +146,9 @@ export default function HomeView() {
 	return (
 		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-8")} data-page-width="dash" data-testid="home-screen">
 			<header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" data-testid="home-header">
-				<div className="flex min-w-0 flex-col gap-1">
-					<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="home-greeting">
-						{firstName ? t("greeting.named", { greeting, name: firstName }) : greeting}
-					</h1>
-					<p className="text-muted-foreground max-w-2xl text-sm" data-testid="home-intro">
-						{t("intro")}
-					</p>
-				</div>
+				<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="home-greeting">
+					{firstName ? t("greeting.named", { greeting, name: firstName }) : greeting}
+				</h1>
 			</header>
 
 			{showSetup && <SetupCard mayRun={mayRun} steps={steps} />}
@@ -171,7 +166,7 @@ export default function HomeView() {
 								? kpiError(() => void evals.refetch())
 								: agentsState === "error"
 									? kpiError(() => void agents.refetch())
-									: t("kpi.agentsHint")
+									: undefined
 						}
 						loading={evalsState === "loading" || agentsState === "loading"}
 						testId="home-kpi-agents"

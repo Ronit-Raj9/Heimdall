@@ -67,7 +67,7 @@ export default function LeaderboardView() {
 	];
 	return (
 		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="leaderboard-page">
-			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} actions={<LeaderboardShare />} />
+			<PageHeader title={t("leaderboard.title")} actions={<LeaderboardShare />} />
 			<RouteTabs
 				tabs={tabs}
 				defaultTab={suiteParam ? "leaderboard" : "agents"}
