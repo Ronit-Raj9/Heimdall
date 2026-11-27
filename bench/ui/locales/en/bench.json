@@ -379,7 +379,7 @@
 		},
 		"table": {
 			"title": "Ranking",
-			"description": "Unknown values sort last, never shown as 0.",
+			"description": "",
 			"label": "Agent setups ranked by solve rate",
 			"rank": "Rank",
 			"tier": "Group",
@@ -3222,13 +3222,13 @@
 		},
 		"lineages": {
 			"title": "Latest change for each agent",
-			"description": "Newest point against the previous one, sign-flip test, alpha {{alpha}}.",
+			"description": "",
 			"points_one": "{{count}} point",
 			"points_other": "{{count}} points"
 		},
 		"chart": {
 			"title": "{{metric}} over time",
-			"description": "A gap means no value for that point.",
+			"description": "",
 			"summary_one": "{{metric}} over time: {{lineages}} lineages, {{count}} point.",
 			"summary_other": "{{metric}} over time: {{lineages}} lineages, {{count}} points.",
 			"latest": "Latest: {{latest}}.",

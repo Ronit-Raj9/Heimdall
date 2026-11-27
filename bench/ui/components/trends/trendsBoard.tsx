@@ -44,7 +44,6 @@ export function TrendsBoard({ data, onIncludeSynthetic }: TrendsBoardProps) {
 		<div className="flex min-w-0 flex-col gap-6">
 			<Section
 				title={t("trends.lineages.title")}
-				description={t("trends.lineages.description", { alpha: data.alpha })}
 				testId="trends-lineages"
 			>
 				<ul className="flex flex-col gap-2">
@@ -61,7 +60,6 @@ export function TrendsBoard({ data, onIncludeSynthetic }: TrendsBoardProps) {
 			</Section>
 			<Section
 				title={t("trends.chart.title", { metric: t(`trends.metric.${data.metric}`) })}
-				description={t("trends.chart.description")}
 				testId="trends-chart-section"
 			>
 				<TrendsChart lineages={lineages} metric={data.metric} slots={slots} />

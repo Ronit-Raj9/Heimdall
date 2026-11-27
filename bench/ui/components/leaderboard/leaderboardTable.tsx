@@ -33,13 +33,11 @@ export const COMPACT_METRICS = ["cost_per_success"] as const;
  */
 export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = false }: LeaderboardTableProps) {
 	const { t } = useTranslation("bench");
-	const { t: t9 } = useTranslation("hw09");
-	const locale = getLocale();
 	const groupStarts = sort.key === "rank" ? tierGroupStarts(rows) : new Map<number, 1 | 2>();
 	const metricColumns = compact ? METRIC_COLUMNS.filter((c) => (COMPACT_METRICS as readonly string[]).includes(c.id)) : METRIC_COLUMNS;
 	// The compact table keeps one line per row: fault columns and the per-row notes wait for "More columns".
 	const shownFaults = compact ? [] : faults;
-	const columnCount = (compact ? 3 : 5) + metricColumns.length + shownFaults.length + (compact ? 1 : 2);
+	const columnCount = (compact ? 4 : 5) + metricColumns.length + shownFaults.length + (compact ? 1 : 2);
 	const head = (key: SortKey, label: string, hint?: string, align: "left" | "right" = "right") => (
 		<SortableHead key={key} sortKey={key} label={label} hint={hint} sort={sort} onSort={onSort} align={align} />
 	);
@@ -127,13 +125,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 										/>
 									</TableCell>
 								))}
-								<TableCell className="text-right align-top tabular-nums" data-testid={`leaderboard-tasks-${entry.rank}`}>
-									{t9("leaderboard.tasksRunsPassed", {
-										tasks: formatCount(entry.tasks, locale),
-										runs: formatCount(entry.runs, locale),
-										passed: formatCount(entry.passes.num, locale),
-									})}
-								</TableCell>
+								<TasksCell entry={entry} compact={compact} />
 								{!compact && (
 									<TableCell className="align-top">
 										<ExperimentLinks entry={entry} />
@@ -188,5 +180,22 @@ function SortableHead({ sortKey, label, hint, sort, onSort, align }: SortableHea
 				<Icon className={cn("size-3.5 shrink-0", !active && "opacity-50")} aria-hidden="true" />
 			</button>
 		</TableHead>
+	);
+}
+/** Tasks and runs; the passed count is in the title on the compact table, so the cell stays one short line. */
+function TasksCell({ entry, compact }: { entry: LeaderboardEntry; compact: boolean }) {
+	const { t: t9 } = useTranslation("hw09");
+	const locale = getLocale();
+	const tasks = formatCount(entry.tasks, locale);
+	const runs = formatCount(entry.runs, locale);
+	const full = t9("leaderboard.tasksRunsPassed", { tasks, runs, passed: formatCount(entry.passes.num, locale) });
+	return (
+		<TableCell
+			className="text-right align-top whitespace-nowrap tabular-nums"
+			data-testid={`leaderboard-tasks-${entry.rank}`}
+			title={compact ? full : undefined}
+		>
+			{compact ? `${tasks} / ${runs}` : full}
+		</TableCell>
 	);
 }

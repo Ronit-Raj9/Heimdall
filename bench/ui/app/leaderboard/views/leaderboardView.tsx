@@ -324,7 +324,6 @@ function Board({
 			{entries.length > 0 && <Podium entries={entries} />}
 			<Section
 				title={t("leaderboard.table.title")}
-				description={t("leaderboard.table.description")}
 				testId="leaderboard-ranking"
 				actions={
 					entries.length > 0 && (
