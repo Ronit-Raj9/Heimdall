@@ -238,6 +238,10 @@ func (h *findingsHandler) list(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, findingsUnknownState)
 		return
 	}
+	archived, ok := readArchiveFilter(ctx, h.env.Mode) // UI fix wave D1: archived= (uifix_d1_archive_store.go)
+	if !ok {
+		return
+	}
 	if err := h.refresh(h.walk()); err != nil {
 		h.sendErr(ctx, "", err)
 		return
@@ -249,6 +253,9 @@ func (h *findingsHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	out := FindingsList{Findings: []findings.Finding{}, Counts: map[string]int{}}
 	for _, f := range all {
+		if !archived.keep(f.IsArchived()) {
+			continue
+		}
 		out.Counts[f.State]++
 		if state == "" || f.State == state {
 			out.Findings = append(out.Findings, f)

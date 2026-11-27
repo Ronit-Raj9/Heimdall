@@ -69,6 +69,9 @@ type RunListRow struct {
 	// Excluded is why a sealed run is left out of scores (schemas.ExcludedReason):
 	// out_of_memory, infra_error, invalid_evaluator or unknown; empty when it scores.
 	Excluded string `json:"excluded,omitempty"`
+	// Archived is set while the run is archived (UI fix wave D1); read from
+	// the organization's archive sidecar, never from the sealed folder.
+	schemas.Archived
 }
 
 // RunListFacets are the distinct values of every filter across all runs, so
@@ -208,6 +211,11 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	marks, ok := loadArchiveMarks(ctx, h.mode, h.root, archiveRuns) // UI fix wave D1: archived= (uifix_d1_archive.go)
+	if !ok {
+		return
+	}
+
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	suiteInfo := h.suiteInfo(work)
@@ -218,7 +226,11 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 	for _, expID := range h.index.Experiments() {
 		m, _ := h.index.Manifest(expID)
 		for _, rv := range h.index.Runs(expID) {
+			if !marks.keep(rv.Run.RunID) {
+				continue
+			}
 			row := runListRow(rv, suiteInfo)
+			row.Archived = marks.mark(rv.Run.RunID)
 			armFacts(&row, rv, m, versions)
 			if m != nil {
 				row.ExpName = strings.TrimSpace(m.Experiment.Name)

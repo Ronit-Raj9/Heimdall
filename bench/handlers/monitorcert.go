@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"context"
+	"slices"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -36,6 +37,7 @@ var (
 type MonitorCertHandler struct {
 	mode  schemas.Mode
 	certs MonitorCertSource
+	write lib.Middleware // guards DELETE (UI fix wave D1, uifix_d1_monitordelete.go)
 }
 
 // NewMonitorCertHandler creates the handler; certs may be nil, and the
@@ -49,6 +51,7 @@ func (h *MonitorCertHandler) RegisterRoutes(r *router.Router, middlewares ...lib
 	r.GET(MonitorCertListRouteDoc.Path, lib.ChainMiddlewares(h.list, middlewares...))
 	r.GET(MonitorCertGetRouteDoc.Path, lib.ChainMiddlewares(h.get, middlewares...))
 	r.GET(MonitorCertReportRouteDoc.Path, lib.ChainMiddlewares(h.report, middlewares...))
+	r.DELETE(MonitorCertDeleteRouteDoc.Path, lib.ChainMiddlewares(h.delete, append(slices.Clone(middlewares), h.write)...))
 }
 
 // list handles GET /api/bench/monitors/certifications.

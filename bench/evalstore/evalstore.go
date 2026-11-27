@@ -48,13 +48,21 @@ func (s *Store) Save(ev *schemas.Evaluation) error {
 	if !ValidID(ev.ID) {
 		return fmt.Errorf("evaluation id %q is not valid", ev.ID)
 	}
+	mu := lockFor(s.dir)
+	mu.Lock()
+	defer mu.Unlock()
+	// Archiving is changed only by SetArchived: a refresh that read the
+	// evaluation before it was archived must not undo it (UI fix wave D1).
+	ev.Archived = s.storedArchived(ev.ID)
+	return s.write(ev)
+}
+
+// write saves ev under the lock the caller holds.
+func (s *Store) write(ev *schemas.Evaluation) error {
 	data, err := json.MarshalIndent(ev, "", "  ")
 	if err != nil {
 		return err
 	}
-	mu := lockFor(s.dir)
-	mu.Lock()
-	defer mu.Unlock()
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
 		return err
 	}

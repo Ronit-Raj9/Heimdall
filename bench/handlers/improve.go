@@ -48,6 +48,9 @@ type ImproveHandler struct {
 	mode  schemas.Mode
 	src   ImproveSource
 	write lib.Middleware
+	// archiveRoot is the project root of the archive sidecar (UI fix wave
+	// D1, uifix_d1_archive.go); "" marks none archived.
+	archiveRoot string
 }
 
 // NewImproveHandler creates the handler. src may be nil; its routes then
@@ -70,6 +73,7 @@ func (h *ImproveHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 	r.POST(APIPrefix+"/improvements/{id}/continue", lib.ChainMiddlewares(h.postContinue, writeMW...))
 	r.POST(APIPrefix+"/improvements/{id}/continue/estimate", lib.ChainMiddlewares(h.postContinueEstimate, middlewares...))
 	h.RegisterStudyRoutes(r, middlewares...)
+	h.registerArchiveRoutes(r, middlewares, writeMW) // UI fix wave D1 (uifix_d1_archive.go)
 }
 
 func (h *ImproveHandler) ready(ctx *fasthttp.RequestCtx) bool {
@@ -117,6 +121,10 @@ func (h *ImproveHandler) getList(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvements", err)
 		return
 	}
+	l, ok := h.archivedList(ctx, l) // UI fix wave D1: archived= (uifix_d1_archive.go)
+	if !ok {
+		return
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(l))
 }
 
@@ -156,6 +164,7 @@ func (h *ImproveHandler) getOne(ctx *fasthttp.RequestCtx) {
 	}
 	out := *d
 	out.Rounds = namedApprovals(ctx, d.Rounds)
+	out.Archived = archiveMarkOf(h.archiveRoot, archiveImprovements, id) // UI fix wave D1
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(&out))
 }
 

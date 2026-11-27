@@ -42,6 +42,9 @@ type ExperimentsHandler struct {
 	recorder *eventRecorder
 	analyses sync.Map // exp id -> id of the last original-grade analysis this server computed
 	paused   pausedCache
+	// archiveRoot is the project root whose archive sidecar marks archived
+	// comparisons (UI fix wave D1, uifix_d1_archive.go); "" marks none.
+	archiveRoot string
 }
 
 // NewExperimentsHandler creates the experiments handler. write guards the
@@ -107,10 +110,19 @@ func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
 	if h.listExperimentsPaged(ctx) {
 		return
 	}
+	marks, ok := h.archiveMarks(ctx)
+	if !ok {
+		return
+	}
 	out := schemas.ExperimentList{Experiments: []schemas.ExperimentStatus{}}
 	for _, id := range h.index.Experiments() {
+		if !marks.keep(id) {
+			continue
+		}
 		if m, ok := h.index.Manifest(id); ok {
-			out.Experiments = append(out.Experiments, h.listRow(m, h.index.Runs(id)))
+			row := h.listRow(m, h.index.Runs(id))
+			row.Archived = marks.mark(id)
+			out.Experiments = append(out.Experiments, row)
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
@@ -226,6 +238,7 @@ func (h *ExperimentsHandler) getExperiment(ctx *fasthttp.RequestCtx) {
 		st.Paused, st.PausedModels = h.pausedFacts(m.ExpID)
 	}
 	st.LatestRegrade = h.latestRegrade(m.ExpID)
+	st.Archived = h.archiveMark(m.ExpID) // UI fix wave D1: an archived comparison still opens by id
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, st)
 }
 
