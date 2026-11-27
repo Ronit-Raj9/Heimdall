@@ -94,28 +94,32 @@ export default function DeviceView({ initialCode }: { initialCode?: string }) {
 		if (isUserCode(typed)) setCode(normalizeUserCode(typed));
 	};
 	const form = (
-		<form className="flex items-end gap-2" onSubmit={onFind} data-testid="device-form">
-			<label className="flex flex-1 flex-col gap-1.5 text-sm">
-				<span className="font-medium">{t("device.codeLabel")}</span>
+		<form className="flex flex-col gap-1.5 text-sm" onSubmit={onFind} data-testid="device-form">
+			<label htmlFor="device-code" className="font-medium">
+				{t("device.codeLabel")}
+			</label>
+			{/* Field and button share one row, so the hint under the field never pushes the button down. */}
+			<div className="flex items-center gap-2">
 				<Input
+					id="device-code"
 					value={typed}
 					onChange={(event) => setTyped(event.target.value)}
 					placeholder="BCDF-GHJK"
 					autoComplete="off"
 					spellCheck={false}
-					className="font-mono tracking-widest uppercase"
+					className="flex-1 font-mono tracking-widest uppercase"
 					data-testid="device-code"
 				/>
-				<span className="text-muted-foreground text-xs">{t("device.codeHint")}</span>
-				{(notACode(typed) || badLink) && (
-					<span className="text-chart-error-ink text-xs" role="alert" data-testid="device-not-a-code">
-						{t("device.notACode")}
-					</span>
-				)}
-			</label>
-			<Button type="submit" dataTestId="device-find" disabled={!isUserCode(typed)}>
-				{t("device.find")}
-			</Button>
+				<Button type="submit" dataTestId="device-find" disabled={!isUserCode(typed)}>
+					{t("device.find")}
+				</Button>
+			</div>
+			<span className="text-muted-foreground text-xs">{t("device.codeHint")}</span>
+			{(notACode(typed) || badLink) && (
+				<span className="text-chart-error-ink text-xs" role="alert" data-testid="device-not-a-code">
+					{t("device.notACode")}
+				</span>
+			)}
 		</form>
 	);
 

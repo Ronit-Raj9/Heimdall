@@ -186,7 +186,7 @@ export default function DocsView() {
 								onChange={(e) => setFilter(e.target.value)}
 								placeholder={t("docs.search")}
 								aria-label={t("docs.search")}
-								className="bg-card h-9 rounded-lg pl-8 text-sm"
+								className="bg-card h-(--control-h) rounded-lg pl-8 text-sm"
 								data-testid="docs-filter"
 							/>
 						</div>
@@ -246,10 +246,12 @@ export default function DocsView() {
 }
 /** The guide's headings. The read page width has no room for a third column, so it folds above the article. */
 function DocToc({ toc, label }: { toc: { id: string; text: string; level: number }[]; label: string }) {
+	// The links render only while open: a closed fold keeps no hidden links under the article.
+	const [open, setOpen] = useState(false);
 	return (
-		<details className="mb-4 rounded-lg border px-3 py-2 text-[13px]" data-testid="docs-toc">
+		<details className="mb-4 w-fit min-w-64 max-w-full rounded-lg border px-3 py-2 text-[13px]" data-testid="docs-toc" onToggle={(e) => setOpen(e.currentTarget.open)}>
 			<summary className="text-muted-foreground cursor-pointer text-xs font-medium tracking-wide uppercase">{label}</summary>
-			<ul className="mt-2 flex flex-col gap-1 border-l">
+			{open && <ul className="mt-2 flex flex-col gap-1 border-l">
 				{toc.map((h) => (
 					<li key={h.id}>
 						<a
@@ -268,7 +270,7 @@ function DocToc({ toc, label }: { toc: { id: string; text: string; level: number
 						</a>
 					</li>
 				))}
-			</ul>
+			</ul>}
 		</details>
 	);
 }

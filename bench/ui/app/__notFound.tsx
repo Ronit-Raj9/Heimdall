@@ -79,7 +79,7 @@ export function NotFoundComponent() {
 			<nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" aria-label={tu("notFound.goTo")} data-testid="not-found-links">
 				<span className="text-foreground/80">{tu("notFound.goTo")}</span>
 				{NOT_FOUND_LINKS.map((l) => (
-					<Link key={l.to} to={l.to as "/"} className="text-primary underline underline-offset-2" data-testid={`not-found-go-${l.key}`}>
+					<Link key={l.to} to={l.to as "/"} className="text-primary underline-offset-2 hover:underline" data-testid={`not-found-go-${l.key}`}>
 						{tu(`notFound.links.${l.key}`)}
 					</Link>
 				))}
@@ -88,7 +88,7 @@ export function NotFoundComponent() {
 			<form action="/docs" method="get" role="search" className="flex w-full max-w-sm items-center gap-2" data-testid="not-found-docs-search">
 				<div className="relative min-w-0 flex-1">
 					<Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
-					<Input name="q" type="search" placeholder={tu("notFound.searchDocs")} aria-label={tu("notFound.searchDocs")} className="h-9 pl-8 text-sm" />
+					<Input name="q" type="search" placeholder={tu("notFound.searchDocs")} aria-label={tu("notFound.searchDocs")} className="pl-8 text-sm" />
 				</div>
 				<Button type="submit" variant="outline">
 					{tu("notFound.search")}

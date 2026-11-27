@@ -92,14 +92,14 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 						)}
 					</div>
 				</div>
-				<nav aria-label={t("nav.menu")} className="flex gap-1 overflow-x-auto px-4 pb-2 md:hidden" data-testid="public-nav-mobile">
+				<nav aria-label={t("nav.menu")} className="bench-no-scrollbar flex gap-1 overflow-x-auto px-4 pb-1 md:hidden" data-testid="public-nav-mobile">
 					{SITE_LINKS.map((l) => (
 						<Link
 							key={l.to}
 							to={l.to}
 							aria-current={active(l.to) ? "page" : undefined}
 							className={cn(
-								"shrink-0 rounded-md px-2.5 py-1 text-[13px]",
+								"inline-flex h-10 shrink-0 items-center rounded-md px-2.5 text-[13px]",
 								active(l.to) ? "bg-accent text-foreground font-medium" : "text-muted-foreground",
 							)}
 						>
