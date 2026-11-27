@@ -148,10 +148,7 @@ export function LandingView() {
 			{(library.data?.packs.length ?? 0) > 0 && (
 				<section className="flex flex-col gap-6" data-testid="landing-packs">
 					<div className="flex flex-wrap items-end justify-between gap-4">
-						<div className="flex flex-col gap-2">
-							<h2 className="text-2xl font-semibold tracking-[-0.02em]">{t("landing.libraryTitle")}</h2>
-							<p className="text-muted-foreground">{t("landing.libraryBody")}</p>
-						</div>
+						<h2 className="text-2xl font-semibold tracking-[-0.02em]">{t("landing.libraryTitle")}</h2>
 						<Link to="/library" className={buttonVariants({ variant: "outline" })}>
 							{t("landing.ctaLibrary")}
 							<ArrowRight aria-hidden="true" />

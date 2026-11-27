@@ -38,7 +38,7 @@
 		"interval": "{{effect}} (range {{lo}} to {{hi}})"
 	},
 	"notFound": {
-		"description": "Page not found.",
+		"description": "The page may have moved, or the link is wrong.",
 		"goTo": "Go to",
 		"searchDocs": "Search the guides",
 		"search": "Search",

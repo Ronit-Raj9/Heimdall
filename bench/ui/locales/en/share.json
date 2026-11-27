@@ -8,7 +8,7 @@
 		"run_trace": "this run",
 		"leaderboard": "this leaderboard view"
 	},
-	"intro": "Anyone with the link can view. Secrets are never shown.",
+	"intro": "Anyone with the link can view a read-only copy, no account needed. Secrets are never shown.",
 	"expiry": "Link expires",
 	"expiryOption": {
 		"1": "1 day",

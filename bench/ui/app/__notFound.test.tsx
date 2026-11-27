@@ -43,7 +43,7 @@ describe("not-found page (N129, N73)", () => {
 		const html = render(<NotFoundComponent />);
 		for (const k of ["evaluations", "agents", "runs", "docs"]) expect(html).toContain(`data-testid="not-found-go-${k}"`);
 		expect(html).toContain('data-testid="not-found-docs-search"');
-		expect(html).toContain("We could not find that page.");
+		expect(html).toContain("The page may have moved, or the link is wrong.");
 		expect(tagOf(html, "not-found-link-home")).toContain("bg-primary");
 	});
 

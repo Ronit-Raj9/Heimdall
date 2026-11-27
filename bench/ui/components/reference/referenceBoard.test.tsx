@@ -39,7 +39,7 @@ describe("reference board", () => {
 	it("says plainly when nothing is published, with no numbers", () => {
 		const html = renderToStaticMarkup(<ReferenceBoardView board={board([])} />);
 		expect(html).toContain('data-testid="reference-empty"');
-		expect(html).toContain("No reference scores are published yet");
+		expect(html).toContain("No reference scores yet.");
 		expect(html).not.toMatch(/\d+%/);
 		const one = renderToStaticMarkup(<ReferenceBoardView board={board([])} benchmark="tau2" />);
 		expect(one).toContain("for this benchmark");

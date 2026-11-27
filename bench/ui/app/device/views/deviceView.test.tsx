@@ -78,7 +78,7 @@ describe("DeviceView", () => {
 		api.lookups = [];
 		const html = render(<DeviceView initialCode="abc" />, hostedSession());
 		expect(html).toContain('data-testid="device-form"');
-		expect(html).toContain("That is not a sign-in code. Codes are 8 letters with no vowels, like BCDF-GHJK.");
+		expect(html).toContain("Not a sign-in code. Codes are 8 letters with no vowels, like BCDF-GHJK.");
 		expect(html).not.toContain('data-testid="device-not-found"');
 		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="device-find"|<button[^>]*data-testid="device-find"[^>]*disabled=""/);
 		expect(api.lookups.every((l) => l.skip)).toBe(true);

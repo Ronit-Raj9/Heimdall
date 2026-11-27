@@ -12,10 +12,10 @@ describe("share dialog (lane 8b)", () => {
 	it("says what an outsider sees, that the page is live, and that the page address needs an account (M8-69)", () => {
 		const lines = shareAudienceLines("evaluation", false).map((k) => i18n.t(k as "share.live", { ns: "uf8b" }));
 		expect(lines).toHaveLength(4);
-		expect(lines[0]).toContain("They will see");
+		expect(lines[0]).toContain("Visible:");
 		expect(lines[1]).toContain("Never shown");
 		expect(lines[1]).not.toContain("prompts");
-		expect(lines[2]).toContain("live page");
+		expect(lines[2]).toContain("Live page");
 		expect(lines[3]).toContain("needs an account");
 		expect(i18n.t(shareAudienceLines("verdict", true)[1] as "share.live", { ns: "uf8b" })).toContain("prompts and agent text");
 	});

@@ -68,7 +68,7 @@ describe("SupportScorecard", () => {
 		const llm: SupportSummary = { ...summary, simulator_mode: "llm", simulator_label: "simulated user (model: anthropic/claude-sim)", synthetic: false };
 		const html = renderToStaticMarkup(<SupportScorecard summary={llm} />);
 		expect(html).toContain("simulated user (model: anthropic/claude-sim)");
-		expect(html).toContain("same simulated user");
+		expect(html).toContain("Compare only under the same simulator");
 		expect(html).not.toContain("smoke test");
 	});
 
