@@ -70,7 +70,7 @@ describe("AgentsPanel", () => {
 		// 22 of 24 steps attributed: under 95%, a warning.
 		expect(html).toMatch(/data-testid="agents-A-coverage" data-tone="warn"/);
 		expect(html).toContain('data-testid="agents-blame-A" data-tier="gate_proven"');
-		expect(html).toContain("LLM-judge blame is not offered: best published step-level accuracy is 14%.");
+		expect(html).toContain("LLM-judge blame off. Best step accuracy is 14%.");
 		expect(html).toContain('data-testid="agents-swimlane-A"');
 		expect(html.match(/data-testid="agents-handoff-marker-A-\d+"/g)).toHaveLength(
 			team.handoffs.filter((h) => h.at_ms !== null && h.to).length,

@@ -100,17 +100,19 @@ export function PairTable({
 	const showCondition = rows.some((r) => r.condition !== "clean");
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
-			<p className="text-muted-foreground text-xs" data-testid="pair-picker-legend">
-				{t5("pair.legend")}
-			</p>
-			{setupNames(arms, setups).length > 0 && (
-				<ul className="flex flex-wrap gap-x-4 gap-y-1 font-sans text-sm" data-testid="pair-picker-setups">
-					{setupNames(arms, setups).map((name) => (
-						<li key={name}>{name}</li>
-					))}
-				</ul>
-			)}
-			<Table stickyColumns={1} data-testid="pair-picker-table">
+			<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+				{setupNames(arms, setups).length > 0 && (
+					<ul className="flex flex-wrap gap-x-4 gap-y-1 font-sans text-sm" data-testid="pair-picker-setups">
+						{setupNames(arms, setups).map((name) => (
+							<li key={name}>{name}</li>
+						))}
+					</ul>
+				)}
+				<p className="text-muted-foreground text-xs" data-testid="pair-picker-legend">
+					{t5("pair.legend")}
+				</p>
+			</div>
+			<Table data-testid="pair-picker-table">
 				<TableHeader>
 					<TableRow>
 						<TableHead className="text-sm">{t("runs.picker.task")}</TableHead>

@@ -14,7 +14,7 @@ describe("DebugFaultReason on a replay run", () => {
 			debug_allowed: { replay: false, fork: false },
 		} as unknown as RunDetail;
 		const html = render(<DebugFaultReason detail={d} />);
-		expect(html).toContain("This run is itself a replay. To replay again, open the source run and replay that.");
+		expect(html).toContain("This run is a replay. Open its source run to replay again.");
 		expect(html).not.toContain("No fault");
 	});
 });

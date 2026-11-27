@@ -29,7 +29,7 @@ const data: RunSteps = {
 describe("TraceView tools chip (N28)", () => {
 	it("explains that each tool use and its answer are listed", () => {
 		const html = renderToStaticMarkup(<TraceView data={data} arm="A" />);
-		expect(tagOf(html, "trace-filter-tools")).toContain('title="Each tool use and its answer are listed"');
+		expect(tagOf(html, "trace-filter-tools")).not.toContain("title=");
 		expect(tagOf(html, "trace-filter-model")).not.toContain("title=");
 	});
 });

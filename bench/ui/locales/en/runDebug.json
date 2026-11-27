@@ -65,7 +65,7 @@
 		"responsePlaceholder": "What the model should say at this call",
 		"messageLabel": "Message",
 		"messagePlaceholder": "For example: run the tests first",
-		"divergence": "If the request differs earlier",
+		"divergence": "If the request differs before this call",
 		"divergenceLive": "Continue live from there",
 		"divergenceStop": "Stop the run",
 		"cost": "Calls before {{call}} replay free. Later calls cost money.",

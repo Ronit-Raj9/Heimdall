@@ -32,12 +32,12 @@ export function RunScenarioEvidence({ detail, arm }: { detail: RunDetail; arm: s
 	);
 }
 
-function Part({ title, description, children, testId }: { title: string; description: string; children: React.ReactNode; testId: string }) {
+function Part({ title, description, children, testId }: { title: string; description?: string; children: React.ReactNode; testId: string }) {
 	return (
 		<section className="flex min-w-0 flex-col gap-2" data-testid={testId}>
 			<div className="flex flex-col gap-0.5">
 				<h3 className="text-foreground text-xs font-semibold tracking-wide uppercase">{title}</h3>
-				<p className="text-muted-foreground max-w-prose text-xs">{description}</p>
+				{description ? <p className="text-muted-foreground max-w-prose text-xs">{description}</p> : null}
 			</div>
 			{children}
 		</section>
@@ -71,7 +71,7 @@ export function ToolCallTable({ calls, arm, initialOpen = [] }: ToolCallTablePro
 		});
 
 	return (
-		<Part title={t("runs.scenario.tools.title")} description={t("runs.scenario.tools.description")} testId={`run-tools-${arm}`}>
+		<Part title={t("runs.scenario.tools.title")} testId={`run-tools-${arm}`}>
 			<p className="text-muted-foreground flex flex-wrap gap-x-3 text-xs" data-testid={`run-tools-${arm}-counts`}>
 				<span>{t("runs.scenario.tools.summary", { count: counts.calls })}</span>
 				<span className={counts.errors > 0 ? "text-chart-error-ink" : undefined}>
@@ -297,7 +297,7 @@ export function AnswerBlock({ answer }: { answer: Answer }) {
 	const { t } = useTranslation("bench");
 	const source = answer.source === "file" || answer.source === "final_message" || answer.source === "missing" ? answer.source : null;
 	return (
-		<Part title={t("runs.scenario.answer.title")} description={t("runs.scenario.answer.description")} testId="run-answer">
+		<Part title={t("runs.scenario.answer.title")} testId="run-answer">
 			<p className="text-xs" data-testid="run-answer-source" data-source={answer.source}>
 				<span className="text-muted-foreground">{t("runs.scenario.answer.source")}: </span>
 				<span className={cn("font-medium", answer.source === "missing" ? "text-chart-error-ink" : "text-foreground")}>
@@ -326,7 +326,7 @@ export function StateFiles({ files, arm }: { files: readonly StateFile[]; arm: s
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	return (
-		<Part title={t("runs.scenario.state.title")} description={t("runs.scenario.state.description")} testId={`run-state-${arm}`}>
+		<Part title={t("runs.scenario.state.title")} testId={`run-state-${arm}`}>
 			<div className="min-w-0 rounded-sm border">
 				<Table aria-label={t("runs.scenario.state.label", { arm })}>
 					<TableHeader>

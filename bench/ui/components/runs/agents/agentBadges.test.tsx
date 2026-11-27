@@ -10,7 +10,7 @@ describe("agent badges", () => {
 		expect(html).toContain('data-state="unknown"');
 		expect(html).toContain(">unknown<");
 		expect(html).toContain("bench-hatched");
-		expect(html).toContain("gateway rows that carry the agent&#x27;s id");
+		expect(html).toContain("gateway rows with the agent&#x27;s id");
 	});
 
 	it("labels strengths with their source, dashing all but proven", () => {

@@ -1079,7 +1079,7 @@
 			"description": "",
 			"tools": {
 				"title": "Tool uses",
-				"description": "Every request through the tool relay, in order.",
+				"description": "",
 				"label": "Tool uses, Setup {{arm}}",
 				"summary_one": "{{count}} call",
 				"summary_other": "{{count}} calls",
@@ -1149,7 +1149,7 @@
 			},
 			"state": {
 				"title": "Exported state",
-				"description": "Locked and read-only for the verifier.",
+				"description": "",
 				"label": "Exported state of setup {{arm}}",
 				"service": "Service",
 				"file": "Export",
@@ -1326,7 +1326,7 @@
 			},
 			"handoffs": {
 				"title": "Handoffs",
-				"description": "Open a row to compare sent and delivered.",
+				"description": "",
 				"empty": "No handoffs recorded between the agents.",
 				"label": "Handoffs of setup {{arm}}",
 				"to": "to",

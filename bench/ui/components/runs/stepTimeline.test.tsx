@@ -195,7 +195,7 @@ describe("StepTimeline", () => {
 	it("reports truncation and skipped lines", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={{ ...data, truncated: true, skipped_lines: 2 }} arm="A" />);
 		expect(html).toContain('data-testid="step-timeline-A-truncated"');
-		expect(html).toContain("2 lines of the timeline file did not parse");
+		expect(html).toContain("2 unreadable lines left out");
 	});
 
 	it("renders the fixtures", () => {
@@ -225,7 +225,7 @@ describe("ObserverStatusLine", () => {
 
 	it("says when no observer status was recorded", () => {
 		const html = renderToStaticMarkup(<ObserverStatusLine observers={[]} arm="A" locale="en" />);
-		expect(html).toContain("No record of how Heimdall watched this run.");
+		expect(html).toContain("No observer record.");
 	});
 });
 
@@ -392,7 +392,7 @@ describe("agent events status", () => {
 
 	it("says when the agent reported nothing", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={{ ...data, agent_events: { collector: "on", received: 0, kept: 0 } }} arm="A" />);
-		expect(html).toContain("The agent reported nothing about itself (only Heimdall&#x27;s own records shown)");
+		expect(html).toContain("The agent reported nothing about itself.");
 		expect(html).not.toContain("Agent reported 0");
 		expect(html).not.toContain("step-agent-events-A-channels");
 		expect(html).not.toContain("step-agent-events-A-reason");

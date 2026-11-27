@@ -124,7 +124,7 @@ describe("ToolCallTable", () => {
 		expect(html).toContain('aria-label="Tool uses, Setup A"');
 		expect(html).toContain("2 calls");
 		expect(html).toContain("1 error");
-		expect(html).toContain("1 problem injected on purpose");
+		expect(html).toContain("1 injected problem");
 		expect(html).toMatch(/data-testid="run-tool-call-1"[^>]*data-error="false"/);
 		expect(html).toContain("find_ticket");
 		expect(html).toMatch(/data-testid="run-tool-call-2-fault" data-tone="warn">.*injected error/);
@@ -182,12 +182,12 @@ describe("AnswerBlock", () => {
 		expect(html).toContain("Thursday at &lt;b&gt;7&lt;/b&gt;, the Thai place");
 		expect(html).not.toContain("<b>7</b>");
 		expect(html).toContain("sha256 6666");
-		expect(html).toContain("Cut at the size cap");
+		expect(html).toContain("Cut at size cap");
 	});
 
 	it("says when the answer came from the final message, and when it is missing", () => {
 		expect(renderToStaticMarkup(<AnswerBlock answer={{ text: "42", source: "final_message", sha256: "" }} />)).toContain(
-			"the agent&#x27;s final message (no answer file was written)",
+			"final message, no answer file",
 		);
 		const missing = renderToStaticMarkup(<AnswerBlock answer={{ text: "", source: "missing", sha256: "" }} />);
 		expect(missing).toContain("missing: no answer file and no final message");

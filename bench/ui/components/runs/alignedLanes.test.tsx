@@ -42,8 +42,8 @@ describe("AlignedLanes", () => {
 	it("marks the first observed divergence as an observation, right before its step", () => {
 		const html = render();
 		expect(html.match(/data-testid="first-divergence-marker"/g)).toHaveLength(1);
-		expect(html).toContain(">First point where the setups did something different<");
-		expect(html).toContain(">This is where they split, not necessarily why.<");
+		expect(html).toContain(">First divergence<");
+		expect(html).toContain(">Where they split, not why.<");
 		expect(html).toContain(pair.first_divergence!.note);
 		const marker = html.indexOf('data-testid="first-divergence-marker"');
 		const step = html.indexOf(`data-testid="aligned-step-${pair.first_divergence!.index}"`);

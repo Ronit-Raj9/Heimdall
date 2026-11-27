@@ -72,7 +72,7 @@ describe("RunFailureCard", () => {
     expect(html).toContain("preparing the task&#x27;s container");
     expect(html).toContain("cat /task/a.txt: Permission denied");
     expect(html).toContain(
-      "This is a setup problem with the benchmark, not your agent.",
+      "Benchmark setup problem.",
     );
     expect(html).toContain('data-testid="run-failure-copy"');
     expect(html).not.toContain("run-failure-toggle");

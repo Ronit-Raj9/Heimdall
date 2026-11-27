@@ -59,7 +59,7 @@ describe("AgentTree", () => {
 
 	it("notes an orphan and keeps roles inert", () => {
 		const html = renderToStaticMarkup(<AgentTree members={members} arm="A" />);
-		expect(html).toContain("Its parent is not in the tree");
+		expect(html).toContain("Parent missing");
 		expect(html).not.toContain("<i>worker");
 		expect(html).toContain("&lt;i&gt;worker&lt;/i&gt;");
 	});

@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FilterBar, FilterSelect } from "@/components/ui/toolbar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ValueCell } from "@/components/valueCell";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
@@ -77,8 +77,6 @@ export const RUN_FILTERS = [
 
 type FilterParam = (typeof RUN_FILTERS)[number]["param"];
 
-const ALL = "__all";
-
 const searchParsers = {
 	exp: parseAsString,
 	arm: parseAsString,
@@ -121,12 +119,9 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 	const filters = { ...search, exp: expId ?? search.exp };
 	const request = runListRequest(filters, search.page);
 	const list = useListRunsQuery(request);
-	const { t: tu } = useTranslation("uf4a");
 	const shownFilters = RUN_FILTERS.filter((f) => !(expId && f.param === "exp"));
 	// M4-19: a filter with one value is no choice and is left out; on a comparison only Setup and Result show at once.
 	const choosable = shownFilters.filter((f) => !list.data || filterHasChoice(list.data.facets[f.facet] ?? [], search[f.param]));
-	const mainFilters = expId ? choosable.filter((f) => MAIN_FILTERS.has(f.param)) : choosable;
-	const moreFilters = expId ? choosable.filter((f) => !MAIN_FILTERS.has(f.param)) : [];
 	const active = shownFilters.some((f) => Boolean(search[f.param]));
 	const page = Math.max(1, search.page ?? 1);
 
@@ -135,9 +130,9 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid={testId}>
-			<div className="flex flex-wrap items-end gap-2" role="group" aria-label={t("runs.list.filtersLabel")}>
-				{mainFilters.map((filter) => (
-					<FilterSelect
+			<FilterBar label={t("runs.list.filtersLabel")} testId="run-list-filters">
+				{choosable.map((filter) => (
+					<RunFilterSelect
 						key={filter.param}
 						param={filter.param}
 						options={list.data?.facets[filter.facet] ?? []}
@@ -145,34 +140,12 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 						onChange={(value) => setFilter(filter.param, value)}
 					/>
 				))}
-				{moreFilters.length > 0 && (
-					<details
-						className="group"
-						data-testid="run-list-more-filters"
-						open={moreFilters.some((f) => Boolean(search[f.param])) || undefined}
-					>
-						<summary className="text-primary flex h-8 cursor-pointer list-none items-center text-sm font-medium [&::-webkit-details-marker]:hidden">
-							{tu("runs.moreFilters")}
-						</summary>
-						<div className="mt-2 flex flex-wrap items-end gap-2">
-							{moreFilters.map((filter) => (
-								<FilterSelect
-									key={filter.param}
-									param={filter.param}
-									options={list.data?.facets[filter.facet] ?? []}
-									value={search[filter.param]}
-									onChange={(value) => setFilter(filter.param, value)}
-								/>
-							))}
-						</div>
-					</details>
-				)}
 				{active && (
 					<Button variant="ghost" size="sm" onClick={clear} dataTestId="run-list-clear">
 						{t("runs.list.clear")}
 					</Button>
 				)}
-			</div>
+			</FilterBar>
 
 			{list.isLoading ? (
 				<BlockSkeleton rows={8} testId="run-list-loading" />
@@ -220,7 +193,7 @@ export function RunList({ expId, running = false, testId = "run-list" }: RunList
 	);
 }
 
-function FilterSelect({
+function RunFilterSelect({
 	param,
 	options,
 	value,
@@ -232,31 +205,18 @@ function FilterSelect({
 	onChange: (value: string | null) => void;
 }) {
 	const { t } = useTranslation("bench");
-	const { t: tu } = useTranslation("uf4a");
-	const id = `run-filter-${param}`;
-	// A value from the URL the facets do not carry (a typo, an old link) still shows as chosen.
-	const choices = value && !options.includes(value) ? [value, ...options] : options;
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
-			<label htmlFor={id} className="text-muted-foreground text-xs" title={param === "track" ? tu("runs.trackHint") : undefined}>
-				{t(`runs.list.filter.${param}`)}
-			</label>
-			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)}>
-				<SelectTrigger id={id} size="sm" className="w-40 max-w-full font-mono text-xs" data-testid={id}>
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					<SelectItem value={ALL}>
-						<span className="font-sans">{t("runs.list.all")}</span>
-					</SelectItem>
-					{choices.map((option) => (
-						<SelectItem key={option} value={option} className="font-mono text-xs">
-							{param === "outcome" ? t(`runs.outcome.${option}`, { defaultValue: option }) : option}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-		</div>
+		<FilterSelect
+			label={t(`runs.list.filter.${param}`)}
+			options={options.map((option) => ({
+				value: option,
+				label: param === "outcome" ? t(`runs.outcome.${option}`, { defaultValue: option }) : option,
+			}))}
+			value={value}
+			onChange={onChange}
+			allLabel={t("runs.list.all")}
+			testId={`run-filter-${param}`}
+		/>
 	);
 }
 
@@ -277,7 +237,7 @@ export function RunTable({
 	const showScore = !passFailOnly(rows);
 	let band = 0;
 	return (
-		<Table stickyColumns={1} data-testid="run-table" aria-label={t("runs.list.tableLabel")}>
+		<Table data-testid="run-table" aria-label={t("runs.list.tableLabel")}>
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">{t("runs.list.col.run")}</TableHead>
@@ -391,13 +351,12 @@ export function faultText(condition: string, attempt: string): string {
 
 function TaskCell({ row }: { row: TitledRow }) {
 	if (!row.task_title) return <EntityLink kind="task" id={row.task} suite={row.suite} />;
+	// The title is the link; the id stays in its tooltip (Q-30), not on a second line.
 	return (
-		<span className="flex max-w-80 min-w-0 flex-col" title={`${row.task_title}\n${row.task}`}>
-			{/* One line per task title so the table fits at 1440; the full title is the tooltip (Q-30). */}
-			<span className="text-foreground line-clamp-1 text-sm [overflow-wrap:anywhere]" data-testid={`run-row-${row.run_id}-task-title`}>
+		<span className="block max-w-80 min-w-0 truncate" data-testid={`run-row-${row.run_id}-task-title`}>
+			<EntityLink kind="task" id={row.task} suite={row.suite} className="font-sans text-sm">
 				{row.task_title}
-			</span>
-			<EntityLink kind="task" id={row.task} suite={row.suite} />
+			</EntityLink>
 		</span>
 	);
 }
