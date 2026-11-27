@@ -11,12 +11,12 @@ never shown again after saving.
 - **Allowed models**: comma separated; empty allows any model.
 - **Monthly budget (USD)**: 0 means no limit. A key past its budget shows
   `over budget` in the table.
-- **Test** asks the provider for its model list, a call providers do not charge for where they have one (otherwise the smallest call they allow). Status: `untested`, `works`, `refused`, `error`.
+- **Test** asks the provider for its model list with the key (free; Sarvam has no list call, so it sends one tiny language check, which may be billed). No chat or completion request is sent. Status: `untested`, `works`, `refused`, `error`.
 
-Runs reach models only through the Bifrost gateway, which holds the key. The
-agent container gets a per-run key, never your provider key. A worker
-(Settings > Workers) is different: it runs the gateway itself, so it is
-handed your provider key for the length of each run it takes. **Edit** with an
+Runs reach models only through the gateway on the worker: the worker receives
+your key for the length of the run and keeps it in memory in its proxy. The
+agent container gets a per-run key, never your provider key. This holds for
+every worker, the shared one and your own (Settings > Workers). **Edit** with an
 empty key field keeps the stored key. **Delete** makes runs using it fail.
 
 Spend per key: [Settings > Usage](/settings?tab=usage), Provider keys section.

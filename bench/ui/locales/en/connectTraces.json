@@ -6,7 +6,7 @@
 	"endpoint": {
 		"title": "Send traces",
 		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works.",
-		"privacy": "Heimdall keeps names, models, tools called and routes. It does not keep prompts, answers or tool arguments.",
+		"privacy": "This traces endpoint keeps only names, models, tools called and routes: no prompts, answers or tool arguments. Failures you send to Production failures are different: Heimdall keeps the request, the answer and the tool calls there, with keys, tokens and contact details removed.",
 		"url": "Traces endpoint",
 		"auth": "Send your ingest token in the Authorization header. Create one with the button below.",
 		"makeToken": "Create an ingest token",

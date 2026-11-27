@@ -3656,7 +3656,7 @@
 			"grouping": "Sessions",
 			"groupingCounts": "{{id}} grouped by session id, {{gap}} grouped by pauses between requests ({{concurrent}} with requests at the same time)",
 			"privacy": "What is kept",
-			"privacyText": "{{rate}}% of sessions are scored and kept for {{days}} days. Only numbers and flags are kept; transcripts sent to Production failures have private data removed.",
+			"privacyText": "{{rate}}% of sessions are scored and kept for {{days}} days. Only numbers and flags are kept; transcripts sent to Production failures are kept with keys, tokens, email addresses and phone numbers removed; names and street addresses are not removed.",
 			"judge": "AI judge"
 		},
 		"compare": {

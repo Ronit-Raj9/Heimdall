@@ -24,7 +24,7 @@
 	"create": "Create link",
 	"creating": "Creating...",
 	"createError": "Could not create the link.",
-	"readOnlyRole": "Viewers can open links but only members can create them.",
+	"readOnlyRole": "Viewers can see which links exist, but only members can create or copy them.",
 	"copy": "Copy",
 	"copied": "Copied",
 	"copyFailed": "Could not copy",

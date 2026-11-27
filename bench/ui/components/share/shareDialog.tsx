@@ -19,6 +19,7 @@ import {
 import "@/lib/types/shareI18n";
 import "@/components/settings/w4m8I18n";
 import "./uf8bI18n";
+import "./ufd4I18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { cn } from "@/lib/utils";
 import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2 } from "lucide-react";
@@ -29,6 +30,19 @@ import "@/components/platform/ufintI18n";
 
 /** Expiry choices, in days; 0 is never. */
 export const EXPIRY_CHOICES = [1, 7, 30, 90, 0] as const;
+
+/** The expiry a new link starts with, in days (decision 7). */
+export const DEFAULT_EXPIRY_DAYS = 7;
+
+/** The choices a person may pick: "Never" (0) only for admins; the server refuses it for others. Exported for tests. */
+export function expiryChoices(isAdmin: boolean): Array<(typeof EXPIRY_CHOICES)[number]> {
+	return EXPIRY_CHOICES.filter((d) => isAdmin || d !== 0);
+}
+
+/** True when a link row may offer Copy: an active link whose address the server sent (viewers get none). Exported for tests. */
+export function canCopyLink(s: Share): boolean {
+	return s.state === "active" && shareUrl(s) !== "";
+}
 
 export interface ShareTarget {
 	kind: ShareKind;
@@ -180,8 +194,10 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 	const { t: tu } = useTranslation("uf8b");
 	const session = useSession();
 	const confirm = useConfirm();
+	const { t: td } = useTranslation("ufd4");
 	const canCreate = canUse(session, "member");
-	const [days, setDays] = useState<number>(30);
+	const isAdmin = canUse(session, "admin");
+	const [days, setDays] = useState<number>(DEFAULT_EXPIRY_DAYS);
 	const [hidePrompts, setHidePrompts] = useState(false);
 	const [label, setLabel] = useState("");
 	const [created, setCreated] = useState<Share | null>(null);
@@ -264,7 +280,7 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 							<fieldset className="flex flex-col gap-2">
 								<legend className="text-sm font-medium">{t("expiry")}</legend>
 								<div className="bg-muted/60 inline-flex w-fit flex-wrap gap-1 rounded-lg p-1" role="radiogroup">
-									{EXPIRY_CHOICES.map((d) => (
+									{expiryChoices(isAdmin).map((d) => (
 										<button
 											key={d}
 											type="button"
@@ -281,6 +297,11 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 										</button>
 									))}
 								</div>
+								{!isAdmin && (
+									<p className="text-muted-foreground text-xs" data-testid="share-never-admin">
+										{td("share.neverAdminOnly")}
+									</p>
+								)}
 							</fieldset>
 							<label className="flex items-start gap-2.5 text-sm">
 								<input
@@ -381,7 +402,12 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 												<span className="text-muted-foreground text-xs">
 													{s.expires_at ? t("expires", { when: formatDate(s.expires_at) }) : t("neverExpires")}
 												</span>
-												{s.state === "active" && shareUrl(s) && <CopyButton text={shareUrl(s)} testId={`share-copy-${s.id}`} />}
+												{canCopyLink(s) && <CopyButton text={shareUrl(s)} testId={`share-copy-${s.id}`} />}
+												{s.state === "active" && !canCopyLink(s) && (
+													<span className="text-muted-foreground text-xs" data-testid={`share-copy-role-${s.id}`}>
+														{td("share.copyNeedsRole")}
+													</span>
+												)}
 												{s.state === "active" && canCreate && (
 													<Button type="button" variant="ghost" size="sm" onClick={() => void turnOff(s)} dataTestId={`share-revoke-${s.id}`}>
 														{t("revoke")}

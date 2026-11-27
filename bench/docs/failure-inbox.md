@@ -25,7 +25,10 @@ Inbox page in the UI (`ui/app/inbox`, `ui/components/inbox`).
    a gateway request that failed, retried, fell back or hit a budget.
 2. **Pull.** `heimdall inbox pull` (or the schedule daemon) asks each source
    for what it flagged since the last pull, reads each flagged session,
-   redacts it, and files it in the inbox.
+   redacts it, and files it in the inbox. The inbox keeps the user's request,
+   the agent's answers and every tool call with its arguments and result;
+   keys, tokens, email addresses, phone numbers, long numbers and home folder
+   names are removed first, names and street addresses are not.
 3. **Dedupe.** Sessions with the same failure signature become one item with
    a count and first and last seen times, so fifty timeouts of the same refund
    tool are one line, not fifty.

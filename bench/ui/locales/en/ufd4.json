@@ -1,0 +1,30 @@
+{
+	"share": {
+		"copyNeedsRole": "Only people who can share can copy this link",
+		"neverAdminOnly": "Only an admin can make a link that never expires.",
+		"org": {
+			"title": "Shared links",
+			"description": "Every read-only link anyone in this organization has made. Turning a link off ends it for everyone who has it.",
+			"empty": "No one in this organization has made a share link yet.",
+			"loadError": "Could not load the share links.",
+			"link": "Link",
+			"by": "Made by",
+			"on": "Shows",
+			"created": "Made",
+			"expiry": "Expires",
+			"state": "State",
+			"unknownCreator": "unknown"
+		}
+	},
+	"shared": {
+		"runs": "{{num}} of {{den}} runs passed",
+		"sample": "rate from {{den}} runs",
+		"tooFew": "Too few runs to rate",
+		"tooFewDetail": "{{den}} runs; at least {{min}} are needed to rate",
+		"costPerRun": "Cost per run (median)",
+		"spent": "Total cost",
+		"finished": "Finished",
+		"started": "Started",
+		"madeBy": "Link made by {{name}}"
+	}
+}

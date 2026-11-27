@@ -62,7 +62,7 @@ describe("FromTracesView", () => {
 		expect(html).toContain('data-testid="from-traces-endpoint-marker"');
 		expect(html).toContain("Step 1 of 2");
 		expect(html).not.toContain("1. Send traces");
-		expect(html).toContain("It does not keep prompts, answers or tool arguments.");
+		expect(html).toContain("no prompts, answers or tool arguments. Failures you send to Production failures are different");
 		expect(html).toContain("export HEIMDALL_INGEST_TOKEN=");
 		expect(html).toContain('data-testid="from-traces-file-button"');
 	});

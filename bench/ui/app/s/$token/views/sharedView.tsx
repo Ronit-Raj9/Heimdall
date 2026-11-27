@@ -15,6 +15,13 @@ import { useTranslation } from "react-i18next";
 import { formatUsd } from "@/lib/money";
 import "./hw16I18n";
 import "@/components/share/uf8bI18n";
+import "@/components/share/ufd4I18n";
+import { headline, costNumbers } from "@/components/verdict/verdictSummary";
+import { armOrder } from "@/components/verdict/verdict.utils";
+import { observedNumber } from "@/components/verdict/armCost";
+import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
+import { getLocale } from "@/lib/i18n";
+import type { Ratio, Value } from "@/lib/types/bench";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
 interface AgentReportCard {
@@ -110,6 +117,9 @@ export function SharedItemView({ item, token }: { item: SharedItem; token: strin
 				{share.label && <h1 className="text-2xl font-semibold tracking-tight">{share.label}</h1>}
 				<div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
 					{share.expires_at && <span>{t("page.expires", { when: formatDate(share.expires_at) })}</span>}
+					{share.created_by_name?.trim() && (
+						<span data-testid="shared-made-by">{t("shared.madeBy", { ns: "ufd4", name: share.created_by_name.trim() })}</span>
+					)}
 					{share.hide_prompts && (
 						<span className="flex items-center gap-1" data-testid="shared-prompts-hidden">
 							<EyeOff className="size-3.5" aria-hidden="true" />
@@ -127,7 +137,9 @@ export function SharedItemView({ item, token }: { item: SharedItem; token: strin
 				/>
 			)}
 			{share.kind === "report_card" && <ReportPart report={(data.report_card as AgentReportCard | null)?.report ?? null} />}
-			{share.kind === "verdict" && <VerdictPart verdict={data.verdict as VerdictPayload | null} />}
+			{share.kind === "verdict" && (
+				<VerdictPart verdict={data.verdict as SharedVerdict | null} experiment={data.experiment as SharedExperiment | null} />
+			)}
 			{share.kind === "run_trace" && <RunPart run={data.run as RunDetail | null} trace={data.trace as RunTrace | null} />}
 			{share.kind === "leaderboard" &&
 				(share.target === "agents" ? (
@@ -219,33 +231,96 @@ export function effectText(effect: VerdictPayload["verdict"]["effect"], withRang
 	return effect.interval ? withRange(e, points(effect.interval[0]), points(effect.interval[1])) : e;
 }
 
-function VerdictPart({ verdict }: { verdict: VerdictPayload | null }) {
+/** The verdict part as a share link sends it; `arm_metrics` (median cost per run) only if a server adds it. */
+type SharedVerdict = VerdictPayload & { arm_metrics?: Record<string, Record<string, Value>> };
+
+/** The experiment part of a shared verdict: only the fields this page reads, every one optional. */
+interface SharedExperiment {
+	spent_usd?: Value | number;
+	started_at?: string;
+	finished_at?: string;
+	setups?: { arm: string; agent?: string; model?: string }[];
+}
+
+/**
+ * One setup's rate line (M8-68): the rate with the runs it rests on, or "too few runs to rate"
+ * under DEFAULT_MIN_RUNS runs, the rule the app uses. Exported for tests.
+ */
+export function rateOrTooFew(r: Ratio | undefined, min = DEFAULT_MIN_RUNS): { rate: number | null; tooFew: boolean } {
+	const rate = naiveScore(r);
+	if (rate === null) return { rate: null, tooFew: false };
+	return { rate, tooFew: (r?.den ?? 0) < min };
+}
+
+/** Total spend of the shared experiment: the observed Value, or a bare number from an older server. Exported for tests. */
+export function spentNumber(spent: SharedExperiment["spent_usd"]): number | null {
+	if (typeof spent === "number") return Number.isFinite(spent) ? spent : null;
+	return observedNumber(spent);
+}
+
+function VerdictPart({ verdict, experiment }: { verdict: SharedVerdict | null; experiment: SharedExperiment | null }) {
 	const { t } = useTranslation("share");
 	const { t: tu } = useTranslation("uf8b");
+	const { t: td } = useTranslation("ufd4");
 	const { t: tg } = useTranslation("glossary");
+	const { t: tp } = useTranslation("experimentPage");
 	if (!verdict) return <p className="text-muted-foreground text-sm">{t("page.noReport")}</p>;
 	const v = verdict.verdict;
+	const order = armOrder(verdict);
+	// The same headline as the app's verdict page; the cheaper-setup line needs a per-setup cost, which only arm_metrics carries.
+	const title = headline(
+		v,
+		order,
+		{ partial: verdict.partial, naive: verdict.naive, costs: costNumbers(order, undefined, verdict.arm_metrics) },
+		getLocale(),
+		tp,
+	);
+	const spent = spentNumber(experiment?.spent_usd);
+	const when = experiment?.finished_at || experiment?.started_at;
 	const action = (ACTIONS as readonly string[]).includes(v.action) ? tu(`shared.actions.${v.action as (typeof ACTIONS)[number]}`) : v.action;
 	const decision = (DECISIONS as readonly string[]).includes(v.decision) ? tg(`terms.${v.decision as (typeof DECISIONS)[number]}.label`) : v.decision;
 	const effect = effectText(v.effect, (e, lo, hi) => tu("shared.interval", { effect: e, lo, hi }));
 	const arms = Object.keys(verdict.naive ?? {}).sort();
 	return (
 		<section className="flex flex-col gap-4" data-testid="shared-verdict">
-			<h2 className="text-2xl font-semibold tracking-tight">{action}</h2>
+			<h2 className="text-2xl font-semibold tracking-tight" data-testid="shared-verdict-headline">
+				{title}
+			</h2>
+			<p className="text-muted-foreground text-sm">{action}</p>
 			{/* The result card: each setup's score with how many runs it rests on (M8-68). */}
 			{arms.length > 0 && (
 				<div className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:break-inside-avoid" data-testid="shared-verdict-scores">
 					{arms.map((arm) => {
 						const r = verdict.naive[arm];
-						const score = naiveScore(r);
+						const { rate, tooFew } = rateOrTooFew(r);
+						const setup = experiment?.setups?.find((x) => x.arm === arm);
+						const what = [setup?.agent, setup?.model].filter(Boolean).join(" · ");
+						const cost = observedNumber(verdict.arm_metrics?.[arm]?.cost_usd);
 						return (
-							<div key={arm} className="rounded-xl border p-4">
+							<div key={arm} className="rounded-xl border p-4" data-testid={`shared-setup-${arm}`}>
 								<p className="text-muted-foreground text-xs">{tu("shared.setup", { arm })}</p>
-								<p className="text-3xl font-semibold tabular-nums">{score === null ? "-" : pct(score)}</p>
+								{what && <p className="truncate text-sm font-medium">{what}</p>}
+								{rate === null ? (
+									<p className="text-3xl font-semibold tabular-nums">-</p>
+								) : tooFew ? (
+									<>
+										<p className="text-lg font-semibold">{td("shared.tooFew")}</p>
+										<p className="text-muted-foreground text-xs tabular-nums">{td("shared.tooFewDetail", { den: r.den, min: DEFAULT_MIN_RUNS })}</p>
+									</>
+								) : (
+									<p className="text-3xl font-semibold tabular-nums">
+										{pct(rate)} <span className="text-muted-foreground text-xs font-normal">{td("shared.sample", { den: r.den })}</span>
+									</p>
+								)}
 								<p className="text-muted-foreground text-xs tabular-nums">
-									{tu("shared.tasksRuns", { num: r.num, den: r.den })}
+									{td("shared.runs", { num: r.num, den: r.den })}
 									{r.unknown > 0 && ` · ${tu("shared.unknownRuns", { count: r.unknown })}`}
 								</p>
+								{cost !== null && (
+									<p className="text-muted-foreground text-xs tabular-nums">
+										{td("shared.costPerRun")}: {formatUsd(cost)}
+									</p>
+								)}
 							</div>
 						);
 					})}
@@ -258,6 +333,10 @@ function VerdictPart({ verdict }: { verdict: VerdictPayload | null }) {
 					[tu("shared.tasks"), v.effect ? String(v.effect.n_tasks) : "-"],
 					[t("page.suite"), verdict.suite],
 					[t("page.guards"), String(v.guards?.length ?? 0)],
+					...(spent !== null ? ([[td("shared.spent"), formatUsd(spent)]] as Array<[string, ReactNode]>) : []),
+					...(when
+						? ([[experiment?.finished_at ? td("shared.finished") : td("shared.started"), formatDate(when)]] as Array<[string, ReactNode]>)
+						: []),
 				]}
 			/>
 			{v.guards && v.guards.length > 0 && (

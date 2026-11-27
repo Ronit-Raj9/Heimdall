@@ -24,7 +24,7 @@ export interface Share {
 	revoked_at?: string;
 	revoked_by?: string;
 	state: ShareState;
-	/** Only on active links. */
+	/** Only on active links, and only for members and above: the server strips them for viewers. */
 	token?: string;
 	path?: string;
 	url?: string;
@@ -36,7 +36,7 @@ export interface NewShare {
 	query?: string;
 	label?: string;
 	hide_prompts?: boolean;
-	/** 0 means never; omitted means 30. */
+	/** 0 means never (admins only; the server answers 403 for others); omitted means 7. */
 	expires_in_days?: number;
 }
 
@@ -51,6 +51,8 @@ export interface SharedMeta {
 	expires_at?: string;
 	exports?: string[];
 	badge: boolean;
+	/** Display name of the member who made the link; sent by newer servers only. */
+	created_by_name?: string;
 }
 
 /** GET /shared/{token}: the item's parts, keyed by name (evaluation, report, report_card, ...). */
