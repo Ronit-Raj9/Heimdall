@@ -67,7 +67,7 @@ describe("Findings tab", () => {
 		expect(html).toContain("It never ran the tests");
 		expect(html).toContain('href="/runs/r_t01_A#step-4"');
 		expect(html).toContain("Check the fix");
-		expect(html).not.toContain("—");
+		expect(html).not.toContain("\u2014");
 	});
 
 	it("hides the possible cause for verified findings", () => {

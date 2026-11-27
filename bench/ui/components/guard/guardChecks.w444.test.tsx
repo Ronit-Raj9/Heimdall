@@ -39,7 +39,7 @@ describe("GuardChecks", () => {
 		expect(html).toContain("No personal data");
 		expect(html.match(/data-testid="guard-check-a-/g)).toHaveLength(8);
 		expect(html).not.toContain("guard-task-h");
-		for (const w of ["—", "–", "heimdall", "bifrost-bench"]) expect(html).not.toContain(w);
+		for (const w of ["\u2014", "\u2013", "heimdall", "bifrost-bench"]) expect(html).not.toContain(w);
 	});
 
 	it("says one check in the singular", () => {
