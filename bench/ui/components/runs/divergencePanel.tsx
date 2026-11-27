@@ -17,7 +17,9 @@ export function DivergenceView({ data }: { data: PairDivergenceResponse }) {
 	const { t } = useTranslation("w441");
 	const [armA, armB] = data.arms;
 	const d = data.divergence;
-	const result = (outcome: string) => (outcome === "pass" ? t("divergence.passed") : t("divergence.failed"));
+	const { t: tb } = useTranslation("bench");
+	// The same Result word the run's outcome badge shows, so one run never reads two ways (M4-62).
+	const result = (outcome: string) => tb(`runs.outcome.${outcome || "unknown"}`, { defaultValue: outcome });
 	const rows: { label: string; value: (s: SideAfter) => string }[] = [
 		{ label: t("divergence.row.turns"), value: (s) => String(s.turns) },
 		{ label: t("divergence.row.retries"), value: (s) => String(s.retries) },
