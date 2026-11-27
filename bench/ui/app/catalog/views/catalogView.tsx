@@ -426,7 +426,7 @@ function EntryRow({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyP
 	const description = cardDescription(e);
 	return (
 		<TableRow data-testid={`catalog-entry-${e.id}`}>
-			<TableCell className="max-w-0 py-2 whitespace-normal sm:w-auto">
+			<TableCell priority="primary" className="max-w-0 py-2 whitespace-normal sm:w-auto">
 				<div className="flex min-w-0 items-center gap-2">
 					<CategoryIcon category={cat} />
 					<button
@@ -443,11 +443,11 @@ function EntryRow({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyP
 				</div>
 				{description && <p className="text-muted-foreground line-clamp-1 text-xs text-pretty sm:line-clamp-2">{description}</p>}
 			</TableCell>
-			<TableCell className="text-muted-foreground hidden py-2 text-xs sm:table-cell">{t(`cat_${cat}`)}</TableCell>
-			<TableCell className="text-muted-foreground hidden py-2 text-xs md:table-cell">
+			<TableCell priority="secondary" className="text-muted-foreground py-2 text-xs">{t(`cat_${cat}`)}</TableCell>
+			<TableCell priority="secondary" className="text-muted-foreground hidden py-2 text-xs md:table-cell">
 				{e.needs_data ? t("sourceNeedsData") : t("sourceReady")}
 			</TableCell>
-			<TableCell className="py-2 text-right">
+			<TableCell priority="status" className="py-2 text-right">
 				<CardAction
 					e={e}
 					busy={props.busyId === e.id}
@@ -600,10 +600,10 @@ export function CatalogBody(props: CatalogBodyProps) {
 							<Table className="table-fixed">
 								<TableHeader className="sr-only sm:not-sr-only">
 									<TableRow>
-										<TableHead>{tu("catalog.colName")}</TableHead>
-										<TableHead className="hidden w-32 sm:table-cell">{t("category")}</TableHead>
-										<TableHead className="hidden w-32 md:table-cell">{t("sourceLabel")}</TableHead>
-										<TableHead className="w-28 text-right sm:w-44">
+										<TableHead priority="primary">{tu("catalog.colName")}</TableHead>
+										<TableHead priority="secondary" className="w-32">{t("category")}</TableHead>
+										<TableHead priority="secondary" className="hidden w-32 md:table-cell">{t("sourceLabel")}</TableHead>
+										<TableHead priority="status" className="w-28 text-right sm:w-44">
 											<span className="sr-only">{tu("catalog.colAction")}</span>
 										</TableHead>
 									</TableRow>
