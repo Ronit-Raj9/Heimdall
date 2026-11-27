@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetAgentSkillsQuery, useScanAgentSkillMutation } from "@/lib/store/apis/agentopsApi";
 import type { AgentSkill } from "@/lib/types/agentops";
 import { ShieldAlert } from "lucide-react";
@@ -39,8 +40,8 @@ export function SkillScanBar({ agentId, onOpenTools }: { agentId: string; onOpen
 				const res = await scan({ id: agentId, name: s.name }).unwrap();
 				out.push({ name: s.name, text: t(res.installed ? "scanBar.admitted" : "scanBar.blocked", { name: s.name }) });
 			} catch (e) {
-				const msg =
-					(e as { data?: { error?: { message?: string } } })?.data?.error?.message ?? String((e as { status?: unknown })?.status ?? "");
+				// The server's message in plain words, never a bare status code (M2-69).
+				const msg = getBenchErrorMessage(e);
 				out.push({ name: s.name, text: t("scanBar.failed", { name: s.name, error: msg }) });
 			}
 			setNotes([...out]);

@@ -1,3 +1,4 @@
+import { LabeledModelPicker } from "@/components/models/labeledModelPicker";
 import { RoleGate, RoleNote } from "@/components/platform/accessNotes";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -5,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetAgentConfigQuery, usePutAgentConfigMutation, useValidateAgentConfigMutation } from "@/lib/store/apis/agentBuilderApi";
-import { CAPABILITIES } from "@/lib/store/apis/evaluationsApi";
+import { CAPABILITIES, useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import type { AgentBehaviorFields, AgentConfigDoc, AgentConfigFields, AgentConfigValidateResponse } from "@/lib/types/agentBuilder";
 import "@/lib/types/agentFirstI18n";
+import "./uf2cI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, ChevronRight, FileCode2, Wrench } from "lucide-react";
@@ -73,6 +76,12 @@ export function buildFields(fields: AgentConfigFields, texts: FormTexts): AgentC
 	return out;
 }
 
+/** The version a save would make: the newest saved version plus one, or null while unknown. */
+export function saveNextVersion(versions: ReadonlyArray<{ version: number }> | undefined): number | null {
+	if (!versions) return null;
+	return versions.length === 0 ? 1 : Math.max(...versions.map((v) => v.version)) + 1;
+}
+
 /**
  * The cache key of an agent's settings save. The tab and its editor share the save's answer, so
  * the "Saved as version n" line survives the editor's remount on the new file.
@@ -99,7 +108,7 @@ function isConflict(error: unknown): boolean {
  * (instructions, model, tools and MCP, memory, retries and limits, capabilities), with the container
  * details folded under "How it runs"; or as raw YAML validated by the server. Saved with If-Match.
  */
-export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unknown>) {
+export function ConfigTab({ agentId, checkFailed = false }: { agentId?: string; checkFailed?: boolean } & Record<string, unknown>) {
 	const { t } = useTranslation("agentBuilder");
 	const query = useGetAgentConfigQuery(agentId ?? "", { skip: !agentId });
 	const [, saved] = usePutAgentConfigMutation({ fixedCacheKey: saveKey(agentId ?? "") });
@@ -124,7 +133,7 @@ export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unk
 	return (
 		<div className="flex min-w-0 flex-col gap-4">
 			{last && <SavedNotice doc={last} />}
-			<ConfigEditor key={query.data.sha256} doc={query.data} onReload={() => void query.refetch()} />
+			<ConfigEditor key={query.data.sha256} doc={query.data} onReload={() => void query.refetch()} checkFailed={checkFailed} />
 		</div>
 	);
 }
@@ -136,7 +145,7 @@ function SavedNotice({ doc }: { doc: AgentConfigDoc }) {
 	const text =
 		n <= 0 ? t("config.savedNoVersion") : doc.version_created ? t("config.savedVersion", { n }) : t("config.savedSameVersion", { n });
 	return (
-		<p role="status" className="text-chart-success-ink flex items-start gap-2 text-sm" data-testid="config-saved">
+		<p role="status" className="text-success-ink flex items-start gap-2 text-sm" data-testid="config-saved">
 			<CheckCircle2 className="mt-0.5 size-4" aria-hidden="true" />
 			{text}
 		</p>
@@ -146,9 +155,13 @@ function SavedNotice({ doc }: { doc: AgentConfigDoc }) {
 /** One titled group of the config form. */
 function FormSection({ title, hint, children, testId }: { title: string; hint?: string; children: ReactNode; testId?: string }) {
 	return (
-		<section className="bg-card grid grid-cols-1 gap-6 rounded-xl border p-5 md:grid-cols-[14rem_minmax(0,1fr)]" data-testid={testId}>
+		// A plain group under a divider, not a card in the panel (X-17, X-93); its title is an h2 (M2-53).
+		<section
+			className="grid grid-cols-1 gap-4 border-t pt-6 first:border-t-0 first:pt-0 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-6"
+			data-testid={testId}
+		>
 			<div className="flex flex-col gap-1">
-				<h3 className="text-sm font-semibold">{title}</h3>
+				<h2 className="text-base font-semibold">{title}</h2>
 				{hint && <p className="text-muted-foreground text-sm">{hint}</p>}
 			</div>
 			<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
@@ -156,11 +169,12 @@ function FormSection({ title, hint, children, testId }: { title: string; hint?: 
 	);
 }
 
-function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => void }) {
+function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onReload: () => void; checkFailed: boolean }) {
 	const { t } = useTranslation("agentBuilder");
 	const fileValid = doc.fields.adapter !== "";
 	const [view, setView] = useState<"form" | "yaml">(fileValid ? "form" : "yaml");
 	const { t: ta } = useTranslation("agentFirst");
+	const { t: tu } = useTranslation("uf2c");
 	const [fields, setFields] = useState<AgentConfigFields>(doc.fields);
 	const [texts, setTexts] = useState<FormTexts>(() => textsOf(doc.fields));
 	const [yamlText, setYamlText] = useState(doc.yaml);
@@ -173,6 +187,11 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 	const formFields = (): AgentConfigFields => buildFields(fields, texts);
 	const dirty =
 		view === "yaml" ? yamlText !== doc.yaml : JSON.stringify(formFields()) !== JSON.stringify(buildFields(doc.fields, textsOf(doc.fields)));
+	// Leaving the page or the tab with unsaved edits asks first (M2-48): browser prompt and in-app confirm.
+	useLeaveGuard(dirty);
+	// Save says which version it makes (M6-77): the newest saved version plus one.
+	const versions = useGetAgentVersionsQuery(doc.id);
+	const nextVersion = saveNextVersion(versions.data?.versions);
 	const setText = (k: keyof FormTexts, v: string) => setTexts((cur) => ({ ...cur, [k]: v }));
 	const behavior = fields.behavior;
 	const setBehavior = <K extends keyof AgentBehaviorFields>(k: K, v: AgentBehaviorFields[K]) =>
@@ -229,6 +248,8 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 				type="number"
 				min={0}
 				step={k === "turns" || k === "wall_s" ? 1 : "any"}
+				inputMode={k === "turns" || k === "wall_s" ? "numeric" : "decimal"}
+				placeholder={ta("setup.noLimit")}
 				value={fields[k] || ""}
 				onChange={(e) => {
 					// Max steps and the time limit are whole numbers of at least 0; CPUs and memory may be fractions (p01-4).
@@ -269,19 +290,19 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 						</button>
 					))}
 				</div>
-				<span className="text-muted-foreground ml-auto font-mono text-xs" title={doc.path}>
-					{doc.path}
-				</span>
 			</div>
-			{!fileValid && <p className="text-chart-warning-ink text-sm">{t("config.invalidFile")}</p>}
+			<p className="text-muted-foreground -mt-2 min-w-0 truncate text-xs" title={doc.path} data-testid="config-path">
+				{tu("setup.savedIn")} <span className="font-mono">{doc.path}</span>
+			</p>
+			{!fileValid && <p className="text-warning-ink text-sm">{t("config.invalidFile")}</p>}
 
 			{view === "form" ? (
-				<div className="flex flex-col gap-4" data-testid="config-form">
+				<div className="flex flex-col gap-6" data-testid="config-form">
 					<FormSection title={ta("setup.instructions")} hint={ta("setup.instructionsHint")} testId="setup-instructions">
 						<label className="flex flex-col gap-1 text-sm md:col-span-2">
 							<span className="font-medium">{ta("setup.description")}</span>
 							<textarea
-								className="border-input bg-card min-h-20 rounded-md border px-3 py-2 text-sm"
+								className="placeholder:text-neutral-500 border-input bg-card field-sizing-content min-h-32 rounded-md border px-3 py-2 text-sm"
 								value={fields.description ?? ""}
 								onChange={(e) => set("description", e.target.value)}
 								data-testid="field-description"
@@ -316,8 +337,15 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 						)}
 					</FormSection>
 					<FormSection title={ta("setup.model")} hint={ta("setup.modelHint")} testId="setup-model">
-						{text("model", t("config.fields.model"))}
-						{text("provider", t("config.fields.provider"))}
+						{/* The model list of /evaluate, not free text (M2-49); a model off the list stays as a custom id. */}
+						<div className="md:col-span-2">
+							<LabeledModelPicker
+								label={t("config.fields.model")}
+								value={fields.model ? { provider: fields.provider ?? "", model: fields.model } : null}
+								onChange={(v) => setFields((cur) => ({ ...cur, model: v.model, provider: v.provider }))}
+								testId="field-model"
+							/>
+						</div>
 						{behavior && (
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{ta("setup.fallbacks")}</span>
@@ -347,7 +375,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{ta("setup.memoryPaths")}</span>
 								<textarea
-									className="border-input bg-card min-h-20 rounded-md border px-3 py-2 font-mono text-xs"
+									className="placeholder:text-neutral-500 border-input bg-card min-h-20 rounded-md border px-3 py-2 font-mono text-xs"
 									value={texts.memory}
 									onChange={(e) => setText("memory", e.target.value)}
 									placeholder="/root/.agent/memory"
@@ -366,18 +394,21 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 									value={behavior.max_retries}
 									onChange={(v) => setBehavior("max_retries", v)}
 									testId="field-max_retries"
+									placeholder={ta("setup.noLimit")}
 								/>
 								<BehaviorNumber
 									label={ta("setup.maxToolCalls")}
 									value={behavior.max_tool_calls}
 									onChange={(v) => setBehavior("max_tool_calls", v)}
 									testId="field-max_tool_calls"
+									placeholder={ta("setup.noLimit")}
 								/>
 								<BehaviorNumber
 									label={ta("setup.providerRetries")}
 									value={behavior.provider_retries}
 									onChange={(v) => setBehavior("provider_retries", v)}
 									testId="field-provider_retries"
+									placeholder={ta("setup.noLimit")}
 								/>
 							</>
 						)}
@@ -394,7 +425,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 										<label
 											key={cap}
 											className={cn(
-												"inline-flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm",
+												"inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm",
 												on ? "border-primary/50 bg-primary/5" : "text-muted-foreground",
 											)}
 										>
@@ -419,13 +450,14 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 							<p className="text-muted-foreground text-xs md:col-span-2">{ta("setup.capabilitiesHelp")}</p>
 						</FormSection>
 					)}
-					<details className="group bg-card rounded-xl border" data-testid="setup-how-it-runs">
-						<summary className="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-2 rounded-xl px-5 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+					{/* Open by default when the readiness check failed: these fields are what break runs (M2-51). */}
+					<details className="group border-t" open={checkFailed || undefined} data-testid="setup-how-it-runs">
+						<summary className="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
 							<ChevronRight className="text-muted-foreground size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
 							{ta("setup.howItRuns")}
 							<span className="text-muted-foreground ml-2 hidden truncate font-normal sm:inline">{ta("setup.howItRunsHint")}</span>
 						</summary>
-						<div className="grid min-w-0 grid-cols-1 gap-4 border-t p-5 md:grid-cols-2">
+						<div className="grid min-w-0 grid-cols-1 gap-4 px-3 py-2 md:grid-cols-2">
 							<label className="flex flex-col gap-1 text-sm">
 								<span className="font-medium">{t("config.fields.adapter")}</span>
 								<Input value={fields.adapter} disabled />
@@ -444,7 +476,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{t("config.fields.env")}</span>
 								<textarea
-									className="border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs"
+									className="placeholder:text-neutral-500 border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs"
 									value={texts.env}
 									onChange={(e) => setText("env", e.target.value)}
 									spellCheck={false}
@@ -459,7 +491,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 				</div>
 			) : (
 				<textarea
-					className="border-input bg-card min-h-[28rem] w-full rounded-md border px-3 py-2 font-mono text-xs"
+					className="placeholder:text-neutral-500 border-input bg-card min-h-[28rem] w-full rounded-md border px-3 py-2 font-mono text-xs"
 					value={yamlText}
 					onChange={(e) => {
 						setYamlText(e.target.value);
@@ -474,7 +506,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 			{check && (
 				<p
 					role={check.ok ? "status" : "alert"}
-					className={cn("flex items-start gap-2 text-sm", check.ok ? "text-chart-success-ink" : "text-destructive")}
+					className={cn("flex items-start gap-2 text-sm", check.ok ? "text-success-ink" : "text-destructive")}
 					data-testid="config-check"
 				>
 					{check.ok && <CheckCircle2 className="mt-0.5 size-4" aria-hidden="true" />}
@@ -492,10 +524,18 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 				</div>
 			)}
 			<RoleNote min="member" />
-			<div className="flex flex-wrap gap-2">
+			{/* Stays in view at the bottom while the long form scrolls, and says why Save is off (M2-48). */}
+			<div className="bg-background/95 sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t py-3 backdrop-blur" data-testid="config-actions">
+				<span className={cn("mr-auto text-sm", dirty ? "font-medium" : "text-muted-foreground")} data-testid="config-dirty">
+					{dirty ? tu("setup.unsaved") : tu("setup.noChanges")}
+				</span>
 				<RoleGate min="member" fallback={null}>
 					<Button onClick={() => void onSave()} disabled={!dirty || saveState.isLoading} data-testid="config-save">
-						{saveState.isLoading ? t("config.saving") : t("config.save")}
+						{saveState.isLoading
+							? t("config.saving")
+							: nextVersion === null
+								? t("config.save")
+								: t("config.saveAsNext", { next: nextVersion, defaultValue: "Save as v{{next}}" })}
 					</Button>
 				</RoleGate>
 				<Button variant="outline" onClick={() => void onValidate()} disabled={validateState.isLoading} data-testid="config-validate">
@@ -547,11 +587,13 @@ function BehaviorNumber({
 	value,
 	onChange,
 	testId,
+	placeholder,
 }: {
 	label: string;
 	value: number;
 	onChange: (v: number) => void;
 	testId: string;
+	placeholder?: string;
 }) {
 	return (
 		<label className="flex flex-col gap-1 text-sm">
@@ -560,6 +602,8 @@ function BehaviorNumber({
 				type="number"
 				min={0}
 				step={1}
+				inputMode="numeric"
+				placeholder={placeholder}
 				value={value || ""}
 				onChange={(e) => onChange(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
 				data-testid={testId}

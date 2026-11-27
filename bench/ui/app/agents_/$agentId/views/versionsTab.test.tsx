@@ -7,6 +7,7 @@ import VersionsTab, { authorOf, saveOutcome } from "./versionsTab";
 
 const state = vi.hoisted(() => ({ versions: [] as AgentVersion[] }));
 
+vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useGetAgentVersionsQuery: () => ({ data: { agent: "codex", versions: state.versions }, isLoading: false, isError: false }),

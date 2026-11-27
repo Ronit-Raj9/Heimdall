@@ -30,6 +30,10 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	getBenchErrorMessage: () => "error",
 }));
 
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: { suites: [] } }),
+	useGetSuiteQuery: () => ({ data: undefined }),
+}));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useListJobsQuery: () => ({ data: { jobs: [] } }) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/components/platform/useJobLog", () => ({ useJobLog: () => ({ lines: [] }) }));
@@ -76,7 +80,9 @@ describe("agent ops tabs", () => {
 		expect(html).toContain('data-testid="agent-build-runner-note"');
 		// Y03: hosted agents can try one real task on their worker.
 		expect(html).toContain('data-testid="agent-check-try-real-hint"');
-		expect(html.split('data-testid="job-run-agent.check"').length - 1).toBe(2);
+		// The real-task check is a paid action with its own confirm (M2-68).
+		expect(html.split('data-testid="job-run-agent.check"').length - 1).toBe(1);
+		expect(html).toContain('data-testid="agent-check-try-real"');
 	});
 
 	it("checks tab points to New agent when the agent is missing", () => {

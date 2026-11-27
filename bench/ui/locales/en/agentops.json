@@ -75,7 +75,7 @@
 			"hint": "MCP servers give the agent extra tools. Choose how the agent is told about them and list the ones it should use, so you can scan them first. Tasks still decide which servers a run starts.",
 			"loading": "Loading MCP settings...",
 			"format": "Config format",
-			"adapterDefault": "adapter default",
+			"adapterDefault": "Let Heimdall decide (recommended)",
 			"path": "Container path (optional)",
 			"servers": "MCP servers ({{file}})",
 			"save": "Save",

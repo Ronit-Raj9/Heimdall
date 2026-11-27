@@ -1,0 +1,65 @@
+{
+	"runs": {
+		"benchmark": "Benchmark",
+		"allBenchmarks": "All benchmarks",
+		"result": "Result",
+		"allResults": "All results",
+		"resultOption": {
+			"pass": "Passed",
+			"fail": "Failed",
+			"timeout": "Ran out of time",
+			"budget": "Ran out of budget",
+			"crash": "Crashed",
+			"integrity_violation": "Cheating detected",
+			"infra_error": "Infrastructure error"
+		},
+		"noneMatch": "No run matches these filters.",
+		"clearFilters": "Clear filters",
+		"withFault": "{{reason}} (injected fault: {{fault}})",
+		"reason": {
+			"fail": "The grader marked the answer wrong",
+			"timeout": "Ran out of time",
+			"budget": "Ran out of budget",
+			"crash": "The agent crashed",
+			"refusal": "The agent refused the task",
+			"integrity_violation": "Cheating detected",
+			"invalid_evaluator": "The grader could not score the run",
+			"infra_error": "Infrastructure error, not the agent",
+			"aborted_infra": "Stopped by an infrastructure error",
+			"other": "Did not pass"
+		}
+	},
+	"setup": {
+		"savedIn": "Saved in",
+		"unsaved": "Unsaved changes",
+		"noChanges": "No changes"
+	},
+	"tools": {
+		"gatewayIntro": "To see what this agent's tool and model calls did across runs, open the",
+		"gatewayLink": "Gateway report card",
+		"chooseZip": "Choose a .zip",
+		"noFile": "No file chosen",
+		"chooseFirst": "Choose a file first",
+		"noServers": "No MCP servers yet",
+		"insertExample": "Insert example",
+		"nothingChanged": "Nothing changed",
+		"mcpTestIntro": "To try an MCP server on its own before the agent uses it, open",
+		"mcpTestLink": "MCP server test"
+	},
+	"versions": {
+		"sameAs": "Same as v{{n}}: change Setup first",
+		"scoredRuns": "Scored runs on this version",
+		"scoredRunsCount_one": "{{count}} scored run on this version",
+		"scoredRunsCount_other": "{{count}} scored runs on this version",
+		"oneHint": "Change Setup and save to make v2, then compare them.",
+		"openSetup": "Open Setup"
+	},
+	"ci": {
+		"packRuns": "Runs: {{list}}",
+		"download": "Download file",
+		"adminsOnly": "Admins only"
+	},
+	"checks": {
+		"anyTask": "First task of the benchmark"
+	}
+}

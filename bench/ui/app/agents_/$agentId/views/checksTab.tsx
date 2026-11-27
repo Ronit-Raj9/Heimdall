@@ -1,9 +1,15 @@
-import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { JobLogPanel } from "@/components/jobs/jobLogPanel";
+import { JobRunButton, plainJobError } from "@/components/jobs/jobRunButton";
+import { PaidButton } from "@/components/ui/paidButton";
+import { canUse } from "@/lib/session/sessionContext";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/session/sessionContext";
-import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { skipToken } from "@reduxjs/toolkit/query/react";
+import "./uf2cI18n";
 import type { Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -92,23 +98,27 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 							<div className="flex flex-wrap items-center gap-2">
 								<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
 								{hosted && (
-									<JobRunButton
-										kind="agent.check"
-										params={{ ...checkParams, real: true }}
-										label={t("checks.check.tryReal")}
-										variant="outline"
-									/>
+									<TryRealButton params={{ ...checkParams, real: true }} label={t("checks.check.tryReal")} />
 								)}
 							</div>
 						)
 					}
 				>
 					<div className="grid gap-3 sm:grid-cols-3">
+						{/* Picked from the org's benchmarks and that benchmark's tasks, not typed ids (M2-68). */}
 						<Field label={t("checks.check.suite")}>
-							<Input value={suite} onChange={(e) => setSuite(e.target.value)} data-testid="agent-check-suite" />
+							<BuildSuiteSelect
+								value={suite}
+								onChange={(v) => {
+									setSuite(v);
+									setTask("");
+								}}
+								placeholder={t("checks.build.pickPlaceholder")}
+								testId="agent-check-suite"
+							/>
 						</Field>
 						<Field label={t("checks.check.task")}>
-							<Input value={task} onChange={(e) => setTask(e.target.value)} data-testid="agent-check-task" />
+							<TaskSelect suite={suite.trim()} value={task} onChange={setTask} />
 						</Field>
 						{hosted && (
 							<p className="text-muted-foreground text-xs sm:col-span-3" data-testid="agent-check-try-real-hint">
@@ -178,7 +188,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 						</Field>
 					) : (
 						<Field label={t("checks.build.suiteOptional")}>
-							<Input value={buildSuite} onChange={(e) => setBuildSuite(e.target.value)} data-testid="agent-build-suite" />
+							<BuildSuiteSelect value={buildSuite} onChange={setBuildSuite} placeholder={t("checks.build.pickPlaceholder")} testId="agent-build-suite" />
 						</Field>
 					)}
 				</CheckStep>
@@ -210,17 +220,55 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 }
 
 /** The org's benchmarks from the light list, for the per-benchmark container build (N181). */
-function BuildSuiteSelect({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+function BuildSuiteSelect({
+	value,
+	onChange,
+	placeholder,
+	testId = "agent-build-suite-select",
+}: {
+	value: string;
+	onChange: (v: string) => void;
+	placeholder: string;
+	testId?: string;
+}) {
 	const { data } = useGetSuitesLightQuery();
-	const ids = (data?.suites ?? []).map((s) => s.id).sort();
+	const ids = selectIds((data?.suites ?? []).map((s) => s.id), value);
 	return (
 		<select
 			className="border-input bg-card h-9 rounded-md border px-2 text-sm"
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
-			data-testid="agent-build-suite-select"
+			data-testid={testId}
 		>
 			<option value="">{placeholder}</option>
+			{ids.map((id) => (
+				<option key={id} value={id}>
+					{id}
+				</option>
+			))}
+		</select>
+	);
+}
+
+/** Sorted ids for a select, keeping the current value listed even when the list lacks it. Pure. */
+export function selectIds(ids: readonly string[], value: string): string[] {
+	return [...new Set([...ids, ...(value ? [value] : [])])].sort();
+}
+
+/** The tasks of the picked benchmark; empty means the benchmark's first task (M2-68). */
+function TaskSelect({ suite, value, onChange }: { suite: string; value: string; onChange: (v: string) => void }) {
+	const { t } = useTranslation("uf2c");
+	const { data } = useGetSuiteQuery(suite ? suite : skipToken);
+	const ids = selectIds((data?.tasks ?? []).map((x) => x.id), value);
+	return (
+		<select
+			className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+			value={value}
+			disabled={!suite}
+			onChange={(e) => onChange(e.target.value)}
+			data-testid="agent-check-task"
+		>
+			<option value="">{t("checks.anyTask")}</option>
 			{ids.map((id) => (
 				<option key={id} value={id}>
 					{id}
@@ -250,8 +298,8 @@ const ICON: Record<StepState, { icon: typeof Circle; cls: string }> = {
 	failed: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	broken: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	running: { icon: Loader2, cls: "text-sky-600 animate-spin dark:text-sky-400" },
-	never: { icon: Circle, cls: "text-muted-foreground/60" },
-	skipped: { icon: CircleMinus, cls: "text-muted-foreground/60" },
+	never: { icon: Circle, cls: "text-muted-foreground" },
+	skipped: { icon: CircleMinus, cls: "text-muted-foreground" },
 };
 
 /** One row of the checklist: status icon, title and short hint, the action, and options on demand. */
@@ -282,7 +330,7 @@ function CheckStep({
 		<li className="flex flex-col gap-3 p-5" data-testid={testId} data-state={state}>
 			<div className="flex flex-wrap items-start gap-4">
 				<Icon className={cn("mt-0.5 size-5 shrink-0", cls)} aria-hidden="true" />
-				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+				<div className="flex min-w-0 basis-full flex-col gap-0.5 sm:flex-1 sm:basis-0">
 					<h3 className="text-sm font-semibold">
 						<span className="text-muted-foreground mr-1.5 tabular-nums">{n}.</span>
 						{title}
@@ -295,7 +343,7 @@ function CheckStep({
 					</span>
 					{problem}
 				</div>
-				{action && <div className="shrink-0">{action}</div>}
+				{action && <div className="w-full sm:w-auto sm:shrink-0">{action}</div>}
 			</div>
 			{children && (
 				<details className="group ml-9">
@@ -314,3 +362,37 @@ function CheckStep({
 }
 
 export default ChecksTab;
+
+/**
+ * "Try one real task": the check with real model calls on the org's own key, so it confirms first
+ * with the paid-action rule (M2-68), then queues the job and opens its live log like JobRunButton.
+ */
+function TryRealButton({ params, label }: { params: Record<string, unknown>; label: string }) {
+	const { t } = useTranslation("jobs");
+	const session = useSession();
+	const [createJob, { error, reset }] = useCreateJobMutation();
+	const [jobId, setJobId] = useState<string | null>(null);
+	return (
+		<div className="flex min-w-0 flex-col gap-2" data-testid="agent-check-try-real-wrap">
+			<PaidButton
+				verb={label}
+				capUsd={null}
+				confirm="always"
+				variant="outline"
+				disabled={!canUse(session, "member")}
+				onConfirm={async () => {
+					reset();
+					const res = await createJob({ kind: "agent.check", params });
+					if ("data" in res && res.data) setJobId(res.data.id);
+				}}
+				testId="agent-check-try-real"
+			/>
+			{error !== undefined && (
+				<p role="alert" className="text-danger-ink text-xs" data-testid="agent-check-try-real-error">
+					{t("panel.startError")}: {plainJobError(getBenchErrorMessage(error))}
+				</p>
+			)}
+			{jobId && <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} />}
+		</div>
+	);
+}

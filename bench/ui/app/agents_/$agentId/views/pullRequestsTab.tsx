@@ -9,9 +9,11 @@ import { useGetCIWorkflowQuery } from "@/lib/store/apis/integrationsApi";
 import { useCreateApiTokenMutation } from "@/lib/store/apis/platformApi";
 import type { CIWorkflowParams } from "@/lib/types/integrations";
 import { Link } from "@tanstack/react-router";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, Copy, Download, KeyRound } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RoleNote } from "@/components/platform/accessNotes";
+import "./uf2cI18n";
 
 export type CIProvider = "github" | "gitlab";
 export type CISource = "config" | "image" | "endpoint";
@@ -52,6 +54,7 @@ const selectClass = "border-input bg-background h-9 w-full rounded-md border px-
  */
 export default function PullRequestsTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("uf2c");
 	const session = useSession();
 	const formId = useId();
 	const hosted = session.authMode === "hosted";
@@ -121,6 +124,12 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 								</option>
 							))}
 						</select>
+						{/* Which benchmarks the pack runs, so the pick is not blind (M2-66). */}
+						{packBenchmarks(packs.data, pack).length > 0 && (
+							<span className="text-muted-foreground text-xs" data-testid="agent-ci-pack-benchmarks">
+								{tu("ci.packRuns", { list: packBenchmarks(packs.data, pack).join(", ") })}
+							</span>
+						)}
 					</label>
 				</div>
 				<fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -181,7 +190,7 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 						{preview.error && (
 							<LoadError title={t("ci.previewError")} error={preview.error} onRetry={() => void preview.refetch()} testId="agent-ci-preview-error" />
 						)}
-						{preview.data && <WorkflowBlock text={preview.data.workflow} />}
+						{preview.data && <WorkflowBlock text={preview.data.workflow} path={preview.data.path} />}
 					</li>
 				</ol>
 			</Section>
@@ -189,12 +198,36 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 	);
 }
 
-function WorkflowBlock({ text }: { text: string }) {
+/** The pack's benchmarks, empty when the pack is not in the list. */
+export function packBenchmarks(packs: ReadonlyArray<{ id: string; benchmarks: string[] }> | undefined, id: string): string[] {
+	return packs?.find((p) => p.id === id)?.benchmarks ?? [];
+}
+
+/** The file name a downloaded workflow gets: the last part of its repository path. */
+export function workflowFileName(path: string | undefined): string {
+	const name = (path ?? "").split("/").pop() ?? "";
+	return name || "heimdall.yml";
+}
+
+/**
+ * The workflow file with Copy and Download inside its top right corner (M2-65). The block grows with
+ * the file (no inner scroll down); long lines scroll sideways, with a fade at the right edge.
+ */
+function WorkflowBlock({ text, path }: { text: string; path?: string }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("uf2c");
 	const [copied, setCopied] = useState(false);
+	const download = () => {
+		const url = URL.createObjectURL(new Blob([text], { type: "text/yaml" }));
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = workflowFileName(path);
+		a.click();
+		URL.revokeObjectURL(url);
+	};
 	return (
-		<div className="mt-2 flex flex-col gap-1">
-			<div className="flex justify-end">
+		<div className="relative mt-2 min-w-0 rounded-lg border" data-testid="agent-ci-workflow-block">
+			<div className="bg-background/90 absolute top-2 right-2 z-10 flex gap-1 rounded-md">
 				<Button
 					type="button"
 					size="sm"
@@ -208,8 +241,16 @@ function WorkflowBlock({ text }: { text: string }) {
 					{copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
 					{copied ? t("ci.copied") : t("ci.copy")}
 				</Button>
+				<Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 px-2 text-xs" onClick={download} dataTestId="agent-ci-download">
+					<Download className="size-3.5" aria-hidden="true" />
+					{tu("ci.download")}
+				</Button>
 			</div>
-			<pre className="bg-muted/50 max-h-[28rem] overflow-auto rounded-lg border p-4 font-mono text-xs leading-5" data-testid="agent-ci-workflow">
+			<pre
+				className="bg-muted/50 overflow-x-auto rounded-lg p-4 pt-11 font-mono text-xs leading-5 [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]"
+				tabIndex={0}
+				data-testid="agent-ci-workflow"
+			>
 				{text}
 			</pre>
 		</div>
@@ -218,6 +259,7 @@ function WorkflowBlock({ text }: { text: string }) {
 
 function TokenStep({ agentId, hosted, admin }: { agentId: string; hosted: boolean; admin: boolean }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("uf2c");
 	const [create, state] = useCreateApiTokenMutation();
 	const [secret, setSecret] = useState<string | null>(null);
 	if (!hosted) {
@@ -256,6 +298,14 @@ function TokenStep({ agentId, hosted, admin }: { agentId: string; hosted: boolea
 						<KeyRound aria-hidden="true" />
 						{t("ci.createToken")}
 					</Button>
+				)}
+				{/* Says who may make the token (M2-67): only admins see the button. */}
+				{admin ? (
+					<span className="text-muted-foreground text-xs" data-testid="agent-ci-token-admins">
+						{tu("ci.adminsOnly")}
+					</span>
+				) : (
+					<RoleNote min="admin" testId="agent-ci-token-admins" />
 				)}
 				<Link to="/settings" search={{ tab: "tokens" } as never} className="text-primary text-sm hover:underline" data-testid="agent-ci-tokens-link">
 					{t("ci.manageTokens")}

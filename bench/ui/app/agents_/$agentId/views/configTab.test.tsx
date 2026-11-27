@@ -34,6 +34,12 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	},
 	useValidateAgentConfigMutation: () => [vi.fn(), { isLoading: false }],
 }));
+// The Setup model field is the shared model picker (M2-49); its list is not needed here.
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useGetAgentVersionsQuery: () => ({ data: { versions: [{ version: 1 }] } }),
+}));
+vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({ isLoading: false }) }));
 vi.mock("@/lib/store/apis/pullAgentsApi", () => ({ useGetPullAgentsQuery: () => ({ isLoading: false }) }));
 vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/session/sessionContext")>()),
@@ -41,6 +47,7 @@ vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
 }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+	useBlocker: () => undefined,
 }));
 
 const render = () => renderToStaticMarkup(<ConfigTab agentId="zz-test-loop" />);
@@ -73,5 +80,27 @@ describe("ConfigTab save and check messages", () => {
 		expect(checkOf({ error: err })).toEqual({ ok: false, error: "request body is not valid JSON" });
 		expect(checkOf({ data: { ok: true } })).toEqual({ ok: true, error: undefined });
 		expect(checkOf({ data: { ok: false, error: "bad yaml" } })).toEqual({ ok: false, error: "bad yaml" });
+	});
+
+	it("keeps Save in view and says why it is off (M2-48)", () => {
+		state.saved = undefined;
+		const html = render();
+		expect(html).toContain('data-testid="config-actions"');
+		expect(html).toContain("sticky bottom-0");
+		expect(html).toContain("No changes");
+	});
+
+	it("shows the settings file under the switch and the section titles as h2 (X-17, M2-53)", () => {
+		state.saved = undefined;
+		const html = render();
+		expect(html).toContain("Saved in");
+		expect(html).toContain("agents/zz-test-loop.yaml");
+		expect(html).toMatch(/<h2[^>]*>Instructions<\/h2>/);
+	});
+
+	it("opens How it runs when the readiness check failed (M2-51)", () => {
+		state.saved = undefined;
+		expect(renderToStaticMarkup(<ConfigTab agentId="zz-test-loop" checkFailed />)).toMatch(/<details[^>]*open=""[^>]*data-testid="setup-how-it-runs"/);
+		expect(render()).not.toMatch(/<details[^>]*open=""/);
 	});
 });

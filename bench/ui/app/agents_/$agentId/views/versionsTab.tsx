@@ -19,6 +19,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { lineDiff } from "./lineDiff";
 import "./gw18I18n";
+import "./uf2cI18n";
+import { Link } from "@tanstack/react-router";
 
 /** Short local date of a version, or the raw value when it does not parse. */
 export function versionDate(value: string): string {
@@ -53,6 +55,23 @@ export function authorOf(v: AgentVersion): { text: string; title: string | undef
 	return { text: v.created_by_name || v.created_by || "-", title: v.created_by || undefined };
 }
 
+/**
+ * The newest version when the saved config is that version (the list's live), so saving again
+ * would make nothing new (M2-62); else null.
+ */
+export function sameAsLatest(list: { live?: number; versions: ReadonlyArray<{ version: number }> } | undefined): number | null {
+	const latest = Math.max(0, ...(list?.versions ?? []).map((v) => v.version));
+	return latest > 0 && list?.live === latest ? latest : null;
+}
+
+/** Which optional columns have any value to show (M2-63): an all-empty Author or Note column hides. */
+export function versionColumns(versions: readonly AgentVersion[]): { author: boolean; note: boolean } {
+	return {
+		author: versions.some((v) => Boolean(v.created_by_name || v.created_by)),
+		note: versions.some((v) => v.note.trim() !== ""),
+	};
+}
+
 /** The Versions tab: every saved version, its config read-only and what changed from the one before. */
 export default function VersionsTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
@@ -66,6 +85,9 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 	// An agent known only from its runs has no settings file: no versions and nothing to save (p01-2).
 	const noFile = Boolean(versionsQuery.data?.no_file);
 	const { t: tm } = useTranslation("w4m1");
+	const { t: tu } = useTranslation("uf2c");
+	const same = sameAsLatest(versionsQuery.data);
+	const cols = versionColumns(versions);
 
 	const save = async () => {
 		setSaved(null);
@@ -101,10 +123,16 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 								}}
 								placeholder={t("versions.notePlaceholder")}
 								aria-label={t("versions.note")}
-								className="h-8 w-56"
+								className="h-8 w-full sm:w-56"
 								data-testid="agent-versions-note"
 							/>
-							<Button type="submit" size="sm" disabled={createState.isLoading} data-testid="agent-versions-save">
+							<Button
+								type="submit"
+								size="sm"
+								disabled={createState.isLoading || same !== null}
+								title={same !== null ? tu("versions.sameAs", { n: same }) : undefined}
+								data-testid="agent-versions-save"
+							>
 								{createState.isLoading ? t("versions.saving") : t("versions.save")}
 							</Button>
 						</form>
@@ -135,45 +163,84 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 				) : versions.length === 0 ? (
 					<EmptyNote testId="agent-versions-empty">{t("versions.empty")}</EmptyNote>
 				) : (
-					<Table data-testid="agent-versions-table">
-						<TableHeader>
-							<TableRow>
-								<TableHead>{t("versions.col.version")}</TableHead>
-								<TableHead>{t("versions.col.date")}</TableHead>
-								<TableHead>{t("versions.col.author")}</TableHead>
-								<TableHead>{t("versions.col.note")}</TableHead>
-								<TableHead className="text-right">{t("versions.col.runs")}</TableHead>
-								<TableHead />
-							</TableRow>
-						</TableHeader>
-						<TableBody>
+					<>
+						{/* Phones: one stacked block per version (M2-61). */}
+						<ul className="divide-y rounded-lg border sm:hidden" data-testid="agent-versions-list">
 							{versions.map((v) => (
-								<TableRow
-									key={v.version}
-									data-testid={`agent-version-v${v.version}`}
-									data-state={selected === v.version ? "selected" : undefined}
-								>
-									<TableCell className="font-mono text-xs">v{v.version}</TableCell>
-									<TableCell className="text-xs">{versionDate(v.created_at)}</TableCell>
-									<TableCell className="text-xs" title={authorOf(v).title}>
-										{authorOf(v).text}
-									</TableCell>
-									<TableCell className="max-w-[24rem] truncate text-xs">{v.note || "-"}</TableCell>
-									<TableCell className="text-right text-xs tabular-nums">{v.runs ?? 0}</TableCell>
-									<TableCell className="text-right">
+								<li key={v.version} className="flex flex-col gap-1 px-3 py-2 text-sm" data-state={selected === v.version ? "selected" : undefined}>
+									<span className="flex items-center gap-2">
+										<span className="font-mono font-medium">v{v.version}</span>
+										<span className="text-muted-foreground text-xs">{versionDate(v.created_at)}</span>
 										<Button
 											size="sm"
-											variant="ghost"
+											variant="link"
+											className="ml-auto"
 											onClick={() => setSelected(selected === v.version ? null : v.version)}
-											data-testid={`agent-version-view-v${v.version}`}
 										>
 											{selected === v.version ? t("versions.hide") : t("versions.view")}
 										</Button>
-									</TableCell>
-								</TableRow>
+									</span>
+									<span className="text-muted-foreground text-xs tabular-nums">{tu("versions.scoredRunsCount", { count: v.runs ?? 0 })}</span>
+									{cols.author && <span className="text-muted-foreground text-xs">{authorOf(v).text}</span>}
+									{cols.note && v.note && <span className="text-xs">{v.note}</span>}
+								</li>
 							))}
-						</TableBody>
-					</Table>
+						</ul>
+						<div className="hidden min-w-0 overflow-x-auto sm:block">
+							<Table data-testid="agent-versions-table" className="text-sm">
+								<TableHeader>
+									<TableRow>
+										<TableHead>{t("versions.col.version")}</TableHead>
+										<TableHead>{t("versions.col.date")}</TableHead>
+										{cols.author && <TableHead>{t("versions.col.author")}</TableHead>}
+										{cols.note && <TableHead>{t("versions.col.note")}</TableHead>}
+										<TableHead className="text-right">{tu("versions.scoredRuns")}</TableHead>
+										<TableHead />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{versions.map((v) => (
+										<TableRow
+											key={v.version}
+											data-testid={`agent-version-v${v.version}`}
+											data-state={selected === v.version ? "selected" : undefined}
+										>
+											<TableCell className="font-mono">v{v.version}</TableCell>
+											<TableCell>{versionDate(v.created_at)}</TableCell>
+											{cols.author && <TableCell title={authorOf(v).title}>{authorOf(v).text}</TableCell>}
+											{cols.note && <TableCell className="max-w-[24rem] truncate">{v.note || "-"}</TableCell>}
+											<TableCell className="text-right tabular-nums">{v.runs ?? 0}</TableCell>
+											<TableCell className="text-right">
+												<Button
+													size="sm"
+													variant="link"
+													onClick={() => setSelected(selected === v.version ? null : v.version)}
+													data-testid={`agent-version-view-v${v.version}`}
+												>
+													{selected === v.version ? t("versions.hide") : t("versions.view")}
+												</Button>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+						{versions.length === 1 && (
+							// One version: say how to get a second one to compare (M2-59).
+							<p className="text-muted-foreground text-sm" data-testid="agent-versions-one-hint">
+								{tu("versions.oneHint")}{" "}
+								<Link
+									to="/agents/$agentId"
+									params={{ agentId }}
+									search={{ tab: "setup" } as never}
+									className="text-primary underline-offset-4 hover:underline"
+									data-testid="agent-versions-open-setup"
+								>
+									{tu("versions.openSetup")}
+								</Link>
+							</p>
+						)}
+					</>
 				)}
 			</Section>
 			{selected !== null && <VersionConfig agentId={agentId} version={selected} versions={versions} />}

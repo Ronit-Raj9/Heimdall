@@ -17,6 +17,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 }));
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 	useGetSuitesLightQuery: () => ({ data: { suites: [{ id: "bfcl" }, { id: "coding-core" }] }, isLoading: false }),
+	useGetSuiteQuery: () => ({ data: { tasks: [{ id: "t1" }] }, isLoading: false }),
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useListJobsQuery: () => ({ data: { jobs: state.jobs } }) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));

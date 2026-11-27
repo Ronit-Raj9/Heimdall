@@ -19,7 +19,10 @@ vi.mock("@/lib/store/apis/agentopsApi", () => ({
 vi.mock("@/lib/store/apis/platformApi", () => ({ useListJobsQuery: () => ({ data: { jobs: [] } }) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/components/platform/useJobLog", () => ({ useJobLog: () => ({ lines: [] }) }));
-vi.mock("@tanstack/react-router", () => ({ useParams: () => ({}) }));
+vi.mock("@tanstack/react-router", () => ({
+	useParams: () => ({}),
+	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+}));
 vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/session/sessionContext")>()),
 	useSession: () => ({ authMode: "local" }),
