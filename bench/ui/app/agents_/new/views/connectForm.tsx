@@ -1,7 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { usePreviewEndpointMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -108,6 +110,9 @@ export function looksLikeKey(value: string): boolean {
 	return /^sk-/i.test(v) || v.length > 30;
 }
 
+/** The shared Select cannot hold an empty value; this stands for "no secret picked" (M2-106). */
+const NO_SECRET = "__none__";
+
 /**
  * A field that holds a secret NAME: a select of the org's secrets when the list loads, so a person
  * never pastes the key itself; otherwise a text box that warns when the value looks like a key.
@@ -131,20 +136,19 @@ export function SecretNameField({
 	if (names.length > 0) {
 		const options = value && !names.includes(value) ? [value, ...names] : names;
 		return (
-			<select
-				id={id}
-				className="border-input bg-card h-9 w-full rounded-md border px-3 font-mono text-sm"
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				data-testid={testId}
-			>
-				<option value="">{tu("agent.secretPick")}</option>
-				{options.map((n) => (
-					<option key={n} value={n}>
-						{n}
-					</option>
-				))}
-			</select>
+			<Select value={value || NO_SECRET} onValueChange={(v) => onChange(v === NO_SECRET ? "" : v)}>
+				<SelectTrigger id={id} className="w-full min-w-0 font-mono" data-testid={testId}>
+					<SelectValue placeholder={tu("agent.secretPick")} />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value={NO_SECRET}>{tu("agent.secretPick")}</SelectItem>
+					{options.map((n) => (
+						<SelectItem key={n} value={n} className="font-mono">
+							{n}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 		);
 	}
 	return (
@@ -209,36 +213,31 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 	const id = `param-${p.name}`;
 	if (p.kind === "bool") {
 		return (
-			<label className="flex items-start gap-2 text-sm">
-				<input
-					type="checkbox"
-					className="mt-1"
-					checked={value === "true"}
-					onChange={(e) => onChange(e.target.checked ? "true" : "false")}
-					data-testid={id}
-				/>
-				<span className="flex flex-col gap-0.5">
-					<span className="font-medium">{p.label}</span>
-					{p.help && <span className="text-muted-foreground text-xs">{p.help}</span>}
-				</span>
-			</label>
+			<Checkbox
+				checked={value === "true"}
+				onChange={(on) => onChange(on ? "true" : "false")}
+				label={<span className="font-medium">{p.label}</span>}
+				hint={p.help || undefined}
+				className="text-sm"
+				testId={id}
+			/>
 		);
 	}
 	let control;
 	if (p.kind === "select") {
 		control = (
-			<select
-				className="border-input bg-card h-9 rounded-md border px-3 text-sm"
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				data-testid={id}
-			>
-				{(p.options ?? []).map((o) => (
-					<option key={o} value={o}>
-						{optionLabel(p, o)}
-					</option>
-				))}
-			</select>
+			<Select value={value} onValueChange={onChange}>
+				<SelectTrigger className="w-full min-w-0 sm:w-auto sm:min-w-56" data-testid={id}>
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{(p.options ?? []).map((o) => (
+						<SelectItem key={o} value={o}>
+							{optionLabel(p, o)}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 		);
 	} else if (p.kind === "multiline") {
 		control = (
@@ -727,46 +726,38 @@ export function PullOptionsFields({ value, onChange }: { value: PullOptions; onC
 	return (
 		<div className="flex flex-col gap-4" data-testid="pull-fields">
 			<p className="text-muted-foreground text-xs">{t("pull.form.intro")}</p>
-			<label className="flex items-start gap-2 text-sm">
-				<input
-					type="checkbox"
-					className="mt-1"
-					checked={value.benchDrives}
-					onChange={(e) => onChange({ ...value, benchDrives: e.target.checked })}
-					data-testid="pull-bench-drives"
-				/>
-				<span className="flex flex-col gap-0.5">
-					<span className="font-medium">{t("pull.form.benchDrives")}</span>
-					<span className="text-muted-foreground text-xs">{t("pull.form.benchDrivesHelp")}</span>
-				</span>
-			</label>
+			<Checkbox
+				checked={value.benchDrives}
+				onChange={(on) => onChange({ ...value, benchDrives: on })}
+				label={<span className="font-medium">{t("pull.form.benchDrives")}</span>}
+				hint={t("pull.form.benchDrivesHelp")}
+				className="text-sm"
+				testId="pull-bench-drives"
+			/>
 			{value.benchDrives && (
-				<label className="flex flex-col gap-1 text-sm">
-					<span className="font-medium">{t("pull.form.history")}</span>
-					<select
-						className="border-input bg-card h-9 rounded-md border px-3 text-sm"
-						value={value.history}
-						onChange={(e) => onChange({ ...value, history: e.target.value === "server" ? "server" : "client" })}
-						data-testid="pull-history"
-					>
-						<option value="client">{t("pull.form.historyClient")}</option>
-						<option value="server">{t("pull.form.historyServer")}</option>
-					</select>
-				</label>
+				<div className="flex flex-col gap-1 text-sm">
+					<span className="font-medium" id="pull-history-label">
+						{t("pull.form.history")}
+					</span>
+					<Select value={value.history} onValueChange={(v) => onChange({ ...value, history: v === "server" ? "server" : "client" })}>
+						<SelectTrigger className="w-full min-w-0 sm:w-auto sm:min-w-56" aria-labelledby="pull-history-label" data-testid="pull-history">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="client">{t("pull.form.historyClient")}</SelectItem>
+							<SelectItem value="server">{t("pull.form.historyServer")}</SelectItem>
+						</SelectContent>
+					</Select>
+				</div>
 			)}
-			<label className="flex items-start gap-2 text-sm">
-				<input
-					type="checkbox"
-					className="mt-1"
-					checked={value.repo}
-					onChange={(e) => onChange({ ...value, repo: e.target.checked })}
-					data-testid="pull-repo"
-				/>
-				<span className="flex flex-col gap-0.5">
-					<span className="font-medium">{t("pull.form.repo")}</span>
-					<span className="text-muted-foreground text-xs">{t("pull.form.repoHelp")}</span>
-				</span>
-			</label>
+			<Checkbox
+				checked={value.repo}
+				onChange={(on) => onChange({ ...value, repo: on })}
+				label={<span className="font-medium">{t("pull.form.repo")}</span>}
+				hint={t("pull.form.repoHelp")}
+				className="text-sm"
+				testId="pull-repo"
+			/>
 		</div>
 	);
 }
