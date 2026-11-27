@@ -703,26 +703,35 @@ func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
 }
 
 // abHeadComment is the agent's description: the file's head comment. yaml.v3
-// puts a comment directly above the first key on that key, so the document,
-// the mapping and the first key are read in that order.
+// splits a head comment with blank lines in it: the paragraphs before the
+// last go on the document (or the mapping), the one directly above the first
+// key on that key. All of them are read, in that order, so a save (which
+// clears every one, abSetHeadComment) keeps the whole comment.
 func abHeadComment(doc *yaml.Node) string {
-	if doc.HeadComment != "" {
-		return doc.HeadComment
+	parts := []string{doc.HeadComment}
+	if len(doc.Content) == 1 {
+		parts = append(parts, abMappingHeadComment(doc.Content[0]))
 	}
-	if len(doc.Content) != 1 {
-		return ""
-	}
-	return abMappingHeadComment(doc.Content[0])
+	return abJoinComments(parts...)
 }
 
 func abMappingHeadComment(root *yaml.Node) string {
-	if root.HeadComment != "" {
-		return root.HeadComment
-	}
+	parts := []string{root.HeadComment}
 	if root.Kind == yaml.MappingNode && len(root.Content) > 0 {
-		return root.Content[0].HeadComment
+		parts = append(parts, root.Content[0].HeadComment)
 	}
-	return ""
+	return abJoinComments(parts...)
+}
+
+// abJoinComments joins the non-empty comment parts with a blank comment line.
+func abJoinComments(parts ...string) string {
+	var out []string
+	for _, p := range parts {
+		if strings.TrimSpace(p) != "" {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, "\n\n")
 }
 
 // abSetHeadComment replaces the description on the mapping root: every
