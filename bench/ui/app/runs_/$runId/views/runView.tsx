@@ -19,7 +19,7 @@ import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
-import { useGetRunFailureQuery } from "@/components/runs/runFailureGroup";
+import type { RunFailureFields } from "@/lib/types/serverFields";
 import { failedToolCall } from "@/components/runs/runFailure.utils";
 import "@/components/runs/uf5aI18n";
 import { RunTraceView } from "@/components/runs/traceView";
@@ -75,7 +75,8 @@ export default function RunView({ runId }: { runId: string }) {
 	const { t } = useTranslation("bench");
 	const [live, setLive] = useState(false);
 	// A live (unsealed) run is polled so new steps arrive and the page flips once it seals.
-	const detail = useGetRunQuery(runId, {
+	// M5-1: the same request carries the failure group ("the same failure in N runs") when the server can group it.
+	const detail = useGetRunQuery({ runId, failure: true }, {
 		pollingInterval: live ? 2000 : 0,
 		skipPollingIfUnfocused: true,
 	});
@@ -330,8 +331,8 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 	// X-40: the run facts are open on load from lg up, folded on smaller screens.
 	useEffect(() => setFactsOpen(isWide()), []);
 	const toolError = detail.sealed && run.outcome !== "pass" ? failedToolCall(detail.tool_calls) : undefined;
-	// M5-1: a sealed run that did not pass asks for its failure group ("the same failure in N runs").
-	const failureGroup = useGetRunFailureQuery(run.run_id, { skip: !detail.sealed || run.outcome === "pass" });
+	// M5-1: the failure group came with the run answer; only a sealed run that did not pass shows it.
+	const failureGroup = detail.sealed && run.outcome !== "pass" ? (detail as RunDetail & RunFailureFields).failure : undefined;
 	// M5-3: one "Verified" badge (beside the gates); the overview names the grade source only when it is not the plain verified grade.
 	const plainVerified = !grade?.judged && (!detail.grade_source || detail.grade_source === "original");
 	return (
@@ -346,7 +347,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					{tu("verdict.brokenComparison")}
 				</p>
 			)}
-			<RunFailureCard run={run} detail={detail} group={failureGroup.data?.failure} />
+			<RunFailureCard run={run} detail={detail} group={failureGroup} />
 			<div className="flex flex-col gap-4" data-testid="run-summary">
 				{(!detail.sealed || !plainVerified) && (
 					<div className="flex flex-wrap items-center gap-2">

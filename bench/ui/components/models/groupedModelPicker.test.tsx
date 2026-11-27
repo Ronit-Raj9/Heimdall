@@ -95,3 +95,11 @@ describe("providers prop (N89)", () => {
 		expect(html).not.toContain("Groq");
 	});
 });
+describe("failed load (M8-84)", () => {
+	it("says the list could not load, with Retry, instead of Loading", () => {
+		q.models = { isError: true, error: { status: 500 }, refetch: () => undefined };
+		const html = render(<GroupedModelPicker value={null} onChange={() => undefined} />);
+		expect(html).toContain("Could not load the list of models.");
+		expect(html).toContain('data-testid="grouped-model-picker-error"');
+	});
+});

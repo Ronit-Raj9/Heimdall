@@ -27,7 +27,7 @@ import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./w447I18n";
 
@@ -430,9 +430,13 @@ function NewReplay() {
 	});
 	// After Start the job is followed until it ends; the list below refreshes with it (M5-59).
 	const jobId = job.data?.id;
-	const jobState = useGetJobQuery(jobId ?? skipToken, { pollingInterval: REPLAY_POLL_MS, skipPollingIfUnfocused: true });
+	// Both polls stop once the job has ended (M1-62).
+	const [jobEnded, setJobEnded] = useState(false);
+	const jobState = useGetJobQuery(jobId ?? skipToken, { pollingInterval: jobEnded ? 0 : REPLAY_POLL_MS, skipPollingIfUnfocused: true });
 	const active = Boolean(jobId) && (!jobState.data || jobState.data.status === "queued" || jobState.data.status === "running");
-	useGetReplaysQuery(undefined, { pollingInterval: active ? REPLAY_POLL_MS : 0 });
+	const ended = Boolean(jobId) && !active;
+	useEffect(() => setJobEnded(ended), [ended]);
+	useGetReplaysQuery(undefined, { pollingInterval: active ? REPLAY_POLL_MS : 0, skipPollingIfUnfocused: true });
 	const [cancel, cancelled] = useCancelJobMutation();
 	const why = problems.map((k) =>
 		k === "needSessions" ? t5("replays.needSessions", { max: settings.data?.max_sessions_per_run || MAX_REPLAY_SESSIONS }) : t5(`replays.${k}`),

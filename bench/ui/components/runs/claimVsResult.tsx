@@ -1,3 +1,4 @@
+import "@/components/runs/ufc4I18n";
 import type { Grade, Run } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
@@ -97,6 +98,7 @@ function GradeDetail({ grade, state }: { grade: Grade | undefined; state: ClaimR
 	const { t } = useTranslation("bench");
 	const { t: t08 } = useTranslation("hw08");
 	const { t: tu } = useTranslation("uf5a");
+	const { t: tc } = useTranslation("ufc4");
 	if (state === "loading") return <span className="bg-accent h-4 w-40 animate-pulse rounded-sm" />;
 	if (state === "error") return <p className="text-muted-foreground text-xs">{t("runs.claim.gradeError")}</p>;
 	if (!grade) return <p className="text-muted-foreground text-xs">{t("runs.claim.noGrade")}</p>;
@@ -117,6 +119,12 @@ function GradeDetail({ grade, state }: { grade: Grade | undefined; state: ClaimR
 						what: tu(`reason.what.${gradeModeWhat(grade.mode)}`),
 						result: grade.passed ? tu("claim.matched") : tu("claim.notMatched"),
 					})}
+				</p>
+			)}
+			{/* Solved with no check and no reason (a practice run): say what passed it (M4-55). */}
+			{grade.passed && grade.tests_ran === 0 && !grade.reason && !grade.mode && !grade.judged && (
+				<p className="text-muted-foreground" data-testid="grade-no-checks">
+					{tc("claim.passedNoChecks")}
 				</p>
 			)}
 			{grade.tests_ran > 0 && (

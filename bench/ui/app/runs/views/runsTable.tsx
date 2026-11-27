@@ -266,7 +266,7 @@ export function RunsTable() {
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
 	// Poll while a run on the page is still running, like the evaluations list (X-84).
 	const [anyLive, setAnyLive] = useState(false);
-	const list = useListRunsQuery(runsRequest(search, search.page), { pollingInterval: anyLive ? RUNS_POLL_MS : 0 });
+	const list = useListRunsQuery(runsRequest(search, search.page), { pollingInterval: anyLive ? RUNS_POLL_MS : 0, skipPollingIfUnfocused: true });
 	useEffect(() => setAnyLive((list.data?.runs ?? []).some((r) => !r.sealed)), [list.data]);
 	useEffect(() => {
 		if (search.benchmark) void setSearch(benchmarkAlias(search));

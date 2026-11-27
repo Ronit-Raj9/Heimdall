@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { CopyId } from "@/components/ui/copyId";
 import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
+import { keyMissingSearch } from "@/components/models/keyMissingNote";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, Minus, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -319,6 +320,10 @@ export function McpReportView({ report }: { report: McpReport }) {
 						))}
 					</ul>
 				)}
+				{/* The scan reads the listing; whether an agent follows poisoned descriptions is the gate mcp_poisoning_followed (M7-110). */}
+				<Link to="/docs" search={{ doc: "tool-safety" } as never} className="text-primary text-sm underline-offset-4 hover:underline" data-testid="mcp-poisoning-link">
+					{t("result.poisoningLink")}
+				</Link>
 			</Section>
 
 			{report.reliability.failures.length > 0 && (
@@ -435,7 +440,8 @@ export function DraftEvaluateLink({ done }: { done: McpDraftResponse }) {
 		return (
 			<p className="text-chart-warning-ink flex flex-wrap items-center gap-2 text-sm" data-testid="mcp-draft-no-key">
 				{t("draft.noKeyedAgent")}
-				<Link to={"/models" as never} className="text-primary underline" data-testid="mcp-draft-models-link">
+				{/* No single provider is named, so this opens Settings, Model keys, and comes back here (M8-12). */}
+				<Link to="/settings" search={keyMissingSearch("", "/mcp-test") as never} className="text-primary underline" data-testid="mcp-draft-models-link">
 					{t("draft.modelsKeys")}
 				</Link>
 			</p>

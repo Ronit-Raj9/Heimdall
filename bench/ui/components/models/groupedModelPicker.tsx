@@ -6,6 +6,9 @@ import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/runs/uf5bI18n";
+import "@/components/runs/ufc4I18n";
+import { InlineError } from "@/components/runs/screenStates";
+import { optionsState } from "@/lib/hooks/useOptionsState";
 
 /**
  * A single searchable model dropdown grouped by provider, built on ModelPicker's modelChoices.
@@ -164,12 +167,15 @@ export function GroupedModelPicker({
 	label,
 }: GroupedModelPickerProps) {
 	const { t } = useTranslation("uf5b");
+	const { t: tc } = useTranslation("ufc4");
 	const id = useId();
 	const name = label ?? t("picker.model");
 	const [showAll, setShowAll] = useState(false);
 	const tid = testId ?? "grouped-model-picker";
 	const models = useGetModelsQuery();
 	const loaded = Boolean(models.data);
+	// A failed load says so with a Retry, never a list stuck on "Loading" (M8-84).
+	const failed = !loaded && optionsState(models, 0) === "error";
 	const catalog = (models.data?.providers ?? []) as unknown as CatalogProvider[];
 	const keys = models.data?.keys ?? [];
 	const [query, setQuery] = useState("");
@@ -236,7 +242,7 @@ export function GroupedModelPicker({
 					data-testid={`${tid}-model`}
 				>
 					<option value="" disabled>
-						{noProvider ? t("picker.pickAgentFirst") : loaded ? t("picker.choose") : t("picker.loading")}
+						{noProvider ? t("picker.pickAgentFirst") : loaded ? t("picker.choose") : failed ? tc("picker.loadError") : t("picker.loading")}
 					</option>
 					{model !== "" && !listed && !customFor && <option value={selected}>{modelOptionLabel(providerName, model)}</option>}
 					{groups.map((g) => (
@@ -286,6 +292,7 @@ export function GroupedModelPicker({
 					</>
 				)}
 			</div>
+			{failed && <InlineError error={models.error} title={tc("picker.loadError")} onRetry={() => void models.refetch()} testId={`${tid}-error`} />}
 			{loaded && provider !== "" && keyState !== "ok" && (
 				<p className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
 					{keyState === "invalid" ? t("picker.keyBroken", { name: providerName }) : t("picker.keyNone", { name: providerName })}{" "}
