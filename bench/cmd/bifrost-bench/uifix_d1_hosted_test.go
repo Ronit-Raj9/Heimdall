@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -169,4 +174,121 @@ func TestHostedMonitorTestDelete(t *testing.T) {
 	if err != nil || len(page.Entries) != 1 || page.Entries[0].TargetID != "mc_d1" {
 		t.Fatalf("audit %+v %v", page.Entries, err)
 	}
+}
+
+// TestHostedMonitorDeleteSharedRoot: with BENCH_MONITOR_CERTS_ROOT set,
+// every organization shares one certificate folder, so the delete is
+// refused (409 with the reason) for every admin and the test stays. Reads
+// are left as they are: they cross organizations in this mode (bob of
+// beta reads acme's test), which this test records.
+func TestHostedMonitorDeleteSharedRoot(t *testing.T) {
+	shared := t.TempDir()
+	t.Setenv(monitorcert.RootEnv, shared)
+	f := newHostedFixture(t)
+	certs, err := monitorcert.NewCertStore(shared, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := certs.Write(&schemas.MonitorCertificate{CertID: "mc_shared", CreatedAt: time.Now()}, []byte("# shared\n")); err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/bench/monitors/certifications/mc_shared"
+	if r := f.do("GET", path, "alice", nil, nil); r.status != 200 {
+		t.Fatalf("read: %d %s", r.status, trim(r.body))
+	}
+	if r := f.do("GET", path, "bob", nil, nil); r.status != 200 {
+		t.Logf("reads no longer cross organizations in shared mode: %d", r.status)
+	}
+	for _, who := range []string{"alice", "bob"} {
+		if r := f.do("DELETE", path, who, nil, nil); r.status != 409 || !strings.Contains(r.body, monitorcert.RootEnv) {
+			t.Fatalf("%s delete in shared mode: %d %s", who, r.status, trim(r.body))
+		}
+	}
+	if _, err := os.Stat(filepath.Join(shared, "mc_shared")); err != nil {
+		t.Fatalf("the shared test was deleted: %v", err)
+	}
+}
+
+// TestHostedArchiveLeavesSealsAlone: archiving and unarchiving a sealed
+// comparison and its runs changes no byte of the org's evidence store (run
+// folders, seals, manifests) and no answer of the verdict, the usage and
+// the run page's seal: only the sidecar is written.
+func TestHostedArchiveLeavesSealsAlone(t *testing.T) {
+	f := newHostedFixture(t)
+	pa, _ := f.env.layout.Paths(f.acme.ID)
+	hashTree := func(root string) string {
+		h := sha256.New()
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() && d.Name() == ".heimdall" {
+				return filepath.SkipDir
+			}
+			if d.IsDir() {
+				return nil
+			}
+			b, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(root, p)
+			fmt.Fprintf(h, "%s\x00%x\x00", rel, sha256.Sum256(b))
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hex.EncodeToString(h.Sum(nil))
+	}
+	numbers := func() string {
+		var b strings.Builder
+		for _, p := range []string{"/api/bench/experiments/" + f.aExp + "/verdict", "/api/bench/usage", "/api/bench/runs/" + f.aRuns[0]} {
+			r := f.do("GET", p, "alice", nil, nil)
+			if r.status != 200 {
+				t.Fatalf("%s: %d %s", p, r.status, trim(r.body))
+			}
+			var m map[string]any // the run page shows the mark; nothing else may change
+			if err := json.Unmarshal([]byte(r.body), &m); err != nil {
+				t.Fatalf("%s: %v", p, err)
+			}
+			delete(m, "archived_at")
+			delete(m, "archived_by")
+			body, _ := json.Marshal(m)
+			fmt.Fprintf(&b, "%s %d %s\n", p, r.status, body)
+		}
+		return b.String()
+	}
+	beforeNumbers := numbers() // the first verdict read may store its analysis
+	beforeStore := hashTree(pa.StoreRoot)
+	for _, p := range append([]string{"/api/bench/experiments/" + f.aExp}, prefixAll("/api/bench/runs/", f.aRuns)...) {
+		if r := f.do("POST", p+"/archive", "alice", nil, nil); r.status != 200 {
+			t.Fatalf("archive %s: %d %s", p, r.status, trim(r.body))
+		}
+	}
+	if got := hashTree(pa.StoreRoot); got != beforeStore {
+		t.Fatal("archiving changed the sealed evidence store")
+	}
+	if got := numbers(); got != beforeNumbers {
+		t.Fatalf("archiving changed a computed answer:\nbefore %s\nafter  %s", beforeNumbers, got)
+	}
+	if got := hashTree(pa.StoreRoot); got != beforeStore {
+		t.Fatal("reading after archiving changed the sealed evidence store")
+	}
+	for _, p := range append([]string{"/api/bench/experiments/" + f.aExp}, prefixAll("/api/bench/runs/", f.aRuns)...) {
+		if r := f.do("POST", p+"/unarchive", "alice", nil, nil); r.status != 200 {
+			t.Fatalf("unarchive %s: %d %s", p, r.status, trim(r.body))
+		}
+	}
+	if got := hashTree(pa.StoreRoot); got != beforeStore {
+		t.Fatal("unarchiving changed the sealed evidence store")
+	}
+}
+
+func prefixAll(prefix string, ids []string) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = prefix + id
+	}
+	return out
 }

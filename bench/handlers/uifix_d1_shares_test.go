@@ -61,6 +61,12 @@ func TestShareListRoles(t *testing.T) {
 	}
 	all, filtered := APIPrefix+"/shares", APIPrefix+"/shares?kind=evaluation&target=ev_1"
 	for _, role := range []auth.Role{auth.RoleViewer, auth.RoleMember} {
+		// A kind or a target alone, or empty values, is the wide list too.
+		for _, wide := range []string{APIPrefix + "/shares?kind=evaluation", APIPrefix + "/shares?target=ev_1", APIPrefix + "/shares?kind=&target=", APIPrefix + "/shares?kind=%20&target=ev_1"} {
+			if res := shareCallAs(r, "GET", wide, nil, role); res.StatusCode() != 403 {
+				t.Fatalf("%s %s: %d %s", role, wide, res.StatusCode(), res.Body())
+			}
+		}
 		if res := shareCallAs(r, "GET", all, nil, role); res.StatusCode() != 403 || !strings.Contains(string(res.Body()), "Only an org owner or admin") {
 			t.Fatalf("%s unfiltered: %d %s", role, res.StatusCode(), res.Body())
 		}
@@ -72,7 +78,6 @@ func TestShareListRoles(t *testing.T) {
 	}{
 		{auth.RoleAdmin, all, true}, {auth.RoleOwner, all, true}, {auth.RoleAdmin, filtered, true},
 		{auth.RoleMember, filtered, true}, {auth.RoleViewer, filtered, false},
-		{auth.RoleViewer, APIPrefix + "/shares?kind=evaluation", false},
 	} {
 		res := shareCallAs(r, "GET", c.uri, nil, c.role)
 		l := d1Decode[ShareList](t, res)
@@ -92,10 +97,34 @@ func TestShareListRoles(t *testing.T) {
 // TestSharedCreatorName: the name is a member name only, never an email
 // or an id.
 func TestSharedCreatorName(t *testing.T) {
-	prev := memberNames
-	t.Cleanup(func() { SetMemberNames(prev) })
+	prev := memberRealNames
+	t.Cleanup(func() { SetMemberRealNames(prev) })
 	var ctx fasthttp.RequestCtx
 	if got := sharedCreatorName(&ctx, "usr_1"); got != "" {
 		t.Fatalf("no org: %q", got)
+	}
+}
+
+// TestCleanSharedName: the public creator name drops control and format
+// characters and is absent when it looks like an email or an id, or is
+// too long.
+func TestCleanSharedName(t *testing.T) {
+	for in, want := range map[string]string{
+		"Asha":                        "Asha",
+		"  Asha \t Rao ":              "Asha Rao",
+		"Asha\u202eoaR":               "AshaoaR",
+		"A\x1b[31mred":                "A[31mred",
+		"asha@example.com":            "",
+		"usr_123":                     "",
+		"":                            "",
+		strings.Repeat("a", 121):      "",
+		"usr_actor_is_the_name_check": "",
+	} {
+		if got := cleanSharedName(in, "usr_x"); got != want {
+			t.Fatalf("cleanSharedName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := cleanSharedName("u_9", "u_9"); got != "" {
+		t.Fatalf("the actor id itself: %q", got)
 	}
 }

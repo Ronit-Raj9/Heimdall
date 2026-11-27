@@ -5,12 +5,16 @@ import (
 
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/monitorcert"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
 // Deleting a monitor test (safety rule test; UI fix wave D1, M7-23):
 // DELETE /monitors/certifications/{id}, admin only (the policy table and
 // the handler both check), audited by the dispatcher like every write.
+
+const monitorSharedRefusal = "Monitor tests on this server are kept in one folder shared by every organization (" + monitorcert.RootEnv + " is set), so deleting one is refused. Unset it to keep them per organization."
 
 // MonitorCertDeleter removes a stored certificate; monitorcert.CertStore
 // implements it. A source without it answers 501.
@@ -20,7 +24,7 @@ type MonitorCertDeleter interface {
 
 // MonitorCertDeleteRouteDoc documents the delete route.
 var MonitorCertDeleteRouteDoc = RouteDoc{Method: "DELETE", Path: APIPrefix + "/monitors/certifications/{id}", Tag: "monitors",
-	Summary: "Delete a monitor certificate (safety rule test) and its report (admin). Its runs and comparisons are not touched", Auth: AuthWrite, Response: DeletedInfo{}}
+	Summary: "Delete a monitor certificate (safety rule test) and its report (admin). Its runs and comparisons are not touched. Refused (409) on a hosted server whose organizations share one certificate folder (BENCH_MONITOR_CERTS_ROOT set)", Auth: AuthWrite, Response: DeletedInfo{}}
 
 func init() { APIRoutes = append(APIRoutes, MonitorCertDeleteRouteDoc) }
 
@@ -34,6 +38,13 @@ func (h *MonitorCertHandler) WithWrite(write lib.Middleware) *MonitorCertHandler
 func (h *MonitorCertHandler) delete(ctx *fasthttp.RequestCtx) {
 	if !isLocalCaller(ctx) && !auth.PrincipalFrom(ctx).Can(auth.RoleAdmin) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "only an org owner or admin may delete a monitor test")
+		return
+	}
+	// With BENCH_MONITOR_CERTS_ROOT set, every organization of a hosted
+	// server shares one certificate folder, so a delete could remove
+	// another organization's test: refuse it.
+	if o, hosted := tenancy.OrgFrom(ctx); hosted && o.ID != "" && monitorcert.SharedRoot() {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, monitorSharedRefusal)
 		return
 	}
 	if h.certs == nil {

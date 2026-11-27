@@ -15,6 +15,7 @@ func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
 		if env.db != nil {
 			handlers.SetMemberNames(hostedMemberNames(&orgService{env: env}))
+			handlers.SetMemberRealNames(hostedMemberRealNames(&orgService{env: env}))
 		}
 		return nil, nil
 	})
@@ -38,6 +39,31 @@ func hostedMemberNames(s *orgService) func(ctx context.Context, orgID string) (m
 			}
 			if name == "" {
 				name = m.UserID
+			}
+			out[m.UserID] = name
+			if e := strings.ToLower(strings.TrimSpace(m.Email)); e != "" {
+				out[e] = name
+			}
+		}
+		return out, nil
+	}
+}
+
+// hostedMemberRealNames maps each member's user id, and lower-case email,
+// to the name the member chose; a member without a name is left out. The
+// shared comparison page shows it to anyone holding the link, so it never
+// falls back to the email, a part of it or the id (UI fix wave D1).
+func hostedMemberRealNames(s *orgService) func(ctx context.Context, orgID string) (map[string]string, error) {
+	return func(ctx context.Context, orgID string) (map[string]string, error) {
+		ms, err := s.Members(ctx, orgID)
+		if err != nil {
+			return nil, err
+		}
+		out := make(map[string]string, 2*len(ms))
+		for _, m := range ms {
+			name := strings.TrimSpace(m.Name)
+			if name == "" {
+				continue
 			}
 			out[m.UserID] = name
 			if e := strings.ToLower(strings.TrimSpace(m.Email)); e != "" {

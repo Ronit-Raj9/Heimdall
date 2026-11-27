@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/findings"
 	"github.com/maximhq/bifrost/bench/improve"
@@ -339,5 +341,88 @@ func TestSharedPageHidesArchiveMark(t *testing.T) {
 		if _, ok := v["archived_by"]; ok {
 			t.Fatalf("%s keeps archived_by", part)
 		}
+	}
+}
+
+// TestArchiveRoleInHandler: the handler itself checks the role of every
+// archive route, so a router without the policy table (as here) still
+// refuses a viewer everywhere and a member on the admin routes, and writes
+// nothing.
+func TestArchiveRoleInHandler(t *testing.T) {
+	r, root, idx := archiveTestRouter(t, nil)
+	saveEval(t, root, "ev_done", schemas.EvaluationCancelled)
+	runID := idx.runs[0].Run.RunID
+	fid := findings.IDOf("cluster:role")
+	if err := findings.Open(root).Update(func(all []findings.Finding) ([]findings.Finding, error) {
+		return append(all, findings.Finding{ID: fid, Key: "cluster:role", Title: "x", Source: "cluster", Origin: "rule", State: findings.StateOpen}), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	imp := router.New()
+	NewImproveHandler(testMode, &fakeImprove{list: []improve.Summary{{ID: "imp_done", Status: improve.StatusDone}}}, nil).WithArchiveRoot(root).RegisterRoutes(imp)
+	admin := []string{"/evaluations/ev_done", "/experiments/" + testExp, "/runs/" + runID}
+	for _, verb := range []string{"/archive", "/unarchive"} {
+		for _, p := range admin {
+			for _, role := range []auth.Role{auth.RoleViewer, auth.RoleMember} {
+				if res := shareCallAs(r, "POST", APIPrefix+p+verb, nil, role); res.StatusCode() != 403 {
+					t.Fatalf("%s %s%s: %d %s", role, p, verb, res.StatusCode(), res.Body())
+				}
+			}
+		}
+		for _, role := range []auth.Role{auth.RoleViewer, auth.RoleMember} {
+			if res := shareCallAs(imp, "POST", APIPrefix+"/improvements/imp_done"+verb, nil, role); res.StatusCode() != 403 {
+				t.Fatalf("%s improvement%s: %d %s", role, verb, res.StatusCode(), res.Body())
+			}
+		}
+		if res := shareCallAs(r, "POST", APIPrefix+"/findings/"+fid+verb, nil, auth.RoleViewer); res.StatusCode() != 403 {
+			t.Fatalf("viewer finding%s: %d %s", verb, res.StatusCode(), res.Body())
+		}
+	}
+	if _, err := os.Stat(archivePath(root)); !os.IsNotExist(err) {
+		t.Fatalf("a refused archive wrote the sidecar: %v", err)
+	}
+	if ev, _ := evalstore.Open(root).Load("ev_done"); ev.IsArchived() {
+		t.Fatal("a refused archive marked the evaluation")
+	}
+	if res := shareCallAs(r, "POST", APIPrefix+"/findings/"+fid+"/archive", nil, auth.RoleMember); res.StatusCode() != 200 {
+		t.Fatalf("member finding: %d %s", res.StatusCode(), res.Body())
+	}
+	if res := shareCallAs(r, "POST", APIPrefix+"/experiments/"+testExp+"/archive", nil, auth.RoleAdmin); res.StatusCode() != 200 {
+		t.Fatalf("admin comparison: %d %s", res.StatusCode(), res.Body())
+	}
+}
+
+// TestArchiveSidecarBound: an archive that would grow the sidecar past the
+// size the lists read is refused, and the marks already stored stay
+// readable.
+func TestArchiveSidecarBound(t *testing.T) {
+	root := t.TempDir()
+	var a archiveFile
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	add := func(from, to int) {
+		for i := from; i < to; i++ {
+			a.kind(archiveRuns)[fmt.Sprintf("r_%07d", i)] = schemas.Archived{ArchivedAt: &at, ArchivedBy: "usr_1"}
+		}
+	}
+	add(0, 1000)
+	one, _ := json.MarshalIndent(a, "", "  ")
+	n := (archiveMaxBytes - 4096) / (len(one) / 1000) // just under the bound
+	add(1000, n)
+	data, _ := json.MarshalIndent(a, "", "  ")
+	if len(data) > archiveMaxBytes-1 || len(data) < archiveMaxBytes-64<<10 {
+		t.Fatalf("setup: %d bytes", len(data))
+	}
+	if err := os.MkdirAll(filepath.Dir(archivePath(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archivePath(root), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := setArchive(root, archiveRuns, "r_"+strings.Repeat("x", 8000), true, "usr_1", at); err == nil {
+		t.Fatal("an archive past the bound was written")
+	}
+	got, err := readArchive(root)
+	if err != nil || len(got.Runs) != len(a.Runs) {
+		t.Fatalf("stored marks: %d of %d, %v", len(got.Runs), len(a.Runs), err)
 	}
 }

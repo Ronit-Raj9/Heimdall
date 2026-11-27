@@ -10,7 +10,7 @@ func init() {
 			Summary: "Create a read-only share link to a report card, evaluation, verdict, run trace or leaderboard view (expires_in_days 0 means never and is admin only, a member asking for it gets 403; default 7). On the hosted server the token is opaque (s_...) and names no organization",
 			Auth:    AuthWrite, Request: sharelinks.NewShare{}, Status: 201, Response: ShareView{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/shares", Tag: "sharing",
-			Summary: "List this organization's share links with their state. Without kind or target (every link of the organization) only an admin may list; a filtered list answers anyone who may read the item. A viewer never gets a link's token, path or url, only its metadata", Response: ShareList{},
+			Summary: "List this organization's share links with their state. Without both kind and target (every link of the organization, or of every item of a kind) only an admin may list; the list of one item answers anyone who may read it. A viewer never gets a link's token, path or url, only its metadata", Response: ShareList{},
 			Query: []QueryDoc{{Name: "kind", Description: "Only links of this kind"}, {Name: "target", Description: "Only links to this item"}}},
 		RouteDoc{Method: "POST", Path: APIPrefix + "/shares/{id}/revoke", Tag: "sharing",
 			Summary: "Turn a share link off at once", Auth: AuthWrite, Response: ShareView{}},

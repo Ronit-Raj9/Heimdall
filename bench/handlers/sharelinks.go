@@ -281,7 +281,7 @@ func (h *shareHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	args := ctx.QueryArgs()
 	kind, target := strings.TrimSpace(string(args.Peek("kind"))), strings.TrimSpace(string(args.Peek("target")))
-	if kind == "" && target == "" && !shareAdmin(ctx) { // UI fix wave D1, decision 7 (uifix_d1_shares.go)
+	if (kind == "" || target == "") && !shareAdmin(ctx) { // a kind or a target alone would list many items' links // UI fix wave D1, decision 7 (uifix_d1_shares.go)
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, shareListRefusal)
 		return
 	}

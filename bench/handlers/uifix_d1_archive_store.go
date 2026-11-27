@@ -130,6 +130,9 @@ func setArchive(root, kind, id string, archive bool, by string, at time.Time) (s
 	if err != nil {
 		return schemas.Archived{}, err
 	}
+	if len(data)+1 > archiveMaxBytes { // never write a file the lists could not read back
+		return schemas.Archived{}, fmt.Errorf("archive file would be larger than %d bytes", archiveMaxBytes)
+	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return schemas.Archived{}, err
 	}

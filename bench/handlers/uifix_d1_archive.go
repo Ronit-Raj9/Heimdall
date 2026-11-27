@@ -52,6 +52,22 @@ func archiveActor(ctx *fasthttp.RequestCtx) string {
 	return "local"
 }
 
+// archiveRoleOK checks the role of an archive route inside the handler too,
+// not only in the policy table: admin for evaluations, comparisons, runs and
+// improvement runs, member for findings. A local caller is the one person
+// of the bench and passes. Otherwise it answers 403 with the reason.
+func archiveRoleOK(ctx *fasthttp.RequestCtx, mode schemas.Mode, role auth.Role) bool {
+	if isLocalCaller(ctx) || auth.PrincipalFrom(ctx).Can(role) {
+		return true
+	}
+	who := "an org owner or admin"
+	if role == auth.RoleMember {
+		who = "an org member, admin or owner"
+	}
+	lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "Only "+who+" may archive or unarchive this.")
+	return false
+}
+
 // archiveMarks is one list's archive filter and the sidecar marks of kind.
 type archiveMarks struct {
 	filter archiveFilter
@@ -140,6 +156,9 @@ func (h *ImproveHandler) registerArchiveRoutes(r *router.Router, middlewares, wr
 var improveBusy = []string{improve.StatusPlanned, improve.StatusRunning, improve.StatusAwaiting}
 
 func (h *ImproveHandler) archive(ctx *fasthttp.RequestCtx, archive bool) {
+	if !archiveRoleOK(ctx, h.mode, auth.RoleAdmin) {
+		return
+	}
 	id, ok := h.id(ctx)
 	if !ok || !h.ready(ctx) {
 		return
@@ -214,6 +233,9 @@ func (h *archiveHandler) conflict(ctx *fasthttp.RequestCtx, msg string) {
 // evaluation archives one evaluation of this org; refused unless it has
 // finished (as deleting it is).
 func (h *archiveHandler) evaluation(ctx *fasthttp.RequestCtx, archive bool) {
+	if !archiveRoleOK(ctx, h.env.Mode, auth.RoleAdmin) {
+		return
+	}
 	ev := &evaluationsHandler{env: h.env, now: h.now}
 	e, ok := ev.load(ctx)
 	if !ok {
@@ -241,6 +263,9 @@ func (h *archiveHandler) evaluation(ctx *fasthttp.RequestCtx, archive bool) {
 // experiment archives one comparison of this org's index; refused while it
 // is queued or running. The sealed folder is never touched.
 func (h *archiveHandler) experiment(ctx *fasthttp.RequestCtx, archive bool) {
+	if !archiveRoleOK(ctx, h.env.Mode, auth.RoleAdmin) {
+		return
+	}
 	id, _ := ctx.UserValue("id").(string)
 	idx := h.env.Services.Index
 	if idx == nil {
@@ -265,6 +290,9 @@ func (h *archiveHandler) experiment(ctx *fasthttp.RequestCtx, archive bool) {
 // run archives one run of this org's index; refused while its comparison
 // is queued or running.
 func (h *archiveHandler) run(ctx *fasthttp.RequestCtx, archive bool) {
+	if !archiveRoleOK(ctx, h.env.Mode, auth.RoleAdmin) {
+		return
+	}
 	id, _ := ctx.UserValue("id").(string)
 	idx := h.env.Services.Index
 	if idx == nil {
@@ -304,6 +332,9 @@ func (h *archiveHandler) sidecar(ctx *fasthttp.RequestCtx, kind, label, id strin
 // finding archives one finding of this org. A finding never runs, so
 // nothing is refused; its state does not change.
 func (h *archiveHandler) finding(ctx *fasthttp.RequestCtx, archive bool) {
+	if !archiveRoleOK(ctx, h.env.Mode, auth.RoleMember) {
+		return
+	}
 	fh := &findingsHandler{env: h.env, now: h.now}
 	id, ok := fh.findingID(ctx)
 	if !ok {
