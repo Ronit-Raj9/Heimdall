@@ -150,6 +150,10 @@ func (h *JobsHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
+	if string(q.Peek("fields")) == "count" {
+		h.count(ctx, work, org, f)
+		return
+	}
 	page, err := h.api.List(work, org, f)
 	if err != nil {
 		h.sendError(ctx, "list jobs", err)
@@ -160,6 +164,41 @@ func (h *JobsHandler) list(ctx *fasthttp.RequestCtx) {
 		kinds = []string{}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, JobList{Jobs: plainJobs(page.Jobs), Next: page.Next, Kinds: kinds})
+}
+
+// JobCount is GET /jobs?fields=count: how many jobs of the caller's
+// organization match the filter, without the jobs. More is true when the
+// count stopped at jobCountMax.
+type JobCount struct {
+	Count int  `json:"count"`
+	More  bool `json:"more,omitempty"`
+}
+
+// jobCountMax bounds a count, so a count of a long history stays cheap.
+const jobCountMax = 1000
+
+// count answers GET /jobs?fields=count by reading the filtered list page
+// by page (limit and before are ignored).
+func (h *JobsHandler) count(ctx *fasthttp.RequestCtx, work context.Context, org string, f jobs.Filter) {
+	f.Limit, f.Before = 500, ""
+	out := JobCount{}
+	for {
+		page, err := h.api.List(work, org, f)
+		if err != nil {
+			h.sendError(ctx, "count jobs", err)
+			return
+		}
+		out.Count += len(page.Jobs)
+		if page.Next == "" {
+			break
+		}
+		if out.Count >= jobCountMax {
+			out.More = true
+			break
+		}
+		f.Before = page.Next
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
 // create handles POST /jobs with {"kind": ..., "params": {...}}: member role,
