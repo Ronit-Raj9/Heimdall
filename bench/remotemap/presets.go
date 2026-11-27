@@ -175,7 +175,7 @@ var Presets = []Preset{
 	},
 	{
 		ID: "chat_completions", Label: "Chat completion endpoint",
-		Help:           "Any endpoint that takes OpenAI-style chat messages and answers with choices[0].message.content. Use Connect your OpenAI-compatible endpoint instead when Heimdall should run the tool calls.",
+		Help:           "Any endpoint that takes OpenAI-style chat messages and answers with choices[0].message.content. Use OpenAI-compatible endpoint instead when Heimdall should run the tool calls.",
 		URLPlaceholder: "https://agent.example.com/v1/chat/completions",
 		Inputs:         []PresetInput{{Name: "model", Label: "Model or agent name", Placeholder: "my-agent"}},
 		Mapping: schemas.RemoteMapping{
