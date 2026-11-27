@@ -530,7 +530,7 @@ services:
     labels: *labels
     <<: [*hardening, *logging]
     group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
-    command: ["bifrost-bench", "registry", "publisher", "-auth-file", "/auth/push.auth", "-manifest", "/manifest/manifest", "-token-file", "/manifest/publish.token", "-checkout", "${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}", "-library", "${HEIMDALL_LIBRARY_DIR:-}"]
+    command: ["registry", "publisher", "-auth-file", "/auth/push.auth", "-manifest", "/manifest/manifest", "-token-file", "/manifest/publish.token", "-checkout", "${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}", "-library", "${HEIMDALL_LIBRARY_DIR:-}"]
     environment:
       HOME: /tmp
     volumes:

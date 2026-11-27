@@ -62,6 +62,13 @@ func PlatformImages(checkoutRoot, libraryRoot string) (map[string]string, error)
 		sort.Strings(files)
 		for _, f := range files {
 			raw, err := os.ReadFile(f)
+			if os.IsPermission(err) {
+				// A private agent file in the checkout (mode 0600, written by
+				// its owner) is not a platform agent: skip it, do not fail the
+				// whole listing.
+				slog.Warn("platform images: agent file skipped, not readable", "file", f)
+				continue
+			}
 			if err != nil {
 				return nil, fmt.Errorf("platform images: %w", err)
 			}

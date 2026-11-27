@@ -57,8 +57,10 @@ has_registry_host() {
 }
 
 images=()
+named=''
 if [ $# -gt 0 ]; then
 	images=("$@")
+	named=1
 else
 	images=(bench/coding-core-base:1)
 	# Agent base images: the build tag of every agent file in the checkout.
@@ -147,6 +149,14 @@ for ref in "${images[@]}"; do
 		continue
 	fi
 	if ! docker image inspect "$ref" >/dev/null 2>&1; then
+		# An image of the default list that has no registry name was never
+		# built on this host: there is nothing to pull. The image publisher
+		# copies it when it is first built. An image named on the command
+		# line is still pulled, and a failed pull is still a failure.
+		if [ -z "$named" ]; then
+			log "skipping $ref: not built on this host yet; it is copied when it is first built"
+			continue
+		fi
 		log "$ref is not on this host; pulling it"
 		if ! docker pull -q "$ref" >/dev/null; then
 			log "FAILED $ref: not on this host and the pull failed"
