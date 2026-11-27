@@ -26,5 +26,19 @@
 			"needDaily": "Give a spending limit per day above 0 USD.",
 			"dailyTooLow": "The spending limit per day must cover the budget for each new model times the most per day."
 		}
+	},
+	"skillImport": {
+		"open": "Import a skill from Bifrost",
+		"agent": "Agent",
+		"skill": "Skill",
+		"version": "Version",
+		"pick": "Pick one",
+		"import": "Import",
+		"cancel": "Cancel",
+		"loading": "Reading the skills of your Bifrost.",
+		"none": "Your Bifrost has no skills yet.",
+		"installed": "Imported as {{folder}}. Its safety scan let it in.",
+		"blocked": "Imported as {{folder}}, but its safety scan blocked it, so the agent does not use it. Open the agent's Tools tab to see why.",
+		"failed": "The skill was not imported."
 	}
 }

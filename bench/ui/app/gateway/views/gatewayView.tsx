@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { FeatureTestDialog } from "./featureTestDialog";
 import { ModelWatchCard } from "./modelWatchCard";
 import { RegisteredAgents } from "./registeredAgents";
+import { SkillImportAction } from "./skillImport";
 import "./w4p6I18n";
 
 const IN_USE_TONE: Record<GwCardLine["enabled"], string> = {
@@ -85,6 +86,7 @@ export function GatewayCardLineRow({ line, onStart }: { line: GwCardLine; onStar
 			</div>
 			<p>{line.state === "not_enough_data" && !line.headline ? t("line.notEnough") : line.headline}</p>
 			{from && <p className="text-muted-foreground text-xs">{from}</p>}
+			{line.feature === "skill_version" && <SkillImportAction />}
 		</li>
 	);
 }
