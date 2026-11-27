@@ -168,7 +168,7 @@ export function LabellerPicker({
 	);
 }
 
-/** Labelling: /annotation. Every queue of the organization with its progress, and a form for a new one. */
+/** Human review: /annotation. Every queue of the organization with its progress, and a form for a new one. */
 export default function AnnotationView() {
 	const { t } = useTranslation("annotation");
 	const session = useSession();

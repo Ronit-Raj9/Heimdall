@@ -1,7 +1,7 @@
 import type { PullCheck, PullStep } from "@/lib/types/liveinbox";
 import { useTranslation } from "react-i18next";
 
-/** The label of a step's link: Settings > Secrets, Models & keys, or the setup form on this page. */
+/** The label of a step's link: Settings > Secrets, Model keys, or the setup form on this page. */
 function linkKey(link: string): "pull.steps.openSecrets" | "pull.steps.openModels" | "pull.steps.openForm" {
 	if (link.startsWith("/settings")) return "pull.steps.openSecrets";
 	if (link.startsWith("/models")) return "pull.steps.openModels";
