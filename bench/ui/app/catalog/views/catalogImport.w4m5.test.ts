@@ -14,7 +14,7 @@ describe("importProblem (p09-2)", () => {
 		expect(importProblem({ ...ok, url: "" })).toBe("Enter a link that starts with https://.");
 		expect(importProblem({ ...ok, url: "http://example.com/x.zip" })).toBe("Only https links can be fetched. Change http:// to https://.");
 		expect(importProblem({ ...ok, suite: "" })).toBe("Enter the benchmark id.");
-		expect(importProblem({ ...ok, suite: "Bad Id" })).toContain("The benchmark id uses lowercase letters");
+		expect(importProblem({ ...ok, suite: "Bad Id" })).toContain("The benchmark id can use lowercase letters");
 		expect(importProblem({ ...ok, limit: "0" })).toBe("Enter a whole number from 1 to 500.");
 		expect(importProblem({ ...ok, limit: "600" })).toBe("Enter a whole number from 1 to 500.");
 		expect(importProblem({ ...ok, limit: "" })).toBe("Enter a whole number from 1 to 500.");
