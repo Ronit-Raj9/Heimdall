@@ -4,7 +4,7 @@
 	"what": {
 		"evaluation": "this report card",
 		"report_card": "this report card",
-		"verdict": "this verdict",
+		"verdict": "this comparison result",
 		"run_trace": "this run",
 		"leaderboard": "this leaderboard view"
 	},

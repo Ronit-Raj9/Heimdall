@@ -9,6 +9,14 @@ const state = vi.hoisted(() => ({ effect: undefined as unknown }));
 
 vi.mock("@/lib/store/apis/gatewayApi", () => ({
 	useGetBifrostSettingQuery: () => ({ data: undefined }),
+	useGetGatewayReportCardQuery: () => ({ data: undefined }),
+}));
+vi.mock("@/lib/store/apis/benchApi", () => ({
+	useGetExperimentQuery: () => ({ data: undefined }),
+}));
+vi.mock("@/app/gateway/views/featureTestDialog", () => ({
+	FeatureTestDialog: () => null,
+	suiteOption: (s: { id: string; version?: string }) => (s.version ? `${s.id}@${s.version}` : s.id),
 }));
 vi.mock("./gatewayEffectQuery", () => ({
 	useGetGatewayEffectOptionalQuery: () => state.effect,
@@ -89,5 +97,13 @@ describe("GatewayEffectCard", () => {
 	it("says what to do when the effect is unknown", () => {
 		const html = render(<GatewayEffectView effect={{ ...effect, state: "unknown", result: undefined, reason: "no rows" }} />);
 		expect(html).toContain("This test could not show an effect: no rows. Check that the setting is on in Bifrost, then run it again.");
+	});
+
+	it("offers to run an unknown test again, and only then", () => {
+		const unknown = { ...effect, state: "unknown" as const, result: undefined, reason: "no rows" };
+		expect(render(<GatewayEffectView effect={unknown} onRunAgain={() => {}} />)).toContain("Run this test again");
+		expect(render(<GatewayEffectView effect={effect} onRunAgain={() => {}} />)).not.toContain("gateway-effect-run-again");
+		state.effect = okQuery(unknown);
+		expect(render(<GatewayEffectCard expId="e1" />)).toContain('data-testid="gateway-effect-run-again"');
 	});
 });

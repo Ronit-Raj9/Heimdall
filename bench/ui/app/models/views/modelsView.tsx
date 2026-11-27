@@ -1,4 +1,5 @@
 import "@/components/settings/uf8aI18n";
+import "@/components/gateway/ufc7I18n";
 import { notify } from "@/lib/notify";
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
 import { CredentialKinds } from "@/components/settings/credentialKinds";
@@ -183,6 +184,7 @@ export default function ModelsView() {
 	const { t } = useTranslation("models");
 	const { t: tu } = useTranslation("u11");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: tc } = useTranslation("ufc7");
 	const session = useSession();
 	const search = useSearch({ strict: false });
 	const navigate = useNavigate();
@@ -285,7 +287,7 @@ export default function ModelsView() {
 							action={
 								isAdmin
 									? {
-											label: t("add"),
+											label: tc("models.add"),
 											onClick: () => setForm({ provider: firstProvider }),
 										}
 									: { label: t("emptyViewerAction"), to: "/experiments" }
@@ -398,7 +400,7 @@ export default function ModelsView() {
 						</div>
 					</DetailsDisclosure>
 					{form && (
-						<SidePanel title={form.key ? t("editTitle") : t("addTitle")} onClose={() => setForm(null)}>
+						<SidePanel title={form.key ? t("editTitle") : tc("models.add")} onClose={() => setForm(null)}>
 							<KeyForm
 								key={`${form.provider}-${form.key?.id ?? "new"}`}
 								providers={providers}
@@ -514,6 +516,7 @@ function ProviderCard({
 	const { t } = useTranslation("models");
 	const { t: tu } = useTranslation("u11");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: tc } = useTranslation("ufc7");
 	const state = providerKeyState(keys);
 	return (
 		<section
@@ -540,7 +543,7 @@ function ProviderCard({
 						variant="ghost"
 						className="gap-1 max-sm:w-full max-sm:justify-start"
 						onClick={onAdd}
-						aria-label={tl("models.addKeyFor", { provider: name })}
+						aria-label={tc("models.addKeyFor", { provider: name })}
 						data-testid={`provider-add-${provider}`}
 					>
 						<Plus className="size-3.5" aria-hidden="true" />

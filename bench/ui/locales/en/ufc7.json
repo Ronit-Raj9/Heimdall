@@ -1,0 +1,9 @@
+{
+	"effect": {
+		"runAgain": "Run this test again"
+	},
+	"models": {
+		"add": "Add a model key",
+		"addKeyFor": "Add a model key for {{provider}}"
+	}
+}

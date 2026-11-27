@@ -581,7 +581,7 @@ export function AdminUsagePanel() {
 
 export function AdminContainersPanel() {
 	const { t } = useTranslation("admin");
-	const q = useListAdminContainersQuery(undefined, { pollingInterval: 10000 });
+	const q = useListAdminContainersQuery(undefined, { pollingInterval: 10000, skipPollingIfUnfocused: true });
 	const [remove, removeState] = useRemoveAdminRunnerMutation();
 	const gate = useGate(q, "admin-containers");
 	if (gate) return gate;

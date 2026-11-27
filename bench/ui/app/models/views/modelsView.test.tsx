@@ -145,7 +145,7 @@ describe("ModelsView", () => {
 		api.q = { models: okQuery({ ...CATALOG, keys: [], default: undefined }) };
 		const html = render(<ModelsView />);
 		expect(html).toContain('data-testid="models-empty"');
-		expect(html).toContain("Add an API key");
+		expect(html).toContain("Add a model key");
 	});
 
 	it("says what to configure when the key store is off", () => {

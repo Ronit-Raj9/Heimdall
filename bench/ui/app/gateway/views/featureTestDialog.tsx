@@ -268,7 +268,20 @@ const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", b
 export const ESTIMATE_DELAY_MS = 500;
 
 /** "Start a test": pick what to run; the estimate shows as soon as the form is complete; Start test, then the confirmation. */
-export function FeatureTestDialog({ feature, name, open, onClose }: { feature: string; name: string; open: boolean; onClose(): void }) {
+export function FeatureTestDialog({
+	feature,
+	name,
+	open,
+	onClose,
+	initial,
+}: {
+	feature: string;
+	name: string;
+	open: boolean;
+	onClose(): void;
+	/** Fields to start from, for example the benchmark of a test being run again. */
+	initial?: Partial<FeatureTestForm>;
+}) {
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
 	const navigate = useNavigate();
@@ -278,7 +291,7 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 	const [plan] = usePlanExperimentMutation();
 	const [create] = useCreateExperimentMutation();
 	const [start] = useStartExperimentMutation();
-	const [form, setForm] = useState<FeatureTestForm>(EMPTY);
+	const [form, setForm] = useState<FeatureTestForm>(() => ({ ...EMPTY, ...initial }));
 	const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
 	const [prepared, setPrepared] = useState<Prepared | null>(null);
 	const [estimating, setEstimating] = useState(false);
