@@ -394,10 +394,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 			</section>
 			<Section
 				title={t("detail.progressTitle")}
-				description={
-					t(spec.mode === "score" ? "detail.progressDescriptionScore" : "detail.progressDescription") +
-					(active ? ` ${t("detail.liveNote")}` : "")
-				}
+				description={active ? t("detail.liveNote") : undefined}
 				testId="evaluation-progress"
 			>
 				{note === "starting" ? (
@@ -430,7 +427,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				)}
 			</Section>
 			{run.length > 0 && skipped.length > 0 && (
-				<Section title={t("detail.skippedTitle")} description={t("detail.skippedDescription")} testId="evaluation-skipped">
+				<Section title={t("detail.skippedTitle")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">
 						{skipped.map((child) => {
 							const refusal = parseSkillRefusal(child.skipped);

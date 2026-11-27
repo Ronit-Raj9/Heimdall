@@ -316,7 +316,8 @@ export function compareArms(arms: Record<string, ReportArmMetrics>, a: string, b
 export function benchmarkWinner(row: ReportBenchmark, a: string, b: string): ComparisonResult | undefined {
 	if (row.verdict)
 		return {
-			winner: row.verdict.winner || "tie",
+			// Only an arm label names a winner; "unclear" or any other word is no clear winner.
+			winner: row.verdict.winner === a || row.verdict.winner === b ? row.verdict.winner : "tie",
 			delta: row.verdict.delta,
 			significant: row.verdict.significant,
 		};

@@ -348,7 +348,7 @@ describe("Step4Setup", () => {
 			isFetching: false,
 			isLoading: false,
 		};
-		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Could not estimate this evaluation right now.");
+		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Could not estimate this evaluation.");
 		q.estimate = {
 			data: undefined,
 			error: { status: "PARSING_ERROR", error: "x" },
@@ -508,9 +508,9 @@ describe("Step4Setup presets and slots", () => {
 		expect(html).toContain("sees a change of about 30 points");
 		expect(html).toContain("too few tasks to see a change");
 		expect(html).toContain("2 faults");
-		expect(html).toContain("Up to 4 runs at once (4 per benchmark; your organization has 4 worker slots).");
+		expect(html).toContain("Up to 4 runs at once (4 per benchmark, your organization has 4 worker slots).");
 		expect(html).toContain('data-testid="step4-basis"');
-		expect(html).toContain("Estimated from other agents&#x27; runs of these benchmarks.");
+		expect(html).toContain("Estimated from other agents&#x27; runs.");
 	});
 });
 describe("MCP route", () => {
@@ -580,7 +580,7 @@ describe("Step4Setup fix wave F26", () => {
 		expect(html).toContain('data-testid="step4-fault-na-broken-tool"');
 		expect(html).toContain("Does not apply here: benchmark hd-harbor-bfcl has no tools");
 		expect(html).not.toContain('data-testid="step4-fault-na-model-down"');
-		expect(html).toContain("These faults do not apply to the chosen benchmarks and add no runs: Broken tool.");
+		expect(html).toContain("These faults do not apply here and add no runs: Broken tool.");
 		expect(html.indexOf("step4-faults-na")).toBeLessThan(html.indexOf('data-testid="step4-fault-group-'));
 		expect(html).toContain("MCP route: benchmark hd-harbor-bfcl has no MCP server");
 		// The estimate stays in plain view; only the settings above it fold (M3-29).
@@ -603,7 +603,7 @@ describe("Step4Setup fix wave F26", () => {
 	it("says what the estimate is based on", () => {
 		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 1, high: 2 }, from_library: true });
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain(
-			"Estimated from other agents&#x27; runs of these benchmarks. Your own runs will make it more exact.",
+			"Estimated from other agents&#x27; runs. Your runs will refine it.",
 		);
 		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 1, high: 2 } });
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Estimated from past runs of this agent and model.");

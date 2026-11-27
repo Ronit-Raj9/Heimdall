@@ -1,7 +1,7 @@
 {
 	"list": {
 		"title": "Evaluations",
-		"subtitle": "Test an agent on several benchmarks.",
+		"subtitle": "",
 		"loadError": "Could not load the evaluations",
 		"empty": "No evaluations yet.",
 		"new": "Evaluate your agent",
@@ -155,7 +155,7 @@
 		"imageMissing": "Task image for {{benchmark}} is missing on the worker. Nothing was spent. An admin must sync it, then run again.",
 		"workerRefused": "The worker refused runs of {{benchmark}}. Nothing was spent. See technical details or ask an admin.",
 		"noWorker": "No worker online for {{benchmark}}. Nothing was spent. Run again when one is online.",
-		"infraTitle": "Infrastructure error"
+		"infraTitle": "Infrastructure error, not the agent"
 	},
 	"raise": {
 		"title_one": "The budget stopped {{count}} benchmark: {{notStarted}} runs not started.",

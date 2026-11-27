@@ -160,21 +160,18 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 
 			<ReportFilterBar where={report.where} onClear={onWhere && (() => onWhere(undefined))} />
 
-			<Section as="h3" title={tr("sections.capability")} description={tr("sections.capabilityHelp")}>
+			<Section as="h3" title={tr("sections.capability")}>
 				<CapabilityTable report={report} />
 			</Section>
 
-			<Section as="h3" title={tr("sections.benchmark")} description={tr("sections.benchmarkHelp")}>
+			<Section as="h3" title={tr("sections.benchmark")}>
 				<BenchmarkList report={report} readOnly={readOnly} />
 			</Section>
 
 			<ReportSlices report={report} onShowOnly={onWhere && ((key, value) => onWhere({ ...report.where, [key]: value }))} />
 
 			{reliabilityCards(report).length > 0 && (
-				<Section as="h3"
-					title={tr("sections.reliability")}
-					description={tr("sections.reliabilityHelp")}
-				>
+				<Section as="h3" title={tr("sections.reliability")}>
 					<ReliabilityCards report={report} />
 				</Section>
 			)}
@@ -363,7 +360,10 @@ export const METRIC_PRIORITY: Record<(typeof METRIC_HEADS)[number], "metric" | "
 	Time: "secondary",
 };
 
-function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
+/** In an A/B table Steps and Tool calls show only from 2xl, so Change and Winner fit at 1440 (round 3). */
+const wideOnly = "hidden 2xl:table-cell";
+
+function MetricCells({ metrics, ab }: { metrics?: ReportArmMetrics; ab?: boolean }) {
 	const { t: tr } = useTranslation("reportCard");
 	const num = "text-right tabular-nums";
 	// Stacked on phones, each value says which column it is (C2-8).
@@ -382,10 +382,10 @@ function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
 			<TableCell label={l("Tokens")} priority="secondary" className={num}>
 				{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}
 			</TableCell>
-			<TableCell label={l("Steps")} priority="secondary" className={num}>
+			<TableCell label={l("Steps")} priority="secondary" className={cn(num, ab && wideOnly)}>
 				{metrics ? compactNumber(metrics.steps) : "-"}
 			</TableCell>
-			<TableCell label={l("Tool calls")} priority="secondary" className={num}>
+			<TableCell label={l("Tool calls")} priority="secondary" className={cn(num, ab && wideOnly)}>
 				{metrics ? compactNumber(metrics.tool_calls) : "-"}
 			</TableCell>
 			<TableCell label={l("Time")} priority="secondary" className={num}>
@@ -423,7 +423,7 @@ function CapabilityTable({ report }: { report: Report }) {
 					<TableHead scope="col">{tr("columns.capability")}</TableHead>
 					{ab && <TableHead scope="col">{tr("columns.setup")}</TableHead>}
 					{METRIC_HEADS.map((h) => (
-						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={h === "Score" ? undefined : "text-right"}>
+						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={cn(h !== "Score" && "text-right", ab && (h === "Steps" || h === "Tool calls") && wideOnly)}>
 							{tr(`columns.metric.${h}`)}
 						</TableHead>
 					))}
@@ -456,13 +456,13 @@ function CapabilityTable({ report }: { report: Report }) {
 										</TableHead>
 									)}
 									<TableCell className="font-semibold">{arm.label}</TableCell>
-									<MetricCells metrics={data.arms[arm.label]} />
+									<MetricCells metrics={data.arms[arm.label]} ab />
 									{i === 0 && (
 										<>
-											<TableCell rowSpan={2} className="text-right align-top tabular-nums">
+											<TableCell rowSpan={2} label={tr("columns.change", { b: b.label, a: a.label })} className="text-right align-top tabular-nums">
 												{cmp ? points(cmp.delta) : "-"}
 											</TableCell>
-											<TableCell rowSpan={2} className="align-top">
+											<TableCell rowSpan={2} label={tr("columns.winner")} className="align-top">
 												<WinnerMark result={cmp} name={cmp ? armName(report, cmp.winner) : undefined} />
 											</TableCell>
 										</>
@@ -523,7 +523,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					className="text-muted-foreground size-4 shrink-0 transition-transform duration-150 group-open/bench:rotate-90"
 					aria-hidden="true"
 				/>
-				<span className="text-foreground min-w-0 flex-1 truncate font-medium">{row.benchmark}</span>
+				<span className="text-foreground min-w-0 flex-1 truncate font-medium max-sm:w-[calc(100%-2rem)] max-sm:flex-none">{row.benchmark}</span>
 				<span className="text-muted-foreground text-xs">{capabilityName(row.capability)}</span>
 				{judge && (
 					<Badge variant={judge.tone} title={judge.title} data-testid={`benchmark-judge-${row.benchmark}`}>

@@ -43,7 +43,7 @@ describe("EvaluationReportCard budget stop (M3-4, G4-01)", () => {
 		expect(html).toContain('data-testid="evaluation-budget-stopped"');
 		expect(html.indexOf(sentence)).toBeLessThan(html.indexOf('data-testid="evaluation-budget-stopped"'));
 		expect(html).toContain("The budget stopped 1 benchmark: 13 runs not started.");
-		expect(html).toContain("Raise the budget and continue, up to $10");
+		expect(html).toContain("Raise budget, up to $10");
 		// The suggested new total doubles the stopped cap: $5 now, $10 suggested.
 		expect(tagOf(html, "evaluation-raise-budget-input")).toContain('value="10"');
 	});

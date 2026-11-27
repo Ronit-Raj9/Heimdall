@@ -135,7 +135,7 @@ describe("EvaluationBody delete (X16)", () => {
 		const { tagOf } = await import("@/lib/testing/render");
 		const running = render(<EvaluationMoreItems evaluation={base} name="x" />, hostedSession("admin"));
 		expect(tagOf(running, "evaluation-delete")).toContain('disabled=""');
-		expect(running).toContain("Cancel the evaluation or wait for it to finish before deleting it.");
+		expect(running).toContain("Cancel or wait for it to finish before deleting.");
 		const done = render(<EvaluationMoreItems evaluation={{ ...base, status: "done" }} name="x" />, hostedSession("admin"));
 		expect(tagOf(done, "evaluation-delete")).not.toContain('disabled=""');
 		expect(render(<EvaluationMoreItems evaluation={{ ...base, status: "done" }} name="x" />, hostedSession("viewer"))).not.toContain(
@@ -246,8 +246,7 @@ describe("EvaluationBody finished progress (N142)", () => {
 		const done: Evaluation = { ...base, status: "done", children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "done" }] };
 		const html = render(<EvaluationBody evaluation={done} />);
 		expect(html).not.toContain("Updates every 3 seconds");
-		expect(html).toContain("One comparison per benchmark.");
-		expect(html).toContain("29 of 30 runs scored, 1 could not run (infrastructure error)");
+		expect(html).toContain("29 of 30 runs scored, 1 infrastructure error");
 		const running = render(<EvaluationBody evaluation={base} />);
 		expect(running).toContain("Updates every 3 seconds.");
 		vi.mocked(useGetExperimentQuery).mockReturnValue(
@@ -269,7 +268,7 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 		const queued: Evaluation = { ...base, children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "queued" }] };
 		const html = render(<EvaluationBody evaluation={queued} />);
 		// A known cause reads as one sentence; the raw text sits in Technical details (M3-9).
-		expect(html).toContain("The worker refused the runs of hd-harbor-tb2.");
+		expect(html).toContain("The worker refused runs of hd-harbor-tb2.");
 		expect(html).toContain("worker shared could not take this run: Modal refused the sandbox");
 		expect(html).toContain('href="/jobs/job_9"');
 		expect(html).toContain("Open the job log");
@@ -291,12 +290,12 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 	it("turns a skill gate refusal into a next step with Scan it now and the agent's tools (L5)", async () => {
 		const { hostedSession } = await import("@/lib/testing/platformFixtures");
 		const html = render(<EvaluationBody evaluation={skippedBy(noScan)} />, hostedSession("member"));
-		expect(html).toContain("Skill pdf-tools of agent zz-loop has not passed a safety scan, so runs of this agent are refused.");
+		expect(html).toContain("Skill pdf-tools of zz-loop has not passed a safety scan. Runs are refused.");
 		expect(html).toContain('data-testid="evaluation-skill-scan-hd-harbor-bfcl"');
 		expect(html).toContain("Scan it now");
 		expect(html).toContain('href="/agents/zz-loop?tab=tools"');
 		const html2 = render(<EvaluationBody evaluation={skippedBy(changed)} />, hostedSession("member"));
-		expect(html2).toContain("Skill pdf-tools changed after its last scan, so runs of this agent are refused.");
+		expect(html2).toContain("Skill pdf-tools changed since its last scan. Runs are refused.");
 	});
 
 	it("offers Scan it now for both skill gate sentences adapters/skillgate.go writes (fix wave 3 integration)", async () => {
@@ -323,7 +322,7 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 			[() => undefined, { isLoading: false, data: { installed: true, skill: {}, record: { decision, counts: {}, findings } } }] as never;
 		vi.mocked(useScanAgentSkillMutation).mockReturnValue(result("admitted"));
 		expect(render(<EvaluationBody evaluation={skippedBy(noScan)} />, hostedSession("member"))).toContain(
-			"Passed the scan. Start the evaluation again to run this benchmark.",
+			"Passed the scan. Start the evaluation again.",
 		);
 		vi.mocked(useScanAgentSkillMutation).mockReturnValue(
 			result("blocked", [{ rule: "exfil", severity: "block", file: "run.sh", line: 3, detail: "sends files to a remote host" }]),

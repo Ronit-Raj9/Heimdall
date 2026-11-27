@@ -45,7 +45,7 @@ describe("BenchmarkChecklist (N124)", () => {
 	});
 	it("waits while compatibility is checked", () => {
 		const html = render({ checking: true });
-		expect(html).toContain("Checking whether your agent can run it...");
+		expect(html).toContain("Checking compatibility...");
 	});
 	it("says so when no benchmark is ready", () => {
 		expect(render({ suites: [suites[2]] })).toContain("No benchmark is ready yet");

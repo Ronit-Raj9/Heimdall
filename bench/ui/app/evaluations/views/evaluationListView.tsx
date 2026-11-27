@@ -69,7 +69,7 @@ export default function EvaluationListView() {
 	return (
 		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="evaluations-screen">
 			{/* No page action: the header's "Evaluate an agent" is the one way in (M3-54). */}
-			<PageHeader title={t("list.title")} subtitle={t("list.subtitle")} />
+			<PageHeader title={t("list.title")} />
 			{list.isLoading ? (
 				<div data-testid="evaluations-loading">
 					<TableSkeleton rows={8} />

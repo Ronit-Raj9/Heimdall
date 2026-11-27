@@ -148,10 +148,7 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 
 	return (
 		<div className="flex flex-col gap-4" data-testid="evaluate-step-1">
-			<div className="flex flex-col gap-1">
-				<h2 className="text-lg font-semibold">{t("agent.heading")}</h2>
-				<p className="text-muted-foreground text-sm">{t("agent.hint")}</p>
-			</div>
+			<h2 className="text-lg font-semibold">{t("agent.heading")}</h2>
 
 			{missingAgent && (
 				<div
