@@ -67,7 +67,6 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 	const writable = canUse(session, "member");
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-data-tab">
-			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
 			<PolicySection suite={suite.id} writable={writable} t={t} />
 			<VersionsSection suite={suite.id} t={t} />
 			{/* M6-32, Q-189: importing from another platform is a separate job: one line here that opens the form. */}

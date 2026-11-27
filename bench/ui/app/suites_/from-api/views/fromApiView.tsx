@@ -707,7 +707,6 @@ function ReviewSection({ draft, writable, onChanged }: { draft: ListedAppTasksDr
 	return (
 		<Section
 			title={t("review.title")}
-			description={t("review.description")}
 			testId="from-api-review"
 			actions={
 				<Link

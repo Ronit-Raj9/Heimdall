@@ -3,7 +3,7 @@
 	"intro": "",
 	"policy": {
 		"title": "Personal data",
-		"description": "Imports and API rows are scanned before becoming tasks.",
+		"description": "Imports and API rows are scanned for personal data before becoming tasks.",
 		"mode": "When personal data is found",
 		"modes": {
 			"off": "Do not scan",

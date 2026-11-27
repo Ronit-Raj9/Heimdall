@@ -153,7 +153,6 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 				{showChecklist && (
 					<ReadinessChecklist suite={suite} writable={canUse(session, "member")} hosted={session.authMode === "hosted"} />
 				)}
-				<p className="text-muted-foreground max-w-prose text-sm">{tu("tasksDescription")}</p>
 				<SuiteTaskFilters
 					filters={filters}
 					options={options}

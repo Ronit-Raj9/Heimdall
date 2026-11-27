@@ -26,7 +26,6 @@ export default function AddSuiteView() {
 					<h2 className="text-lg font-semibold">{t("suites.addFlow.title")}</h2>
 					<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />
 				</div>
-				<p className="text-muted-foreground text-sm">{t("suites.addFlow.subtitle")}</p>
 			</div>
 			<AddChooser />
 			<Section title={t("imports.title")} description={t("imports.subtitle")} testId="imports-section">

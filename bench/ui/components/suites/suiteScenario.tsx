@@ -77,7 +77,6 @@ export function TaskScenario({
 		<section className="flex min-w-0 flex-col gap-3" data-testid="suites-task-scenario">
 			<div className="flex flex-col gap-0.5">
 				<h3 className="text-foreground text-xs font-semibold tracking-wide uppercase">{t("suites.scenario.title")}</h3>
-				<p className="text-muted-foreground text-xs">{t("suites.scenario.hint")}</p>
 			</div>
 
 			{task.impossible && (

@@ -60,7 +60,6 @@ export function BuildTab({ suite }: { suite: SuiteSummary }) {
 	const writable = canUse(session, "member");
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-build-tab">
-			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
 			{!writable && (
 				<p role="note" className="text-muted-foreground rounded-sm border px-4 py-2 text-sm" data-testid="suite-build-viewer">
 					{t("viewerNote")}
