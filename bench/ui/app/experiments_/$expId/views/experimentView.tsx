@@ -394,6 +394,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					<div className="flex flex-wrap items-center gap-1.5" data-testid="experiment-actions">
 						<ExperimentRunActions status={st} />
 						<ShareButton kind="verdict" target={expId} />
+						{/* Without its button the re-score action is only its dialog and log: kept out of the page column so it adds no empty gap. */}
+						{canMember && <RegradeAction expId={expId} open={regradeOpen} onOpenChange={setRegradeOpen} hideButton />}
 					</div>
 				}
 				// M4-14: Re-score, Compare runs, the three downloads, Copy id and, after a line, Delete in the shared More menu.
@@ -406,10 +408,11 @@ export default function ExperimentView({ expId }: { expId: string }) {
 						search: compareSearch(undefined, expId) as Record<string, unknown>,
 						testId: "experiment-compare",
 					},
-					...exportItems.items,
+					// Round 3: the file name made each download line 600 px wide; the menu names the kind of file only.
+					...exportItems.items.map((item) => ({ ...item, label: menuLabel(item.label) })),
 					// Q-70: a summary a person can read and send on, built from what the page has.
 					...(verdict.data && !kind ? [{ label: tr("report.menu"), onSelect: () => downloadSummary(), testId: "experiment-summary" }] : []),
-					{ label: tu("header.copyId", { id: expId }), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
+					{ label: tu("header.copyId", { id: "" }).trim(), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
 					...archive.items.map((item) => ({ ...item, separatorBefore: true })),
 					deleteItem,
 				]}
@@ -417,7 +420,6 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 			<InlineError error={headerError} testId="experiment-header-error" />
 			{archive.alert}
-			{canMember && <RegradeAction expId={expId} open={regradeOpen} onOpenChange={setRegradeOpen} hideButton />}
 
 			{system && (
 				<p
@@ -627,4 +629,8 @@ function ExportTab({ expId }: { expId: string }) {
 			<ExperimentExportMenu expId={expId} initiallyOpen />
 		</div>
 	);
+}
+/** A download line without its file name ("Download spreadsheet (CSV): x.csv, 10 runs" to "Download spreadsheet (CSV), 10 runs"). Pure. */
+export function menuLabel(label: string): string {
+	return label.replace(/: [^\s,]+(?=,|$)/, "");
 }

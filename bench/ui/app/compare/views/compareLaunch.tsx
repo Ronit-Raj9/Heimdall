@@ -13,10 +13,10 @@ export function CompareLaunch() {
 	const { t: tRefs } = useTranslation("refCompare");
 	return (
 		<div className="grid items-start gap-3 lg:grid-cols-2">
-			<ActionCard icon={GitCompareArrows} title={t("launch.title")} description={t("launch.description")} testId="compare-launch">
+			<ActionCard icon={GitCompareArrows} title={t("launch.title")} description={t("launch.description")} testId="compare-launch" mountWhenOpen>
 				<MigrateForm testId="compare-launch-form" />
 			</ActionCard>
-			<ActionCard icon={GitBranch} title={tRefs("compare.title")} description={tRefs("compare.description")} testId="compare-launch-refs">
+			<ActionCard icon={GitBranch} title={tRefs("compare.title")} description={tRefs("compare.description")} testId="compare-launch-refs" mountWhenOpen>
 				<CompareRefsForm testId="compare-launch-refs-form" />
 			</ActionCard>
 		</div>

@@ -1,4 +1,7 @@
 import "./experimentsI18n";
+import "@/components/experiments/ufvp4I18n";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
+import { ChevronDown } from "lucide-react";
 
 import { filterExperiments } from "@/components/experiments/experimentList";
 import {
@@ -16,7 +19,7 @@ import { formatRelative, formatWhen } from "@/components/platform/platform.utils
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
-import { FilterSelect, FilterTokens, ShowTestsChip, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { FilterSelect, FilterTokens, filterChipClass, filterChipOff, filterChipOn, ShowTestsChip, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Pager, pageSlice } from "@/components/ui/pager";
 import { StatusPill } from "@/components/ui/statusPill";
@@ -205,14 +208,15 @@ function VerdictPill({
 	// cheaper setup is the news then, in the same sentence as the verdict page.
 	if (v.key === "inconclusive") {
 		const news = listCostNews(arms, stats);
+		const text = news
+			? tp(news.sameScore ? "summary.headline.sameScoreCheaper" : "summary.headline.unclearScoreCheaper", {
+					setup: news.arm,
+					ratio: new Intl.NumberFormat(getLocale(), { maximumSignificantDigits: 2 }).format(news.ratio),
+				})
+			: t("verdict.inconclusive");
 		return (
-			<span className="text-muted-foreground text-sm" data-testid={testId}>
-				{news
-					? tp(news.sameScore ? "summary.headline.sameScoreCheaper" : "summary.headline.unclearScoreCheaper", {
-							setup: news.arm,
-							ratio: new Intl.NumberFormat(getLocale(), { maximumSignificantDigits: 2 }).format(news.ratio),
-						})
-					: t("verdict.inconclusive")}
+			<span className="text-muted-foreground line-clamp-2 min-w-0 text-sm leading-snug" data-testid={testId} title={text}>
+				{text}
 			</span>
 		);
 	}
@@ -267,6 +271,7 @@ export function ExperimentBoard() {
 	const { t } = useTranslation("experimentsUx");
 	const { t: tb } = useTranslation("bench");
 	const { t: tu } = useTranslation("uf4b");
+	const { t: tv } = useTranslation("ufvp4");
 	const locale = getLocale();
 	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
 	// M4-79, M1-62: refresh every 15 s while a row runs, never when nothing does.
@@ -440,26 +445,6 @@ export function ExperimentBoard() {
 							testId="experiment-filter-suite"
 						/>
 					)}
-					{(agents.length > 1 || filters.agent) && (
-						<FilterSelect
-							label={tu("list.agent")}
-							allLabel={t("chips.all")}
-							options={agents.map((a) => ({ value: a, label: a }))}
-							value={filters.agent}
-							onChange={(v) => setFilter({ agent: v })}
-							testId="experiment-filter-agent"
-						/>
-					)}
-					{(models.length > 1 || filters.model) && (
-						<FilterSelect
-							label={tu("list.model")}
-							allLabel={t("chips.all")}
-							options={models.map((m) => ({ value: m, label: m }))}
-							value={filters.model}
-							onChange={(v) => setFilter({ model: v })}
-							testId="experiment-filter-model"
-						/>
-					)}
 					<FilterSelect
 						label={t("col.verdict")}
 						allLabel={t("chips.all")}
@@ -480,8 +465,36 @@ export function ExperimentBoard() {
 						onChange={(on) => setFilter({ archived: on ? "1" : null })}
 						testId="experiment-show-archived"
 					/>
+					{(agents.length > 1 || models.length > 1 || filters.agent || filters.model || systemCount > 0) && (
+						<DropdownMenu
+							label={tv("list.moreFiltersLabel")}
+							align="start"
+							items={[]}
+							testId="experiment-more-filters"
+							content={
+								<div className="flex flex-col items-start gap-3 p-3">
+					{(agents.length > 1 || filters.agent) && (
+						<FilterSelect
+							label={tu("list.agent")}
+							allLabel={t("chips.all")}
+							options={agents.map((a) => ({ value: a, label: a }))}
+							value={filters.agent}
+							onChange={(v) => setFilter({ agent: v })}
+							testId="experiment-filter-agent"
+						/>
+					)}
+					{(models.length > 1 || filters.model) && (
+						<FilterSelect
+							label={tu("list.model")}
+							allLabel={t("chips.all")}
+							options={models.map((m) => ({ value: m, label: m }))}
+							value={filters.model}
+							onChange={(v) => setFilter({ model: v })}
+							testId="experiment-filter-model"
+						/>
+					)}
 					{systemCount > 0 && (
-						<label className="text-muted-foreground ml-auto inline-flex min-h-6 items-center gap-2 text-sm" title={t("system.toggleHint")}>
+						<label className="text-muted-foreground inline-flex min-h-6 items-center gap-2 text-sm" title={t("system.toggleHint")}>
 							{/* M4-75: a switch, not a 14 px checkbox. */}
 							<input
 								type="checkbox"
@@ -494,6 +507,19 @@ export function ExperimentBoard() {
 							/>
 							{t("system.toggle", { count: systemCount })}
 						</label>
+					)}
+								</div>
+							}
+							trigger={(p) => {
+								const on = [filters.agent, filters.model, showSystem ? "1" : null].filter(Boolean).length;
+								return (
+									<button {...p} className={cn(filterChipClass, on > 0 ? filterChipOn : filterChipOff)}>
+										{on > 0 ? tv("list.moreFiltersOn", { count: on }) : tv("list.moreFilters")}
+										<ChevronDown className="size-3.5" aria-hidden />
+									</button>
+								);
+							}}
+						/>
 					)}
 				</div>
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
@@ -529,7 +555,7 @@ export function ExperimentBoard() {
 					{bulk.bar}
 					<div className="bg-card overflow-hidden rounded-xl border">
 						<div
-							className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
+							className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,15rem)_6rem_6rem_7rem_2.5rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
 							aria-hidden="true"
 						>
 							<span>{t("col.experiment")}</span>
@@ -549,7 +575,7 @@ export function ExperimentBoard() {
 								return (
 									<li
 										key={e.exp_id}
-										className={`${isArchived(e as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""} hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-4 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] md:items-center md:gap-4`}
+										className={`${isArchived(e as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""} hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-2.5 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,15rem)_6rem_6rem_7rem_2.5rem] md:items-center md:gap-4`}
 										data-testid={`experiment-row-${e.exp_id}`}
 									>
 										<span className="flex min-w-0 items-center gap-3">
@@ -587,7 +613,7 @@ export function ExperimentBoard() {
 													<StatusPill raw={e.state} testId={`experiment-row-${e.exp_id}-state`} />
 												)}
 											</span>
-											<span>
+											<span className="min-w-0">
 												{kind ? (
 													<KindPill kind={kind} testId={`experiment-row-${e.exp_id}-kind`} />
 												) : (
