@@ -67,7 +67,7 @@ describe("SchedulesBody", () => {
 		expect(html).toContain('href="/operate"');
 	});
 
-	it("shows the hosted guardrails with a runners link and real next, last and spend", () => {
+	it("shows the hosted guardrails in plain words (X-48) and real next, last and spend", () => {
 		const rows = [
 			{
 				...DATA.rows[0],
@@ -83,9 +83,10 @@ describe("SchedulesBody", () => {
 		];
 		const html = render({ ...DATA, rows, hosted: true, ticker: true, limits: { max_schedules: 20, min_interval_min: 15 } });
 		expect(html).toContain('data-testid="schedules-hosted-limits"');
-		expect(html).toContain("1 of 20 schedules");
+		expect(html).toContain("Up to 20 repeat runs for this organization, 1 used.");
 		expect(html).toContain("every 15 minutes");
-		expect(html).toContain('href="/workers"');
+		// X-48: the limits line carries no Workers link any more.
+		expect(html).not.toContain('href="/workers"');
 		expect(html).not.toContain('data-testid="schedules-no-ticker"');
 		expect(html).toContain("1.50 / 5.00");
 		expect(html).toContain(">ok<");

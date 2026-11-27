@@ -4,7 +4,14 @@ import type { Action, ExperimentStatus, ReleasePolicyDecision } from "@/lib/type
 import { SessionContext, type SessionInfo } from "@/lib/session/sessionContext";
 import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The form lists finished evaluations (M7-74); the rendering here has no store, so the list is stubbed.
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useListEvaluationsQuery: () => ({ data: [] }),
+}));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 import { ExperimentOption, ReleaseForm } from "./releaseForm";
 import type { ReleaseFormValues } from "./releases.utils";
 

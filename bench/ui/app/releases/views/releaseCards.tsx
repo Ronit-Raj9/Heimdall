@@ -6,7 +6,8 @@ import { CopyId } from "@/components/ui/copyId";
 import { releaseEvidenceUrl } from "@/lib/store/apis/benchApi";
 import type { ReleaseRecord } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Bot, CheckCircle2, ChevronDown, Download, Link2Off, Rocket, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronDown, Download, Link2, Link2Off, Printer, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import "@/components/canaries/uf7bI18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -52,68 +53,88 @@ export function ReleaseCards({ releases, chainOk }: { releases: ReleaseRecord[];
 	);
 }
 
+/**
+ * The override badge and line of a record (M7-75): one amber badge and a plain sentence, never red.
+ * "unclear" when the test found no clear winner. Null for a record released without an override.
+ * Exported for tests.
+ */
+export function overrideWords(record: Pick<ReleaseRecord, "override" | "action">): { unclear: boolean; reason: string } | null {
+	if (!record.override) return null;
+	return { unclear: record.action === "no_decision", reason: record.override };
+}
+
+/** The link that opens one release on the Releases page (M7-83). Exported for tests. */
+export function releaseLink(origin: string, id: string): string {
+	return `${origin}/releases?release=${encodeURIComponent(id)}`;
+}
+
 function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolean }) {
 	const { t } = useTranslation("u14");
 	const { t: tg } = useTranslation("gw06");
+	const { t: m } = useTranslation("uf7b");
 	const [open, setOpen] = useState(false);
+	const [copied, setCopied] = useState(false);
 	const id = record.release_id;
 	const ship = record.action === "ship";
-	// A record exists only because someone released, so the main badge always reads Released (N171).
-	// The result's advice is a second badge: the override when there is one, else the advice when it was not ship.
+	// A record exists only because someone released, so the badge always says it was released (N171).
+	// An override is one amber badge with the reason inline (M7-75); the advice shows when it was not ship.
 	const advice = resultWords(record.action, tg as (key: string) => string);
+	const over = overrideWords(record);
 	const agent = releaseTitle(record, t as never);
+	const first = !record.prev_hash || record.prev_hash === "-";
+	const copyLink = () => {
+		try {
+			void navigator.clipboard?.writeText(releaseLink(window.location.origin, id)).then(() => setCopied(true), () => undefined);
+		} catch {
+			// No clipboard: nothing to do, the address bar still works.
+		}
+	};
 	return (
-		<li className="relative" data-testid={`release-entry-${id}`}>
+		<li className="relative scroll-mt-4" id={`release-${id}`} data-testid={`release-entry-${id}`}>
 			<span
 				className={cn(
-					"bg-background absolute top-5 -left-6 flex size-3.5 items-center justify-center rounded-full border-2",
-					record.override ? "border-chart-error" : "border-chart-success",
+					"bg-background absolute top-5 -left-6 size-3.5 rounded-full border-2",
+					over ? "border-chart-warning bg-chart-warning" : "border-chart-success bg-chart-success",
 				)}
 				aria-hidden="true"
 			/>
-			<div className="bg-card rounded-xl border p-5 transition hover:shadow-md">
+			<div className="border-b pt-1 pb-5">
 				<div className="flex flex-wrap items-start justify-between gap-3">
-					<div className="flex min-w-0 items-center gap-3">
-						<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-							<Bot className="size-4.5" aria-hidden="true" />
-						</span>
-						<div className="min-w-0">
-							<div className="truncate text-base font-semibold tracking-tight" title={agent} data-testid={`release-agent-${id}`}>
-								{agent}
-							</div>
-							<time className="text-muted-foreground text-xs" dateTime={record.created_at} data-testid={`release-created-${id}`}>
-								{formatReleaseTime(record.created_at)}
-							</time>
+					<div className="min-w-0">
+						<div className="truncate text-base font-semibold tracking-tight" title={agent} data-testid={`release-agent-${id}`}>
+							{agent}
 						</div>
+						<time className="text-muted-foreground text-xs" dateTime={record.created_at} data-testid={`release-created-${id}`}>
+							{formatReleaseTime(record.created_at)}
+						</time>
 					</div>
 					<div className="flex flex-wrap items-center gap-1.5">
-						<span
-							className="bg-chart-success/15 text-chart-success-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-							title={record.decision || record.action}
-							data-testid={`release-action-${id}`}
-						>
-							<Rocket className="size-3" aria-hidden="true" />
-							{t("releases.shipped")}
-						</span>
-						{record.override ? (
+						{over ? (
 							<span
-								className="bg-destructive/10 text-chart-error-ink inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-								title={tg("releases.overrideTitle", { action: advice, approver: record.approver, override: record.override })}
+								className="bg-chart-warning/15 text-chart-warning-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
 								data-testid={`release-override-tag-${id}`}
 							>
-								{t("releases.override")}
+								<TriangleAlert className="size-3" aria-hidden="true" />
+								{over.unclear ? t("releases.overrideUnclear") : t("releases.override")}
 							</span>
 						) : (
-							!ship && (
+							<>
 								<span
-									className="bg-chart-warning/15 text-chart-warning-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-									title={record.decision || record.action}
-									data-testid={`release-advice-${id}`}
+									className="bg-chart-success/15 text-chart-success-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+									data-testid={`release-action-${id}`}
 								>
-									<TriangleAlert className="size-3" aria-hidden="true" />
-									{tg("releases.resultSaid", { action: advice })}
+									{t("releases.shipped")}
 								</span>
-							)
+								{!ship && (
+									<span
+										className="bg-chart-warning/15 text-chart-warning-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+										data-testid={`release-advice-${id}`}
+									>
+										<TriangleAlert className="size-3" aria-hidden="true" />
+										{tg("releases.resultSaid", { action: advice })}
+									</span>
+								)}
+							</>
 						)}
 					</div>
 				</div>
@@ -130,20 +151,19 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 							{t("releases.approvedBy", { name: record.approver })}
 						</span>
 					</span>
-					<span className="flex items-center gap-3 text-xs">
+					<span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
 						<span
-							className={cn("flex items-center gap-1", linked ? "text-chart-success-ink" : "text-chart-error-ink")}
+							className={cn("flex min-h-6 items-center gap-1", linked ? "text-chart-success-ink" : "text-chart-error-ink")}
 							data-testid={`release-link-${id}`}
 							data-linked={linked}
-							title={record.hash}
 						>
 							{linked ? <CheckCircle2 className="size-3.5" aria-hidden="true" /> : <Link2Off className="size-3.5" aria-hidden="true" />}
-							{linked ? t("releases.linked") : t("releases.unlinked")}
+							{!linked ? t("releases.unlinked") : first ? t("releases.linkedFirst") : t("releases.linked")}
 						</span>
 						<a
 							href={releaseEvidenceUrl(id)}
 							download={`${id}-evidence.zip`}
-							className="text-primary flex items-center gap-1 hover:underline"
+							className="text-primary flex min-h-6 items-center gap-1 hover:underline"
 							data-testid={`release-evidence-${id}`}
 						>
 							<Download className="size-3.5" aria-hidden="true" />
@@ -151,7 +171,28 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 						</a>
 						<button
 							type="button"
-							className="text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+							className="text-primary flex min-h-6 items-center gap-1 hover:underline"
+							onClick={copyLink}
+							data-testid={`release-copy-link-${id}`}
+						>
+							<Link2 className="size-3.5" aria-hidden="true" />
+							{copied ? m("releases.copied") : m("releases.copyLink")}
+						</button>
+						<button
+							type="button"
+							className="text-primary flex min-h-6 items-center gap-1 hover:underline print:hidden"
+							onClick={() => {
+								setOpen(true);
+								window.setTimeout(() => window.print(), 0);
+							}}
+							data-testid={`release-print-${id}`}
+						>
+							<Printer className="size-3.5" aria-hidden="true" />
+							{m("releases.print")}
+						</button>
+						<button
+							type="button"
+							className="text-muted-foreground hover:text-foreground flex min-h-6 items-center gap-0.5"
 							onClick={() => setOpen((o) => !o)}
 							aria-expanded={open}
 							data-testid={`release-details-toggle-${id}`}
@@ -162,15 +203,30 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 					</span>
 				</div>
 
-				{record.summary && (
+				{record.summary ? (
 					<div className="bg-muted/30 mt-4 rounded-lg px-3 py-2" data-testid={`release-evidence-strip-${id}`}>
 						<ReleaseEvidence summary={record.summary} testId={`release-numbers-${id}`} />
 					</div>
+				) : (
+					// M7-76: a record made from a comparison has no numbers of its own; say so and link to them.
+					<p className="text-muted-foreground mt-4 text-sm" data-testid={`release-no-numbers-${id}`}>
+						{m("releases.noNumbers")}{" "}
+						{record.evaluation_id ? (
+							<Link to="/evaluations/$evalId" params={{ evalId: record.evaluation_id }} className="text-primary hover:underline">
+								{m("releases.openComparison")}
+							</Link>
+						) : (
+							<EntityLink kind="experiment" id={record.exp_id} className="text-sm">
+								{m("releases.openComparison")}
+							</EntityLink>
+						)}
+					</p>
 				)}
 
-				{record.override && (
-					<p className="text-chart-error-ink mt-3 line-clamp-2 text-sm wrap-anywhere" data-testid={`release-override-${id}`}>
-						{record.override}
+				{over && (
+					<p className="mt-3 text-sm wrap-anywhere" data-testid={`release-override-${id}`}>
+						{over.unclear ? t("releases.overrideLineUnclear") : t("releases.overrideLine", { action: advice })}{" "}
+						{t("releases.reason", { reason: over.reason })}
 					</p>
 				)}
 
@@ -211,7 +267,12 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 								<EntityLink kind="experiment" id={record.exp_id} className="text-xs" testId={`release-exp-${id}`} />
 							</Row>
 						)}
-						<Row label={t("releases.config")}>
+						{record.agent_id && record.version ? (
+							<Row label={m("releases.version")}>
+								<span data-testid={`release-version-${id}`}>{`${record.agent_id} v${record.version}`}</span>
+							</Row>
+						) : null}
+						<Row label={m("releases.arm")}>
 							<span className="font-mono" data-testid={`release-config-${id}`}>
 								{record.arm} · {shortHash(record.config_hash)}
 							</span>

@@ -62,12 +62,17 @@ describe("LiveBody", () => {
 			<LiveBody
 				status={{
 					...LIVE_STATUS_FIXTURE,
+					...({ mode: undefined } as object),
 					configured: false,
 					problem: undefined,
 					compare: undefined,
 				}}
 			/>,
 		);
+		// M7-64: on a live server the setup hero says it already, so the note is not shown twice.
+		const live = renderToStaticMarkup(<LiveBody status={{ ...LIVE_STATUS_FIXTURE, configured: false, problem: undefined, compare: undefined }} />);
+		expect(live).not.toContain('data-testid="live-unconfigured"');
+		expect(live).toContain('data-testid="live-simulate"');
 		expect(html).toContain('data-testid="live-unconfigured"');
 		expect(html).toContain("Live quality scoring is not set up yet. Use Set up live scoring above.");
 		expect(html).toContain("(Terminal: heimdall livescore init)");
@@ -92,6 +97,7 @@ describe("LiveBody", () => {
 				hosted
 				status={{
 					...LIVE_STATUS_FIXTURE,
+					...({ mode: undefined } as object),
 					configured: false,
 					problem: undefined,
 					compare: undefined,

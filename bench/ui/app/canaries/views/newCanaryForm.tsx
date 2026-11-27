@@ -13,7 +13,11 @@ import {
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { CanaryDefinition, SuiteSummary } from "@/lib/types/bench";
-import type { CanaryInitRequest } from "@/lib/types/schedules";
+import type { AlertConfig, CanaryInitRequest } from "@/lib/types/schedules";
+import { useGetSchedulesQuery } from "@/lib/store/apis/schedulesApi";
+import { checkCost, HowOften, howOftenCron, howOftenOf, howOftenProblem, newHowOften, usd } from "@/components/canaries/howOften";
+import { runsPerDay } from "@/lib/utils/cron";
+import "@/components/canaries/uf7bI18n";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -32,7 +36,7 @@ export type CanaryWhen = "manual" | "daily" | "hourly" | "weekly" | "custom";
 /** The choices of the "How often" select, in order. */
 export const CANARY_WHEN: readonly CanaryWhen[] = ["manual", "daily", "hourly", "weekly", "custom"];
 
-/** The cron line each fixed choice sends (always in UTC). */
+/** The cron line each fixed choice sends at its default time (06:00, Monday for weekly). */
 export const CANARY_WHEN_CRON: Readonly<Record<"daily" | "hourly" | "weekly", string>> = {
 	daily: "0 6 * * *",
 	hourly: "0 * * * *",
@@ -63,15 +67,31 @@ export interface CanaryFormFields {
 	when: CanaryWhen;
 	/** The custom cron line; used only when when is "custom". */
 	cron: string;
+	/** "HH:MM" of the daily and weekly choices. */
+	time: string;
+	/** 0 (Sunday) to 6, for the weekly choice. */
+	weekday: number;
+	/** The zone the time is in; the browser zone for a new drift monitor. */
+	timezone: string;
+	/** How big a change counts as a drop: "" is the server default (normal). */
+	sensitivity: string;
+	/** The alert channels (org hooks) told when the monitor drifts. */
+	alerts: AlertConfig[];
 	perRun: string;
 	perDay: string;
 	smoke: boolean;
 	force: boolean;
 }
 
-/** A new drift monitor: every day at 06:00 UTC, all tasks, one model row to pick. */
+/** A new drift monitor: every day at 06:00 in the browser zone, all tasks, one model row to pick. */
 export function newCanaryFields(): CanaryFormFields {
+	const how = newHowOften();
 	return {
+		time: how.time,
+		weekday: how.weekday,
+		timezone: how.timezone,
+		sensitivity: "",
+		alerts: [],
 		name: "",
 		agent: "",
 		suite: "",
@@ -88,20 +108,14 @@ export function newCanaryFields(): CanaryFormFields {
 }
 
 /** The cron line the form sends, or null for "Only when I press Check now". Exported for tests. */
-export function canaryCron(f: Pick<CanaryFormFields, "when" | "cron">): string | null {
-	if (f.when === "manual") return null;
-	if (f.when === "custom") return f.cron.trim();
-	return CANARY_WHEN_CRON[f.when];
+export function canaryCron(f: Pick<CanaryFormFields, "when" | "cron"> & Partial<Pick<CanaryFormFields, "time" | "weekday">>): string | null {
+	return howOftenCron({ when: f.when, cron: f.cron, time: f.time ?? "06:00", weekday: f.weekday ?? 1 });
 }
 
 /** The choice that shows a saved schedule: a fixed one when its cron matches, else custom. Exported for tests. */
 export function canaryWhenOf(schedule: { cron: string; timezone?: string } | undefined): CanaryWhen {
-	if (!schedule) return "manual";
-	const tz = schedule.timezone ?? "";
-	if (tz === "" || tz === "UTC") {
-		for (const w of ["daily", "hourly", "weekly"] as const) if (CANARY_WHEN_CRON[w] === schedule.cron.trim()) return w;
-	}
-	return "custom";
+	if (!schedule || !schedule.cron.trim()) return schedule ? "custom" : "manual";
+	return howOftenOf(schedule.cron, schedule.timezone).when;
 }
 
 /** The text fields of the first form (comma separated tasks and provider/model targets, a cron box). */
@@ -131,13 +145,21 @@ export function canaryFieldsFromText(f: CanaryTextFields): CanaryFormFields {
 		}),
 		when: cron ? "custom" : "manual",
 		cron,
+		time: "06:00",
+		weekday: 1,
+		timezone: "UTC",
+		sensitivity: "",
+		alerts: [],
 	};
 }
 
+/** The POST /canaries body: the server takes a whole definition, alerts and sensitivity included. */
+export type CanaryRequest = CanaryInitRequest & { alerts?: AlertConfig[]; sensitivity?: string };
+
 /** Builds the POST /canaries body from the form (or the older text shape). Exported for tests. */
-export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): CanaryInitRequest {
+export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): CanaryRequest {
 	const f = "tasksAll" in input ? input : canaryFieldsFromText(input);
-	const req: CanaryInitRequest = {
+	const req: CanaryRequest = {
 		name: f.name.trim(),
 		agent: f.agent.trim(),
 		suite: f.suite.trim(),
@@ -149,7 +171,9 @@ export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): 
 		budget: { per_run_usd: Number(f.perRun) || 0, per_day_usd: Number(f.perDay) || 0 },
 	};
 	const cron = canaryCron(f);
-	if (cron !== null) req.schedule = { cron, timezone: "UTC" };
+	if (cron !== null) req.schedule = { cron, timezone: f.timezone || "UTC" };
+	if (f.sensitivity) req.sensitivity = f.sensitivity;
+	if (f.alerts.length) req.alerts = f.alerts.map((a) => ({ ...a }));
 	if (f.smoke) req.smoke = true;
 	if (f.force) req.force = true;
 	return req;
@@ -157,8 +181,14 @@ export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): 
 
 /** The form fields of an existing definition (the Edit button). Exported for tests. */
 export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
-	const when = canaryWhenOf(d.schedule);
+	const how = d.schedule?.cron?.trim() ? howOftenOf(d.schedule.cron, d.schedule.timezone) : newHowOften({ when: d.schedule ? "custom" : "manual" });
+	const when = how.when;
 	return {
+		time: how.time,
+		weekday: how.weekday,
+		timezone: how.timezone,
+		sensitivity: d.sensitivity ?? "",
+		alerts: (d.alerts ?? []).map((a) => ({ url_env: a.url_env, ...(a.secret_env ? { secret_env: a.secret_env } : {}), ...(a.events ? { events: a.events } : {}), ...(a.format ? { format: a.format as AlertConfig["format"] } : {}) })),
 		name: d.name,
 		agent: d.agent,
 		suite: d.suite,
@@ -166,7 +196,7 @@ export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
 		taskIds: d.tasks === "all" ? [] : [...d.tasks],
 		targets: d.targets.length ? d.targets.map((tg) => ({ provider: tg.provider ?? "", model: tg.model })) : [{ provider: "", model: "" }],
 		when,
-		cron: when === "custom" ? (d.schedule?.cron ?? "") : "",
+		cron: when === "custom" ? how.cron || (d.schedule?.cron ?? "") : "",
 		perRun: String(d.budget.per_run_usd ?? 0),
 		perDay: String(d.budget.per_day_usd ?? 0),
 		smoke: Boolean(d.smoke),
@@ -178,9 +208,11 @@ export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
  * The PUT /canaries/{name} body: the form over the saved definition, so what the form does not show
  * (description, alerts, sensitivity) is kept. Exported for tests.
  */
-export function buildCanaryEdit(initial: CanaryDefinition, f: CanaryFormFields): CanaryInitRequest {
+export function buildCanaryEdit(initial: CanaryDefinition, f: CanaryFormFields): CanaryRequest {
 	const req = buildCanaryRequest({ ...f, name: initial.name, force: false });
-	const out: CanaryInitRequest = { ...(initial as CanaryInitRequest), ...req, trials: initial.trials || 1 };
+	const out: CanaryRequest = { ...(initial as CanaryRequest), ...req, trials: initial.trials || 1 };
+	if (!f.alerts.length) delete out.alerts;
+	if (!f.sensitivity) delete out.sensitivity;
 	if (req.schedule) out.schedule = { ...initial.schedule, ...req.schedule };
 	else delete out.schedule;
 	out.smoke = f.smoke;
@@ -201,7 +233,7 @@ export function suiteTaskIds(suites: readonly SuiteSummary[] | undefined, ref: s
 }
 
 /** The schedules keys of the form's own problems. */
-export type CanaryProblemKey = `canary.problem.${"name" | "agent" | "suite" | "tasks" | "targets" | "cron" | "budget" | "budgetOrder"}`;
+export type CanaryProblemKey = `canary.problem.${"name" | "agent" | "suite" | "tasks" | "targets" | "cron" | "cronInvalid" | "budget" | "budgetOrder"}`;
 
 /** Field keys of the form that a problem can sit under. */
 export type CanaryField = "name" | "agent" | "suite" | "tasks" | "targets" | "schedule" | "budget";
@@ -220,7 +252,9 @@ export function canaryFormProblems(
 	if (!f.suite.trim()) out.push({ field: "suite", key: "canary.problem.suite" });
 	if (!f.tasksAll && f.taskIds.length === 0) out.push({ field: "tasks", key: "canary.problem.tasks" });
 	if (!f.targets.some((r) => r.model.trim() !== "")) out.push({ field: "targets", key: "canary.problem.targets" });
-	if (f.when === "custom" && !f.cron.trim()) out.push({ field: "schedule", key: "canary.problem.cron" });
+	const cronIssue = howOftenProblem({ ...f, time: f.time ?? "06:00", weekday: f.weekday ?? 1, timezone: f.timezone ?? "UTC" });
+	if (cronIssue === "empty") out.push({ field: "schedule", key: "canary.problem.cron" });
+	else if (cronIssue === "invalid") out.push({ field: "schedule", key: "canary.problem.cronInvalid" });
 	if (!f.smoke) {
 		const run = Number(f.perRun);
 		const day = Number(f.perDay);
@@ -250,7 +284,11 @@ export function NewCanaryForm({
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
+	const { t: c } = useTranslation("uf7b");
 	const [create, createState] = useCreateCanaryMutation();
+	// The org's alert channels (the hooks of the Repeat runs tab) for "Tell me when".
+	const hooks = useGetSchedulesQuery();
+	const [conflict, setConflict] = useState(false);
 	const [edit, editState] = useEditCanaryMutation();
 	const state = initial ? editState : createState;
 	const suites = useGetSuitesLightQuery();
@@ -274,13 +312,14 @@ export function NewCanaryForm({
 		return cron === null
 			? t("canary.whenWords.manual")
 			: f.when === "custom"
-				? t("canary.whenWords.custom", { cron })
-				: t(`canary.whenWords.${f.when}`);
+				? t("canary.whenWords.custom", { cron, zone: f.timezone })
+				: t(`canary.whenWords.${f.when}`, { time: f.time, zone: f.timezone, day: c(`howOften.day.${["sun", "mon", "tue", "wed", "thu", "fri", "sat"][f.weekday] as "mon"}`) });
 	};
 	const submit = async () => {
 		setMsg(null);
 		setServerProblems([]);
 		const fail = (err: unknown, fallback: string) => {
+			if ((err as { status?: number } | undefined)?.status === 409) setConflict(true);
 			const ps = errorProblems(err);
 			setServerProblems(ps);
 			setMsg(ps.length ? null : errorMessage(err, fallback));
@@ -328,14 +367,14 @@ export function NewCanaryForm({
 
 	const nameField = (
 		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{t("canary.name")}</span>
+			<span className="text-foreground text-sm font-medium">{t("canary.name")}</span>
 			<Input value={f.name} onChange={set("name")} placeholder="nightly-gpt" disabled={Boolean(initial)} data-testid="canary-new-name" />
 			{under("name")}
 		</label>
 	);
 	const agentField = (
 		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{t("canary.agent")}</span>
+			<span className="text-foreground text-sm font-medium">{t("canary.agent")}</span>
 			<select className={selectClass} value={f.agent} onChange={set("agent")} data-testid="canary-new-agent">
 				<option value="">{agents.isLoading ? t("canary.agentsLoading") : t("canary.agentPick")}</option>
 				{f.agent && !agentPaths.includes(f.agent) && <option value={f.agent}>{f.agent}</option>}
@@ -346,7 +385,7 @@ export function NewCanaryForm({
 				))}
 			</select>
 			{agents.isSuccess && agentList.length === 0 && (
-				<Link to="/agents" className="text-xs underline" data-testid="canary-new-no-agents">
+				<Link to="/agents/new" className="text-xs underline" data-testid="canary-new-no-agents">
 					{t("canary.agentsEmpty")}
 				</Link>
 			)}
@@ -355,7 +394,7 @@ export function NewCanaryForm({
 	);
 	const suiteField = (
 		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{t("canary.suite")}</span>
+			<span className="text-foreground text-sm font-medium">{t("canary.suite")}</span>
 			<select
 				className={selectClass}
 				value={f.suite}
@@ -370,16 +409,16 @@ export function NewCanaryForm({
 				))}
 			</select>
 			{!suites.isLoading && refs.length === 0 && (
-				<span className="text-muted-foreground" data-testid="canary-new-no-suites">
+				<Link to="/suites" search={{ tab: "catalog" } as never} className="text-xs underline" data-testid="canary-new-no-suites">
 					{t("canary.suitesEmpty")}
-				</span>
+				</Link>
 			)}
 			{under("suite")}
 		</label>
 	);
 	const tasksField = (
 		<div className="flex flex-col gap-1 text-xs" role="group" aria-label={t("canary.tasks")}>
-			<span className="text-muted-foreground">{t("canary.tasks")}</span>
+			<span className="text-foreground text-sm font-medium">{t("canary.tasks")}</span>
 			<select
 				className={selectClass}
 				value={f.tasksAll ? "all" : "some"}
@@ -430,12 +469,17 @@ export function NewCanaryForm({
 	const setRow = (i: number, row: CanaryModelRow) => patch({ targets: f.targets.map((r, j) => (j === i ? row : r)) });
 	const modelsField = (
 		<div className="flex flex-col gap-2 text-xs" role="group" aria-label={t("canary.targets")} data-testid="canary-new-targets">
-			<span className="text-muted-foreground">{t("canary.targets")}</span>
+			<span className="text-foreground text-sm font-medium">{t("canary.targets")}</span>
 			{f.targets.map((row, i) => (
-				<div key={i} className="flex items-end gap-2" data-testid={`canary-new-target-${i}`}>
-					<div className="min-w-0 flex-1">
+				<div key={i} className="flex min-w-0 flex-wrap items-end gap-2" data-testid={`canary-new-target-${i}`}>
+					<div className="flex w-full min-w-0 flex-1 flex-col gap-1">
+						<span className="text-muted-foreground">
+							{c("canary.modelN", { n: i + 1 })}
+							{i > 0 && !row.model && ` (${c("canary.pickModel")})`}
+						</span>
 						<ModelPicker
-							value={row.provider || row.model ? { provider: row.provider, model: row.model } : null}
+							// Only the first row takes the server default; an added row starts empty (M7-58).
+							value={row.provider || row.model ? { provider: row.provider, model: row.model } : i === 0 ? null : { provider: "", model: "" }}
 							onChange={(v) => setRow(i, { provider: v.provider, model: v.model })}
 							testId={`canary-new-model-${i}`}
 						/>
@@ -471,38 +515,60 @@ export function NewCanaryForm({
 		</div>
 	);
 	const whenField = (
-		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{t("canary.when")}</span>
-			<select
-				className={selectClass}
-				value={f.when}
-				onChange={(e) => patch({ when: e.target.value as CanaryWhen })}
-				data-testid="canary-new-when"
-			>
-				{CANARY_WHEN.map((w) => (
-					<option key={w} value={w}>
-						{t(`canary.whenOption.${w}`)}
-					</option>
-				))}
-			</select>
-			{f.when === "custom" && (
-				<Input
-					value={f.cron}
-					onChange={set("cron")}
-					placeholder="0 6 * * *"
-					aria-label={t("canary.cronCustom")}
-					data-testid="canary-new-cron"
-				/>
-			)}
-			{f.when !== "manual" && <span className="text-muted-foreground">{t("canary.utc")}</span>}
+		<div className="flex min-w-0 flex-col gap-1 text-xs sm:col-span-3">
+			<HowOften
+				value={{ when: f.when, cron: f.cron, time: f.time, weekday: f.weekday, timezone: f.timezone }}
+				onChange={(v) => patch(v)}
+				testIdPrefix="canary-new"
+			/>
 			{under("schedule")}
-		</label>
+		</div>
 	);
 	const moneyField = (k: "perRun" | "perDay", label: string) => (
 		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{label}</span>
-			<Input value={f[k]} onChange={set(k)} inputMode="decimal" data-testid={`canary-new-${k}`} />
+			<span className="text-foreground text-sm font-medium">{label}</span>
+			<Input value={f[k]} onChange={set(k)} inputMode="decimal" min="0" data-testid={`canary-new-${k}`} />
 		</label>
+	);
+	const cronLine = canaryCron(f);
+	const cost = f.smoke ? null : checkCost(cronLine ? runsPerDay(cronLine) : 0, Number(f.perRun), Number(f.perDay));
+	const hookList = hooks.data?.file.alerts ?? [];
+	const picked = (a: AlertConfig) => f.alerts.some((x) => x.url_env === a.url_env);
+	const tellField = (
+		<div className="flex min-w-0 flex-col gap-2 text-xs" data-testid="canary-new-tell">
+			<label className="flex max-w-sm min-w-0 flex-col gap-1">
+				<span className="text-foreground text-sm font-medium">{c("canary.threshold")}</span>
+				<select className={selectClass} value={f.sensitivity} onChange={(e) => patch({ sensitivity: e.target.value })} data-testid="canary-new-sensitivity">
+					<option value="">{c("canary.sensitivity.normal")}</option>
+					<option value="high">{c("canary.sensitivity.high")}</option>
+					<option value="low">{c("canary.sensitivity.low")}</option>
+				</select>
+			</label>
+			<fieldset className="flex flex-col gap-1">
+				<legend className="text-foreground text-sm font-medium mb-1">{c("canary.channel")}</legend>
+				{hooks.isSuccess && hookList.length === 0 ? (
+					<span data-testid="canary-new-no-channel">
+						{c("canary.noChannel")}{" "}
+						<Link to="/scheduled-checks" search={{ tab: "schedules" } as never} hash="schedules-alerts" className="text-primary underline">
+							{c("canary.setUpChannel")}
+						</Link>
+					</span>
+				) : (
+					hookList.map((a) => (
+						<label key={a.url_env} className="flex items-center gap-2">
+							<input
+								type="checkbox"
+								checked={picked(a)}
+								onChange={(e) => patch({ alerts: e.target.checked ? [...f.alerts, { ...a }] : f.alerts.filter((x) => x.url_env !== a.url_env) })}
+								data-testid={`canary-new-channel-${a.url_env}`}
+							/>
+							<span>{a.format === "slack" ? c("canary.channelSlack", { name: a.url_env }) : c("canary.channelHook", { name: a.url_env })}</span>
+						</label>
+					))
+				)}
+			</fieldset>
+			<span className="text-muted-foreground">{c("canary.thresholdNote")}</span>
+		</div>
 	);
 	return (
 		<SetupCard
@@ -529,19 +595,29 @@ export function NewCanaryForm({
 				<Step n={2} title={u("canaries.stepWhere")}>
 					<div className="grid gap-3 sm:grid-cols-2">{modelsField}</div>
 				</Step>
-				<Step n={3} title={u("canaries.stepWhen")} last>
+				<Step n={3} title={u("canaries.stepWhen")}>
+					<div className="grid gap-3 sm:grid-cols-3">{whenField}</div>
+				</Step>
+				<Step n={4} title={c("canary.stepTell")}>
+					{tellField}
+				</Step>
+				<Step n={5} title={c("canary.stepBudget")} last>
 					<div className="grid gap-3 sm:grid-cols-3">
-						{whenField}
 						{moneyField("perRun", t("canary.perRun"))}
 						{moneyField("perDay", t("canary.perDay"))}
 					</div>
+					{cost && (
+						<p className="text-muted-foreground text-xs" data-testid="canary-new-cost">
+							{c("cost.line", { count: cost.runs, perRun: usd(cost.perRun), day: usd(cost.day), month: usd(cost.month) })}
+						</p>
+					)}
 					{under("budget")}
 					<div className="flex flex-wrap items-center gap-4 text-xs">
 						<label className="flex items-center gap-1">
 							<input type="checkbox" checked={f.smoke} onChange={flag("smoke")} />
 							{t("canary.smoke")}
 						</label>
-						{!initial && (
+						{!initial && (conflict || f.force) && (
 							<label className="flex items-center gap-1">
 								<input type="checkbox" checked={f.force} onChange={flag("force")} />
 								{t("canary.force")}
@@ -549,8 +625,13 @@ export function NewCanaryForm({
 						)}
 					</div>
 					<div className="flex flex-wrap items-start gap-3 text-xs">
-						<Button disabled={state.isLoading || problems.length > 0} onClick={() => void submit()} data-testid="canary-new-submit">
-							{initial ? t("canary.save") : t("canary.create")}
+						<Button
+							disabled={state.isLoading || problems.length > 0}
+							isLoading={state.isLoading}
+							onClick={() => void submit()}
+							data-testid="canary-new-submit"
+						>
+							{initial ? t("canary.save") : cost ? c("canary.createUpTo", { day: usd(cost.day) }) : t("canary.create")}
 						</Button>
 						{problems.length > 0 && (
 							<div className="text-muted-foreground flex flex-col gap-0.5 text-xs" data-testid="canary-new-missing">
@@ -565,6 +646,11 @@ export function NewCanaryForm({
 							</div>
 						)}
 						{msg && <span data-testid="canary-new-msg">{msg}</span>}
+						{!initial && !f.smoke && Number(f.perRun) > 0 && (
+							<span className="text-muted-foreground basis-full" data-testid="canary-new-baseline-note">
+								{c("canary.baselineNote", { perRun: usd(Number(f.perRun)) })}
+							</span>
+						)}
 						{otherProblems.length > 0 && (
 							<ul className="text-chart-error-ink text-xs" data-testid="canary-new-problems">
 								{otherProblems.map((p) => (

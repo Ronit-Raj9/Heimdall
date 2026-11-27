@@ -40,9 +40,29 @@ const filled = () => ({
 });
 
 describe("how often (N80)", () => {
-	it("starts on every day at 06:00 UTC and sends that schedule in UTC", () => {
+	it("starts on every day at 06:00 in the browser zone and sends that zone (M7-48)", () => {
 		expect(newCanaryFields().when).toBe("daily");
-		expect(buildCanaryRequest(filled()).schedule).toEqual({ cron: "0 6 * * *", timezone: "UTC" });
+		expect(newCanaryFields().timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+		expect(buildCanaryRequest({ ...filled(), timezone: "UTC" }).schedule).toEqual({ cron: "0 6 * * *", timezone: "UTC" });
+		expect(buildCanaryRequest({ ...filled(), time: "02:30", timezone: "Europe/Berlin" }).schedule).toEqual({
+			cron: "30 2 * * *",
+			timezone: "Europe/Berlin",
+		});
+		expect(buildCanaryRequest({ ...filled(), when: "weekly", weekday: 5, time: "07:00" }).schedule?.cron).toBe("0 7 * * 5");
+	});
+
+	it("blocks Create on a cron line that is not valid (M7-46)", () => {
+		expect(canaryFormProblems({ ...filled(), when: "custom", cron: "every night lol" }).map((p) => p.key)).toEqual([
+			"canary.problem.cronInvalid",
+		]);
+		expect(canaryFormProblems({ ...filled(), when: "custom", cron: "0 2 * * *" })).toEqual([]);
+	});
+
+	it("sends the alert channels and the drop size (M7-49)", () => {
+		const req = buildCanaryRequest({ ...filled(), sensitivity: "high", alerts: [{ url_env: "SLACK_URL", format: "slack" }] });
+		expect(req.sensitivity).toBe("high");
+		expect(req.alerts).toEqual([{ url_env: "SLACK_URL", format: "slack" }]);
+		expect("alerts" in buildCanaryRequest(filled())).toBe(false);
 	});
 
 	it("sends no schedule for Only when I press Check now", () => {
@@ -61,7 +81,7 @@ describe("how often (N80)", () => {
 		);
 		expect(submitTag(html)).toContain('disabled=""');
 		expect(html).toContain('data-testid="canary-new-cron"');
-		expect(buildCanaryRequest({ ...filled(), when: "custom", cron: "*/30 * * * *" }).schedule).toEqual({
+		expect(buildCanaryRequest({ ...filled(), when: "custom", cron: "*/30 * * * *", timezone: "UTC" }).schedule).toEqual({
 			cron: "*/30 * * * *",
 			timezone: "UTC",
 		});
@@ -72,12 +92,16 @@ describe("how often (N80)", () => {
 		expect(canaryWhenOf({ cron: "0 6 * * *", timezone: "UTC" })).toBe("daily");
 		expect(canaryWhenOf({ cron: "0 * * * *" })).toBe("hourly");
 		expect(canaryWhenOf({ cron: "0 6 * * 1" })).toBe("weekly");
-		expect(canaryWhenOf({ cron: "0 6 * * *", timezone: "Europe/Berlin" })).toBe("custom");
+		// The zone is its own field now (M7-48), so a daily line in any zone is still "daily".
+		expect(canaryWhenOf({ cron: "0 6 * * *", timezone: "Europe/Berlin" })).toBe("daily");
+		expect(canaryWhenOf({ cron: "*/30 * * * *" })).toBe("custom");
 		expect(canaryWhenOf(undefined)).toBe("manual");
 		const def = CANARY_DRIFTED_FIXTURE.definition;
 		expect(canaryFormFields({ ...def, schedule: { cron: "0 6 * * *" } }).when).toBe("daily");
-		const custom = canaryFormFields({ ...def, schedule: { cron: "15 3 * * *" } });
-		expect([custom.when, custom.cron]).toEqual(["custom", "15 3 * * *"]);
+		const daily = canaryFormFields({ ...def, schedule: { cron: "15 3 * * *", timezone: "Europe/Berlin" } });
+		expect([daily.when, daily.time, daily.timezone]).toEqual(["daily", "03:15", "Europe/Berlin"]);
+		const custom = canaryFormFields({ ...def, schedule: { cron: "15 3 1 * *" } });
+		expect([custom.when, custom.cron]).toEqual(["custom", "15 3 1 * *"]);
 		expect(canaryFormFields({ ...def, schedule: undefined }).when).toBe("manual");
 	});
 

@@ -6,6 +6,8 @@ import { okQuery } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
 import { ReleasePanel } from "./releasePanel";
 
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+
 const api = vi.hoisted(() => ({ list: undefined as unknown }));
 vi.mock("@/lib/store", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store")>();

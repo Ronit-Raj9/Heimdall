@@ -5,7 +5,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ChainBadge, ReleaseCards, initials } from "./releaseCards";
+import { ChainBadge, ReleaseCards, initials, releaseLink } from "./releaseCards";
+import { liveNow } from "./releasesView";
+import i18n from "@/lib/i18n";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -24,11 +26,33 @@ describe("ReleaseCards", () => {
 		expect(html).toContain("Approved by");
 	});
 
-	it("tags an override in red", () => {
-		const r = { ...fixture.releases[0], override: "ship despite warn" };
+	it("tags an override with one amber badge and the reason inline (M7-75)", () => {
+		const r = { ...fixture.releases[0], action: "hold" as const, override: "ship despite warn" };
 		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
 		expect(html).toContain(`data-testid="release-override-tag-${r.release_id}"`);
-		expect(html).toContain("ship despite warn");
+		expect(html).toContain("Released although the result said hold. Reason: ship despite warn");
+		expect(html).not.toContain(`data-testid="release-action-${r.release_id}"`);
+		expect(html).not.toContain("text-chart-error-ink mt-3");
+	});
+
+	it("says first record, no numbers, and offers a link to the release (M7-76, M7-82, M7-83)", () => {
+		const r = { ...fixture.releases[0], prev_hash: "", summary: undefined };
+		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
+		expect(html).toContain("First record in the log");
+		expect(html).toContain("No numbers were recorded with this release.");
+		expect(html).toContain(`data-testid="release-copy-link-${r.release_id}"`);
+		expect(releaseLink("https://h.io", "rel_1")).toBe("https://h.io/releases?release=rel_1");
+		expect(html).not.toContain("hover:shadow-md");
+	});
+
+	it("names Live now from the newest release per agent (M7-77)", () => {
+		const t = i18n.getFixedT("en", "uf7b") as never;
+		const rs = [
+			{ ...fixture.releases[0], agent_id: "codex", version: 1, approver: "ana", created_at: "2026-11-21T10:00:00Z" },
+			{ ...fixture.releases[0], agent_id: "codex", version: 2, approver: "raj", created_at: "2026-11-23T10:00:00Z" },
+		];
+		expect(liveNow(rs, t)).toEqual(["codex v2 (released 23 Nov by raj)"]);
+		expect(liveNow([], t)).toEqual([]);
 	});
 
 	it("shows chain status and approver initials", () => {
@@ -110,20 +134,22 @@ describe("ReleaseCards", () => {
 });
 
 describe("ReleaseCards: a record always reads Released (N171)", () => {
-	it("shows Released and Released despite the rules on an overridden release, never Not released", () => {
+	it("shows Released with an override on an overridden release, never Not released (M7-75)", () => {
 		const r = { ...fixture.releases[0], action: "hold" as const, override: "hotfix for a customer", approver: "ana" };
 		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
-		expect(html).toContain(">Released<");
-		expect(html).toContain("Released despite the rules");
-		expect(html).toContain("The result said hold; ana released it anyway: hotfix for a customer");
+		expect(html).toContain("Released with an override");
+		expect(html).toContain("Reason: hotfix for a customer");
 		expect(html).not.toContain("Not released");
+		const unclear = renderToStaticMarkup(<ReleaseCards releases={[{ ...r, action: "no_decision" as const }]} chainOk />);
+		expect(unclear).toContain("Released without a clear result");
+		expect(unclear).toContain("Released although the test found no clear winner.");
 	});
 	it("shows only Released on a ship record", () => {
 		const r = { ...fixture.releases[0], action: "ship" as const, override: undefined };
 		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
 		expect(html).toContain(">Released<");
 		expect(html).not.toContain("The result said");
-		expect(html).not.toContain("Released despite the rules");
+		expect(html).not.toContain("Released with an override");
 	});
 	it("names the advice on an older record released without an override", () => {
 		const r = { ...fixture.releases[0], action: "no_decision" as const, override: undefined };

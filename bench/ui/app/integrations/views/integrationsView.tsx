@@ -37,6 +37,11 @@ import type {
 } from "@/lib/types/integrations";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEmbedded } from "@/components/shell/embedded";
+import { Link } from "@tanstack/react-router";
+import "@/components/canaries/uf7bI18n";
 import { cn } from "@/lib/utils";
 import { Activity, Code2, Download, Network, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
@@ -100,10 +105,26 @@ export function defaultEventsFor(f: WebhookFormat): WebhookEventType[] {
  * What is wrong with a web address before it is sent (a fw23 locale key under webhooks), or null.
  * A hosted server delivers only to https (webhooks.ValidateURL); a local one also takes http.
  */
-export function webhookUrlProblem(url: string, hosted: boolean): "httpsOnly" | null {
+export function webhookUrlProblem(url: string, hosted: boolean): "httpsOnly" | "local" | null {
 	const trimmed = url.trim();
 	if (!hosted || trimmed === "") return null;
-	return /^https:\/\//i.test(trimmed) ? null : "httpsOnly";
+	if (!/^https:\/\//i.test(trimmed)) return "httpsOnly";
+	// M7-70: the hosted server cannot reach an address on the user's own machine or network.
+	const host = trimmed.replace(/^https:\/\//i, "").split(/[/:?#]/)[0].toLowerCase();
+	if (host === "localhost" || host.endsWith(".local") || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0$|\[?::1\]?$)/.test(host)) return "local";
+	return null;
+}
+
+/** Why the add form's button is off, as uf7b keys, or none (M7-70). Exported for tests. */
+export function webhookFormProblems(
+	f: WebhookFormat,
+	routingKey: string,
+	events: readonly WebhookEventType[],
+): ("integrations.noEvents" | "integrations.badRoutingKey")[] {
+	const out: ("integrations.noEvents" | "integrations.badRoutingKey")[] = [];
+	if (f === "pagerduty" && routingKey.trim() !== "" && !/^[A-Za-z0-9]{20,64}$/.test(routingKey.trim())) out.push("integrations.badRoutingKey");
+	if (events.length === 0) out.push("integrations.noEvents");
+	return out;
 }
 
 /** Whether the add form has what a hook of format f needs. */
@@ -133,6 +154,7 @@ export function WebhookUrlField({
 }) {
 	const { t } = useTranslation("integrations");
 	const { t: tf } = useTranslation("fw23");
+	const { t: m } = useTranslation("uf7b");
 	const problem = webhookUrlProblem(url, hosted);
 	const hintId = useId();
 	return (
@@ -148,7 +170,7 @@ export function WebhookUrlField({
 			/>
 			{problem && (
 				<p id={hintId} className="text-chart-error-ink text-xs" data-testid="webhook-url-problem">
-					{tf(`webhooks.${problem}`)}
+					{problem === "local" ? m("integrations.localUrl") : tf(`webhooks.${problem}`)}
 				</p>
 			)}
 		</div>
@@ -156,8 +178,45 @@ export function WebhookUrlField({
 }
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
+/**
+ * X-54: the styled list (components/ui Select) for the plain choices of this page, so every dropdown
+ * opens the same way. "" means nothing picked and shows the placeholder.
+ */
+function StyledSelect({
+	value,
+	onChange,
+	options,
+	placeholder,
+	testId,
+	className,
+}: {
+	value: string;
+	onChange(v: string): void;
+	options: readonly { value: string; label: string }[];
+	placeholder?: string;
+	testId: string;
+	className?: string;
+}) {
+	return (
+		<Select value={value || undefined} onValueChange={onChange}>
+			<SelectTrigger className={cn("w-full min-w-0", className)} data-testid={testId}>
+				<SelectValue placeholder={placeholder} />
+			</SelectTrigger>
+			<SelectContent>
+				{options.map((o) => (
+					<SelectItem key={o.value} value={o.value}>
+						{o.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
 /** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
 type IntegrationTab = "webhooks" | "exports" | "ci" | "maxim" | "ide" | "bifrost";
+
+const TABS: readonly IntegrationTab[] = ["webhooks", "exports", "ci", "maxim", "ide", "bifrost"];
 
 const TAB_ICONS: Record<IntegrationTab, LucideIcon> = {
 	webhooks: WebhookIcon,
@@ -234,65 +293,82 @@ export default function IntegrationsView() {
 		return { tone: "idle", label: t("cards.ci.manual") };
 	};
 
+	const label = (k: IntegrationTab) =>
+		k === "ide" ? tc("ide.tab") : k === "maxim" ? tt("maxim.tab") : k === "bifrost" ? tb("tab") : t(`tabs.${k}`);
+	const desc = (k: IntegrationTab) =>
+		k === "ide" ? tc("ide.desc") : k === "maxim" ? tt("maxim.desc") : k === "bifrost" ? tb("desc") : t(`cards.${k}.desc`);
+	// X-55: inside Settings the tab already has the page padding, so the view adds none of its own.
+	const embedded = useEmbedded();
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-6" data-testid="integrations-view">
+		<div className={cn("mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="integrations-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
-			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6" role="tablist" aria-label={t("title")}>
-				{(["webhooks", "exports", "ci", "maxim", "ide", "bifrost"] as const).map((k) => {
-					const Icon = TAB_ICONS[k];
-					const active = k === tab;
+			{/* X-52: a real tab strip (Radix: arrow keys, tabpanel and aria-controls), one line with a status dot each. */}
+			<Tabs value={tab} onValueChange={(v) => setTab(v as IntegrationTab)} className="min-w-0 gap-4">
+				<TabsList aria-label={t("title")} className="h-auto w-full max-w-full flex-wrap justify-start gap-1 sm:flex-nowrap sm:overflow-x-auto">
+					{TABS.map((k) => {
+						const Icon = TAB_ICONS[k];
+						const st = status(k);
+						return (
+							<TabsTrigger key={k} value={k} className="h-8 flex-none px-3" title={st?.label} data-testid={`integrations-tab-${k}`}>
+								<Icon className="size-4" aria-hidden="true" />
+								{label(k)}
+								{st ? (
+									<span className={cn("size-2 rounded-full", TONE_DOT[st.tone])} aria-label={st.label} role="img" />
+								) : (
+									<Skeleton className="size-2 rounded-full" />
+								)}
+							</TabsTrigger>
+						);
+					})}
+				</TabsList>
+				{TABS.map((k) => {
 					const st = status(k);
 					return (
-						<button
-							key={k}
-							type="button"
-							role="tab"
-							aria-selected={active}
-							onClick={() => setTab(k)}
-							className={cn(
-								"bg-card focus-visible:ring-ring/60 flex flex-col gap-3 rounded-xl border p-5 text-left transition-all hover:shadow-md focus-visible:ring-2 focus-visible:outline-none",
-								active ? "border-primary ring-primary/30 ring-1" : "hover:border-foreground/20",
+						<TabsContent key={k} value={k} className="flex min-w-0 flex-col gap-4">
+							<div className="flex flex-wrap items-center gap-2">
+								<p className="text-muted-foreground text-sm">{desc(k)}</p>
+								{st && <StatusDot tone={st.tone} label={st.label} />}
+							</div>
+							{k === "webhooks" && (
+								<div className="flex flex-col gap-6">
+									<WebhooksPanel />
+									<EmailPanel />
+									<DeliveryLogPanel />
+									<ProductionTracesCard />
+								</div>
 							)}
-							data-testid={`integrations-tab-${k}`}
-						>
-							<div className="flex items-center justify-between gap-2">
-								<span
-									className={cn(
-										"flex size-9 items-center justify-center rounded-lg",
-										active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-									)}
-								>
-									<Icon className="size-4.5" aria-hidden="true" />
-								</span>
-								{st ? <StatusDot tone={st.tone} label={st.label} /> : <Skeleton className="h-5 w-20 rounded-full" />}
-							</div>
-							<div className="flex flex-col gap-0.5">
-								<span className="text-base font-semibold">
-									{k === "ide" ? tc("ide.tab") : k === "maxim" ? tt("maxim.tab") : k === "bifrost" ? tb("tab") : t(`tabs.${k}`)}
-								</span>
-								<span className="text-muted-foreground line-clamp-2 text-sm">
-									{k === "ide" ? tc("ide.desc") : k === "maxim" ? tt("maxim.desc") : k === "bifrost" ? tb("desc") : t(`cards.${k}.desc`)}
-								</span>
-							</div>
-						</button>
+							{k === "exports" && <ExportsPanel />}
+							{k === "ci" && <CIPanel />}
+							{k === "maxim" && <MaximPanel />}
+							{k === "ide" && <McpInstallPanel />}
+							{k === "bifrost" && <BifrostUsePanel />}
+						</TabsContent>
 					);
 				})}
-			</div>
-			<div role="tabpanel">
-				{tab === "webhooks" && (
-					<div className="flex flex-col gap-6">
-						<WebhooksPanel />
-						<EmailPanel />
-						<DeliveryLogPanel />
-					</div>
-				)}
-				{tab === "exports" && <ExportsPanel />}
-				{tab === "ci" && <CIPanel />}
-				{tab === "maxim" && <MaximPanel />}
-				{tab === "ide" && <McpInstallPanel />}
-				{tab === "bifrost" && <BifrostUsePanel />}
-			</div>
+			</Tabs>
 		</div>
+	);
+}
+
+/**
+ * M2-98: traces from production come in through the failure inbox and the agent import, not a hook;
+ * this card points there from Integrations.
+ */
+function ProductionTracesCard() {
+	const { t: m } = useTranslation("uf7b");
+	return (
+		<section className="bg-card flex flex-col gap-2 rounded-xl border p-5" data-testid="integrations-production-traces">
+			<h2 className="text-base font-semibold">{m("integrations.tracesTitle")}</h2>
+			<p className="text-muted-foreground text-sm">{m("integrations.tracesText")}</p>
+			<div className="flex flex-wrap gap-2">
+				<Button size="sm" variant="outline" asChild>
+					<Link to="/agents/from-traces">{m("integrations.tracesAgents")}</Link>
+				</Button>
+				<Button size="sm" variant="outline" asChild>
+					<Link to="/inbox">{m("integrations.tracesInbox")}</Link>
+				</Button>
+			</div>
+		</section>
 	);
 }
 
@@ -326,6 +402,7 @@ function ErrorNote({ message, testId }: { message: string; testId?: string }) {
 
 function WebhooksPanel() {
 	const { t } = useTranslation("integrations");
+	const { t: m } = useTranslation("uf7b");
 	const confirm = useConfirm();
 	const { data, error, isLoading, refetch } = useListWebhooksQuery();
 	const { t: tm } = useTranslation("w4m8");
@@ -377,22 +454,17 @@ function WebhooksPanel() {
 			>
 				<label className="flex flex-col gap-1 text-sm sm:col-span-3">
 					<span className="text-muted-foreground text-xs font-medium">{t("webhooks.format")}</span>
-					<select
-						className={cn(selectClass, "sm:max-w-xs")}
+					<StyledSelect
+						className="sm:max-w-xs"
 						value={format}
-						onChange={(e) => {
-							const f = e.target.value as WebhookFormat;
+						onChange={(v) => {
+							const f = v as WebhookFormat;
 							setFormat(f);
 							setEvents(defaultEventsFor(f));
 						}}
-						data-testid="webhook-format"
-					>
-						{HOOK_FORMATS.map((f) => (
-							<option key={f} value={f}>
-								{t(`webhooks.formats.${f}`)}
-							</option>
-						))}
-					</select>
+						options={HOOK_FORMATS.map((f) => ({ value: f, label: t(`webhooks.formats.${f}`) }))}
+						testId="webhook-format"
+					/>
 					<span className="text-muted-foreground text-xs" data-testid="webhook-format-help">
 						{t(`webhooks.formatHelp.${format}`)}
 					</span>
@@ -422,6 +494,11 @@ function WebhooksPanel() {
 				>
 					{create.isLoading ? t("webhooks.adding") : t("webhooks.add")}
 				</Button>
+				{webhookFormProblems(format, routingKey, events).map((k) => (
+					<p key={k} className="text-chart-error-ink text-xs sm:col-span-3" data-testid={`webhook-problem-${k.split(".")[1]}`}>
+						{m(k)}
+					</p>
+				))}
 				<fieldset className="flex flex-wrap gap-4 text-sm sm:col-span-3">
 					<legend className="sr-only">{t("webhooks.events")}</legend>
 					{eventsFor(format).map((ev) => (
@@ -451,7 +528,9 @@ function WebhooksPanel() {
 			)}
 			{error ? (
 				<PanelLoadError title={tm("loadErrors.webhooks")} error={error} onRetry={() => void refetch()} testId="webhooks-load-error" />
-			) : isLoading ? null : (
+			) : isLoading ? (
+				<Skeleton className="h-9 w-full rounded-md" data-testid="webhooks-loading" />
+			) : (
 				<WebhookList
 					hooks={data?.webhooks ?? []}
 					tests={tests}
@@ -661,7 +740,7 @@ export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}
 								<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">
 									{state === "retrying" ? when(d.next_attempt_at) : ""}
 								</td>
-								<td className="text-chart-error-ink max-w-[16rem] truncate px-3 text-xs" title={d.error}>
+								<td className="text-danger-ink max-w-48 truncate px-3 text-xs" title={d.error}>
 									{d.error ?? ""}
 								</td>
 								<td className="px-3 py-1.5 text-right">
@@ -739,30 +818,23 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 				<div className="grid gap-3 sm:grid-cols-2">
 					<label className="flex flex-col gap-1 text-sm">
 						{t("exports.format")}
-						<select
-							className={selectClass}
+						<StyledSelect
 							value={format}
-							onChange={(e) => setFormat(e.target.value as IntegrationExportFormat)}
-							data-testid="export-format"
-						>
-							{FORMATS.map((f) => (
-								<option key={f} value={f}>
-									{t(`exports.formats.${f}`)}
-								</option>
-							))}
-						</select>
+							onChange={(v) => setFormat(v as IntegrationExportFormat)}
+							options={FORMATS.map((f) => ({ value: f, label: t(`exports.formats.${f}`) }))}
+							testId="export-format"
+						/>
 					</label>
 					{format === "harbor" ? (
 						<label className="flex flex-col gap-1 text-sm">
 							{t("exports.suite")}
-							<select className={selectClass} value={suite} onChange={(e) => setSuite(e.target.value)} data-testid="export-suite">
-								<option value="">{t("exports.pickSuite")}</option>
-								{(suites.data?.suites ?? []).map((s) => (
-									<option key={s.id} value={s.id}>
-										{s.id}
-									</option>
-								))}
-							</select>
+							<StyledSelect
+								value={suite}
+								onChange={setSuite}
+								placeholder={t("exports.pickSuite")}
+								options={(suites.data?.suites ?? []).map((s) => ({ value: s.id, label: s.id }))}
+								testId="export-suite"
+							/>
 						</label>
 					) : (
 						<div className="flex flex-col gap-1 text-sm">
@@ -964,27 +1036,26 @@ function CIPanel() {
 			<div className="grid gap-3 sm:grid-cols-3">
 				<label className="flex flex-col gap-1 text-sm">
 					{t("ci.mode")}
-					<select
-						className={selectClass}
+					<StyledSelect
 						value={mode}
-						onChange={(e) => setMode(e.target.value as "recorded" | "live")}
-						data-testid="ci-mode"
-					>
-						<option value="recorded">{t("ci.modeRecorded")}</option>
-						<option value="live">{t("ci.modeLive")}</option>
-					</select>
+						onChange={(v) => setMode(v as "recorded" | "live")}
+						options={[
+							{ value: "recorded", label: t("ci.modeRecorded") },
+							{ value: "live", label: t("ci.modeLive") },
+						]}
+						testId="ci-mode"
+					/>
 				</label>
 				{mode === "live" && (
 					<label className="flex flex-col gap-1 text-sm">
 						{t("ci.agent")}
-						<select className={selectClass} value={agent} onChange={(e) => setAgent(e.target.value)} data-testid="ci-agent">
-							<option value="">{t("ci.pickAgent")}</option>
-							{(agents.data?.agents ?? []).map((a) => (
-								<option key={a.id} value={a.id}>
-									{a.id}
-								</option>
-							))}
-						</select>
+						<StyledSelect
+							value={agent}
+							onChange={setAgent}
+							placeholder={t("ci.pickAgent")}
+							options={(agents.data?.agents ?? []).map((a) => ({ value: a.id, label: a.id }))}
+							testId="ci-agent"
+						/>
 					</label>
 				)}
 			</div>

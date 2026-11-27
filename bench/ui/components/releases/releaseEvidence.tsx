@@ -4,6 +4,7 @@ import i18n from "@/lib/i18n";
 import type { DatasetComparison, ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import "@/components/canaries/uf7bI18n";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
 
 /** "codex v4", or the agent alone when the version is unknown. */
@@ -61,7 +62,7 @@ function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
 	for (const cap of s.capabilities ?? []) {
 		out.push({
 			key: `cap-${cap.capability}`,
-			label: cap.capability,
+			label: cap.capability.charAt(0).toUpperCase() + cap.capability.slice(1).replace(/[_-]/g, " "),
 			before: cap.baseline ? scoreText(cap.baseline) : undefined,
 			after: scoreText(cap.candidate),
 			better: direction(cap.baseline?.score, cap.candidate.score, true),
@@ -99,25 +100,43 @@ function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
 	return out;
 }
 
+/**
+ * The two column heads of the decision table (M7-78): the version names, or, when both sides are the
+ * same version, "This evaluation" and "Earlier run", each with its run count. Exported for tests.
+ */
+export function evidenceHeads(summary: ReleaseSummary, t: (k: string, o?: Record<string, unknown>) => string): { before?: string; after: string } {
+	const b = summary.baseline;
+	const c = summary.candidate;
+	const after = versionName(c.agent, c.version);
+	if (!b) return { after };
+	const before = versionName(b.agent, b.version);
+	if (before !== after) return { before, after };
+	return {
+		before: t("evidence.earlier", { count: b.runs ?? 0 }),
+		after: t("evidence.this", { count: c.runs ?? 0 }),
+	};
+}
+
 /** Before and after numbers of a release: score with its interval per capability, cost per solved task, false completion, fault survival. */
 export function ReleaseEvidence({ summary, testId }: { summary: ReleaseSummary; testId?: string }) {
 	const { t } = useTranslation("u14");
+	const { t: m } = useTranslation("uf7b");
 	const b = summary.baseline;
-	const c = summary.candidate;
+	const heads = evidenceHeads(summary, m as never);
 	return (
 		<div className="flex flex-col gap-2" data-testid={testId}>
 			<table className="w-full text-xs tabular-nums">
 				<thead className="text-muted-foreground text-left">
 					<tr>
 						<th className="py-1 pr-3 font-medium" />
-						{b && <th className="py-1 pr-3 font-medium">{versionName(b.agent, b.version)}</th>}
-						<th className="py-1 font-medium">{versionName(c.agent, c.version)}</th>
+						{b && <th className="py-1 pr-3 font-medium">{heads.before}</th>}
+						<th className="py-1 font-medium">{heads.after}</th>
 					</tr>
 				</thead>
 				<tbody>
 					{rows(summary, t as never).map((r) => (
 						<tr key={r.key} className="border-t" data-testid={testId ? `${testId}-${r.key}` : undefined}>
-							<td className="text-muted-foreground py-1.5 pr-3 capitalize">{r.label}</td>
+							<td className="text-muted-foreground py-1.5 pr-3">{r.label}</td>
 							{b && <td className="py-1.5 pr-3">{r.before ?? "-"}</td>}
 							<td
 								className={cn(

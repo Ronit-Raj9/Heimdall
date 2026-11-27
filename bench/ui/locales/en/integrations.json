@@ -100,7 +100,7 @@
 		"signingTitle": "How to verify",
 		"format": "Send to",
 		"formats": {
-			"json": "Web address (signed JSON)",
+			"json": "Web address",
 			"slack": "Slack",
 			"teams": "Microsoft Teams",
 			"pagerduty": "PagerDuty"
@@ -118,7 +118,7 @@
 			"pagerduty": "https://events.pagerduty.com/v2/enqueue"
 		},
 		"formatHelp": {
-			"json": "Each message is the event as JSON, signed with the secret shown once below.",
+			"json": "Each message is the event as structured data, signed with the secret shown once below.",
 			"slack": "In Slack, add the Incoming Webhooks app to a channel and paste its URL. Messages show the score, the change and a button to the report card.",
 			"teams": "In Teams, add the Workflows app \"Post to a channel when a webhook request is received\" and paste its URL. Messages are cards with the score and the change.",
 			"pagerduty": "In PagerDuty, add an Events API v2 integration to a service and paste its integration key. Only problems page: regressions, blocked releases, failed checks, offline workers. Send test checks the key without opening an incident."
@@ -185,7 +185,7 @@
 		"test": "Send test email",
 		"testSent": "Test email sent to {{to}}",
 		"testLogged": "Test email written to the server log for {{to}}: this server has no mail service yet",
-		"notDelivering": "This server has no mail service set up yet, so emails are only written to its log. Ask your server owner to set HEIMDALL_SMTP_URL, or a Resend or Postmark key.",
+		"notDelivering": "This server cannot send email yet, so emails are only written to its log. Ask your server owner to set up email (the setup guide has the details).",
 		"unavailable": "Email notifications are not available here: {{reason}}."
 	}
 }

@@ -8,6 +8,7 @@ import type { ExperimentStatus } from "@/lib/types/bench";
 import type { ProjectFileList } from "@/lib/types/projectfiles";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/canaries/uf7bI18n";
 
 /** Splits a comma or space separated id list, dropping blanks and duplicates. */
 export function splitIds(s: string): string[] {
@@ -47,8 +48,19 @@ export function certifyCandidates(experiments: ExperimentStatus[] | undefined, q
 }
 
 /** Starts a monitor.certify job (on the worker) from a monitor settings file and finished comparisons. */
+/**
+ * What is wrong with the false alarm rates text (M7-69): it must be a comma list of numbers above 0
+ * and below 1. True when it cannot be sent. Exported for tests.
+ */
+export function fprProblem(text: string): boolean {
+	const parts = text.split(",").map((x) => x.trim());
+	if (parts.some((x) => x === "")) return true;
+	return parts.some((x) => !/^\d*\.?\d+(e-?\d+)?$/i.test(x) || !(Number(x) > 0 && Number(x) < 1));
+}
+
 export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 	const { t } = useTranslation("govern");
+	const { t: m } = useTranslation("uf7b");
 	const files = useListProjectFilesQuery({ area: "policies", recursive: true });
 	const experiments = useListExperimentsQuery();
 	const [monitor, setMonitor] = useState("");
@@ -59,7 +71,8 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 	const monitors = monitorFiles(files.data);
 	const candidates = certifyCandidates(experiments.data?.experiments, search);
 	const shown = candidates.slice(0, MAX_SHOWN);
-	const ready = monitor !== "" && picked.length > 0 && picked.length <= MAX_PICKED;
+	const fprBad = fprProblem(fpr);
+	const ready = monitor !== "" && picked.length > 0 && picked.length <= MAX_PICKED && !fprBad;
 	const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 	return (
 		<Card data-testid="monitor-certify">
@@ -126,11 +139,31 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					<label className="flex flex-col gap-1 text-xs">
 						{t("monitors.fpr")}
-						<Input value={fpr} onChange={(e) => setFpr(e.target.value)} />
+						<Input
+							value={fpr}
+							onChange={(e) => setFpr(e.target.value)}
+							inputMode="decimal"
+							aria-invalid={fprBad || undefined}
+							data-testid="monitor-certify-fpr"
+						/>
+						{fprBad && (
+							<span className="text-chart-error-ink" data-testid="monitor-certify-fpr-problem">
+								{m("monitors.fprProblem")}
+							</span>
+						)}
 					</label>
 					<label className="flex flex-col gap-1 text-xs">
 						{t("monitors.gradeSource")}
-						<Input value={gradeSource} onChange={(e) => setGradeSource(e.target.value)} />
+						{/* M7-69: the scores come from the original grading unless a regrade id was set before. */}
+						<select
+							className="border-input bg-background h-9 w-full min-w-0 rounded-md border px-2 text-sm"
+							value={gradeSource}
+							onChange={(e) => setGradeSource(e.target.value)}
+							data-testid="monitor-certify-grade-source"
+						>
+							<option value="original">{m("monitors.gradeOriginal")}</option>
+							{gradeSource !== "original" && <option value={gradeSource}>{gradeSource}</option>}
+						</select>
 					</label>
 				</div>
 				{ready ? (

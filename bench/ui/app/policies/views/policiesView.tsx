@@ -1,5 +1,6 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
-import { PolicyForm, policyNameProblem, starterPolicy } from "@/components/govern/policyForm";
+import { PolicyForm, checkSentence, policyNameProblem, starterPolicy } from "@/components/govern/policyForm";
+import "@/components/canaries/uf7bI18n";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
 import i18n from "@/lib/i18n";
 import "@/app/schedules/views/w4m7bI18n";
@@ -114,9 +115,17 @@ export default function PoliciesView() {
 											{p.valid ? (
 												<span className="text-muted-foreground text-xs">{t("policies.checks", { count: p.checks })}</span>
 											) : (
-												<Badge variant="destructive" className="w-fit">
-													{t("policies.invalid")}
-												</Badge>
+												// M7-80: say what is wrong, not only that something is.
+												<span className="flex flex-col gap-0.5">
+													<Badge variant="destructive" className="w-fit">
+														{t("policies.invalid")}
+													</Badge>
+													{p.error && (
+														<span className="text-danger-ink line-clamp-2 text-xs break-words" title={p.error} data-testid={`policies-item-error-${p.file}`}>
+															{p.error}
+														</span>
+													)}
+												</span>
 											)}
 										</span>
 									</button>
@@ -154,18 +163,60 @@ export default function PoliciesView() {
 function ExistingPolicy({ file, onDeleted }: { file: string; onDeleted(): void }) {
 	const { t } = useTranslation("govern");
 	const q = useGetPolicyQuery(file);
+	const [editing, setEditing] = useState(false);
 	if (q.isLoading) return <Skeleton className="h-64 w-full" />;
 	if (q.isError || !q.data) return <LoadError title={t("policies.loadError")} error={q.error} onRetry={q.refetch} testId="policy-error" />;
+	// M7-80: a valid rule set opens as plain sentences first; Edit opens the editor. A broken one
+	// opens in the editor so it can be fixed, with its error text above it.
+	if (!editing && q.data.valid && q.data.policy)
+		return <PolicyReadView policy={q.data.policy} onEdit={() => setEditing(true)} />;
 	return (
-		<PolicyEditor
-			key={q.data.sha256}
-			file={file}
-			initialYAML={q.data.yaml}
-			initialPolicy={q.data.policy}
-			sha256={q.data.sha256}
-			onReload={() => void q.refetch()}
-			onDeleted={onDeleted}
-		/>
+		<div className="flex flex-col gap-3">
+			{!q.data.valid && q.data.error && (
+				<p role="alert" className="text-danger-ink text-sm break-words" data-testid="policy-invalid-error">
+					{q.data.error}
+				</p>
+			)}
+			<PolicyEditor
+				key={q.data.sha256}
+				file={file}
+				initialYAML={q.data.yaml}
+				initialPolicy={q.data.policy}
+				sha256={q.data.sha256}
+				onReload={() => void q.refetch()}
+				onDeleted={onDeleted}
+			/>
+		</div>
+	);
+}
+
+/** A rule set as plain sentences, with Edit for members (M7-80). Exported for tests. */
+export function PolicyReadView({ policy, onEdit }: { policy: ReleasePolicy; onEdit(): void }) {
+	const { t: tu } = useTranslation("u14");
+	const { t: m } = useTranslation("uf7b");
+	return (
+		<div className="flex flex-col gap-4" data-testid="policy-read">
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<div className="min-w-0">
+					<h2 className="text-base font-semibold break-words">{policy.name}</h2>
+					{policy.description && <p className="text-muted-foreground text-sm">{policy.description}</p>}
+				</div>
+				<RoleGate min="member" fallback={null}>
+					<Button size="sm" variant="outline" onClick={onEdit} data-testid="policy-edit">
+						{m("policies.edit")}
+					</Button>
+				</RoleGate>
+			</div>
+			{policy.checks.length === 0 ? (
+				<p className="text-muted-foreground text-sm">{m("policies.noRules")}</p>
+			) : (
+				<ul className="flex list-disc flex-col gap-1 pl-5 text-sm" data-testid="policy-read-rules">
+					{policy.checks.map((c) => (
+						<li key={c.id}>{checkSentence(c, tu)}</li>
+					))}
+				</ul>
+			)}
+		</div>
 	);
 }
 

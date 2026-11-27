@@ -4,7 +4,7 @@
 	"new": "New monitor",
 	"loadError": "Could not load live monitors",
 	"detailError": "Could not load this monitor",
-	"noTicker": "Scheduled checks do not fire on this server, so monitors only run when you press Run now.",
+	"noTicker": "Checks do not fire on this server, so monitors only run when you press Run now.",
 	"emptyTitle": "Watch a deployed agent",
 	"emptyMessage": "Pick an agent with a remote endpoint. Heimdall runs a few of its ready benchmark tasks every hour and tells you when quality drops or the endpoint goes down.",
 	"list": {

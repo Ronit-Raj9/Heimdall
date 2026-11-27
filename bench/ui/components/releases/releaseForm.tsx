@@ -9,6 +9,9 @@ import type { Action, Decision, ExperimentStatus, ReleasePolicyDecision, Release
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
+import "@/components/canaries/uf7bI18n";
 import { useTranslation } from "react-i18next";
 import "@/app/experiments/views/experimentsI18n";
 import { humanExperimentName } from "@/components/experiments/experiments.utils";
@@ -64,8 +67,20 @@ export function ExperimentOption({ experiment }: { experiment: ExperimentStatus 
 export function ReleaseForm(props: ReleaseFormProps) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: m } = useTranslation("uf7b");
 	const { experiments, expId, verdict, policy } = props;
-	const [values, setValues] = useState<ReleaseFormValues>({ ...EMPTY_RELEASE_FORM, ...props.initialValues });
+	const session = useSession();
+	// M7-81: the approver starts as the signed-in person, so it is not retyped (and not lost) each time.
+	const [values, setValues] = useState<ReleaseFormValues>(() => ({
+		...EMPTY_RELEASE_FORM,
+		...(session.user?.email ? { approver: session.user.email } : {}),
+		...props.initialValues,
+	}));
+	const evaluations = useListEvaluationsQuery();
+	const promotable = (evaluations.data ?? [])
+		.filter((ev) => ev.status === "done" && (ev.spec?.mode === "versions" || ev.spec?.mode === "score"))
+		.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+		.slice(0, 3);
 	const [token, setToken] = useState(readWriteToken);
 	const set = (patch: Partial<ReleaseFormValues>) => setValues((v) => ({ ...v, ...patch }));
 	const blockers = verdict ? releaseBlockers(verdict.action, policy) : [];
@@ -82,7 +97,6 @@ export function ReleaseForm(props: ReleaseFormProps) {
 				policy,
 				values,
 			});
-	const session = useSession();
 
 	// Hosted: releases need the member role; a viewer sees why, a demo visitor sees no form.
 	if (!canUse(session, "member")) return session.signedIn ? <RoleNote min="member" testId="release-form-role" /> : null;
@@ -111,6 +125,32 @@ export function ReleaseForm(props: ReleaseFormProps) {
 					</SelectContent>
 				</Select>
 			</Field>
+
+			{experiments.length === 0 && (
+				<div className="flex flex-col gap-2 rounded-md border px-3 py-2 text-sm" data-testid="release-no-comparison">
+					<p>{m("releaseForm.noComparison")}</p>
+					<Button size="sm" variant="outline" className="w-fit" asChild>
+						<Link to="/evaluate" search={{ mode: "versions" } as never} data-testid="release-evaluate-versions">
+							{m("promote.evaluateNew")}
+						</Link>
+					</Button>
+				</div>
+			)}
+			{promotable.length > 0 && (
+				// M7-74: an evaluation is released from its own page; list the newest finished ones here.
+				<div className="flex flex-col gap-1 text-xs" data-testid="release-evaluations">
+					<span className="text-muted-foreground">{m("releaseForm.fromEvaluation")}</span>
+					<ul className="flex flex-col gap-1">
+						{promotable.map((ev) => (
+							<li key={ev.id}>
+								<Link to="/evaluations/$evalId" params={{ evalId: ev.id }} className="text-primary hover:underline">
+									{ev.spec?.name || ev.id}
+								</Link>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 
 			<VerdictSummary {...props} />
 

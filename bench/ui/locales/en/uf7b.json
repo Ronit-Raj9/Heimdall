@@ -1,0 +1,182 @@
+{
+	"howOften": {
+		"label": "How often",
+		"option": {
+			"daily": "Every day at a time",
+			"hourly": "Every hour",
+			"weekly": "Every week on a day at a time",
+			"manual": "Only when I press Check now",
+			"custom": "Custom (cron)"
+		},
+		"zone": "Time zone",
+		"yourZone": "{{zone}} (your time)",
+		"weekday": "Day",
+		"time": "Time",
+		"day": {
+			"sun": "Sunday",
+			"mon": "Monday",
+			"tue": "Tuesday",
+			"wed": "Wednesday",
+			"thu": "Thursday",
+			"fri": "Friday",
+			"sat": "Saturday"
+		},
+		"cron": "Cron line (minute hour day month weekday)",
+		"cronHelp": "Enter a cron line. Example: 0 2 * * * is every day at 02:00.",
+		"invalid": "Not a valid schedule. Example: 0 2 * * * is every day at 02:00.",
+		"next": "Next runs: {{list}} ({{zone}}). The first is {{utc}} UTC.",
+		"nextUtc": "Next runs: {{list}} (UTC).",
+		"invalidShort": "a valid schedule (example: 0 2 * * * is every day at 02:00)"
+	},
+	"canary": {
+		"modelN": "Model {{n}}",
+		"pickModel": "pick a model",
+		"threshold": "Tell me when the score drops by",
+		"sensitivity": {
+			"normal": "A clear drop (normal)",
+			"high": "Any small drop (more alerts)",
+			"low": "Only a big drop (fewer alerts)"
+		},
+		"channel": "Send the alert to",
+		"noChannel": "No alert channel yet.",
+		"setUpChannel": "Set one up",
+		"channelSlack": "Slack: {{name}}",
+		"channelHook": "Web address: {{name}}",
+		"thresholdNote": "Each check is compared with the baseline; a drop beyond the noise of the benchmark sends the alert.",
+		"stepTell": "Tell me when",
+		"stepBudget": "Budget",
+		"createUpTo": "Create, up to {{day}} a day",
+		"baselineNote": "After you create it, record a baseline (one run, up to {{perRun}}).",
+		"cliLead": "Prefer the terminal?"
+	},
+	"cost": {
+		"line_one": "At most {{count}} run a day, up to {{perRun}} a run, at most {{day}} a day and {{month}} a month.",
+		"line_other": "At most {{count}} runs a day, up to {{perRun}} a run, at most {{day}} a day and {{month}} a month.",
+		"lineLast_one": "At most {{count}} run a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
+		"lineLast_other": "At most {{count}} runs a day, about {{perRun}} a run (what the last run cost), at most {{day}} a day and {{month}} a month.",
+		"unknown": "Price per run not known yet. The daily limit caps it at {{day}} a day and {{month}} a month."
+	},
+	"schedules": {
+		"more": "More"
+	},
+	"repeat": {
+		"createUpTo": "Add repeat run, up to {{day}} a day"
+	},
+	"alerts": {
+		"kinds": "Only web addresses (webhooks) and Slack for now.",
+		"pickSecret": "Pick a secret",
+		"formatHook": "Web address",
+		"formatSlack": "Slack",
+		"allEvents": "every event",
+		"event": {
+			"verdict_regressed": "A comparison got worse",
+			"policy_block": "A release rule blocked a release",
+			"experiment_invalid": "A comparison could not be checked",
+			"run_errors": "Runs failed with errors",
+			"schedule_failed": "A repeat run failed",
+			"canary_drifted": "A drift monitor dropped",
+			"canary_model_changed": "A watched model changed under the same name",
+			"live_signal_threshold": "A live check crossed its limit",
+			"live_comparison_worse": "A live comparison found the new version worse"
+		}
+	},
+	"live": {
+		"notEndpoint": "{{agent}} has no remote endpoint, so it cannot be live monitored. Use a drift monitor instead.",
+		"useDrift": "Set up a drift monitor",
+		"problem": {
+			"name": "Give the monitor a name.",
+			"agent": "Pick an agent with a remote endpoint.",
+			"tasks": "At least 1 task.",
+			"interval": "At least every {{min}} minutes.",
+			"budget": "Set a budget per day above $0."
+		},
+		"toCreate": "To create the monitor: {{list}}",
+		"cost_one": "At most {{count}} check a day, at most {{day}} a day and {{month}} a month.",
+		"cost_other": "At most {{count}} checks a day, at most {{day}} a day and {{month}} a month.",
+		"createUpTo": "Create, up to {{day}} a day",
+		"runPaid": "Run now (paid)",
+		"runTitle": "Run this check now?",
+		"runConfirm": "Run now",
+		"runAsk": "Run {{name}} now? One check can spend up to {{usd}}; {{left}} of today's budget is left.",
+		"runAskUnknown": "Run {{name}} now? It calls the agent and spends model budget; the price of one check is not known."
+	},
+	"repeatAsk": {
+		"title": {
+			"nightly": "Repeat this evaluation every night?",
+			"weekly": "Repeat this evaluation every week?"
+		},
+		"when": {
+			"nightly": "It runs again every night at 02:00 ({{zone}}).",
+			"weekly": "It runs again every Monday at 02:00 ({{zone}})."
+		},
+		"price": "About {{run}} a run (what this run cost), up to {{month}} a month. Daily limit: {{limit}}.",
+		"priceUnknown": "Price per run not known: this run's cost was not recorded. Each run is capped by the evaluation's own budget.",
+		"priceNoLimit": "About {{run}} a run (what this run cost), up to {{month}} a month. No daily limit.",
+		"limitOnly": "Daily limit: {{limit}}.",
+		"limitLabel": "Daily limit ($)",
+		"limitPlaceholder": "No limit",
+		"limitBad": "Type an amount above $0, or leave it empty.",
+		"created": "Repeat run created.",
+		"confirm": "Create repeat run",
+		"cancel": "Cancel"
+	},
+	"promote": {
+		"onlyOne": "{{name}} is already the live version, so there is nothing new to release. Save a new version of {{agent}}, evaluate it against the live one, then come back here.",
+		"newVersion": "Save a new version",
+		"evaluateNew": "Evaluate the new version against the live one"
+	},
+	"releases": {
+		"liveLabel": "Live now:",
+		"liveNone": "none yet",
+		"liveOne": "{{name}} (released {{date}} by {{approver}})",
+		"evaluateAgent": "Evaluate an agent",
+		"noNumbers": "No numbers were recorded with this release.",
+		"openComparison": "Open the comparison",
+		"copyLink": "Copy link to this release",
+		"copied": "Link copied",
+		"print": "Print this release",
+		"version": "Version released",
+		"arm": "Setup and its fingerprint"
+	},
+	"checks": {
+		"title": "Checks",
+		"subtitle": "Tests that run on their own: drift monitors compare with a baseline, repeat runs repeat an evaluation, live monitors probe a deployed agent.",
+		"tab": {
+			"drift": "Drift monitors",
+			"schedules": "Repeat runs",
+			"live": "Live monitors"
+		}
+	},
+	"releaseForm": {
+		"noComparison": "No finished comparison of two versions yet. Evaluate the new version against the live one first.",
+		"fromEvaluation": "Releasing from an evaluation? Open it and use Promote this version:"
+	},
+	"evidence": {
+		"this_one": "This evaluation ({{count}} run)",
+		"this_other": "This evaluation ({{count}} runs)",
+		"earlier_one": "Earlier run ({{count}} run)",
+		"earlier_other": "Earlier run ({{count}} runs)"
+	},
+	"monitors": {
+		"fprProblem": "Use numbers between 0 and 1, split by commas. Example: 0.01, 0.001.",
+		"gradeOriginal": "The original scores"
+	},
+	"integrations": {
+		"tracesTitle": "Production traces",
+		"tracesText": "Traces from your live agent come in through the failure inbox, or can start a new agent from what it already does.",
+		"tracesAgents": "Start an agent from traces",
+		"tracesInbox": "Open the failure inbox",
+		"localUrl": "This address is on your own machine or network, so the hosted server cannot reach it. Use a public https address.",
+		"noEvents": "Tick at least one event, or the hook never sends anything.",
+		"badRoutingKey": "A PagerDuty routing key is 20 to 64 letters and digits, from the PagerDuty service's Events API v2 integration."
+	},
+	"operate": {
+		"backupLabel": "Saved results, {{date}}, {{size}}",
+		"which": "Which comparison (type to search)",
+		"all": "All comparisons"
+	},
+	"policies": {
+		"edit": "Edit",
+		"noRules": "This rule set has no rules yet."
+	}
+}

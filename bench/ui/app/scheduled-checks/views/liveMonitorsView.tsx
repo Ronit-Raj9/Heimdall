@@ -1,6 +1,8 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { PageHeader } from "@/components/shell";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, InlineError, LoadError, Section } from "@/components/runs/screenStates";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
@@ -21,6 +23,9 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LineChart, samplePassRate } from "./liveMonitorChart";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import { usd as usd2 } from "@/components/canaries/howOften";
+import "@/components/canaries/uf7bI18n";
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? "-" : `${Math.round(v * 100)}%`);
 const ms = (v: number | null | undefined) => (v === null || v === undefined ? "-" : `${Math.round(v)}`);
@@ -110,8 +115,18 @@ export function MonitorTable({
 						{rows.map((r) => (
 							<tr
 								key={r.id}
-								className={`cursor-pointer border-t ${r.id === selected ? "bg-muted" : ""}`}
+								className={`hover:bg-muted/40 focus-visible:ring-(--focus) cursor-pointer border-t outline-none focus-visible:ring-2 ${r.id === selected ? "bg-muted" : ""}`}
 								onClick={() => onSelect(r.id)}
+								// M7-24: the row opens on Enter or Space too, so keyboard users can reach every monitor.
+								tabIndex={0}
+								role="link"
+								aria-current={r.id === selected || undefined}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										onSelect(r.id);
+									}
+								}}
 								data-testid={`live-monitor-row-${r.id}`}
 							>
 								<td className="py-1 pr-3 font-medium">{r.name}</td>
@@ -160,12 +175,32 @@ export function endpointAgents(agents: Pick<AgentSummary, "id" | "owns_model">[]
 /** The agent field: a list of endpoint agents, or a link to Connect when there is none. */
 export function MonitorAgentPicker({ value, agents, onChange }: { value: string; agents: string[]; onChange: (id: string) => void }) {
 	const { t } = useTranslation("liveMonitors");
+	const { t: m } = useTranslation("uf7b");
+	// M7-54: an agent with no remote endpoint is never shown as some other agent picked; say why and point to drift monitors.
+	const notEndpoint = value !== "" && !agents.includes(value);
+	const notEndpointNote = notEndpoint ? (
+		<span className="text-chart-warning-ink" data-testid="live-monitor-form-not-endpoint">
+			{m("live.notEndpoint", { agent: value })}{" "}
+			<Link
+				to="/scheduled-checks"
+				search={{ tab: "drift", agent: value } as never}
+				className="text-primary font-medium underline-offset-4 hover:underline"
+				data-testid="live-monitor-form-use-drift"
+			>
+				{m("live.useDrift")}
+			</Link>
+		</span>
+	) : null;
 	if (agents.length === 0) {
 		return (
 			<div className="flex flex-col gap-1 text-xs">
 				{t("form.agent")}
 				<span className="text-muted-foreground">
-					{t("form.noEndpointAgents")}{" "}
+					{notEndpointNote ?? (
+						<>
+							{t("form.noEndpointAgents")}{" "}
+						</>
+					)}
 					<Link
 						to="/connect"
 						className="text-primary font-medium underline-offset-4 hover:underline"
@@ -182,45 +217,95 @@ export function MonitorAgentPicker({ value, agents, onChange }: { value: string;
 			{t("form.agent")}
 			<select
 				className="border-input bg-card h-9 rounded-md border px-2 text-sm"
-				value={value}
+				value={notEndpoint ? "" : value}
 				onChange={(e) => onChange(e.target.value)}
 				data-testid="live-monitor-form-agent"
 			>
-				<option value="" disabled>
-					{t("form.pickAgent")}
-				</option>
+				<option value="">{t("form.pickAgent")}</option>
 				{agents.map((id) => (
 					<option key={id} value={id}>
 						{id}
 					</option>
 				))}
 			</select>
+			{notEndpointNote}
 		</label>
 	);
 }
 
+/** The live monitor form's fields, as typed. */
+export interface LiveMonitorFields {
+	name: string;
+	agent: string;
+	benchmark: string;
+	tasks: string;
+	interval: string;
+	budget: string;
+}
+
+/** The uf7b keys of what the form still needs, by field (M7-53). Exported for tests. */
+export function liveMonitorProblems(
+	f: LiveMonitorFields,
+	agents: string[],
+	minInterval = 15,
+): { field: keyof LiveMonitorFields; key: "live.problem.name" | "live.problem.agent" | "live.problem.tasks" | "live.problem.interval" | "live.problem.budget" }[] {
+	const out: ReturnType<typeof liveMonitorProblems> = [];
+	const whole = (v: string) => /^\d+$/.test(v.trim()) ? Number(v) : NaN;
+	if (!f.name.trim()) out.push({ field: "name", key: "live.problem.name" });
+	if (!f.agent || !agents.includes(f.agent)) out.push({ field: "agent", key: "live.problem.agent" });
+	if (!(whole(f.tasks) >= 1)) out.push({ field: "tasks", key: "live.problem.tasks" });
+	if (!(whole(f.interval) >= minInterval)) out.push({ field: "interval", key: "live.problem.interval" });
+	if (!(Number(f.budget) > 0)) out.push({ field: "budget", key: "live.problem.budget" });
+	return out;
+}
+
 function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose: () => void; onCreated: (id: string) => void }) {
 	const { t } = useTranslation("liveMonitors");
+	const { t: m } = useTranslation("uf7b");
 	const [create, state] = useCreateLiveMonitorMutation();
 	const agentList = useGetAgentsQuery();
+	const list = useGetLiveMonitorsQuery(undefined);
+	const minInterval = list.data?.min_interval_min || 15;
 	const agents = endpointAgents(agentList.data?.agents ?? []);
-	const [f, setF] = useState({ name: "", agent, benchmark: "", tasks: "3", interval: "60", budget: "" });
+	const [f, setF] = useState<LiveMonitorFields>({ name: "", agent, benchmark: "", tasks: "3", interval: "60", budget: "2" });
 	const [err, setErr] = useState("");
-	const field = (k: keyof typeof f, label: string, type = "text") => (
-		<label className="flex flex-col gap-1 text-xs">
-			{label}
-			<Input type={type} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-testid={`live-monitor-form-${k}`} />
-		</label>
-	);
+	const [touched, setTouched] = useState<Partial<Record<keyof LiveMonitorFields, boolean>>>({});
+	const problems = liveMonitorProblems(f, agents, minInterval);
+	const problemOf = (k: keyof LiveMonitorFields) => problems.find((p) => p.field === k);
+	const field = (k: keyof LiveMonitorFields, label: string, type = "text") => {
+		const p = touched[k] ? problemOf(k) : undefined;
+		return (
+			<label className="flex flex-col gap-1 text-xs">
+				{label}
+				<Input
+					type={type}
+					value={f[k]}
+					min={type === "number" ? (k === "interval" ? minInterval : k === "tasks" ? 1 : 0) : undefined}
+					aria-invalid={p ? true : undefined}
+					onChange={(e) => setF({ ...f, [k]: e.target.value })}
+					onBlur={() => setTouched((x) => ({ ...x, [k]: true }))}
+					data-testid={`live-monitor-form-${k}`}
+				/>
+				{p && (
+					<span className="text-chart-error-ink" data-testid={`live-monitor-form-problem-${k}`}>
+						{m(p.key, { min: minInterval })}
+					</span>
+				)}
+			</label>
+		);
+	};
+	const why = problems.length ? m("live.toCreate", { list: problems.map((p) => m(p.key, { min: minInterval })).join(" ") }) : null;
+	const interval = Number(f.interval);
+	const budget = Number(f.budget);
 	const submit = async () => {
 		setErr("");
 		const res = await create({
-			name: f.name || undefined,
+			name: f.name.trim(),
 			agent: f.agent,
 			benchmark: f.benchmark || undefined,
-			tasks: Number(f.tasks) || undefined,
-			interval_min: Number(f.interval) || undefined,
-			budget_usd_per_day: f.budget ? Number(f.budget) : undefined,
+			tasks: Number(f.tasks),
+			interval_min: Number(f.interval),
+			budget_usd_per_day: Number(f.budget),
 		});
 		if ("error" in res) {
 			const e = res.error as { data?: { error?: string; message?: string } };
@@ -244,18 +329,26 @@ function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose:
 					{err}
 				</p>
 			)}
-			<div className="flex gap-2">
+			{interval >= minInterval && budget > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid="live-monitor-form-cost">
+					{m("live.cost", { count: Math.floor(1440 / interval), day: usd2(budget), month: usd2(budget * 30) })}
+				</p>
+			)}
+			<div className="flex flex-wrap items-center gap-2">
 				<Button
 					size="sm"
-					disabled={!f.agent || !agents.includes(f.agent) || state.isLoading}
+					disabled={problems.length > 0 || state.isLoading}
+					isLoading={state.isLoading}
+					aria-describedby={why ? "live-monitor-form-why" : undefined}
 					onClick={() => void submit()}
 					data-testid="live-monitor-form-create"
 				>
-					{t("form.create")}
+					{budget > 0 ? m("live.createUpTo", { day: usd2(budget) }) : t("form.create")}
 				</Button>
 				<Button size="sm" variant="ghost" onClick={onClose}>
 					{t("form.cancel")}
 				</Button>
+				<WhyDisabled reason={state.isLoading ? null : why} testId="live-monitor-form-why" />
 			</div>
 		</Section>
 	);
@@ -367,30 +460,57 @@ function IncidentCard({ i }: { i: MonitorIncident }) {
 
 function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 	const { t } = useTranslation("liveMonitors");
+	const { t: m } = useTranslation("uf7b");
 	const confirm = useConfirm();
 	const [act, state] = useMonitorActionMutation();
-	const [badge] = useSetMonitorBadgeMutation();
+	const [badge, badgeState] = useSetMonitorBadgeMutation();
+	const [err, setErr] = useState<unknown>(null);
+	// M1-44: every action waits for the server and shows its error beside the buttons.
+	const run = async (fn: () => Promise<unknown>, done?: string) => {
+		setErr(null);
+		try {
+			await fn();
+			if (done) notify({ text: done });
+		} catch (e) {
+			setErr(e);
+		}
+	};
+	const known = d.check_budget_usd > 0;
 	return (
-		<span className="flex flex-wrap items-center gap-2" data-testid="live-monitor-actions">
+		<span className="flex flex-wrap items-start gap-2" data-testid="live-monitor-actions">
+			{/* M7-53: Run now spends money, so it always asks first and says how much one check can cost. */}
+			<PaidButton
+				size="sm"
+				variant="outline"
+				verb={m("live.runConfirm")}
+				capUsd={known ? d.check_budget_usd : null}
+				estimateAt="title"
+				confirm="always"
+				confirmText={
+					known
+						? m("live.runAsk", { name: d.name, usd: usd2(d.check_budget_usd), left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)) })
+						: m("live.runAskUnknown", { name: d.name })
+				}
+				disabled={state.isLoading}
+				onConfirm={() => run(() => act({ id: d.id, action: "run" }).unwrap(), t("started", { ns: "toast", name: d.name }))}
+				testId="live-monitor-run"
+			/>
 			<Button
 				size="sm"
 				variant="outline"
 				disabled={state.isLoading}
-				onClick={() => void act({ id: d.id, action: "run" })}
-				data-testid="live-monitor-run"
-			>
-				{t("actions.run")}
-			</Button>
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={state.isLoading}
-				onClick={() => void act({ id: d.id, action: d.paused ? "resume" : "pause" })}
+				onClick={() => void run(() => act({ id: d.id, action: d.paused ? "resume" : "pause" }).unwrap())}
 				data-testid="live-monitor-pause"
 			>
 				{d.paused ? t("actions.resume") : t("actions.pause")}
 			</Button>
-			<Button size="sm" variant="ghost" onClick={() => void badge({ id: d.id, enabled: !d.badge })} data-testid="live-monitor-badge">
+			<Button
+				size="sm"
+				variant="ghost"
+				disabled={badgeState.isLoading}
+				onClick={() => void run(() => badge({ id: d.id, enabled: !d.badge }).unwrap())}
+				data-testid="live-monitor-badge"
+			>
 				{d.badge ? t("detail.badgeOff") : t("detail.badgeOn")}
 			</Button>
 			<Button
@@ -398,12 +518,14 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 				variant="ghost"
 				disabled={state.isLoading}
 				onClick={async () => {
-					if (await confirm(t("actions.deleteConfirm", { name: d.name }))) void act({ id: d.id, action: "delete" });
+					if (await confirm(t("actions.deleteConfirm", { name: d.name })))
+						void run(() => act({ id: d.id, action: "delete" }).unwrap(), t("deleted", { ns: "toast", name: d.name }));
 				}}
 				data-testid="live-monitor-delete"
 			>
 				{t("actions.delete")}
 			</Button>
+			<InlineError error={err} testId="live-monitor-action-error" className="basis-full" />
 		</span>
 	);
 }

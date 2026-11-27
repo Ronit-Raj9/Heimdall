@@ -20,4 +20,9 @@ describe("delete backup", () => {
 		await deleteBackup(() => Promise.resolve(true), remove, "backup-1.tar.gz");
 		expect(remove).toHaveBeenCalledWith("backup-1.tar.gz");
 	});
+
+	it("passes a failed delete on to the caller (M1-44)", async () => {
+		const remove = vi.fn(() => Promise.reject(new Error("disk busy")));
+		await expect(deleteBackup(() => Promise.resolve(true), remove, "backup-1.tar.gz")).rejects.toThrow("disk busy");
+	});
 });

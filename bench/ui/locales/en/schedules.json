@@ -1,11 +1,11 @@
 {
-	"title": "Schedules",
-	"subtitle": "Run tests automatically at set times.",
+	"title": "Repeat runs",
+	"subtitle": "Repeat an evaluation or a comparison at set times, with a daily spending limit.",
 	"loadError": "Could not load the schedules.",
 	"empty": "No schedules yet. Add one below: pick a comparison file, a time and a daily spending limit.",
 	"noTicker": "This server cannot start scheduled runs right now (it is offline). Schedules are saved and start once it is back.",
 	"noTickerLink": "Check the server status",
-	"hostedLimits": "Scheduled comparisons run on your workers. This organization uses {{count}} of {{max}} schedules; each can run at most once every {{min}} minutes.",
+	"hostedLimits": "Up to {{max}} repeat runs for this organization, {{count}} used. Each runs at most once every {{min}} minutes.",
 	"hostedRunnersLink": "Workers",
 	"table": {
 		"name": "Name",
@@ -35,7 +35,7 @@
 		"job": "job"
 	},
 	"add": {
-		"title": "Add a schedule",
+		"title": "Add a repeat run",
 		"name": "Name",
 		"namePlaceholder": "nightly-core",
 		"experiment": "Comparison file",
@@ -58,7 +58,7 @@
 		"timezone": "Timezone",
 		"timezonePlaceholder": "UTC",
 		"maxUsd": "Daily spending limit (USD)",
-		"submit": "Add schedule",
+		"submit": "Add repeat run",
 		"hint": "Example: 0 6 * * * runs every day at 06:00. Comparisons with a real model need a total budget (budget.total_usd) and a daily limit at least that large."
 	},
 	"alerts": {
@@ -89,7 +89,7 @@
 		"agent": "Agent",
 		"agentPick": "Pick an agent",
 		"agentsLoading": "Loading agents...",
-		"agentsEmpty": "No agents yet. Create one on the Agents page.",
+		"agentsEmpty": "No agents yet. Create one first.",
 		"agentPlaceholder": "agents/codex.yaml",
 		"suite": "Benchmark",
 		"tasks": "Tasks",
@@ -118,10 +118,10 @@
 		"utc": "Times are UTC.",
 		"whenWords": {
 			"manual": "It runs only when you press Check now.",
-			"daily": "It checks every day at 06:00 UTC.",
+			"daily": "It checks every day at {{time}} ({{zone}}).",
 			"hourly": "It checks every hour.",
-			"weekly": "It checks every Monday at 06:00 UTC.",
-			"custom": "It checks on the cron line {{cron}} (UTC)."
+			"weekly": "It checks every {{day}} at {{time}} ({{zone}}).",
+			"custom": "It checks on the cron line {{cron}} ({{zone}})."
 		},
 		"perRun": "Spending limit per check (USD)",
 		"perDay": "Spending limit per day (USD)",
@@ -131,7 +131,7 @@
 		"created": "Drift monitor {{name}} created. Next: record its baseline (the reference result later checks are compared with).",
 		"createdWhen": "Drift monitor {{name}} created. {{when}} Next: record its baseline (the reference result later checks are compared with).",
 		"baseline": "Record baseline",
-		"baselineConfirm": "Record a new baseline for this drift monitor? This runs it once.",
+		"baselineConfirm": "Record a new baseline for this drift monitor? This runs it once and can spend up to ${{usd}}.",
 		"run": "Check now",
 		"delete": "Delete",
 		"deleteConfirm": "Delete drift monitor {{name}}? Its baseline and check history are deleted too.",
@@ -144,7 +144,8 @@
 			"targets": "Add at least one model to watch.",
 			"cron": "Enter a cron line for the custom schedule.",
 			"budget": "Set both spending limits, or tick Practice mode.",
-			"budgetOrder": "The limit per check is above the limit per day, so no check could start."
+			"budgetOrder": "The limit per check is above the limit per day, so no check could start.",
+			"cronInvalid": "Not a valid schedule. Example: 0 2 * * * is every day at 02:00."
 		},
 		"edit": "Edit",
 		"editTitle": "Edit drift monitor {{name}}",
@@ -152,15 +153,16 @@
 		"saved": "Drift monitor {{name}} saved.",
 		"suitePick": "Pick a benchmark",
 		"suitesLoading": "Loading benchmarks...",
-		"suitesEmpty": "No benchmarks yet. Add one on the Benchmarks page first.",
+		"suitesEmpty": "No benchmarks yet. Pick one from the catalog first.",
 		"pausedNote": "Paused: scheduled checks do not run until you resume. Check now still works.",
 		"noSchedulePause": "This drift monitor runs only when you press Check now, so there is nothing to pause.",
 		"unknown": "No drift monitor is called {{name}}. It may have been deleted.",
-		"showAll": "Show all drift monitors"
+		"showAll": "Show all drift monitors",
+		"baselineConfirmNoCap": "Record a new baseline for this drift monitor? This runs it once in practice mode, for free."
 	},
 	"noTickerAction": "Set up a drift monitor instead",
 	"paused": "Paused",
 	"pause": "Pause",
 	"resume": "Resume",
-	"editTitle": "Edit schedule {{name}}"
+	"editTitle": "Edit repeat run {{name}}"
 }

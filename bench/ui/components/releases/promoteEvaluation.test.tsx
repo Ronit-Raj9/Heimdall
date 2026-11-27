@@ -12,7 +12,12 @@ vi.mock("@/lib/store/apis/evalReleaseApi", () => ({
 	useScheduleEvaluationMutation: () => mutation(),
 }));
 
-const { GateResultCard, PromoteEvaluation, RepeatEvaluation, previewTitle } = await import("./promoteEvaluation");
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useGetEvaluationQuery: () => ({ data: { result: { arms: [], cost_usd: 0.4, at: "" } } }),
+}));
+
+const { GateResultCard, PromoteEvaluation, RepeatEvaluation, onlyLiveVersion, parseRepeatLimit, previewTitle, repeatAsk } = await import("./promoteEvaluation");
 const { releaseTitle } = await import("./releaseEvidence");
 
 const preview: EvaluationReleasePreview = {
@@ -168,6 +173,39 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		const html = render(<RepeatEvaluation evaluationId="ev_1" />);
 		expect(html).toContain('data-testid="evaluation-repeat-nightly"');
 		expect(html).toContain("Repeat weekly");
+		expect(html).toContain('data-testid="evaluation-repeat-limit"');
+		expect(html).toContain('data-paid="true"');
+	});
+
+	it("asks before a repeat run with the time, the zone and the cost (M7-51)", async () => {
+		const i18n = (await import("@/lib/i18n")).default;
+		const t = i18n.getFixedT("en", "uf7b") as never;
+		const ask = repeatAsk("nightly", "Europe/Berlin", 0.4, t);
+		expect(ask.message).toBe("It runs again every night at 02:00 (Europe/Berlin). About $0.40 a run (what this run cost), up to $12.00 a month. Daily limit: $0.80.");
+		expect(ask.limit).toBe(0.8);
+		const unknown = repeatAsk("weekly", "UTC", undefined, t);
+		expect(unknown.message).toContain("every Monday at 02:00 (UTC)");
+		expect(unknown.message).toContain("Price per run not known");
+		expect(unknown.limit).toBeUndefined();
+		const typed = repeatAsk("nightly", "UTC", 0.4, t, 5);
+		expect(typed.message).toContain("Daily limit: $5.00.");
+		expect(typed.limit).toBe(5);
+		const unknownTyped = repeatAsk("weekly", "UTC", undefined, t, 3);
+		expect(unknownTyped.message).toContain("Daily limit: $3.00.");
+		expect(unknownTyped.limit).toBe(3);
+		expect(parseRepeatLimit("")).toBeUndefined();
+		expect(parseRepeatLimit("$2.5")).toBe(2.5);
+		expect(parseRepeatLimit("0")).toBeNaN();
+		expect(parseRepeatLimit("abc")).toBeNaN();
+	});
+
+	it("knows when the evaluated version is already live (M7-74)", () => {
+		expect(onlyLiveVersion({ problem: "codex v1 is already the live version", version: 1, live: { agent: "codex", version: 1 } })).toBe(true);
+		expect(onlyLiveVersion({ problem: "", version: 1, live: { agent: "codex", version: 1 } })).toBe(false);
+		expect(onlyLiveVersion({ problem: "x", version: 2, live: { agent: "codex", version: 1 } })).toBe(false);
+		expect(onlyLiveVersion({ problem: "x", problem_code: "same_as_live", version: 2, live: { agent: "codex", version: 1 } })).toBe(true);
+		expect(onlyLiveVersion({ problem: "x", problem_code: "only_one_version", version: 2, live: { agent: "codex", version: 1 } })).toBe(true);
+		expect(onlyLiveVersion({ problem: "x", problem_code: "not_finished", version: 1, live: { agent: "codex", version: 1 } })).toBe(false);
 	});
 });
 
