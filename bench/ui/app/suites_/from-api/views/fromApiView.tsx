@@ -226,6 +226,7 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 					)}
 					<input
 						type="file"
+						className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent"
 						accept=".yaml,.yml,.json"
 						onChange={(e) => void readFile(e, (s, n) => (onSpec(s), setSpecName(n)))}
 						data-testid="from-api-spec-file"
@@ -242,6 +243,7 @@ function NewDraftForm({ onCreated }: { onCreated(id: string): void }) {
 					<span className="text-muted-foreground text-xs">{t("new.pasteOrPick")}</span>
 					<input
 						type="file"
+						className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent"
 						accept=".md,.txt,.markdown"
 						onChange={(e) => void readFile(e, (s, n) => (setPolicy(s), setPolicyName(n)))}
 						data-testid="from-api-policy-file"

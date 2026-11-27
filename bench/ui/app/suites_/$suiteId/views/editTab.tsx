@@ -406,12 +406,13 @@ function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDi
 				<div className="flex flex-wrap gap-3 text-sm">
 					<label className="flex flex-col gap-1">
 						{t("edit.uploadFile")}
-						<input type="file" disabled={busy} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="suite-edit-upload-file" />
+						<input type="file" className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent" disabled={busy} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="suite-edit-upload-file" />
 					</label>
 					<label className="flex flex-col gap-1">
 						{t("edit.uploadZip")}
 						<input
 							type="file"
+							className="text-muted-foreground w-fit max-w-full text-xs file:border-input file:bg-card file:text-foreground file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-md file:border file:px-3 file:text-sm file:font-medium hover:file:bg-accent"
 							accept=".zip,application/zip"
 							disabled={busy || !target}
 							onChange={(e) => void onZip(e.target.files?.[0])}

@@ -176,7 +176,7 @@ export function SuitesList({ suites }: { suites: readonly SuiteSummary[] }) {
 					/>
 					<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="suites-show-tests" />
 					<span className="ml-auto" aria-live="polite">
-						<ListCount shown={shown.length} total={real.length} hidden={showTests ? 0 : hidden} noun={tw("suites.noun")} testId="suites-count" />
+						<ListCount shown={shown.length} total={real.length} hidden={0} noun={tw("suites.noun")} testId="suites-count" />
 					</span>
 				</div>
 				<FilterTokens tokens={tokens} onClear={() => void setUrl({ category: null, source: null })} testId="suites-tokens" />

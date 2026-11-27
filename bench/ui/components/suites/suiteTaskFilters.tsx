@@ -32,7 +32,7 @@ export function SuiteTaskFilters({ filters, options, onChange, onReset, search, 
 	return (
 		<div className="flex flex-wrap items-end gap-3" role="group" aria-label={t("suites.filters.label")} data-testid="suites-task-filters">
 			{onSearch && (
-				<div className="flex w-full min-w-0 flex-col gap-1 sm:w-64">
+				<div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-64">
 					<label htmlFor={searchId} className="text-muted-foreground text-xs">
 						{tf("tasks.search")}
 					</label>
@@ -42,7 +42,7 @@ export function SuiteTaskFilters({ filters, options, onChange, onReset, search, 
 						value={search ?? ""}
 						placeholder={tf("tasks.searchPlaceholder")}
 						onChange={(event) => onSearch(event.target.value)}
-						className="h-8"
+						className="h-(--control-h)"
 						data-testid="suites-task-search"
 					/>
 				</div>
@@ -104,12 +104,12 @@ function FilterSelect({ label, value, options, onChange, testId }: FilterSelectP
 	// M6-8: a filter with no option to pick is not shown, not shown disabled.
 	if (all.length === 0) return null;
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className="flex min-w-0 flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
 			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)}>
-				<SelectTrigger id={id} size="sm" className="min-w-32 text-xs" data-testid={testId}>
+				<SelectTrigger id={id} className="min-w-32" data-testid={testId}>
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent data-testid={`${testId}-content`}>
