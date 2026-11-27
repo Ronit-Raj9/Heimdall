@@ -24,6 +24,8 @@ import { DeleteOrgRow, RetentionSection } from "./dataControls";
 import { PromptLogsSection } from "./promptLogsSection";
 import { SettingsSection, When } from "./settingsBits";
 import "./w4m8I18n";
+import "./uf8aI18n";
+import { useUnsavedGuard } from "./useUnsavedGuard";
 
 /** Turns public read on after a confirmation, or off without one. */
 export async function togglePublic(
@@ -54,7 +56,7 @@ function WriteFailure({ error, title, testId, min }: { error: unknown; title: st
 /** A labelled row of the organization card. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
 	return (
-		<div className="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-3 py-2.5 text-sm">
+		<div className="grid grid-cols-1 items-center gap-1 py-2.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
 			<span className="text-muted-foreground">{label}</span>
 			<span className="min-w-0">{children}</span>
 		</div>
@@ -74,12 +76,14 @@ export function OrgTab({ org }: { org: OrgSummary }) {
 
 function OrgSettings({ info }: { info: OrgInfo }) {
 	const { t } = useTranslation("platform");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const formId = useId();
 	const isAdmin = canUse(session, "admin");
 	const isOwner = canUse(session, "owner");
 	const [name, setName] = useState(info.name);
 	useEffect(() => setName(info.name), [info.name]);
+	useUnsavedGuard(isAdmin && name.trim() !== "" && name.trim() !== info.name);
 	const [rename, renameState] = useRenameOrgMutation();
 	const [setPublic, publicState] = useSetPublicReadMutation();
 	const confirm = useConfirm();
@@ -209,38 +213,41 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 				)}
 			</SettingsSection>
 
-			<RetentionSection />
-
-			<PromptLogsSection />
-
-			{(session.user || session.authMode === "hosted") && (
-				<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
-					<div className="border-chart-error/40 divide-chart-error/20 flex flex-col divide-y rounded-lg border">
-						{session.user && (
-							<div className="flex flex-wrap items-center gap-4 px-4 py-4">
-								<div className="flex min-w-60 flex-1 flex-col gap-1">
-									<span className="text-foreground text-sm font-medium">{t("settings.org.leaveTitle")}</span>
-									<span className="text-muted-foreground text-xs">{t("settings.org.leaveBody", { org: info.name })}</span>
+			{/* Settings that delete data sit together at the bottom, apart from the harmless ones above. */}
+			<SettingsSection title={t("settings.org.dangerTitle")} description={tl("org.dangerBody")} testId="settings-org-danger">
+				<div className="flex flex-col gap-10">
+					<RetentionSection />
+					<PromptLogsSection />
+				</div>
+				{(session.user || session.authMode === "hosted") && (
+					<>
+						<div className="flex flex-col divide-y rounded-lg border">
+							{session.user && (
+								<div className="flex flex-wrap items-center gap-4 px-4 py-4">
+									<div className="flex min-w-60 flex-1 flex-col gap-1">
+										<span className="text-foreground text-sm font-medium">{t("settings.org.leaveTitle")}</span>
+										<span className="text-muted-foreground text-xs">{t("settings.org.leaveBody", { org: info.name })}</span>
+									</div>
+									<ConfirmButton
+										label={t("settings.org.leave")}
+										question={t("settings.org.leaveConfirm", { org: info.name })}
+										confirmLabel={t("settings.org.leave")}
+										cancelLabel={t("settings.members.cancel")}
+										onConfirm={() => void onLeave()}
+										isLoading={leaveState.isLoading}
+										variant="destructive"
+										testId="org-leave"
+									/>
 								</div>
-								<ConfirmButton
-									label={t("settings.org.leave")}
-									question={t("settings.org.leaveConfirm", { org: info.name })}
-									confirmLabel={t("settings.org.leave")}
-									cancelLabel={t("settings.members.cancel")}
-									onConfirm={() => void onLeave()}
-									isLoading={leaveState.isLoading}
-									variant="destructive"
-									testId="org-leave"
-								/>
-							</div>
+							)}
+							{session.authMode === "hosted" && <DeleteOrgRow info={info} />}
+						</div>
+						{leaveState.error && (
+							<WriteFailure error={leaveState.error} title={t("settings.org.leaveError")} testId="org-leave-error" min="admin" />
 						)}
-						{session.authMode === "hosted" && <DeleteOrgRow info={info} />}
-					</div>
-					{leaveState.error && (
-						<WriteFailure error={leaveState.error} title={t("settings.org.leaveError")} testId="org-leave-error" min="admin" />
-					)}
-				</SettingsSection>
-			)}
+					</>
+				)}
+			</SettingsSection>
 		</div>
 	);
 }

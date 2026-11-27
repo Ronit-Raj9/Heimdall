@@ -72,9 +72,10 @@ describe("AdminUsageBody", () => {
 
 describe("helpers", () => {
 	it("formats and defaults", () => {
-		expect(formatUSD(1234.5)).toBe("$1,234.50");
+		expect(formatUSD(1234.5)).toBe("$1,235"); // the one UI money rule (lib/money)
 		expect(formatUSD(0.0042)).toBe("$0.0042");
-		expect(defaultRange(new Date("2026-11-21T12:00:00Z"))).toEqual({ from: "2026-10-23", to: "2026-11-21" });
+		// This calendar month, UTC (M8-19).
+		expect(defaultRange(new Date("2026-11-21T12:00:00Z"))).toEqual({ from: "2026-11-01", to: "2026-11-21" });
 	});
 });
 
@@ -87,7 +88,7 @@ describe("UsageBody runs without a cost (F1.price)", () => {
 		};
 		const html = renderToStaticMarkup(<UsageBody data={data} />);
 		expect(html).toMatch(
-			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; API keys to include them\.</,
+			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; Model keys to include them\.</,
 		);
 		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 runs with no model call</);
 		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');
@@ -115,7 +116,7 @@ describe("usage link parameters", () => {
 	it("takes the range from the link", () => {
 		expect(rangeFromSearch({ from: "2026-11-01" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-23", invalid: [] });
 		expect(rangeFromSearch({ from: "2026-11-01", to: "2026-11-10" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-10", invalid: [] });
-		expect(rangeFromSearch({ to: "2026-10-31" }, now)).toEqual({ from: "2026-10-02", to: "2026-10-31", invalid: [] });
+		expect(rangeFromSearch({ to: "2026-10-31" }, now)).toEqual({ from: "2026-10-01", to: "2026-10-31", invalid: [] });
 		expect(rangeFromSearch({}, now)).toEqual({ ...defaultRange(now), invalid: [] });
 	});
 	it("swaps a reversed range", () => {
@@ -126,10 +127,10 @@ describe("usage link parameters", () => {
 			swapped: true,
 		});
 	});
-	it("falls back to the last 30 days and flags a date that is not real", () => {
+	it("falls back to the month of to and flags a date that is not real", () => {
 		expect(rangeFromSearch({ from: "2026-02-30" }, now)).toEqual({ ...defaultRange(now), invalid: ["2026-02-30"] });
 		expect(rangeFromSearch({ from: "yesterday", to: "2026-11-10" }, now)).toEqual({
-			from: "2026-10-12",
+			from: "2026-11-01",
 			to: "2026-11-10",
 			invalid: ["yesterday"],
 		});

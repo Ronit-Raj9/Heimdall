@@ -102,7 +102,13 @@ export function AdminUsersPanel() {
 	};
 	return (
 		<div className="flex flex-col gap-3" data-testid="admin-users">
-			<Input placeholder={t("users.search")} value={filter} onChange={(e) => setFilter(e.target.value)} className="w-full sm:max-w-sm" />
+			<Input
+				placeholder={t("users.search")}
+				aria-label={t("users.search")}
+				value={filter}
+				onChange={(e) => setFilter(e.target.value)}
+				className="w-full sm:max-w-sm"
+			/>
 			{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 				<Table>
@@ -443,6 +449,7 @@ export function AdminImagesPanel() {
 														className="h-8 w-48"
 														value={note}
 														placeholder={t("images.rejectReason")}
+														aria-label={t("images.rejectReason")}
 														onChange={(e) => setNote(e.target.value)}
 														data-testid={`admin-image-note-${img.id}`}
 													/>

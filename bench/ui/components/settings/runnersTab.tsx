@@ -1,4 +1,5 @@
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/accessNotes";
+import { notify } from "@/lib/notify";
 import { ConfirmButton, RunnerStatusBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { isValidPool, runnerStartCommand } from "@/components/platform/platform.utils";
@@ -23,7 +24,11 @@ import { BookOpen, Server, ServerCog } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { CredentialKinds } from "./credentialKinds";
+import { splitRevoked } from "./revokedFilter";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
+import "./uf8aI18n";
 import { WorkerPlatformsSection } from "./workerPlatformsSection";
 import { ConnectedWorkers } from "@/components/workers/connectedWorkers";
 import { WhereRunsGo } from "@/components/workers/whereRunsGo";
@@ -47,6 +52,7 @@ export function saveTokenCommand(token: string, file: string): string {
 export function RunnersTab({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
 	const { t: tu } = useTranslation("u11");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const runners = useListRunnersQuery(undefined, {
 		pollingInterval: 15_000,
@@ -56,6 +62,12 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 	const list = runners.data?.runners ?? [];
 	return (
 		<div className="flex flex-col gap-12" data-testid="settings-runners">
+			<div className="flex flex-col gap-3">
+				<p className="text-muted-foreground max-w-prose text-sm" data-testid="runners-intro">
+					{tl("kinds.runners.what")}
+				</p>
+				<CredentialKinds current="runners" />
+			</div>
 			<WhereRunsGo />
 			<WorkerPlatformsSection />
 			<ConnectedWorkers />
@@ -78,18 +90,15 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 				) : (
 					<div className="grid gap-3 sm:grid-cols-2" data-testid="runners-table">
 						{list.map((runner: Runner) => (
-							<div
-								key={runner.id}
-								className="bg-card flex flex-col gap-4 rounded-xl border p-5 transition-shadow hover:shadow-md"
-								data-testid={`runner-row-${runner.id}`}
-							>
+							<div key={runner.id} className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid={`runner-row-${runner.id}`}>
 								<div className="flex items-start gap-3">
 									<span className="bg-muted text-muted-foreground relative flex size-9 shrink-0 items-center justify-center rounded-lg">
 										<Server className="size-4" aria-hidden="true" />
 										<span
 											className={cn(
 												"ring-card absolute -top-0.5 -right-0.5 size-2.5 rounded-full ring-2",
-												runner.live ? "bg-chart-success animate-pulse" : "bg-muted-foreground/40",
+												// Pulses only while it runs something; an idle live worker is a still dot.
+												runner.live ? cn("bg-chart-success", runner.running_slots > 0 && "animate-pulse") : "bg-muted-foreground/40",
 											)}
 											title={runner.live ? t("settings.runners.live") : tu("settings.offline")}
 											aria-label={runner.live ? t("settings.runners.live") : tu("settings.offline")}
@@ -137,7 +146,12 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 											})}
 											confirmLabel={t("settings.runners.remove")}
 											cancelLabel={t("settings.runners.cancel")}
-											onConfirm={() => void removeRunner(runner.id)}
+											onConfirm={() =>
+												void removeRunner(runner.id)
+													.unwrap()
+													.then(() => notify({ text: t("deleted", { ns: "toast", name: runner.name }) }))
+													.catch(() => undefined)
+											}
 											isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
 											testId={`runner-remove-${runner.id}`}
 										/>
@@ -156,15 +170,17 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 						</p>
 					))}
 			</SettingsSection>
-			<SettingsSection title={tu("settings.startCommand")} description={tu("settings.startCommandHint")} testId="runner-start">
-				<CopyBlock
-					value={runnerStartCommand(typeof window === "undefined" ? "" : window.location.origin, list[0]?.pool ?? "default")}
-					label={tu("settings.startCommand")}
-					testId="runner-start-command"
-				/>
-			</SettingsSection>
 			<div id="runner-token-setup" className="scroll-mt-6">
-				<RunnerTokensSection />
+				<DetailsDisclosure label={tl("runners.ownMachine")} testId="runner-own-machine" contentClassName="flex flex-col gap-12">
+					<SettingsSection title={tu("settings.startCommand")} description={tu("settings.startCommandHint")} testId="runner-start">
+						<CopyBlock
+							value={runnerStartCommand(typeof window === "undefined" ? "" : window.location.origin, list[0]?.pool ?? "default")}
+							label={tu("settings.startCommand")}
+							testId="runner-start-command"
+						/>
+					</SettingsSection>
+					<RunnerTokensSection />
+				</DetailsDisclosure>
 			</div>
 		</div>
 	);
@@ -172,8 +188,10 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 
 function RunnerTokensSection() {
 	const { t } = useTranslation("platform");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const { t: th } = useTranslation("hw05");
+	const [showRevoked, setShowRevoked] = useState(false);
 	const formId = useId();
 	const tokens = useListRunnerTokensQuery();
 	const [create, createState] = useCreateRunnerTokenMutation();
@@ -199,7 +217,8 @@ function RunnerTokensSection() {
 		}
 	};
 
-	const list = tokens.data?.tokens ?? [];
+	const all = tokens.data?.tokens ?? [];
+	const { shown: list, hidden } = splitRevoked(all, (tk) => tk.state === "active", showRevoked);
 	const writeError = (error: unknown, title: string, testId: string) =>
 		isRoleRefusal(session, error) ? (
 			<ForbiddenNote min="admin" error={error} testId={testId} />
@@ -311,63 +330,77 @@ function RunnerTokensSection() {
 					onRetry={() => void tokens.refetch()}
 					testId="runner-tokens-error"
 				/>
-			) : list.length === 0 ? (
+			) : all.length === 0 ? (
 				<EmptyNote testId="runner-tokens-empty">{t("settings.runners.tokensEmpty")}</EmptyNote>
 			) : (
 				<TableFrame testId="runner-tokens-table">
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>{t("settings.runners.tokenName")}</TableHead>
-								<TableHead>{t("settings.runners.pool")}</TableHead>
-								<TableHead>{t("settings.runners.prefix")}</TableHead>
-								<TableHead>{t("settings.runners.tokenState")}</TableHead>
-								<TableHead>{t("settings.runners.createdAt")}</TableHead>
-								<TableHead>{t("settings.runners.lastUsed")}</TableHead>
-								<TableHead className="text-right" />
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{list.map((token) => (
-								<TableRow key={token.id} data-testid={`runner-token-row-${token.id}`} data-state={token.state}>
-									<TableCell className="text-foreground font-medium">{token.name || "-"}</TableCell>
-									<TableCell>
-										<Badge variant="outline" className="font-mono">
-											{token.pool}
-										</Badge>
-									</TableCell>
-									<TableCell className="text-muted-foreground font-mono text-xs">hmr_{token.prefix}…</TableCell>
-									<TableCell>
-										<Badge variant={token.state === "active" ? "success" : token.state === "expired" ? "warning" : "outline"}>
-											{t(`settings.runners.tokenStates.${token.state}`)}
-										</Badge>
-									</TableCell>
-									<TableCell className="text-muted-foreground">
-										<When value={token.created_at} />
-									</TableCell>
-									<TableCell className="text-muted-foreground">
-										<When value={token.last_used_at} />
-									</TableCell>
-									<TableCell className="text-right">
-										{token.state === "active" && (
-											<ConfirmButton
-												label={t("settings.runners.revoke")}
-												question={t("settings.runners.confirmRevoke", {
-													pool: token.pool,
-												})}
-												confirmLabel={t("settings.runners.confirm")}
-												cancelLabel={t("settings.runners.cancel")}
-												onConfirm={() => void revoke(token.id)}
-												isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
-												testId={`runner-token-revoke-${token.id}`}
-											/>
-										)}
-									</TableCell>
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>{t("settings.runners.tokenName")}</TableHead>
+									<TableHead>{t("settings.runners.pool")}</TableHead>
+									<TableHead>{t("settings.runners.prefix")}</TableHead>
+									<TableHead>{t("settings.runners.tokenState")}</TableHead>
+									<TableHead>{t("settings.runners.createdAt")}</TableHead>
+									<TableHead>{t("settings.runners.lastUsed")}</TableHead>
+									<TableHead className="bg-card sticky right-0 text-right" />
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{list.map((token) => (
+									<TableRow key={token.id} data-testid={`runner-token-row-${token.id}`} data-state={token.state}>
+										<TableCell className="text-foreground font-medium">{token.name || "-"}</TableCell>
+										<TableCell>
+											<Badge variant="outline" className="font-mono">
+												{token.pool}
+											</Badge>
+										</TableCell>
+										<TableCell className="text-muted-foreground font-mono text-xs">hmr_{token.prefix}…</TableCell>
+										<TableCell>
+											<Badge variant={token.state === "active" ? "success" : token.state === "expired" ? "warning" : "outline"}>
+												{t(`settings.runners.tokenStates.${token.state}`)}
+											</Badge>
+										</TableCell>
+										<TableCell className="text-muted-foreground">
+											<When value={token.created_at} />
+										</TableCell>
+										<TableCell className="text-muted-foreground">
+											<When value={token.last_used_at} />
+										</TableCell>
+										<TableCell className="bg-card sticky right-0 text-right">
+											{token.state === "active" && (
+												<ConfirmButton
+													label={t("settings.runners.revoke")}
+													question={t("settings.runners.confirmRevoke", {
+														pool: token.pool,
+													})}
+													confirmLabel={t("settings.runners.confirm")}
+													cancelLabel={t("settings.runners.cancel")}
+													onConfirm={() =>
+														void revoke(token.id)
+															.unwrap()
+															.then(() => notify({ text: tl("toast.revoked", { name: token.pool }) }))
+															.catch(() => undefined)
+													}
+													isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
+													testId={`runner-token-revoke-${token.id}`}
+												/>
+											)}
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
 				</TableFrame>
+			)}
+			{hidden > 0 && (
+				<div>
+					<Button type="button" size="sm" variant="ghost" onClick={() => setShowRevoked((v) => !v)} dataTestId="runner-tokens-show-revoked">
+						{showRevoked ? tl("tokens.hideRevoked") : tl("tokens.showRevoked", { count: hidden })}
+					</Button>
+				</div>
 			)}
 			{revokeState.error && writeError(revokeState.error, t("settings.runners.revokeError"), "runner-token-revoke-error")}
 		</SettingsSection>

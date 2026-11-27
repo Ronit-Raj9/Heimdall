@@ -60,7 +60,7 @@
 		"title": "What your plan includes",
 		"private_benchmarks": "Private benchmarks",
 		"ci": "CI gate on pull requests",
-		"alerts": "Scheduled checks and alerts",
+		"alerts": "Checks and alerts",
 		"own_worker_support": "Own worker support",
 		"invoice_billing": "Invoice billing",
 		"included": "Included",

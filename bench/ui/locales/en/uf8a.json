@@ -1,0 +1,206 @@
+{
+	"settings": {
+		"section": "Section",
+		"tabKeys": "Model keys",
+		"tabAccount": "Password",
+		"groups": {
+			"models": "Models and spend",
+			"credentials": "Credentials",
+			"running": "Running",
+			"project": "Project",
+			"team": "Team",
+			"you": "You",
+			"server": "Server"
+		}
+	},
+	"kinds": {
+		"title": "Which one do I need?",
+		"colWhat": "What it is",
+		"colWho": "Who uses it",
+		"colWhere": "Where",
+		"keys": {
+			"name": "Model keys",
+			"what": "Your keys for AI model providers (OpenAI, Anthropic and others). Agents and graders use them to call models; the provider bills you.",
+			"who": "Agents and graders, during runs"
+		},
+		"secrets": {
+			"name": "Secrets",
+			"what": "Values your agent's tools need while a run is going, such as a web search key. Model provider keys do not go here.",
+			"who": "Your agent's tools, during runs"
+		},
+		"tokens": {
+			"name": "Access tokens",
+			"what": "Tokens that let your own scripts, CI and the SDK call Heimdall as you. Most people do not need one.",
+			"who": "Your scripts, CI and the SDK"
+		},
+		"runners": {
+			"name": "Worker tokens",
+			"what": "Where your runs execute: the shared worker, a cloud sandbox (Daytona, E2B, Modal), or your own machine. The tokens here only connect a worker.",
+			"who": "A worker you run yourself"
+		},
+		"here": "You are here"
+	},
+	"models": {
+		"deleteError": "Could not delete the key.",
+		"secretsHint": "Keys your agent's tools need, such as a web search key, are Secrets, not model keys.",
+		"yourKeys": "Your keys",
+		"browse": "Browse providers",
+		"browseMeta": "{{count}} providers",
+		"addKeyFor": "Add API key for {{provider}}",
+		"test": "Test (paid)",
+		"testKey": "Test key (paid, about $0.001)",
+		"testFor": "Test {{name}}, a paid call of about $0.001",
+		"testTitle": "A test sends one small paid call to the provider, about $0.001.",
+		"editFor": "Edit {{name}}",
+		"spent": "Spent this month (UTC): {{spent}} of {{budget}}",
+		"spentNoLimit": "Spent this month (UTC): {{spent}}",
+		"allModels_one": "All {{count}} {{provider}} model",
+		"allModels_other": "All {{count}} {{provider}} models",
+		"anyModel": "Every {{provider}} model",
+		"unlocks": "Leave Allowed models empty to unlock every {{provider}} model in the price list ({{count}}), for example {{first3}}.",
+		"unlocksAny": "Leave Allowed models empty to unlock every {{provider}} model.",
+		"storageHint": "Stored encrypted. Only the last 4 characters are shown again. Every member of this organization can run evaluations with it; only admins can change or delete it.",
+		"optional": "(optional)",
+		"labelPlaceholder": "e.g. team {{provider}} key",
+		"budgetHint": "0 means no limit. At the limit, runs on this key stop and the key shows 'over budget' until the 1st of next month (UTC).",
+		"mustBeZeroOrMore": "Must be 0 or more",
+		"moreOptions": "More options",
+		"savedLine": "Key {{name}} saved.",
+		"done": "Done",
+		"returnSaved": "Key saved.",
+		"returnAction": "Back to your evaluation",
+		"unavailableAdmin": "This server cannot save API keys yet. Admin: set HEIMDALL_MASTER_KEY and restart (see the hosting guide).",
+		"unavailableViewer": "This server cannot save API keys yet. The person who runs this server can turn it on.",
+		"whoRuns": "See who runs this server",
+		"keyMissing": "No working {{provider}} key. Add one in Settings > Model keys.",
+		"keyMissingAction": "Add a {{provider}} key"
+	},
+	"secrets": {
+		"nameUnusable": "Name not usable in agents",
+		"confirmRotate": "Replace the value of {{name}}? Runs that start after this use the new value; the old one cannot be recovered.",
+		"confirmRotateLabel": "Replace",
+		"description": "Values are encrypted and can never be read back, only replaced.",
+		"howAgentsRead": "How agents read secrets"
+	},
+	"tokens": {
+		"description": "A token can do only what its role and scope allow. Send it in the Authorization: Bearer header to the API at /api/v1.",
+		"showRevoked": "Show revoked ({{count}})",
+		"hideRevoked": "Hide revoked",
+		"newToken": "New token",
+		"neverExpires": "A token that never expires is risky if it leaks."
+	},
+	"runners": {
+		"ownMachine": "Use your own machine"
+	},
+	"usage": {
+		"period": "Period",
+		"presets": {
+			"month": "This month",
+			"lastMonth": "Last month",
+			"7d": "Last 7 days",
+			"30d": "Last 30 days",
+			"custom": "Custom"
+		},
+		"csv": "Download CSV",
+		"definition": "Spend: what the model calls for this organization's work cost, priced from the price list, counted on the day of the call, UTC.",
+		"cost": "Spend, {{from}} to {{to}}",
+		"costHint": "Priced from the price list. Runs on the shared key included.",
+		"keys": "Charged to your keys this month",
+		"keysHint": "What your key budgets count. Includes judges and authoring jobs.",
+		"keySpent": "Charged to this key this month",
+		"showEmpty_one": "Show {{count}} day without runs",
+		"showEmpty_other": "Show {{count}} days without runs",
+		"hideEmpty": "Hide days without runs"
+	},
+	"billing": {
+		"sharedRuns": "Runs on the shared worker"
+	},
+	"toast": {
+		"revoked": "{{name}} revoked. It stops working now."
+	},
+	"dialog": {
+		"close": "Close"
+	},
+	"unsaved": {
+		"title": "Leave without saving?",
+		"body": "You have changes on this page that are not saved. They are lost if you leave.",
+		"leave": "Leave",
+		"stay": "Stay"
+	},
+	"retention": {
+		"confirm_one": "Delete comparisons older than {{count}} day now? Comparisons and their runs older than that are deleted. This cannot be undone.",
+		"confirm_other": "Delete comparisons older than {{count}} days now? Comparisons and their runs older than that are deleted. This cannot be undone.",
+		"confirmLabel": "Delete older data",
+		"confirmTitle": "Shorten data retention?",
+		"confirmCount": "Keep comparisons for {{days}} days? This deletes about {{runs}} runs in {{experiments}} comparisons at the next sweep. This cannot be undone."
+	},
+	"org": {
+		"dangerBody": "These settings delete data. Each one asks before it does."
+	},
+	"kill": {
+		"stateOn": "New runs are stopped for every organization. Runs already going finish.",
+		"stateOff": "New runs are allowed.",
+		"stop": "Stop all new runs",
+		"allow": "Allow new runs again",
+		"confirmOff": "Allow new runs on the whole server again? Queued runs start at once."
+	},
+	"audit": {
+		"groups": {
+			"all": "All actions",
+			"members": "Members",
+			"keys": "Keys and tokens",
+			"releases": "Releases",
+			"runs": "Runs",
+			"settings": "Settings"
+		},
+		"includeReads": "Include reads",
+		"pageOnly": "Search covers the whole log. Type and group filters apply to the page in view.",
+		"noMatch": "No entries on this page match the filters.",
+		"clearFilters": "Clear filters",
+		"details": "Details",
+		"verbs": {
+			"read": "{{actor}} opened {{what}} {{target}}",
+			"readNoTarget": "{{actor}} opened {{what}}",
+			"list": "{{actor}} listed {{what}}",
+			"listNoTarget": "{{actor}} listed {{what}}",
+			"view": "{{actor}} viewed {{what}} {{target}}",
+			"viewNoTarget": "{{actor}} viewed {{what}}",
+			"export": "{{actor}} exported {{what}} {{target}}",
+			"exportNoTarget": "{{actor}} exported {{what}}",
+			"create": "{{actor}} created {{what}} {{target}}",
+			"createNoTarget": "{{actor}} created {{what}}",
+			"update": "{{actor}} changed {{what}} {{target}}",
+			"updateNoTarget": "{{actor}} changed {{what}}",
+			"delete": "{{actor}} deleted {{what}} {{target}}",
+			"deleteNoTarget": "{{actor}} deleted {{what}}",
+			"revoke": "{{actor}} revoked {{what}} {{target}}",
+			"revokeNoTarget": "{{actor}} revoked {{what}}",
+			"role": "{{actor}} changed the role of {{target}}",
+			"roleNoTarget": "{{actor}} changed a {{what}} role",
+			"register": "{{actor}} registered {{what}} {{target}}",
+			"registerNoTarget": "{{actor}} registered {{what}}",
+			"invite": "{{actor}} invited {{target}}",
+			"inviteNoTarget": "{{actor}} sent an invitation",
+			"accept": "{{actor}} accepted {{what}} {{target}}",
+			"acceptNoTarget": "{{actor}} accepted {{what}}",
+			"remove": "{{actor}} removed {{what}} {{target}}",
+			"removeNoTarget": "{{actor}} removed {{what}}",
+			"rename": "{{actor}} renamed {{what}} {{target}}",
+			"renameNoTarget": "{{actor}} renamed {{what}}",
+			"login": "{{actor}} signed in",
+			"loginNoTarget": "{{actor}} signed in",
+			"logout": "{{actor}} signed out",
+			"logoutNoTarget": "{{actor}} signed out",
+			"other": "{{actor}}: {{action}} {{target}}"
+		},
+		"onlyReads": "This page has only reads. Include reads to see them."
+	},
+	"github": {
+		"reconnect": "Reconnect GitHub",
+		"disconnected": "GitHub disconnected.",
+		"disconnectError": "Could not disconnect GitHub."
+	},
+	"members": {
+		"inviteValid": "The link works once and expires"
+	}
+}

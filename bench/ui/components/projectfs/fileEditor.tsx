@@ -1,4 +1,5 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
+import { useUnsavedGuard } from "@/components/settings/useUnsavedGuard";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -86,6 +87,7 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 	const loadError = file.error && !missing ? getBenchErrorMessage(file.error) : null;
 
 	const dirty = !binary && text !== loadedText;
+	useUnsavedGuard(dirty);
 	const segments = path.split("/");
 
 	return (
@@ -101,8 +103,8 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 						</span>
 					))}
 					{dirty && (
-						<span className="ml-1 flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">
-							<span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+						<span className="bg-chart-warning/10 text-chart-warning-ink ml-1 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs">
+							<span className="bg-chart-warning size-1.5 rounded-full" aria-hidden="true" />
 							{t("editor.unsaved")}
 						</span>
 					)}

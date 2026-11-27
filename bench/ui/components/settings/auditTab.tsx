@@ -6,7 +6,7 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { auditExportUrl, useVerifyAuditMutation } from "@/lib/store/apis/dataOpsApi";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
 import type { AuditVerifyResult } from "@/lib/types/dataops";
-import type { AuditEntry, AuditList, Member, OrgSummary } from "@/lib/types/bench";
+import type { AuditEntry, AuditList, AuditLogParams, Member, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
 	Bot,
@@ -22,10 +22,13 @@ import {
 	UserRound,
 	type LucideIcon,
 } from "lucide-react";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { formatWhen } from "../platform/platform.utils";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
 import "./w4m8I18n";
+import "./uf8aI18n";
 
 /** Rows per page of the audit log. */
 export const AUDIT_PAGE_SIZE = 50;
@@ -174,45 +177,139 @@ function AuditTools({ org, filters }: { org: OrgSummary; filters: { action?: str
 	);
 }
 
+/** Action groups of the filter, by the first part of an action id ("member.role" is Members). */
+export const AUDIT_GROUPS = {
+	members: ["member", "members", "invite", "invites", "invitation", "invitations"],
+	keys: ["key", "keys", "model", "models", "token", "tokens", "secret", "secrets", "runner_token", "runner_tokens"],
+	releases: ["release", "releases"],
+	runs: ["run", "runs", "experiment", "experiments", "evaluation", "evaluations", "runner", "runners"],
+	settings: ["org", "orgs", "settings", "retention", "billing", "prompt_logs", "github", "integration", "integrations"],
+} as const;
+export type AuditGroup = keyof typeof AUDIT_GROUPS;
+
+/** True for an entry that only read something (its action ends in ".read" or ".list"). */
+export function isReadAction(action: string): boolean {
+	return /\.(read|list|view|export)$/.test(action);
+}
+
+/** The group of an action id, or undefined when it is in none. */
+export function auditGroupOf(action: string): AuditGroup | undefined {
+	const head = action.split(".")[0] ?? "";
+	return (Object.keys(AUDIT_GROUPS) as AuditGroup[]).find((g) => (AUDIT_GROUPS[g] as readonly string[]).includes(head));
+}
+
+/** Rows kept by the page's own filters: changes only unless reads are included, and the action group. */
+export function filterAuditView(rows: readonly AuditEntry[], opts: { reads: boolean; group: AuditGroup | "all" }): AuditEntry[] {
+	return rows.filter(
+		(row) => (opts.reads || !isReadAction(row.action)) && (opts.group === "all" || auditGroupOf(row.action) === opts.group),
+	);
+}
+
+/** The verb of an action id in words: its last part ("member.role" is "role", "runs.diff.read" is "read"). */
+const VERBS = [
+	"read",
+	"list",
+	"view",
+	"export",
+	"create",
+	"update",
+	"delete",
+	"revoke",
+	"role",
+	"register",
+	"invite",
+	"accept",
+	"remove",
+	"rename",
+	"login",
+	"logout",
+] as const;
+
 /**
- * The organization's audit log, newest first: who did what to which target, when and from where.
- * The action filter runs on the server; actor type and free text filter the page in view. Pages go
- * back in time with the server's opaque cursor.
+ * One entry as a sentence: "{{actor}} opened diff of runs r_1". The verb comes from the action's
+ * last part, the object from the parts before it; an action the page does not know falls back to
+ * "{{actor}} did <action>".
+ */
+export function auditSentence(t: AuditT, row: AuditEntry, actor: string): string {
+	const parts = row.action.split(".");
+	const verb = parts[parts.length - 1] ?? "";
+	const what = parts.slice(0, -1).join(" ").replace(/_/g, " ");
+	const target = row.target_id || "";
+	const vars = { actor, what, target } as unknown as { defaultValue?: string };
+	const text = (VERBS as readonly string[]).includes(verb)
+		? t(`audit.verbs.${verb}${target ? "" : "NoTarget"}`, { ns: "uf8a", ...vars })
+		: t("audit.verbs.other", { ns: "uf8a", ...vars, action: row.action } as unknown as { defaultValue?: string });
+	return text.replace(/\s+/g, " ").trim();
+}
+
+/** Older than a day: the absolute time reads better than "3 weeks ago". */
+export function auditAbsolute(at: AuditEntry["at"], now = Date.now()): boolean {
+	const ms = typeof at === "string" ? Date.parse(at) : typeof at === "number" ? at : NaN;
+	return Number.isFinite(ms) && now - ms > 24 * 3600 * 1000;
+}
+
+function AuditTime({ at }: { at: AuditEntry["at"] }) {
+	const { i18n } = useTranslation();
+	if (!auditAbsolute(at)) return <When value={at} />;
+	const abs = formatWhen(at, i18n.language) ?? "";
+	return <time title={abs}>{abs}</time>;
+}
+
+/** The audit list request: page, size and the trimmed search text as `q` when there is one. */
+export function auditParams(orgId: string, cursor: string | undefined, text: string): AuditLogParams {
+	const q = text.trim();
+	const params: AuditLogParams & { q?: string } = { orgId, cursor, limit: AUDIT_PAGE_SIZE, ...(q ? { q } : {}) };
+	return params;
+}
+
+/**
+ * The organization's audit log, newest first: who did what to which target, when and from where,
+ * as sentences with the raw action, route and address behind "Details". Changes only by default.
+ * Actor type, action group and free text filter the page in view and live in the URL; pages go back
+ * in time with the server's opaque cursor.
  */
 export function AuditTab({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
+	const { t: tf } = useTranslation("uf8a");
 	const formId = useId();
-	const [actionInput, setActionInput] = useState("");
-	const [action, setAction] = useState("");
-	const [actor, setActor] = useState<ActorFilter>("all");
-	const [text, setText] = useState("");
+	const search = useSearch({ strict: false }) as { q?: unknown; actor?: unknown; group?: unknown; reads?: unknown };
+	const navigate = useNavigate();
+	const actor: ActorFilter =
+		typeof search.actor === "string" && (ACTOR_TYPES as readonly string[]).includes(search.actor) ? (search.actor as ActorFilter) : "all";
+	const group: AuditGroup | "all" = typeof search.group === "string" && search.group in AUDIT_GROUPS ? (search.group as AuditGroup) : "all";
+	const reads = search.reads === "1" || search.reads === 1 || search.reads === true;
+	const urlText = typeof search.q === "string" ? search.q : "";
+	const [text, setText] = useState(urlText);
+	useEffect(() => setText(urlText), [urlText]);
+	const setSearch = (patch: Record<string, string | undefined>) =>
+		void navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, ...patch })) as never, replace: true });
 	// Cursors of the pages seen so far: [undefined] is the newest page.
 	const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
 	const cursor = cursors[cursors.length - 1];
-	const audit = useGetAuditLogQuery({
-		orgId: org.id,
-		action: action || undefined,
-		cursor,
-		limit: AUDIT_PAGE_SIZE,
-	});
+	// The text also goes to the server (G1 `q`, M8-53), which searches the whole log; a server
+	// without it ignores `q` and the text still filters the page in view below.
+	const audit = useGetAuditLogQuery(auditParams(org.id, cursor, urlText));
 	// Users read as their member name, never their address (both are admin routes, like this tab).
 	const members = useListMembersQuery(org.id);
 	const people = members.data?.members ?? [];
 	const tl = t as unknown as AuditT;
+	const tx = tf as unknown as AuditT;
 	const rows = audit.data?.entries ?? [];
-	const shown = useMemo(() => filterAuditRows(rows, actor, text), [rows, actor, text]);
+	const shown = useMemo(
+		() => filterAuditView(filterAuditRows(rows, actor, urlText), { reads, group }),
+		[rows, actor, urlText, reads, group],
+	);
 	const next = nextAuditCursor(audit.data);
+	const filtered = actor !== "all" || group !== "all" || Boolean(urlText.trim());
 
 	const apply = (event: FormEvent) => {
 		event.preventDefault();
-		setAction(actionInput.trim());
+		setSearch({ q: text.trim() || undefined });
 		setCursors([undefined]);
 	};
 	const clear = () => {
-		setActionInput("");
-		setAction("");
-		setActor("all");
 		setText("");
+		setSearch({ q: undefined, actor: undefined, group: undefined });
 		setCursors([undefined]);
 	};
 
@@ -222,25 +319,27 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 			description={t("settings.audit.description", { org: org.name })}
 			testId="settings-audit"
 		>
-			<AuditTools org={org} filters={{ action: action || undefined, actor: actor === "all" ? undefined : actor, q: text }} />
+			<AuditTools org={org} filters={{ actor: actor === "all" ? undefined : actor, q: urlText }} />
 			<form className="flex flex-wrap items-end gap-3" onSubmit={apply} data-testid="audit-filters">
-				<div className="flex min-w-48 flex-col gap-1.5">
-					<label htmlFor={`${formId}-action`} className="text-[13px] font-medium">
-						{t("settings.audit.filterAction")}
-					</label>
-					<Input
-						id={`${formId}-action`}
-						className="h-9 font-mono"
-						placeholder={t("settings.audit.filterActionPlaceholder")}
-						title={t("settings.audit.actionHint")}
-						value={actionInput}
-						onChange={(event) => setActionInput(event.target.value)}
-						data-testid="audit-action"
-					/>
+				<div className="flex flex-col gap-1.5">
+					<span className="text-[13px] font-medium">{t("settings.audit.filterAction")}</span>
+					<Select value={group} onValueChange={(value) => setSearch({ group: value === "all" ? undefined : value })}>
+						<SelectTrigger className="min-w-36" aria-label={t("settings.audit.filterAction")} data-testid="audit-action">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent position="popper">
+							<SelectItem value="all">{tf("audit.groups.all")}</SelectItem>
+							{(Object.keys(AUDIT_GROUPS) as AuditGroup[]).map((g) => (
+								<SelectItem key={g} value={g}>
+									{tf(`audit.groups.${g}`)}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 				<div className="flex flex-col gap-1.5">
 					<span className="text-[13px] font-medium">{t("settings.audit.filterActorType")}</span>
-					<Select value={actor} onValueChange={(value) => setActor(value as ActorFilter)}>
+					<Select value={actor} onValueChange={(value) => setSearch({ actor: value === "all" ? undefined : value })}>
 						<SelectTrigger className="min-w-32" aria-label={t("settings.audit.filterActorType")} data-testid="audit-actor">
 							<SelectValue />
 						</SelectTrigger>
@@ -281,14 +380,39 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 						{t("settings.audit.clear")}
 					</Button>
 				</div>
+				<label className="flex h-9 items-center gap-2 text-sm">
+					<input
+						type="checkbox"
+						checked={reads}
+						onChange={(event) => setSearch({ reads: event.target.checked ? "1" : undefined })}
+						data-testid="audit-reads"
+					/>
+					{tf("audit.includeReads")}
+				</label>
 			</form>
+			<p className="text-muted-foreground text-xs">{tf("audit.pageOnly")}</p>
 
 			{audit.isLoading ? (
 				<BlockSkeleton rows={6} testId="audit-loading" />
 			) : audit.isError || !audit.data ? (
 				<LoadError title={t("settings.audit.loadError")} error={audit.error} onRetry={() => void audit.refetch()} testId="audit-error" />
-			) : shown.length === 0 ? (
+			) : rows.length === 0 ? (
 				<EmptyNote testId="audit-empty">{t("settings.audit.empty")}</EmptyNote>
+			) : shown.length === 0 ? (
+				<div className="flex flex-wrap items-center gap-3" data-testid="audit-no-match">
+					<EmptyNote testId="audit-empty">{filtered ? tf("audit.noMatch") : tf("audit.onlyReads")}</EmptyNote>
+					{filtered ? (
+						<Button type="button" size="sm" variant="outline" onClick={clear} dataTestId="audit-no-match-clear">
+							{tf("audit.clearFilters")}
+						</Button>
+					) : (
+						!reads && (
+							<Button type="button" size="sm" variant="outline" onClick={() => setSearch({ reads: "1" })} dataTestId="audit-no-match-reads">
+								{tf("audit.includeReads")}
+							</Button>
+						)
+					)}
+				</div>
 			) : (
 				<ol className={cn("relative flex flex-col", audit.isFetching && "opacity-60")} data-testid="audit-table">
 					{shown.map((row, i) => {
@@ -303,22 +427,23 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 									<Icon className="size-4" aria-hidden="true" />
 								</span>
 								<div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
-									<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-										<span className="text-foreground max-w-64 truncate font-medium" title={row.actor_id}>
-											{who}
+									<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+										<span className="text-foreground min-w-0 break-words" title={row.actor_id}>
+											{auditSentence(tx, row, who)}
 										</span>
-										<code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-xs">{row.action}</code>
-										{target && (
-											<span className="text-muted-foreground max-w-64 truncate font-mono text-xs" title={target}>
-												{target}
-											</span>
-										)}
 										<span className="text-muted-foreground ml-auto text-xs">
-											<When value={row.at} />
+											<AuditTime at={row.at} />
 										</span>
 									</div>
-									{(details || row.ip) && (
-										<div className="text-muted-foreground flex min-w-0 flex-wrap gap-x-3 font-mono text-xs">
+									<details className="text-muted-foreground text-xs">
+										<summary className="w-fit cursor-pointer select-none">{tf("audit.details")}</summary>
+										<div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-1 font-mono">
+											<code className="bg-muted text-foreground rounded px-1.5 py-0.5">{row.action}</code>
+											{target && (
+												<span className="max-w-full truncate" title={target}>
+													{target}
+												</span>
+											)}
 											{details && (
 												<span className="max-w-full truncate" title={details}>
 													{details}
@@ -326,7 +451,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 											)}
 											{row.ip && <span>{row.ip}</span>}
 										</div>
-									)}
+									</details>
 								</div>
 							</li>
 						);

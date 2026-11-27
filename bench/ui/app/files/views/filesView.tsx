@@ -4,6 +4,7 @@ import { SyncCard } from "@/components/projectfs/syncCard";
 import { LoadError } from "@/components/runs/screenStates";
 import "@/components/settings/w4m8I18n";
 import { EmptyState } from "@/components/shell/emptyState";
+import { useEmbedded } from "@/components/shell/embedded";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +71,7 @@ export default function FilesView() {
 	const { t } = useTranslation(FILES_NS);
 	const { t: tm } = useTranslation("w4m8");
 	const session = useSession();
+	const embedded = useEmbedded();
 	const canWrite = canUse(session, "member");
 	const search = useSearch({ strict: false }) as { area?: string; dir?: string; path?: string };
 	const navigate = useNavigate();
@@ -111,19 +113,17 @@ export default function FilesView() {
 	const crumbs = dir ? dir.split("/") : [];
 
 	return (
-		<div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 p-6" data-testid="files-view">
-			<PageHeader
-				title={t("title")}
-				subtitle={t("subtitle")}
-				actions={
-					<Button asChild size="sm" variant="outline">
-						<a href={projectExportUrl()} data-testid="files-export">
-							<Download className="size-4" aria-hidden="true" />
-							{t("export")}
-						</a>
-					</Button>
-				}
-			/>
+		<div className={cn("mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="files-view">
+			{/* The action sits beside the header, not inside it, so a narrow screen stacks them instead of squeezing the title. */}
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<PageHeader title={t("title")} subtitle={t("subtitle")} className="mb-0 min-w-0 flex-1" />
+				<Button asChild size="sm" variant="outline" className="self-start">
+					<a href={projectExportUrl()} data-testid="files-export">
+						<Download className="size-4" aria-hidden="true" />
+						{t("export")}
+					</a>
+				</Button>
+			</div>
 			{!canWrite && (
 				<p className="text-muted-foreground flex items-center gap-2 text-sm">
 					<Lock className="size-3.5" aria-hidden="true" />

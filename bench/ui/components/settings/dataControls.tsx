@@ -1,4 +1,5 @@
 import { ForbiddenNote, RoleNote, isRoleRefusal } from "@/components/platform/accessNotes";
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,20 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
 import "@/components/calibration/hw04I18n";
+import "./uf8aI18n";
+import { useUnsavedGuard } from "./useUnsavedGuard";
+import { previewOf, useLazyGetRetentionPreviewQuery } from "./retentionPreviewApi";
+import { formatCount } from "@/lib/numbers";
+import { Dialog } from "@/components/ui/dialog";
+
+/**
+ * True when a new retention deletes runs that the old one keeps: any limit after "forever" (0),
+ * or fewer days than before. Saving such a change asks first.
+ */
+export function retentionShrinks(oldDays: number, newDays: number): boolean {
+	if (newDays <= 0) return false;
+	return oldDays <= 0 || newDays < oldDays;
+}
 
 /** The preset retention choices in days; 0 keeps everything forever. */
 export const RETENTION_PRESETS = [0, 30, 90, 180, 365] as const;
@@ -69,13 +84,16 @@ export function RetentionSection() {
 export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	const { t } = useTranslation("platform");
 	const { t: tHw04 } = useTranslation("hw04");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
+	const confirm = useConfirm();
 	const formId = useId();
 	const canEdit = canUse(session, "admin");
 	const [choice, setChoice] = useState(retentionChoice(policy.run_days));
 	const [custom, setCustom] = useState(choice === "custom" ? String(policy.run_days) : "");
 	const [saved, setSaved] = useState(false);
 	const [save, state] = useSetRetentionMutation();
+	const [fetchPreview] = useLazyGetRetentionPreviewQuery();
 	useEffect(() => {
 		const next = retentionChoice(policy.run_days);
 		setChoice(next);
@@ -83,10 +101,24 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	}, [policy.run_days]);
 	const days = retentionDays(choice, custom, policy);
 	const changed = days !== null && days !== policy.run_days;
+	useUnsavedGuard(canEdit && changed && !saved);
 
 	const onSave = async (event: FormEvent) => {
 		event.preventDefault();
 		if (days === null || !changed) return;
+		// A shorter retention deletes old comparisons at the next sweep: say so and ask first.
+		// The dry run count is shown when the server sends it; without it the plain question stays.
+		if (retentionShrinks(policy.run_days, days)) {
+			const preview = await fetchPreview(days)
+				.unwrap()
+				.then((answer) => previewOf(answer, days))
+				.catch(() => null);
+			const question = preview
+				? tl("retention.confirmCount", { days, runs: formatCount(preview.runs), experiments: formatCount(preview.experiments) })
+				: tl("retention.confirm", { count: days });
+			if (!(await confirm(question, { title: tl("retention.confirmTitle"), confirmLabel: tl("retention.confirmLabel"), destructive: true })))
+				return;
+		}
 		try {
 			await save(days).unwrap();
 			setSaved(true);
@@ -215,22 +247,14 @@ export function DeleteOrgRow({ info }: { info: OrgInfo }) {
 export function DeleteOrgDialog({ info, onClose }: { info: OrgInfo; onClose(): void }) {
 	const { t } = useTranslation("platform");
 	const session = useSession();
-	const titleId = useId();
+	const { t: tl } = useTranslation("uf8a");
+	const formId = useId();
 	const inputId = useId();
 	const inputRef = useRef<HTMLInputElement>(null);
 	const [typed, setTyped] = useState("");
 	const [remove, state] = useDeleteOrgMutation();
 	const [switchOrg] = useSwitchOrgMutation();
 	const matches = typed === info.slug;
-	useEffect(() => {
-		inputRef.current?.focus();
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && !state.isLoading) onClose();
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose, state.isLoading]);
-
 	const onDelete = async (event: FormEvent) => {
 		event.preventDefault();
 		if (!matches) return;
@@ -249,26 +273,22 @@ export function DeleteOrgDialog({ info, onClose }: { info: OrgInfo; onClose(): v
 		}
 	};
 
+	const close = (open: boolean) => {
+		if (!open && !state.isLoading) onClose();
+	};
 	return (
-		<div
-			className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-			data-testid="org-delete-backdrop"
-			onMouseDown={(event) => {
-				if (event.target === event.currentTarget && !state.isLoading) onClose();
-			}}
+		<Dialog
+			open
+			onOpenChange={close}
+			role="alertdialog"
+			size="sm"
+			title={t("settings.org.deleteDialogTitle", { org: info.name })}
+			description={t("settings.org.deleteDialogBody")}
+			closeLabel={tl("dialog.close")}
+			initialFocus={inputRef}
+			testId="org-delete-dialog"
 		>
-			<form
-				role="alertdialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-card text-card-foreground w-full max-w-md space-y-4 rounded-lg border p-5 text-left shadow-lg"
-				onSubmit={(event) => void onDelete(event)}
-				data-testid="org-delete-dialog"
-			>
-				<h2 id={titleId} className="text-sm font-semibold">
-					{t("settings.org.deleteDialogTitle", { org: info.name })}
-				</h2>
-				<p className="text-muted-foreground text-sm">{t("settings.org.deleteDialogBody")}</p>
+			<form id={formId} className="space-y-4" onSubmit={(event) => void onDelete(event)} data-testid="org-delete-form">
 				<div className="flex flex-col gap-1.5">
 					<label htmlFor={inputId} className="text-[13px] font-medium">
 						{t("settings.org.deleteTypeSlug", { slug: info.slug })}
@@ -294,6 +314,6 @@ export function DeleteOrgDialog({ info, onClose }: { info: OrgInfo; onClose(): v
 					</Button>
 				</div>
 			</form>
-		</div>
+		</Dialog>
 	);
 }

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useGetBillingUsageQuery } from "@/lib/store/apis/billingApi";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import "@/components/settings/uf8aI18n";
 
 /**
  * Usage tab, hosted only: what the org used of Heimdall itself per day (shared worker minutes,
@@ -13,13 +14,16 @@ import { useTranslation } from "react-i18next";
  */
 export function BillingUsageSection({ from, to }: { from: string; to: string }) {
 	const { t } = useTranslation("billing");
+	const { t: tl } = useTranslation("uf8a");
 	const usage = useGetBillingUsageQuery({ from, to });
 	if (usage.isLoading) return null;
 	if (usage.isError || !usage.data) {
 		return <LoadError title={t("usage.error")} error={usage.error} onRetry={() => void usage.refetch()} testId="billing-usage-error" />;
 	}
 	const rep = usage.data;
-	const days = rep.days.filter((d) => d.shared_worker_minutes > 0 || d.runs > 0 || d.evaluations > 0 || d.operator_judge_calls > 0).reverse();
+	const days = rep.days
+		.filter((d) => d.shared_worker_minutes > 0 || d.runs > 0 || d.evaluations > 0 || d.operator_judge_calls > 0)
+		.reverse();
 	return (
 		<Card data-testid="billing-usage">
 			<CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
@@ -27,14 +31,19 @@ export function BillingUsageSection({ from, to }: { from: string; to: string }) 
 					<CardTitle>{t("usage.title")}</CardTitle>
 					<p className="text-muted-foreground text-[13px]">{t("usage.description")}</p>
 				</div>
-				<Link to="/settings" search={{ tab: "billing" }} className="text-primary text-sm underline-offset-2 hover:underline" data-testid="billing-usage-plan">
+				<Link
+					to="/settings"
+					search={{ tab: "billing" }}
+					className="text-primary text-sm underline-offset-2 hover:underline"
+					data-testid="billing-usage-plan"
+				>
 					{t("usage.plan")}
 				</Link>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				<dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4" data-testid="billing-usage-totals">
 					<Total label={t("usage.minutes")} value={formatWhole(rep.totals.shared_worker_minutes)} />
-					<Total label={t("usage.runs")} value={formatWhole(rep.totals.runs)} />
+					<Total label={tl("billing.sharedRuns")} value={formatWhole(rep.totals.runs)} />
 					<Total label={t("usage.evaluations")} value={formatWhole(rep.totals.evaluations)} />
 					<Total label={t("usage.storageNow")} value={rep.storage_bytes === undefined ? "-" : formatBytes(rep.storage_bytes)} />
 				</dl>
@@ -50,7 +59,7 @@ export function BillingUsageSection({ from, to }: { from: string; to: string }) 
 								<TableRow>
 									<TableHead>{t("usage.day")}</TableHead>
 									<TableHead className="text-right">{t("usage.minutes")}</TableHead>
-									<TableHead className="text-right">{t("usage.runs")}</TableHead>
+									<TableHead className="text-right">{tl("billing.sharedRuns")}</TableHead>
 									<TableHead className="text-right">{t("usage.evaluations")}</TableHead>
 									<TableHead className="text-right">{t("usage.storage")}</TableHead>
 									<TableHead className="text-right">{t("usage.judge")}</TableHead>
@@ -63,7 +72,9 @@ export function BillingUsageSection({ from, to }: { from: string; to: string }) 
 										<TableCell className="text-right tabular-nums">{formatWhole(d.shared_worker_minutes)}</TableCell>
 										<TableCell className="text-right tabular-nums">{formatWhole(d.runs)}</TableCell>
 										<TableCell className="text-right tabular-nums">{formatWhole(d.evaluations)}</TableCell>
-										<TableCell className="text-right tabular-nums">{d.storage_bytes === undefined ? "-" : formatBytes(d.storage_bytes)}</TableCell>
+										<TableCell className="text-right tabular-nums">
+											{d.storage_bytes === undefined ? "-" : formatBytes(d.storage_bytes)}
+										</TableCell>
 										<TableCell className="text-right tabular-nums">{formatWhole(d.operator_judge_calls)}</TableCell>
 									</TableRow>
 								))}

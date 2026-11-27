@@ -4,7 +4,7 @@ import type { WorkerPlatform } from "@/lib/store/apis/workerPlatformsApi";
 import { platformStatusTone } from "@/lib/store/apis/workerPlatformsApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PlatformCard, connectHint, platformsOff } from "./workerPlatformsSection";
+import { PlatformCard, connectHint, endpointPlaceholder, platformsOff } from "./workerPlatformsSection";
 
 const noop = () => {};
 const base: WorkerPlatform = {
@@ -44,7 +44,9 @@ describe("PlatformCard", () => {
 		expect(html).toContain('data-testid="platform-modal-default"');
 		expect(html).toContain("Working");
 		expect(html).toContain('data-testid="platform-modal-test"');
-		expect(html).toContain('data-testid="platform-modal-disconnect"');
+		// Replace token and Disconnect sit behind "More actions" (X-58).
+		expect(html).toContain('data-testid="platform-modal-more"');
+		expect(html).not.toContain('data-testid="platform-modal-disconnect"');
 		expect(html).not.toContain("platform-modal-make-default");
 		expect(html).not.toContain("platform-modal-form");
 	});
@@ -53,7 +55,8 @@ describe("PlatformCard", () => {
 		const html = card({ ...base, connected: true, status: "invalid" }, { error: "the platform refused the token" });
 		expect(html).toContain('data-testid="platform-modal-make-default"');
 		expect(html).toContain("Token refused");
-		expect(html).toContain("Could not update Modal: the platform refused the token");
+		expect(html).toContain("Could not update Modal");
+		expect(html).toContain('data-testid="platform-modal-error"');
 	});
 
 	it("uses plain words, no em dashes", () => {
@@ -78,11 +81,12 @@ describe("helpers", () => {
 		expect(platformsOff({ status: 500 })).toBe(false);
 	});
 });
-describe("why Test and connect is disabled (N14)", () => {
-	it("says what to paste while the button is disabled", () => {
+describe("what Test and connect still needs (N14)", () => {
+	it("says what to paste; the button stays enabled and checks on press (M8-33)", () => {
 		const html = card(base);
 		expect(html).toContain("Paste the token to test it.");
 		expect(html).toContain('aria-describedby="');
+		expect(html.match(/<button[^>]*platform-modal-connect[^>]*>/)?.[0]).not.toContain('disabled=""');
 		const needsEndpoint = card({ ...base, name: "daytona", title: "Daytona", endpoint_label: "API URL", endpoint_required: true });
 		expect(needsEndpoint).toContain("Paste the token and the endpoint to test them.");
 	});
@@ -93,5 +97,15 @@ describe("why Test and connect is disabled (N14)", () => {
 		expect(connectHint("tok", "", true)).toBe("needTokenAndEndpoint");
 		expect(connectHint("tok", "", false)).toBeUndefined();
 		expect(connectHint("tok", "https://x", true)).toBeUndefined();
+	});
+});
+describe("self-hosted address example (X-60)", () => {
+	it("uses the server's example, else the catalog's per platform", () => {
+		expect(endpointPlaceholder({ name: "daytona", endpoint_placeholder: "https://d.example/api" }, () => "x")).toBe(
+			"https://d.example/api",
+		);
+		expect(endpointPlaceholder({ name: "e2b" }, (n) => `fallback-${n}`)).toBe("fallback-e2b");
+		const html = card({ ...base, name: "daytona", title: "Daytona", endpoint_label: "API URL" });
+		expect(html).toContain('placeholder="https://daytona.example.com/api"');
 	});
 });

@@ -26,6 +26,19 @@ import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles, mayManage } from "./settingsBits";
 import "./hw03I18n";
+import "./uf8aI18n";
+
+/** Whether any member row has an action for the caller (remove, change role, reset link); none hides the column. */
+export function membersHaveActions(
+	list: readonly Pick<Member, "user_id" | "role">[],
+	selfId: string | undefined,
+	callerRole: Role | undefined,
+	isAdmin: boolean,
+	isOwner: boolean,
+): boolean {
+	if (!isAdmin) return false;
+	return list.some((m) => m.user_id !== selfId && (isOwner || mayManage(callerRole, m.role)));
+}
 import "@/components/shell/w4b07I18n";
 
 /** The link an invitation token opens, on this site. */
@@ -70,6 +83,7 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 	};
 
 	const list = members.data?.members ?? [];
+	const showActions = membersHaveActions(list, session.user?.id, session.role, isAdmin, isOwner);
 	return (
 		<div className="flex flex-col gap-10" data-testid="settings-members">
 			<SettingsSection
@@ -104,13 +118,13 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 				) : (
 					<TableFrame testId="members-table">
 						<Table>
-							<TableHeader>
+							<TableHeader className="max-sm:hidden">
 								<TableRow>
 									{/* Wave 4, N33: only admins see the members' addresses. */}
 									<TableHead>{isAdmin ? t("settings.members.email") : tw("members.person")}</TableHead>
 									<TableHead>{t("settings.members.role")}</TableHead>
 									<TableHead>{t("settings.members.since")}</TableHead>
-									{isAdmin && <TableHead className="text-right">{t("settings.members.actions")}</TableHead>}
+									{showActions && <TableHead className="text-right">{t("settings.members.actions")}</TableHead>}
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -121,6 +135,7 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 										org={org}
 										isSelf={member.user_id === session.user?.id}
 										isAdmin={isAdmin}
+										showActions={showActions}
 										callerRole={session.role}
 										canReset={isOwner && member.user_id !== session.user?.id}
 										onResetLink={() => void onResetLink(member.user_id)}
@@ -160,6 +175,7 @@ function MemberRow({
 	org,
 	isSelf,
 	isAdmin,
+	showActions = isAdmin,
 	callerRole,
 	onRole,
 	onRemove,
@@ -172,6 +188,8 @@ function MemberRow({
 	org: OrgSummary;
 	isSelf: boolean;
 	isAdmin: boolean;
+	/** The Actions column: only when some row of the list has an action (a one-owner org has none). */
+	showActions?: boolean;
 	callerRole: Role | undefined;
 	onRole: (role: Role) => void;
 	onRemove: () => void;
@@ -186,18 +204,19 @@ function MemberRow({
 	// The caller manages a member only when it holds at least the member's role; never itself here.
 	const manageable = isAdmin && !isSelf && mayManage(callerRole, member.role);
 	return (
-		<TableRow data-testid={`member-row-${member.user_id}`}>
-			<TableCell className="max-w-80">
+		<TableRow
+			data-testid={`member-row-${member.user_id}`}
+			className="max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:py-2"
+		>
+			<TableCell className="max-w-80 max-sm:w-full max-sm:max-w-none">
 				<div className="flex min-w-0 flex-col">
 					<span className="text-foreground flex items-center gap-2 truncate font-medium">
 						{member.name || (isAdmin ? member.email : tw("members.someone"))}
 						{isSelf && (
-							<span className="bg-primary/10 text-primary rounded-sm px-1 py-px text-[10.5px] font-semibold tracking-wide uppercase">
-								{t("settings.members.you")}
-							</span>
+							<span className="bg-muted text-muted-foreground rounded-sm px-1 py-px text-xs font-medium">{t("settings.members.you")}</span>
 						)}
 					</span>
-					{isAdmin && member.name && <span className="text-muted-foreground truncate font-mono text-xs">{member.email}</span>}
+					{isAdmin && member.name && <span className="text-muted-foreground truncate text-[13px]">{member.email}</span>}
 				</div>
 			</TableCell>
 			<TableCell>
@@ -217,8 +236,8 @@ function MemberRow({
 			<TableCell className="text-muted-foreground">
 				<When value={member.created_at} />
 			</TableCell>
-			{isAdmin && (
-				<TableCell className="text-right">
+			{showActions && (
+				<TableCell className="text-right max-sm:ml-auto">
 					<div className="inline-flex items-center gap-2">
 						{canReset && onResetLink && (
 							<ConfirmButton
@@ -253,13 +272,14 @@ function MemberRow({
 function InviteSection({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
 	const { t: h } = useTranslation("hw03");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const formId = useId();
 	const roles = grantableRoles(session.role);
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState<Role>("member");
 	const [touched, setTouched] = useState(false);
-	const [created, setCreated] = useState<{ email: string; link: string } | null>(null);
+	const [created, setCreated] = useState<{ email: string; link: string; expires?: Invitation["expires_at"] } | null>(null);
 	const [createInvitation, createState] = useCreateInvitationMutation();
 	const invitations = useListInvitationsQuery(org.id);
 	const [revoke, revokeState] = useRevokeInvitationMutation();
@@ -272,7 +292,11 @@ function InviteSection({ org }: { org: OrgSummary }) {
 		try {
 			const result = await createInvitation({ orgId: org.id, email: email.trim(), role }).unwrap();
 			// The server's link when it sends one (built from its public URL), else one on this site.
-			setCreated({ email: result.email, link: result.url || (result.token ? invitationLink(pageOrigin(), result.token) : "") });
+			setCreated({
+				email: result.email,
+				link: result.url || (result.token ? invitationLink(pageOrigin(), result.token) : ""),
+				expires: result.expires_at,
+			});
 			setEmail("");
 			setTouched(false);
 		} catch {
@@ -293,6 +317,11 @@ function InviteSection({ org }: { org: OrgSummary }) {
 						testId="invite-created"
 					>
 						<p className="text-muted-foreground text-xs">{t("settings.invite.linkHint", { email: created.email })}</p>
+						{created.expires && (
+							<p className="text-muted-foreground text-xs" data-testid="invite-created-expires">
+								{tl("members.inviteValid")} <When value={created.expires} />
+							</p>
+						)}
 					</OneTimeSecret>
 				) : (
 					<form

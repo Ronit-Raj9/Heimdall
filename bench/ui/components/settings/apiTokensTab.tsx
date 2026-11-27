@@ -1,4 +1,5 @@
 import { ForbiddenNote, RoleGate, isRoleRefusal } from "@/components/platform/accessNotes";
+import { notify } from "@/lib/notify";
 import { ConfirmButton, RoleBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { tokenState } from "@/components/platform/platform.utils";
@@ -12,10 +13,14 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateApiTokenMutation, useListApiTokensQuery, useRevokeApiTokenMutation } from "@/lib/store/apis/platformApi";
 import type { ApiToken, ApiTokenScope, Role } from "@/lib/types/bench";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/agents/views/w4m1I18n";
+import { CredentialKinds } from "./credentialKinds";
+import { splitRevoked } from "./revokedFilter";
+import "./uf8aI18n";
 import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles } from "./settingsBits";
 
 /** Where ingest tokens live: they are not access tokens and are listed on the Inbox page (p02-7). */
@@ -55,21 +60,27 @@ export const PUBLIC_API_BASE = "/api/v1";
 
 const STATE_VARIANT = { active: "success", revoked: "outline", expired: "warning" } as const;
 
-/** API tokens for CI and scripts: create with a name, role and expiry (shown once), list, revoke. */
+/** API tokens for CI and scripts: list first (live ones), then create (shown once) behind "New token"; revoke. */
 export function ApiTokensTab() {
 	const { t } = useTranslation("platform");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const tokens = useListApiTokensQuery();
 	const [revoke, revokeState] = useRevokeApiTokenMutation();
+	const [showRevoked, setShowRevoked] = useState(false);
 	const isAdmin = canUse(session, "admin");
-	const list = tokens.data?.tokens ?? [];
+	const all = tokens.data?.tokens ?? [];
+	const { shown: list, hidden } = splitRevoked(all, (tk) => tokenState(tk) === "active", showRevoked);
 
 	return (
 		<div className="flex flex-col gap-10" data-testid="settings-tokens">
-			<RoleGate min="admin">
-				<CreateTokenSection />
-			</RoleGate>
-			<SettingsSection title={t("settings.tokens.title")} description={t("settings.tokens.description")} testId="settings-tokens-list">
+			<div className="flex flex-col gap-3">
+				<p className="text-muted-foreground max-w-prose text-sm" data-testid="tokens-intro">
+					{tl("kinds.tokens.what")}
+				</p>
+				<CredentialKinds current="tokens" />
+			</div>
+			<SettingsSection title={t("settings.tokens.title")} description={tl("tokens.description")} testId="settings-tokens-list">
 				{tokens.isLoading ? (
 					<BlockSkeleton rows={3} testId="tokens-loading" />
 				) : tokens.isError || !tokens.data ? (
@@ -79,74 +90,96 @@ export function ApiTokensTab() {
 						onRetry={() => void tokens.refetch()}
 						testId="tokens-error"
 					/>
-				) : list.length === 0 ? (
+				) : all.length === 0 ? (
 					<EmptyNote testId="tokens-empty">{t("settings.tokens.empty")}</EmptyNote>
 				) : (
 					<TableFrame testId="tokens-table">
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t("settings.tokens.name")}</TableHead>
-									<TableHead>{t("settings.tokens.prefix")}</TableHead>
-									<TableHead>{t("settings.tokens.role")}</TableHead>
-									<TableHead>{t("settings.tokens.scope")}</TableHead>
-									<TableHead>{t("settings.tokens.createdAt")}</TableHead>
-									<TableHead>{t("settings.tokens.lastUsed")}</TableHead>
-									<TableHead>{t("settings.tokens.expires")}</TableHead>
-									<TableHead>{t("settings.tokens.status")}</TableHead>
-									{isAdmin && <TableHead className="text-right" />}
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{list.map((token: ApiToken) => {
-									const state = tokenState(token);
-									return (
-										<TableRow key={token.id} data-testid={`token-row-${token.id}`} data-state={state}>
-											<TableCell className="text-foreground font-medium">{token.name}</TableCell>
-											<TableCell className="text-muted-foreground font-mono text-xs">hm_{token.prefix}…</TableCell>
-											<TableCell>
-												<RoleBadge role={token.role} />
-											</TableCell>
-											<TableCell>
-												<Badge variant="outline" data-testid={`token-scope-${token.id}`}>
-													{t(`settings.tokens.scopeOptions.${tokenScope(token)}`)}
-												</Badge>
-											</TableCell>
-											<TableCell className="text-muted-foreground">
-												<When value={token.created_at} />
-											</TableCell>
-											<TableCell className="text-muted-foreground">
-												<When value={token.last_used_at} />
-											</TableCell>
-											<TableCell className="text-muted-foreground">
-												<When value={token.expires_at} empty={t("settings.tokens.expiryOptions.0")} />
-											</TableCell>
-											<TableCell>
-												<Badge variant={STATE_VARIANT[state]} className={state === "revoked" ? "text-muted-foreground" : undefined}>
-													{t(`settings.tokens.${state}`)}
-												</Badge>
-											</TableCell>
-											{isAdmin && (
-												<TableCell className="text-right">
-													{state === "active" && (
-														<ConfirmButton
-															label={t("settings.tokens.revoke")}
-															question={t("settings.tokens.confirmRevoke", { name: token.name })}
-															confirmLabel={t("settings.tokens.confirm")}
-															cancelLabel={t("settings.tokens.cancel")}
-															onConfirm={() => void revoke(token.id)}
-															isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
-															testId={`token-revoke-${token.id}`}
-														/>
-													)}
+						<div className="overflow-x-auto">
+							<Table>
+								<TableHeader className="max-sm:hidden">
+									<TableRow>
+										<TableHead>{t("settings.tokens.name")}</TableHead>
+										<TableHead className="hidden lg:table-cell">{t("settings.tokens.prefix")}</TableHead>
+										<TableHead>{t("settings.tokens.role")}</TableHead>
+										<TableHead>{t("settings.tokens.scope")}</TableHead>
+										<TableHead className="hidden lg:table-cell">{t("settings.tokens.createdAt")}</TableHead>
+										<TableHead>{t("settings.tokens.lastUsed")}</TableHead>
+										<TableHead>{t("settings.tokens.expires")}</TableHead>
+										<TableHead>{t("settings.tokens.status")}</TableHead>
+										{isAdmin && <TableHead className="bg-card sticky right-0 text-right" />}
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{list.map((token: ApiToken) => {
+										const state = tokenState(token);
+										// Below sm each row stacks into a card: name, state, role and scope, expiry, Revoke.
+										const cell = "max-sm:block max-sm:border-0 max-sm:px-4 max-sm:py-0.5";
+										return (
+											<TableRow
+												key={token.id}
+												data-testid={`token-row-${token.id}`}
+												data-state={state}
+												className="max-sm:block max-sm:py-3"
+											>
+												<TableCell className={`text-foreground font-medium ${cell}`}>{token.name}</TableCell>
+												<TableCell className="text-muted-foreground hidden font-mono text-xs lg:table-cell">hm_{token.prefix}…</TableCell>
+												<TableCell className={`${cell} max-sm:inline-block max-sm:pr-0`}>
+													<RoleBadge role={token.role} />
 												</TableCell>
-											)}
-										</TableRow>
-									);
-								})}
-							</TableBody>
-						</Table>
+												<TableCell className={`${cell} max-sm:inline-block`}>
+													<Badge variant="outline" data-testid={`token-scope-${token.id}`}>
+														{t(`settings.tokens.scopeOptions.${tokenScope(token)}`)}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-muted-foreground hidden lg:table-cell">
+													<When value={token.created_at} />
+												</TableCell>
+												<TableCell className={`text-muted-foreground max-sm:hidden`}>
+													<When value={token.last_used_at} />
+												</TableCell>
+												<TableCell className={`text-muted-foreground ${cell}`}>
+													<span className="sm:hidden">{t("settings.tokens.expires")}: </span>
+													<When value={token.expires_at} empty={t("settings.tokens.expiryOptions.0")} />
+												</TableCell>
+												<TableCell className={cell}>
+													<Badge variant={STATE_VARIANT[state]} className={state === "revoked" ? "text-muted-foreground" : undefined}>
+														{t(`settings.tokens.${state}`)}
+													</Badge>
+												</TableCell>
+												{isAdmin && (
+													<TableCell className={`bg-card sticky right-0 text-right max-sm:static max-sm:text-left ${cell} max-sm:pt-2`}>
+														{state === "active" && (
+															<ConfirmButton
+																label={t("settings.tokens.revoke")}
+																question={t("settings.tokens.confirmRevoke", { name: token.name })}
+																confirmLabel={t("settings.tokens.confirm")}
+																cancelLabel={t("settings.tokens.cancel")}
+																onConfirm={() =>
+																void revoke(token.id)
+																	.unwrap()
+																	.then(() => notify({ text: tl("toast.revoked", { name: token.name }) }))
+																	.catch(() => undefined)
+																}
+																isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
+																testId={`token-revoke-${token.id}`}
+															/>
+														)}
+													</TableCell>
+												)}
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						</div>
 					</TableFrame>
+				)}
+				{hidden > 0 && (
+					<div>
+						<Button type="button" size="sm" variant="ghost" onClick={() => setShowRevoked((v) => !v)} dataTestId="tokens-show-revoked">
+							{showRevoked ? tl("tokens.hideRevoked") : tl("tokens.showRevoked", { count: hidden })}
+						</Button>
+					</div>
 				)}
 				<IngestTokensNote />
 				{revokeState.error &&
@@ -158,19 +191,26 @@ export function ApiTokensTab() {
 						</p>
 					))}
 			</SettingsSection>
+			<RoleGate min="admin">
+				<DetailsDisclosure label={tl("tokens.newToken")} defaultOpen={!tokens.isLoading && all.length === 0} testId="tokens-new">
+					<CreateTokenSection />
+				</DetailsDisclosure>
+			</RoleGate>
 		</div>
 	);
 }
 
 function CreateTokenSection() {
 	const { t } = useTranslation("platform");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const formId = useId();
 	const roles = grantableRoles(session.role);
 	const [name, setName] = useState("");
 	const [role, setRole] = useState<Role>(roles.includes("member") ? "member" : (roles[0] ?? "viewer"));
 	const [expiry, setExpiry] = useState<ExpiryChoice>("90");
-	const [scope, setScope] = useState<ApiTokenScope>("evaluate");
+	// Read only by default: a token that can start evaluations can spend money.
+	const [scope, setScope] = useState<ApiTokenScope>("read");
 	const [touched, setTouched] = useState(false);
 	const [created, setCreated] = useState<{ name: string; secret: string } | null>(null);
 	const [create, createState] = useCreateApiTokenMutation();
@@ -273,6 +313,11 @@ function CreateTokenSection() {
 					{t("settings.tokens.create")}
 				</Button>
 			</form>
+			{expiry === "0" && (
+				<p className="text-chart-warning-ink text-xs" role="status" data-testid="token-never-expires">
+					{tl("tokens.neverExpires")}
+				</p>
+			)}
 			{createState.error &&
 				(isRoleRefusal(session, createState.error) ? (
 					<ForbiddenNote min="admin" error={createState.error} testId="token-create-error" />

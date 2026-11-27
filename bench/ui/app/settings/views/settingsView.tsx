@@ -1,4 +1,4 @@
-import { RoleBadge } from "@/components/platform/badges";
+import "@/components/settings/uf8aI18n";
 import { ApiTokensTab } from "@/components/settings/apiTokensTab";
 import { AuditTab } from "@/components/settings/auditTab";
 import { BillingTab } from "@/components/settings/billingTab";
@@ -10,7 +10,9 @@ import { RunnersTab } from "@/components/settings/runnersTab";
 import { SecretsTab } from "@/components/settings/secretsTab";
 import { EmptyNote } from "@/components/runs/screenStates";
 import { EmbeddedPage, RouteTabs } from "@/components/shell";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePageTitle } from "@/lib/routing/pageTitle";
 import { useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import AdminView from "@/app/admin/views/adminView";
 import FilesView from "@/app/files/views/filesView";
@@ -21,16 +23,33 @@ import OperateView from "@/app/operate/views/operateView";
 import UploadView from "@/app/upload/views/uploadView";
 import UsageView from "@/app/usage/views/usageView";
 import WorkersView from "@/app/workers/views/workersView";
-import { Building2, CreditCard, FolderTree, Gauge, Github, KeyRound, KeySquare, ListChecks, LockKeyhole, Plug, ScrollText, Server, Shield, UserRound, Users, Wrench } from "lucide-react";
+import {
+	Building2,
+	CreditCard,
+	FolderTree,
+	Gauge,
+	Github,
+	KeyRound,
+	KeySquare,
+	ListChecks,
+	LockKeyhole,
+	Plug,
+	ScrollText,
+	Server,
+	Shield,
+	UserRound,
+	Users,
+	Wrench,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import type { ComponentType } from "react";
+import { Fragment, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
  * Every Settings tab, in menu order. "runners" is the Workers tab (its id predates the rename and
  * stays for old links). Members, tokens, GitHub, activity, organization and account exist only in
- * hosted mode; Server admin only for server admins.
+ * hosted mode; Server admin only for server admins. The rail shows them in SETTINGS_GROUPS order.
  */
 export const SETTINGS_TABS = [
 	"keys",
@@ -51,6 +70,24 @@ export const SETTINGS_TABS = [
 	"admin",
 ] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+export type SettingsGroup = "models" | "credentials" | "running" | "project" | "team" | "you" | "server";
+
+/** Rail groups, in rail order: money first, the credential kinds together. */
+export const SETTINGS_GROUPS: readonly { id: SettingsGroup; tabs: readonly SettingsTab[] }[] = [
+	{ id: "models", tabs: ["keys", "usage", "billing"] },
+	{ id: "credentials", tabs: ["secrets", "tokens", "github"] },
+	{ id: "running", tabs: ["runners", "jobs", "integrations", "operations"] },
+	{ id: "project", tabs: ["files"] },
+	{ id: "team", tabs: ["members", "org", "audit"] },
+	{ id: "you", tabs: ["account"] },
+	{ id: "server", tabs: ["admin"] },
+];
+
+/** The groups holding the visible tabs; a group with no visible tab drops out (no empty heading). */
+export function settingsGroupsFor(visible: readonly SettingsTab[]): { id: SettingsGroup; tabs: SettingsTab[] }[] {
+	return SETTINGS_GROUPS.map((g) => ({ id: g.id, tabs: g.tabs.filter((id) => visible.includes(id)) })).filter((g) => g.tabs.length > 0);
+}
 
 /** The tab a plain /settings opens. */
 export const DEFAULT_SETTINGS_TAB: SettingsTab = "keys";
@@ -76,7 +113,7 @@ const TAB_ICON: Record<SettingsTab, ComponentType<{ className?: string }>> = {
 	admin: Shield,
 };
 
-/** A tab name from the URL, or the default (API keys) for anything else. */
+/** A tab name from the URL, or the default (Model keys) for anything else. */
 export function settingsTab(raw: string | null | undefined): SettingsTab {
 	if (raw === "workers") return "runners";
 	return SETTINGS_TABS.includes(raw as SettingsTab) ? (raw as SettingsTab) : DEFAULT_SETTINGS_TAB;
@@ -94,7 +131,7 @@ export interface SettingsViewProps {
 }
 
 /**
- * The one Settings page: API keys, workers, usage, project files, background jobs,
+ * The one Settings page: model keys, workers, usage, project files, background jobs,
  * integrations, operations, secrets and, in hosted mode, members, tokens, GitHub, the activity
  * log, the organization and the signed-in user's password. The old pages (/models, /workers,
  * /usage, /files, /jobs, /integrations, /operate, /admin) redirect to their tab here.
@@ -102,9 +139,16 @@ export interface SettingsViewProps {
 export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 	const { t } = useTranslation("platform");
 	const { t: tSecrets } = useTranslation("secrets");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const org = session.org;
 	const local = session.authMode === "local";
+	const tabs = settingsTabsFor(session);
+	const active = tabs.includes(tab) ? tab : DEFAULT_SETTINGS_TAB;
+	// Renamed tabs (Model keys, Password) read from this lane's catalog; the rest keep their names.
+	const tabLabel = (id: SettingsTab) =>
+		id === "keys" ? tl("settings.tabKeys") : id === "account" ? tl("settings.tabAccount") : t(`settings.tabs.${id}`);
+	usePageTitle(`${tabLabel(active)} · ${t("settings.title")} · Heimdall`);
 
 	if (!local && (!session.signedIn || !org)) {
 		return (
@@ -122,8 +166,7 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 		);
 	}
 
-	const tabs = settingsTabsFor(session);
-	const active = tabs.includes(tab) ? tab : DEFAULT_SETTINGS_TAB;
+	const groups = settingsGroupsFor(tabs);
 
 	return (
 		<section
@@ -132,10 +175,7 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 			data-mode={local ? "local" : "hosted"}
 		>
 			<header className="flex flex-col gap-1.5">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
-					{!local && session.role && <RoleBadge role={session.role} />}
-				</div>
+				<h1 className="text-foreground text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
 				<p className="text-muted-foreground text-sm" data-testid={local ? "settings-local" : undefined}>
 					{local ? t("settings.localBody") : t("settings.subtitle", { org: org?.name ?? "" })}
 				</p>
@@ -146,22 +186,54 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 				orientation="vertical"
 				className="gap-6 md:grid md:grid-cols-[200px_minmax(0,1fr)] md:items-start md:gap-10"
 			>
-				<div className="-mx-1 overflow-x-auto px-1 pb-1 md:sticky md:top-4 md:mx-0 md:overflow-visible md:p-0">
-					<TabsList className="h-auto w-max gap-1 bg-transparent p-0 md:w-full md:flex-col md:items-stretch" aria-label={t("settings.title")}>
-						{tabs.map((id) => {
-							const Icon = TAB_ICON[id];
-							return (
-								<TabsTrigger
-									key={id}
-									value={id}
-									className="text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground h-9 flex-none justify-start gap-2.5 rounded-lg px-3 data-[state=active]:shadow-none md:w-full dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted"
-									data-testid={`settings-tab-${id}`}
+				{/* Phones: one select, so the active section is always visible. */}
+				<div className="md:hidden">
+					<Select value={active} onValueChange={(value) => onTabChange(settingsTab(value))}>
+						<SelectTrigger className="w-full" aria-label={tl("settings.section")} data-testid="settings-section-select">
+							<span className="text-muted-foreground">{tl("settings.section")}:</span>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{groups.map((g) => (
+								<SelectGroup key={g.id}>
+									<SelectLabel>{tl(`settings.groups.${g.id}`)}</SelectLabel>
+									{g.tabs.map((id) => (
+										<SelectItem key={id} value={id}>
+											{tabLabel(id)}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
+				<div className="hidden md:sticky md:top-4 md:block">
+					<TabsList className="h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0" aria-label={t("settings.title")}>
+						{groups.map((g, i) => (
+							<Fragment key={g.id}>
+								<p
+									className={`text-muted-foreground px-3 text-[11px] font-medium tracking-wide uppercase ${i === 0 ? "" : "pt-4"}`}
+									role="presentation"
+									data-testid={`settings-group-${g.id}`}
 								>
-									<Icon className="size-4" aria-hidden="true" />
-									{t(`settings.tabs.${id}`)}
-								</TabsTrigger>
-							);
-						})}
+									{tl(`settings.groups.${g.id}`)}
+								</p>
+								{g.tabs.map((id) => {
+									const Icon = TAB_ICON[id];
+									return (
+										<TabsTrigger
+											key={id}
+											value={id}
+											className="text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground dark:data-[state=active]:bg-muted h-9 w-full flex-none justify-start gap-2.5 rounded-lg px-3 data-[state=active]:shadow-none dark:data-[state=active]:border-transparent"
+											data-testid={`settings-tab-${id}`}
+										>
+											<Icon className="size-4" aria-hidden="true" />
+											{tabLabel(id)}
+										</TabsTrigger>
+									);
+								})}
+							</Fragment>
+						))}
 					</TabsList>
 				</div>
 				<div className="min-w-0">
