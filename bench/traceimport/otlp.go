@@ -80,7 +80,7 @@ func parseOTLP(values []any) ([]*Session, error) {
 	for _, id := range order {
 		sess := otlpSession(id, byTrace[id])
 		if sess.Agent == "" {
-			sess.Agent = oneLine(agentOf[id], MaxAgentBytes)
+			sess.Agent = agentName(agentOf[id])
 		}
 		out = append(out, sess)
 	}
@@ -104,7 +104,7 @@ func otlpSession(id string, spans []otlpSpan) *Session {
 			b.s.Ended = sp.end
 		}
 		if a := asString(sp.attrs["gen_ai.agent.name"]); a != "" && b.s.Agent == "" {
-			b.s.Agent = oneLine(a, MaxAgentBytes)
+			b.s.Agent = agentName(a)
 		}
 		if m := asString(firstOf(sp.attrs, "gen_ai.response.model", "gen_ai.request.model")); m != "" {
 			b.s.Model = m
