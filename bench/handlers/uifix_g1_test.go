@@ -195,3 +195,12 @@ func TestCatalogInternalFlag(t *testing.T) {
 		t.Fatalf("plain entry %s", b)
 	}
 }
+
+func TestSuiteHealthTaskFilter(t *testing.T) {
+	c := newHealthClient(t, healthSuites(t), healthRecord{}, false)
+	resp := c.do(t, "GET", APIPrefix+"/suites/hs/health?tasks=pub,none", nil, nil)
+	var h schemas.SuiteHealth
+	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &h) != nil || len(h.Tasks) != 1 || h.Tasks[0].Task != "pub" {
+		t.Fatalf("filtered %d %s", resp.StatusCode(), resp.Body())
+	}
+}

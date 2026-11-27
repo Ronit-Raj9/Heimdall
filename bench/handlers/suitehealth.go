@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -158,6 +159,15 @@ func (h *SuiteHealthHandler) getHealth(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		sendDepError(ctx, h.mode, "suite health "+id, err)
 		return
+	}
+	// ?tasks=a,b keeps only those tasks in tasks; counts, runs and notes
+	// still cover the whole suite.
+	if raw := strings.TrimSpace(string(ctx.QueryArgs().Peek("tasks"))); raw != "" && out != nil {
+		keep := map[string]bool{}
+		for _, t := range strings.Split(raw, ",") {
+			keep[strings.TrimSpace(t)] = true
+		}
+		out.Tasks = slices.DeleteFunc(out.Tasks, func(t schemas.TaskHealth) bool { return !keep[t.Task] })
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
