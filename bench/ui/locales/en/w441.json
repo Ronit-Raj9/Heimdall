@@ -32,7 +32,7 @@
 	},
 	"behaviour": {
 		"title": "Behaviour checks",
-		"description": "These checks read the recorded steps. They do not change any score.",
+		"description": "Things the agent did that a reviewer should know about, read from its steps. They do not change the score.",
 		"loading": "Reading the steps of this run.",
 		"error": "Could not run the behaviour checks.",
 		"seen": "Seen",
@@ -43,7 +43,10 @@
 		"perArm": "{{arm}}: {{fired}} of {{runs}} runs",
 		"split": "{{passed}} passed, {{failed}} failed",
 		"partial": "Only the first 500 runs were read.",
-		"edit": "Edit checks"
+		"edit": "Edit checks",
+		"allUnknown": "Checks could not read this run's steps.",
+		"clearCount": "{{count}} checks not seen",
+		"unknownCount": "{{count}} checks could not tell"
 	},
 	"editor": {
 		"title": "Edit behaviour checks",
@@ -68,6 +71,7 @@
 		"firstStep": "First step",
 		"laterStep": "Later step",
 		"empty": "No checks of your own yet.",
-		"saveError": "Could not save the checks."
+		"saveError": "Could not save the checks.",
+		"needNameAndStep": "Give the rule a name and a step to match."
 	}
 }

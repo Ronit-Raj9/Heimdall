@@ -169,7 +169,9 @@ describe("debug on a server that cannot hold model calls (N212)", () => {
 		const html = render(<RunDebugActions detail={d} />);
 		expect(html).toContain("run-replay");
 		expect(html).not.toContain('data-testid="run-debug"');
-		expect(tagOf(html, "run-debug-breakpoints-reason")).not.toBeNull();
+		// M5-14: on a finished run the note moves into the Replay tooltip; a live run shows it as a line.
+		expect(tagOf(html, "run-debug-breakpoints-reason")).toBeNull();
+		expect(tagOf(render(<RunDebugActions detail={{ ...d, sealed: false }} />), "run-debug-breakpoints-reason")).not.toBeNull();
 		expect(html).toContain(
 			"Pausing before model calls needs a worker this server controls. On this server, use Replay or Fork from a step.",
 		);

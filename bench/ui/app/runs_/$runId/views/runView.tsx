@@ -19,6 +19,8 @@ import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
+import { failedToolCall } from "@/components/runs/runFailure.utils";
+import "@/components/runs/uf5aI18n";
 import { RunTraceView } from "@/components/runs/traceView";
 import { RunBehaviourChecks } from "@/components/runs/behaviourChecks"; // I28 behaviour checks
 import { canFork, RunDebugActions } from "@/components/runs/debug/debugActions"; // X20b run debugging
@@ -42,16 +44,26 @@ import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
 import i18n, { getLocale } from "@/lib/i18n";
-import { useGetCatalogQuery, useGetExperimentQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
+import {
+	useGetCatalogQuery,
+	useGetExperimentQuery,
+	useGetPairQuery,
+	useGetRunEventsQuery,
+	useGetRunQuery,
+} from "@/lib/store/apis/benchApi";
+import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import { usePageTitle } from "@/lib/routing/pageTitle";
+import { cn } from "@/lib/utils";
 import { useGetRunAgentsQuery } from "@/lib/store/apis/runAgentsApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
-import type { GateResult, RunDetail, Value } from "@/lib/types/bench";
-import { Link, useSearch } from "@tanstack/react-router";
-import { Coins, Footprints, GitCompareArrows, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { GateResult, PairRun, RunDetail, Value } from "@/lib/types/bench";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { AlertTriangle, Check, Coins, Copy, Ellipsis, Footprints, GitCompareArrows, RotateCcw, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RUN_TABS, hiddenRunTabs, runHasVoice, runTabFlags, type RunTabId } from "./runTabs";
+import { gateName, orderRunTabs, rerunSearch, runCrumbs } from "./runView.uf5a";
 import { MaximRunButton } from "./maximRunButton";
 
 /**
@@ -74,6 +86,18 @@ export default function RunView({ runId }: { runId: string }) {
 	const frames = useRunFrames(runId, detail.data ? !detail.data.sealed : false); // U08
 	const { t: tRec } = useTranslation("recordings"); // Z03
 	const recordings = useRunRecordings(runId, !detail.data?.sealed); // Z03: recordings exist once the run is exported
+	const { t: tu } = useTranslation("uf5a");
+	const [moreOpen, setMoreOpen] = useState(false);
+	const expId = detail.data?.slot.exp_id;
+	const exp = useGetExperimentQuery(expId ?? "", { skip: !expId });
+	const evaluationId = exp.data?.evaluation_id;
+	const evaluation = useGetEvaluationQuery(evaluationId ?? "", { skip: !evaluationId });
+	// M1-8 / M3-19: the tab title names the object and the section.
+	usePageTitle(
+		detail.data
+			? `${tu("page.titleDoc", { task: detail.data.slot.task })} · ${evaluationId ? tu("page.crumbEvaluations") : tu("page.crumbRuns")} · Heimdall`
+			: undefined,
+	);
 
 	if (detail.isLoading) return <BlockSkeleton rows={8} testId="run-loading" />;
 	if (detail.error || !detail.data) {
@@ -110,29 +134,40 @@ export default function RunView({ runId }: { runId: string }) {
 	}));
 	if (flags.replay) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
 	if (flags.recording) tabs.splice(2, 0, { id: "recording", label: tRec("tab"), testId: "run-tab-recording" }); // Z03
+	// M5-13: the tabs every run has keep their place; tabs only some runs have come after Proof.
+	const orderedTabs = orderRunTabs(tabs);
+	const toolError = d.sealed && run.outcome !== "pass" ? failedToolCall(d.tool_calls) : undefined;
+	const crumbs = runCrumbs({
+		task: slot.task,
+		expId: slot.exp_id,
+		expName: exp.data?.name,
+		evaluationId,
+		evaluationName: evaluation.data?.spec.name,
+		labels: { runs: tu("page.crumbRuns"), evaluations: tu("page.crumbEvaluations"), run: tu("page.crumbRun", { task: slot.task }) },
+	});
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="run-screen" data-run-id={runId} data-output={output}>
 			<PageHeader
-				breadcrumbs={[
-					{ label: t("experiments.list.title"), to: "/experiments" },
-					{
-						label: slot.exp_id,
-						to: "/experiments/$expId",
-						params: { expId: slot.exp_id },
-					},
-					{ label: t("runs.page.crumb", { id: runId }) },
-				]}
-				title={t("runs.page.title", {
-					task: slot.task,
-					arm: slot.arm,
-					outcome: d.sealed ? t(`runs.outcome.${run.outcome}`) : t("runs.list.inFlight"),
-				})}
+				breadcrumbs={crumbs}
+				title={<span className="text-balance">{tu("page.title", { task: slot.task, arm: slot.arm })}</span>}
 				meta={
 					<>
 						{d.sealed ? (
 							<>
-								<OutcomeBadge outcome={run.outcome} testId="run-outcome" />
+								{toolError ? (
+									<span
+										className="bg-chart-warning/10 text-chart-warning-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+										title={tu("verdict.checkInfraHint")}
+										data-testid="run-outcome"
+										data-outcome={run.outcome}
+									>
+										<AlertTriangle className="size-3" aria-hidden="true" />
+										{tu("verdict.toolError")}
+									</span>
+								) : (
+									<OutcomeBadge outcome={run.outcome} testId="run-outcome" />
+								)}
 								{run.human_assisted && (
 									<span className="text-chart-warning-ink text-xs" title={tRec("humanAssistedNote")} data-testid="run-human-assisted">
 										{tRec("humanAssisted")}
@@ -150,37 +185,65 @@ export default function RunView({ runId }: { runId: string }) {
 					</>
 				}
 				subtitle={
-					<span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="run-facts">
-						<EntityLink kind="run" id={runId} />
+					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="run-facts">
 						<span>
-							{t("runs.page.experiment")} <EntityLink kind="experiment" id={slot.exp_id} />
-						</span>
-						<span>
-							{t("runs.page.task")} <EntityLink kind="task" id={slot.task} suite={slot.suite} />
-						</span>
-						<span>
-							{t("runs.page.slotFacts", {
-								condition: slot.condition,
+							{tu("page.facts", {
+								name: exp.data?.name ?? slot.exp_id,
 								trial: slot.trial,
+								condition: slot.condition === "clean" ? tu("page.noFault") : slot.condition,
 							})}
 						</span>
+						<span className="inline-flex items-center">
+							{t("runs.page.task")}{" "}
+							<span className="ml-1 inline-flex py-1">
+								<EntityLink kind="task" id={slot.task} suite={slot.suite} />
+							</span>
+						</span>
+						<CopyIdButton id={runId} />
 					</span>
 				}
 				actions={
 					<div className="flex flex-wrap items-start gap-2">
 						<RunDebugActions detail={d} />
 						<RunActions expId={slot.exp_id} runId={runId} sealed={Boolean(d.sealed)} outcome={d.run?.outcome} superseded={d.superseded} />
-						<RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
+						{d.sealed && !run.debug && (
+							<Button variant="outline" size="sm" asChild>
+								<Link
+									to="/evaluate"
+									search={rerunSearch(d, exp.data?.setups) as never}
+									title={tu("page.rerunHint")}
+									data-testid="run-rerun"
+								>
+									<RotateCcw aria-hidden="true" />
+									{tu("page.rerun")}
+								</Link>
+							</Button>
+						)}
 						<ShareButton kind="run_trace" target={runId} />
-						<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
-						<RunCompareButton detail={d} />
+						{/* M5-12: on a phone, Export, Maxim and Compare sit behind More so the header keeps one row of actions. */}
+						<Button
+							variant="outline"
+							size="sm"
+							className="sm:hidden"
+							aria-expanded={moreOpen}
+							onClick={() => setMoreOpen((v) => !v)}
+							dataTestId="run-more"
+						>
+							<Ellipsis aria-hidden="true" />
+							{tu("page.more")}
+						</Button>
+						<div className={cn("flex-wrap items-start gap-2 sm:flex", moreOpen ? "flex w-full" : "hidden")} data-testid="run-more-actions">
+							<RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
+							<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
+							<RunCompareButton detail={d} />
+						</div>
 					</div>
 				}
 			/>
 
 			{run.debug && <DebugBanner debug={run.debug} />}
 
-			<RouteTabs tabs={tabs} defaultTab="overview" label={t("runs.page.tabsLabel")} testId="run-tabs">
+			<RouteTabs tabs={orderedTabs} defaultTab="overview" label={t("runs.page.tabsLabel")} testId="run-tabs">
 				{(active) =>
 					active === "replay" ? (
 						<ScreenReplay runId={runId} live={!d.sealed} />
@@ -238,31 +301,62 @@ function RunTab({ tab, detail, agents }: { tab: RunTabId; detail: RunDetail; age
 	}
 }
 
+/** Whether the viewport is at least lg wide (1024 px); false outside a browser. */
+function isWide(): boolean {
+	try {
+		return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+	} catch {
+		return false;
+	}
+}
+
 function OverviewTab({ detail }: { detail: RunDetail }) {
 	const { t } = useTranslation("bench");
 	const { t: tt } = useTranslation("runTrace");
+	const { t: tu } = useTranslation("uf5a");
 	const locale = getLocale();
 	const catalog = useGetCatalogQuery();
 	const { run, slot, grade } = detail;
+	const exp = useGetExperimentQuery(slot.exp_id);
+	const paired = Boolean(slot.pair_id) && !run.debug && (exp.data?.arms ?? []).length >= 2;
+	const pair = useGetPairQuery(slot.pair_id ?? "", { skip: !paired });
+	const others = (pair.data?.runs ?? []).filter((o) => o.arm !== slot.arm);
+	const [factsOpen, setFactsOpen] = useState(false);
+	// X-40: the run facts are open on load from lg up, folded on smaller screens.
+	useEffect(() => setFactsOpen(isWide()), []);
+	const toolError = detail.sealed && run.outcome !== "pass" ? failedToolCall(detail.tool_calls) : undefined;
+	// M5-3: one "Verified" badge (beside the gates); the overview names the grade source only when it is not the plain verified grade.
+	const plainVerified = !grade?.judged && (!detail.grade_source || detail.grade_source === "original");
 	return (
 		<div className="flex flex-col gap-8" data-testid="run-overview">
 			{!detail.sealed && <LiveScreen runId={run.run_id} />}
-			<RunFailureCard run={run} />
+			{exp.data?.decision === "invalid" && (
+				<p
+					className="border-chart-warning/50 bg-chart-warning/5 rounded-md border px-4 py-3 text-sm"
+					role="status"
+					data-testid="run-broken-comparison"
+				>
+					{tu("verdict.brokenComparison")}
+				</p>
+			)}
+			<RunFailureCard run={run} detail={detail} />
 			<div className="flex flex-col gap-4" data-testid="run-summary">
-				<div className="flex flex-wrap items-center gap-2">
-					{detail.sealed ? (
-						<OutcomeBadge outcome={run.outcome} testId="run-summary-outcome" />
-					) : (
-						<span className="bg-chart-info/10 text-chart-info-ink inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium">
-							<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
-							{tt("overview.running")}
-						</span>
-					)}
-					<GradeSourceTag source={detail.grade_source} judged={Boolean(grade?.judged)} testId="run-grade-source" />
-				</div>
-				<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-					<RunStatCards detail={detail} />
-				</div>
+				{(!detail.sealed || !plainVerified) && (
+					<div className="flex flex-wrap items-center gap-2">
+						{!detail.sealed && (
+							<span className="bg-chart-info/10 text-chart-info-ink inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium">
+								<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
+								{tt("overview.running")}
+							</span>
+						)}
+						{!plainVerified && (
+							<GradeSourceTag source={detail.grade_source} judged={Boolean(grade?.judged)} testId="run-grade-source" />
+						)}
+					</div>
+				)}
+				<dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4" data-testid="run-stats">
+					<RunStatCards detail={detail} others={others} />
+				</dl>
 			</div>
 
 			<Section title={tt("overview.agentSaid")} testId="run-grade">
@@ -279,9 +373,16 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 				{grade?.judged && <JudgeCriteria judge={grade.judge} testId="run-judge-criteria" />}
 			</Section>
 
-			<details className="group rounded-xl border" data-testid="run-details">
+			<RunBehaviourChecks runId={run.run_id} />
+
+			<details
+				className="group rounded-xl border"
+				open={factsOpen}
+				onToggle={(e) => setFactsOpen((e.currentTarget as HTMLDetailsElement).open)}
+				data-testid="run-details"
+			>
 				<summary className="text-muted-foreground hover:text-foreground cursor-pointer px-4 py-3 text-sm font-medium">
-					{tt("overview.details")}
+					{tu("page.details")}
 				</summary>
 				<div className="flex flex-col gap-6 border-t px-4 py-4">
 					<div data-testid="run-identity">
@@ -324,7 +425,21 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					title={t("verdict.gates.title")}
 					description={t("runs.page.gatesDescription")}
 					testId="run-gates"
-					actions={<GradeSourceTag sealedOnly testId="run-gates-source" />}
+					actions={
+						toolError ? (
+							<span
+								className="border-chart-warning/50 text-chart-warning-ink inline-flex h-5 items-center gap-1 rounded-[5px] border px-1.5 text-[11px] font-medium"
+								title={tu("verdict.checkInfraHint")}
+								data-testid="run-gates-source"
+								data-grade-source="infra"
+							>
+								<AlertTriangle className="size-3" aria-hidden="true" />
+								{tu("verdict.checkInfra")}
+							</span>
+						) : (
+							<GradeSourceTag sealedOnly testId="run-gates-source" />
+						)
+					}
 				>
 					<RunGates gates={detail.gates} />
 				</Section>
@@ -339,7 +454,26 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 
 /** The run's own gate results: which fired, with what effect, and the detail each recorded. */
 function RunGates({ gates }: { gates: readonly GateResult[] }) {
+	const { t: tu } = useTranslation("uf5a");
+	const list = <RunGateList gates={gates} />;
+	// M5-9: all clear reads as one line; the checks stay one click away.
+	if (gates.every((g) => !g.fired)) {
+		return (
+			<details className="rounded-sm border text-xs" data-testid="run-gates-all-clear">
+				<summary className="text-chart-success-ink cursor-pointer px-3 py-2 font-medium">
+					{tu("gates.allPassed", { count: gates.length })}
+					<span className="text-muted-foreground ml-2 font-normal">{tu("gates.showAll")}</span>
+				</summary>
+				<div className="border-t">{list}</div>
+			</details>
+		);
+	}
+	return list;
+}
+
+function RunGateList({ gates }: { gates: readonly GateResult[] }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf5a");
 	return (
 		<ul className="flex flex-col divide-y rounded-sm border text-xs" data-testid="run-gate-list">
 			{gates.map((gate) => (
@@ -349,8 +483,8 @@ function RunGates({ gates }: { gates: readonly GateResult[] }) {
 					data-testid={`run-gate-${gate.gate}`}
 					data-fired={gate.fired}
 				>
-					<span className="font-mono font-medium">{gate.gate}</span>
-					<span className="text-muted-foreground">{gate.effect}</span>
+					<span className="font-medium">{gateName(gate.gate, tu as never)}</span>
+					<span className="text-muted-foreground font-mono text-[11px]">{gate.gate}</span>
 					<span className={gate.fired ? "text-chart-error-ink font-medium" : "text-chart-success-ink"}>
 						{gate.fired ? t("runs.page.gateFired") : t("runs.page.gateClear")}
 					</span>
@@ -372,8 +506,11 @@ function metricText(value: Value | undefined, unit?: "usd"): string {
  * The Overview stat cards. "Model turns" counts model turns that got an answer (the steps metric); the
  * Step by step tab also counts tool uses and commands, so the two numbers differ on purpose (N28).
  */
-export function RunStatCards({ detail }: { detail: RunDetail }) {
+export function RunStatCards({ detail, others = [] }: { detail: RunDetail; others?: readonly PairRun[] }) {
 	const { t: tt } = useTranslation("runTrace");
+	const { t: tu } = useTranslation("uf5a");
+	// M5-21: with the pair loaded, each number shows the other setups' value under it as a muted line.
+	const beside = (value: (o: PairRun) => string) => others.map((o) => tu("page.setupB", { arm: o.arm, value: value(o) }));
 	return (
 		<>
 			<StatCard
@@ -381,11 +518,30 @@ export function RunStatCards({ detail }: { detail: RunDetail }) {
 				label={tt("overview.steps")}
 				hint={tt("overview.stepsHint")}
 				value={metricText(detail.metrics.steps)}
+				beside={beside((o) => metricText(o.metrics.steps))}
 				testId="run-stat-steps"
 			/>
-			<StatCard icon={Wrench} label={tt("overview.toolCalls")} value={metricText(detail.metrics.tool_calls)} testId="run-stat-tools" />
-			<StatCard icon={Coins} label={tt("overview.cost")} value={metricText(detail.metrics.cost_usd, "usd")} testId="run-stat-cost" />
-			<StatCard icon={Timer} label={tt("overview.time")} value={wallText(detail.metrics, detail.run.timing)} testId="run-stat-time" />
+			<StatCard
+				icon={Wrench}
+				label={tt("overview.toolCalls")}
+				value={metricText(detail.metrics.tool_calls)}
+				beside={beside((o) => metricText(o.metrics.tool_calls))}
+				testId="run-stat-tools"
+			/>
+			<StatCard
+				icon={Coins}
+				label={tt("overview.cost")}
+				value={metricText(detail.metrics.cost_usd, "usd")}
+				beside={beside((o) => metricText(o.metrics.cost_usd, "usd"))}
+				testId="run-stat-cost"
+			/>
+			<StatCard
+				icon={Timer}
+				label={tt("overview.time")}
+				value={wallText(detail.metrics, detail.run.timing)}
+				beside={beside((o) => wallText(o.metrics, o.run.timing))}
+				testId="run-stat-time"
+			/>
 		</>
 	);
 }
@@ -429,27 +585,71 @@ export function RunCompareButton({ detail }: { detail: RunDetail }) {
 	);
 }
 
+/** One run number in the Overview strip: a plain dl item (X-40), not a card, since it does nothing on click. */
 function StatCard({
 	icon: Icon,
 	label,
 	hint,
 	value,
+	beside = [],
 	testId,
 }: {
 	icon: LucideIcon;
 	label: string;
 	hint?: string;
 	value: string;
+	beside?: readonly string[];
 	testId: string;
 }) {
 	return (
-		<div className="bg-card flex flex-col gap-1 rounded-xl border p-4 transition-shadow hover:shadow-md" title={hint} data-testid={testId}>
-			<span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+		<div className="flex min-w-0 flex-col gap-0.5" title={hint} data-testid={testId}>
+			<dt className="text-muted-foreground flex items-center gap-1.5 text-xs">
 				<Icon className="size-3.5" aria-hidden="true" />
 				{label}
-			</span>
-			<span className="text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
+			</dt>
+			<dd className="text-2xl font-semibold tracking-tight tabular-nums">{value}</dd>
+			{beside.map((line) => (
+				<dd key={line} className="text-muted-foreground text-xs tabular-nums">
+					{line}
+				</dd>
+			))}
 		</div>
+	);
+}
+
+/** The run id with a copy button (M5-20); the id text stays selectable. */
+function CopyIdButton({ id }: { id: string }) {
+	const { t: tu } = useTranslation("uf5a");
+	const [copied, setCopied] = useState(false);
+	useEffect(() => {
+		if (!copied) return;
+		const timer = window.setTimeout(() => setCopied(false), 1400);
+		return () => window.clearTimeout(timer);
+	}, [copied]);
+	const copy = () => {
+		try {
+			void navigator.clipboard?.writeText(id).then(
+				() => setCopied(true),
+				() => undefined,
+			);
+		} catch {
+			// No clipboard (insecure context): the id is still selectable.
+		}
+	};
+	return (
+		<span className="inline-flex items-center gap-1">
+			<span className="font-mono">{id}</span>
+			<button
+				type="button"
+				onClick={copy}
+				aria-label={copied ? tu("page.copied") : tu("page.copyId")}
+				title={copied ? tu("page.copied") : tu("page.copyId")}
+				className="hover:text-foreground rounded-sm p-1"
+				data-testid="run-copy-id"
+			>
+				{copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+			</button>
+		</span>
 	);
 }
 
@@ -474,14 +674,27 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 	const arm = detail.slot.arm;
 	const runId = detail.run.run_id;
 	const events = useGetRunEventsQuery(runId);
-	const initialStep = stepParam(useSearch({ strict: false }) as Record<string, unknown>);
+	const search = useSearch({ strict: false }) as Record<string, unknown>;
+	const initialStep = stepParam(search);
+	const navigate = useNavigate();
+	// M5-24: the trace search lives in ?tq= so a shared link or Back keeps it.
+	const traceQuery = typeof search.tq === "string" ? search.tq : "";
+	const setTraceQuery = (q: string) =>
+		void navigate({ to: ".", search: ((prev: Record<string, unknown>) => ({ ...prev, tq: q || undefined })) as never, replace: true });
 	return (
 		<div className="flex flex-col gap-8" data-testid="run-timeline">
 			<RunRemoteCoverage runId={runId} arm={arm} />
 			<RunGatewayPolicy runId={runId} />
 			{!detail.sealed && <HoldPanel runId={runId} />}
-			<RunTraceView runId={runId} arm={arm} live={!detail.sealed} canFork={canFork(detail)} initialStep={initialStep} />
-			<RunBehaviourChecks runId={runId} />
+			<RunTraceView
+				runId={runId}
+				arm={arm}
+				live={!detail.sealed}
+				canFork={canFork(detail)}
+				initialStep={initialStep}
+				query={traceQuery}
+				onQueryChange={setTraceQuery}
+			/>
 			{detail.run.debug?.from_run && <TraceDiff runId={runId} otherRunId={detail.run.debug.from_run} />}
 			{detail.sessions && detail.sessions.length > 0 && <SessionsTimeline sessions={detail.sessions} arm={arm} />}
 			{detail.tool_calls && detail.tool_calls.length > 0 && <ToolCallTable calls={detail.tool_calls} arm={arm} />}

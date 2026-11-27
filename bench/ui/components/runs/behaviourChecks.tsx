@@ -26,31 +26,65 @@ function StatusWord({ result }: { result: RuleResult }) {
 	return <Badge variant="outline">{t("behaviour.cannotTell")}</Badge>;
 }
 
-/** One row per rule on a run: seen, not seen or cannot tell, with the steps that matched. */
+/** The run's results in show order: fired first, then cannot tell, then clear; and whether none could be read. */
+export function behaviourOrder(results: readonly RuleResult[]): { fired: RuleResult[]; unknown: RuleResult[]; clear: RuleResult[]; allUnknown: boolean } {
+	const fired = results.filter((r) => r.status === "fired");
+	const clear = results.filter((r) => r.status === "clear");
+	const unknown = results.filter((r) => r.status !== "fired" && r.status !== "clear");
+	return { fired, unknown, clear, allUnknown: results.length > 0 && unknown.length === results.length };
+}
+
+function BehaviourRow({ r, title, runId }: { r: RuleResult; title: string; runId: string }) {
+	const { t } = useTranslation("w441");
+	return (
+		<li className="flex flex-col gap-1" data-testid={`behaviour-run-${r.rule_id}`}>
+			<div className="flex flex-wrap items-center gap-2">
+				<span>{title}</span>
+				<StatusWord result={r} />
+				{r.status === "unknown" && r.reason && <span className="text-muted-foreground text-xs">{r.reason}</span>}
+			</div>
+			{r.status === "fired" &&
+				(r.hits ?? []).map((h, i) => (
+					<div key={i} className="flex flex-wrap items-center gap-2 pl-4 font-mono text-xs">
+						<a className="underline" href={`/runs/${encodeURIComponent(runId)}?tab=timeline&step=${h.seqs[0] ?? ""}`}>
+							{h.summary}
+						</a>
+						{h.witnessed && <Badge variant="outline">{t("behaviour.witnessed")}</Badge>}
+					</div>
+				))}
+		</li>
+	);
+}
+
+/**
+ * The rules on a run: fired first with the steps that matched, then those that could not tell and those
+ * not seen, each folded. When no rule could read the steps, one line says so instead of a row per rule.
+ */
 export function RunBehaviourView({ data, rules, runId }: { data: RunBehaviourResponse; rules: BehaviourRule[]; runId: string }) {
 	const { t } = useTranslation("w441");
 	const titles = new Map(rules.map((r) => [r.id, r.title]));
+	const order = behaviourOrder(data.results);
+	if (order.allUnknown) {
+		return (
+			<p className="text-muted-foreground text-sm" data-testid="behaviour-run-unknown">
+				{t("behaviour.allUnknown")}
+			</p>
+		);
+	}
+	const row = (r: RuleResult) => <BehaviourRow key={r.rule_id} r={r} title={titles.get(r.rule_id) ?? r.rule_id} runId={runId} />;
+	const fold = (list: RuleResult[], label: string, testId: string) =>
+		list.length > 0 && (
+			<details data-testid={testId}>
+				<summary className="text-muted-foreground cursor-pointer text-xs">{label}</summary>
+				<ul className="mt-2 flex flex-col gap-3">{list.map(row)}</ul>
+			</details>
+		);
 	return (
-		<ul className="flex flex-col gap-3 text-sm" data-testid="behaviour-run-list">
-			{data.results.map((r) => (
-				<li key={r.rule_id} className="flex flex-col gap-1" data-testid={`behaviour-run-${r.rule_id}`}>
-					<div className="flex flex-wrap items-center gap-2">
-						<span>{titles.get(r.rule_id) ?? r.rule_id}</span>
-						<StatusWord result={r} />
-						{r.status === "unknown" && r.reason && <span className="text-muted-foreground text-xs">{r.reason}</span>}
-					</div>
-					{r.status === "fired" &&
-						(r.hits ?? []).map((h, i) => (
-							<div key={i} className="flex flex-wrap items-center gap-2 pl-4 font-mono text-xs">
-								<a className="underline" href={`/runs/${encodeURIComponent(runId)}?tab=timeline&step=${h.seqs[0] ?? ""}`}>
-									{h.summary}
-								</a>
-								{h.witnessed && <Badge variant="outline">{t("behaviour.witnessed")}</Badge>}
-							</div>
-						))}
-				</li>
-			))}
-		</ul>
+		<div className="flex flex-col gap-3 text-sm" data-testid="behaviour-run-list">
+			{order.fired.length > 0 && <ul className="flex flex-col gap-3">{order.fired.map(row)}</ul>}
+			{fold(order.unknown, t("behaviour.unknownCount", { count: order.unknown.length }), "behaviour-run-unknown-list")}
+			{fold(order.clear, t("behaviour.clearCount", { count: order.clear.length }), "behaviour-run-clear-list")}
+		</div>
 	);
 }
 

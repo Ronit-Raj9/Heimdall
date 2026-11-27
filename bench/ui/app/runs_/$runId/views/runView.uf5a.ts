@@ -1,0 +1,63 @@
+// Pure helpers of the run page (fix wave lane 5a), so their rules are tested without a page.
+import type { Crumb } from "@/components/shell/pageHeader";
+import type { RouteTab } from "@/components/shell/routeTabs";
+import type { ExperimentStatus, RunDetail } from "@/lib/types/bench";
+
+/** Tabs every run has, in their fixed order. Every other tab (only some runs have it) comes after these. */
+const FIXED_TABS = ["overview", "timeline", "output", "evidence"] as const;
+
+/**
+ * The run page tabs in a fixed order (M5-13): the tabs every run has keep their place, and the tabs only
+ * some runs have (replay, recording, agents, visual, voice, gpu, services, security) follow Proof in their
+ * given order, so a tab never moves between two runs.
+ */
+export function orderRunTabs(tabs: readonly RouteTab[]): RouteTab[] {
+	const fixed = FIXED_TABS.map((id) => tabs.find((tab) => tab.id === id)).filter((tab): tab is RouteTab => Boolean(tab));
+	const rest = tabs.filter((tab) => !(FIXED_TABS as readonly string[]).includes(tab.id));
+	return [...fixed, ...rest];
+}
+
+/** A gate's plain name (uf5a gates.names.<id>); an unknown gate keeps its id. */
+export function gateName(id: string, t: (key: string, opts: { defaultValue: string }) => string): string {
+	return t(`gates.names.${id}`, { defaultValue: id });
+}
+
+/**
+ * The search of "Run this task again" (M5-5): the evaluate wizard with this run's agent, model, benchmark
+ * and task, opened at the cost step. Nothing starts from the link.
+ */
+export function rerunSearch(d: Pick<RunDetail, "slot" | "run">, setups?: ExperimentStatus["setups"]): Record<string, string | number> {
+	const setup = setups?.find((s) => s.arm === d.slot.arm);
+	const out: Record<string, string | number> = { suite: d.slot.suite, task: d.slot.task, step: 4 };
+	const agent = setup?.agent || d.run.agent.config_id;
+	if (agent) out.agent = agent;
+	if (setup?.model) out.model = setup.model;
+	return out;
+}
+
+export interface RunCrumbInput {
+	task: string;
+	expId: string;
+	expName?: string;
+	evaluationId?: string;
+	evaluationName?: string;
+	labels: { runs: string; evaluations: string; run: string };
+}
+
+/**
+ * The run page trail (M5-7, M1-7): a run of an evaluation reads "Evaluations > <evaluation> > <comparison>
+ * > Run <task>", any other "Runs and traces > <comparison> > Run <task>". Names, never raw ids, once loaded.
+ */
+export function runCrumbs(input: RunCrumbInput): Crumb[] {
+	const comparison: Crumb = { label: input.expName || input.expId, to: "/experiments/$expId", params: { expId: input.expId } };
+	const run: Crumb = { label: input.labels.run };
+	if (input.evaluationId) {
+		return [
+			{ label: input.labels.evaluations, to: "/evaluations" },
+			{ label: input.evaluationName || input.evaluationId, to: "/evaluations/$evalId", params: { evalId: input.evaluationId } },
+			comparison,
+			run,
+		];
+	}
+	return [{ label: input.labels.runs, to: "/runs" }, comparison, run];
+}
