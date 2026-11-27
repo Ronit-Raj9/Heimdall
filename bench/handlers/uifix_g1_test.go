@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"github.com/maximhq/bifrost/bench/evalstore"
 	"strings"
 	"testing"
 
@@ -78,5 +80,32 @@ func TestSuiteTitleFromCatalog(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("catalog gave no suite title")
+	}
+}
+
+func TestReleasePreviewProblemCode(t *testing.T) {
+	r, root, _, ev := evalReleaseFixture(t, nil)
+	ev.Spec.Arms[1].Version = 1
+	if err := evalstore.Open(root).Save(ev); err != nil {
+		t.Fatal(err)
+	}
+	preview := func() EvaluationReleasePreview {
+		ctx := evalCall(r, "GET", APIPrefix+"/evaluations/"+ev.ID+"/release-preview", "")
+		var p EvaluationReleasePreview
+		if err := json.Unmarshal(ctx.Response.Body(), &p); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if p := preview(); p.ProblemCode != ReleaseProblemOnlyOneVersion {
+		t.Fatalf("live version code %+v", p)
+	}
+	ev.Status = schemas.EvaluationRunning
+	ev.Children[0].Status = string(schemas.ExperimentRunning)
+	if err := evalstore.Open(root).Save(ev); err != nil {
+		t.Fatal(err)
+	}
+	if p := preview(); p.ProblemCode != ReleaseProblemNotFinished {
+		t.Fatalf("running code %q", p.ProblemCode)
 	}
 }
