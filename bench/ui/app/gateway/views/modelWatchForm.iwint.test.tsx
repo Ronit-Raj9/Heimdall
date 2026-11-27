@@ -126,7 +126,8 @@ describe("Start now on a skipped model", () => {
 				onStartNow={() => undefined}
 			/>,
 		);
-		expect(html).toMatch(/data-testid="model-watch-retry-openai\/a"[^>]*>Start now</);
-		expect(html).toMatch(/data-testid="model-watch-retry-openai\/b"[^>]*>Try again</);
+		// M7-113: both start a paid evaluation, so the label names the cap.
+		expect(html).toMatch(/data-testid="model-watch-retry-openai\/a"[^>]*>.*?Start now, up to \$4\.00</);
+		expect(html).toMatch(/data-testid="model-watch-retry-openai\/b"[^>]*>.*?Try again, up to \$4\.00</);
 	});
 });

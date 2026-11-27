@@ -3,7 +3,6 @@ declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		paid: typeof import("@/locales/en/paid.json");
 		toast: typeof import("@/locales/en/toast.json");
-		ufs2: typeof import("@/locales/en/ufs2.json");
 	}
 }
 export {};

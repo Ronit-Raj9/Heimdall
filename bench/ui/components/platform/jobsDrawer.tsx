@@ -1,16 +1,17 @@
 import { jobKindLabel, jobKindLabelFor } from "@/components/jobs/jobKindLabels";
 import { JobStatusBadge } from "@/components/platform/badges";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
-import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { getLocale } from "@/lib/i18n";
+import { addUnseenDone, clearUnseenDone, notify } from "@/lib/notify";
 import { useSession } from "@/lib/session/sessionContext";
 import { JOBS_POLL_MS, useListJobsQuery } from "@/lib/store/apis/platformApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import type { Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, ListTodo, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { ChevronRight, ListTodo } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatRelative, isActiveJob, jobFraction, shortJobId, splitJobs, targetLabel } from "./platform.utils";
 
@@ -18,6 +19,15 @@ import { formatRelative, isActiveJob, jobFraction, shortJobId, splitJobs, target
 const IDLE_POLL_MS = 30_000;
 /** Finished jobs listed in the drawer. */
 const RECENT_LIMIT = 12;
+
+/**
+ * Jobs that were active at the last poll and are finished now: the finish notices (M1-45).
+ * The first poll (prev null) reports nothing, so opening a page never shows old finishes.
+ */
+export function finishedSince(prev: ReadonlySet<string> | null, jobs: readonly Job[]): Job[] {
+	if (!prev) return [];
+	return jobs.filter((j) => prev.has(j.id) && !isActiveJob(j));
+}
 
 /** A job's kind in words ("experiment.run" is jobs.kinds.experiment_run); then the shared kind map (jobKindLabels.ts); unknown kinds show as written. */
 export function useJobKindLabel(): (kind: string) => string {
@@ -117,6 +127,27 @@ export function JobsIndicator() {
 	const list = jobs.data?.jobs ?? [];
 	const running = list.filter(isActiveJob).length;
 	useEffect(() => setBusy(running > 0), [running]);
+	const kindLabel = useJobKindLabel();
+	const { t: tt } = useTranslation("toast");
+
+	// Finish notices: a toast with a link, and "(n done)" in the tab title until the drawer opens.
+	const activeIds = useRef<Set<string> | null>(null);
+	useEffect(() => {
+		if (!jobs.data) return;
+		const done = finishedSince(activeIds.current, jobs.data.jobs);
+		activeIds.current = new Set(jobs.data.jobs.filter(isActiveJob).map((j) => j.id));
+		if (done.length === 0) return;
+		for (const job of done) {
+			const name = jobKindLabelFor(job.kind, job.params, kindLabel(job.kind));
+			notify({ kind: "info", text: tt("finished", { name }), action: { label: tt("viewResults"), to: `/jobs/${job.id}` } });
+		}
+		if (!open) addUnseenDone(done.length);
+		// kindLabel and tt are stable enough; the effect runs per poll answer.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [jobs.data]);
+	useEffect(() => {
+		if (open) clearUnseenDone();
+	}, [open]);
 
 	const status = errorStatus(jobs.error);
 	if (skip || (!jobs.data && (status === 404 || status === 401 || status === 403))) return null;
@@ -173,82 +204,43 @@ export interface JobsDrawerProps {
 	onClose: () => void;
 }
 
-/** The jobs drawer: running and queued jobs first, then recent ones. Escape or the scrim closes it. */
+/** The jobs drawer: running and queued jobs first, then recent ones. A right-side shared Dialog (focus trapped, Escape or the scrim closes it). */
 export function JobsDrawer({ jobs, isLoading, error, onRetry, onClose }: JobsDrawerProps) {
 	const { t } = useTranslation("platform");
 	const session = useSession();
-	const titleId = useId();
-	const closeRef = useRef<HTMLButtonElement>(null);
 	const { active, recent } = splitJobs(jobs);
 
-	useEffect(() => {
-		closeRef.current?.focus();
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") onClose();
-		};
-		document.addEventListener("keydown", onKey);
-		return () => document.removeEventListener("keydown", onKey);
-	}, [onClose]);
-
 	return (
-		<div className="fixed inset-0 z-50 flex justify-end" data-testid="jobs-drawer-root">
-			<button
-				type="button"
-				aria-label={t("jobs.close")}
-				tabIndex={-1}
-				onClick={onClose}
-				className="animate-in fade-in-0 absolute inset-0 cursor-default bg-black/25 duration-200 dark:bg-black/50"
-			/>
-			<aside
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-card animate-in slide-in-from-right-8 fade-in-0 relative flex h-full w-full max-w-md flex-col border-l shadow-(--shadow-pop) duration-200 ease-(--ease-out)"
-				data-testid="jobs-drawer"
-			>
-				<header className="flex items-start gap-3 border-b px-5 py-4">
-					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-						<h2 id={titleId} className="text-foreground text-base font-semibold tracking-tight">
-							{t("jobs.drawerTitle")}
-						</h2>
-						<p className="text-muted-foreground text-xs">
-							{session.org ? t("jobs.drawerSubtitle", { org: session.org.name }) : t("jobs.drawerSubtitleLocal")}
-						</p>
-					</div>
-					<Button
-						ref={closeRef}
-						variant="ghost"
-						size="icon"
-						className="size-8"
-						onClick={onClose}
-						aria-label={t("jobs.close")}
-						dataTestId="jobs-drawer-close"
-					>
-						<X className="size-4" aria-hidden="true" />
-					</Button>
-				</header>
-				<div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
-					{isLoading ? (
-						<BlockSkeleton rows={4} testId="jobs-drawer-loading" className="px-3" />
-					) : error ? (
-						<LoadError title={t("jobs.loadError")} error={error} onRetry={onRetry} testId="jobs-drawer-error" className="mx-3" />
-					) : (
-						<>
-							<DrawerSection title={t("jobs.running")} count={active.length} empty={t("jobs.noneRunning")} testId="jobs-drawer-running">
-								{active.map((job) => (
-									<JobRow key={job.id} job={job} onOpen={onClose} />
-								))}
-							</DrawerSection>
-							<DrawerSection title={t("jobs.recent")} count={recent.length} empty={t("jobs.noneRecent")} testId="jobs-drawer-recent">
-								{recent.slice(0, RECENT_LIMIT).map((job) => (
-									<JobRow key={job.id} job={job} onOpen={onClose} />
-								))}
-							</DrawerSection>
-						</>
-					)}
-				</div>
-			</aside>
-		</div>
+		<Dialog
+			open
+			onOpenChange={(next) => !next && onClose()}
+			side="right"
+			title={t("jobs.drawerTitle")}
+			description={<span className="text-xs">{session.org ? t("jobs.drawerSubtitle", { org: session.org.name }) : t("jobs.drawerSubtitleLocal")}</span>}
+			closeLabel={t("jobs.close")}
+			testId="jobs-drawer"
+		>
+			<div className="-mx-3 flex min-h-0 flex-1 flex-col gap-5 border-t pt-4">
+				{isLoading ? (
+					<BlockSkeleton rows={4} testId="jobs-drawer-loading" className="px-3" what={t("jobs.drawerTitle")} onRetry={onRetry} />
+				) : error ? (
+					<LoadError title={t("jobs.loadError")} error={error} onRetry={onRetry} testId="jobs-drawer-error" className="mx-3" />
+				) : (
+					<>
+						<DrawerSection title={t("jobs.running")} count={active.length} empty={t("jobs.noneRunning")} testId="jobs-drawer-running">
+							{active.map((job) => (
+								<JobRow key={job.id} job={job} onOpen={onClose} />
+							))}
+						</DrawerSection>
+						<DrawerSection title={t("jobs.recent")} count={recent.length} empty={t("jobs.noneRecent")} testId="jobs-drawer-recent">
+							{recent.slice(0, RECENT_LIMIT).map((job) => (
+								<JobRow key={job.id} job={job} onOpen={onClose} />
+							))}
+						</DrawerSection>
+					</>
+				)}
+			</div>
+		</Dialog>
 	);
 }
 
