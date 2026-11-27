@@ -1,5 +1,6 @@
 import type { Run, RunDetail } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { AlertOctagon, AlertTriangle, Check, Copy, Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +12,7 @@ import {
   runReason,
   type RunReason,
 } from "./runFailure.utils";
+import { sameFailureLink, type RunFailureGroup } from "./runFailureGroup";
 import "./uf5aI18n";
 
 /**
@@ -22,11 +24,49 @@ import "./uf5aI18n";
 export function RunFailureCard({
   run,
   detail,
+  group,
   testId = "run-failure",
 }: {
   run: Pick<Run, "outcome" | "failures">;
   detail?: Pick<RunDetail, "run" | "grade" | "tool_calls" | "sealed">;
+  /** The server's failure group (`?failure=1`); when it holds other runs, a link to them follows the card. */
+  group?: RunFailureGroup;
   testId?: string;
+}) {
+  const card = <RunFailureBody run={run} detail={detail} testId={testId} />;
+  const same = run.outcome === "pass" ? undefined : sameFailureLink(group);
+  if (!same) return card;
+  return (
+    <div className="flex flex-col gap-2">
+      {card}
+      <SameFailureLink count={same.count} search={same.search} testId={`${testId}-same`} />
+    </div>
+  );
+}
+
+/** "The same failure in N runs of this evaluation", linking to that failure group. */
+function SameFailureLink({ count, search, testId }: { count: number; search: Record<string, string>; testId: string }) {
+  const { t } = useTranslation("uf5a");
+  return (
+    <Link
+      to="/inbox"
+      search={search as never}
+      className="text-primary self-start text-sm underline-offset-2 hover:underline"
+      data-testid={testId}
+    >
+      {t("reason.sameFailure", { count })}
+    </Link>
+  );
+}
+
+function RunFailureBody({
+  run,
+  detail,
+  testId,
+}: {
+  run: Pick<Run, "outcome" | "failures">;
+  detail?: Pick<RunDetail, "run" | "grade" | "tool_calls" | "sealed">;
+  testId: string;
 }) {
   const { t } = useTranslation("bench");
   const failure = runFailure(run);

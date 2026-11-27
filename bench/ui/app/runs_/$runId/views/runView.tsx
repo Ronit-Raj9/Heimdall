@@ -19,6 +19,7 @@ import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
+import { useGetRunFailureQuery } from "@/components/runs/runFailureGroup";
 import { failedToolCall } from "@/components/runs/runFailure.utils";
 import "@/components/runs/uf5aI18n";
 import { RunTraceView } from "@/components/runs/traceView";
@@ -95,7 +96,7 @@ export default function RunView({ runId }: { runId: string }) {
 	// M1-8 / M3-19: the tab title names the object and the section.
 	usePageTitle(
 		detail.data
-			? `${tu("page.titleDoc", { task: detail.data.slot.task })} · ${evaluationId ? tu("page.crumbEvaluations") : tu("page.crumbRuns")} · Heimdall`
+			? `${tu("page.titleDoc", { task: (detail.data as { task_title?: string }).task_title || detail.data.slot.task })} · ${evaluationId ? tu("page.crumbEvaluations") : tu("page.crumbRuns")} · Heimdall`
 			: undefined,
 	);
 
@@ -116,6 +117,9 @@ export default function RunView({ runId }: { runId: string }) {
 
 	const d = detail.data;
 	const { slot, run } = d;
+	// M5-17 (G1): optional names from the server; the ids stay when they are missing.
+	const names = d as typeof d & { task_title?: string; suite_title?: string };
+	const taskName = names.task_title || slot.task;
 	const output = runOutputKind(d, d.output);
 	const flags = runTabFlags(agents, frames, recordings);
 	const hidden = hiddenRunTabs({
@@ -143,14 +147,14 @@ export default function RunView({ runId }: { runId: string }) {
 		expName: exp.data?.name,
 		evaluationId,
 		evaluationName: evaluation.data?.spec.name,
-		labels: { runs: tu("page.crumbRuns"), evaluations: tu("page.crumbEvaluations"), run: tu("page.crumbRun", { task: slot.task }) },
+		labels: { runs: tu("page.crumbRuns"), evaluations: tu("page.crumbEvaluations"), run: tu("page.crumbRun", { task: taskName }) },
 	});
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="run-screen" data-run-id={runId} data-output={output}>
 			<PageHeader
 				breadcrumbs={crumbs}
-				title={<span className="text-balance">{tu("page.title", { task: slot.task, arm: slot.arm })}</span>}
+				title={<span className="text-balance">{tu("page.title", { task: taskName, arm: slot.arm })}</span>}
 				meta={
 					<>
 						{d.sealed ? (
@@ -199,6 +203,7 @@ export default function RunView({ runId }: { runId: string }) {
 								<EntityLink kind="task" id={slot.task} suite={slot.suite} />
 							</span>
 						</span>
+						{names.suite_title && <span data-testid="run-suite-title">{tu("page.suite", { name: names.suite_title })}</span>}
 						<CopyIdButton id={runId} />
 					</span>
 				}
@@ -325,6 +330,8 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 	// X-40: the run facts are open on load from lg up, folded on smaller screens.
 	useEffect(() => setFactsOpen(isWide()), []);
 	const toolError = detail.sealed && run.outcome !== "pass" ? failedToolCall(detail.tool_calls) : undefined;
+	// M5-1: a sealed run that did not pass asks for its failure group ("the same failure in N runs").
+	const failureGroup = useGetRunFailureQuery(run.run_id, { skip: !detail.sealed || run.outcome === "pass" });
 	// M5-3: one "Verified" badge (beside the gates); the overview names the grade source only when it is not the plain verified grade.
 	const plainVerified = !grade?.judged && (!detail.grade_source || detail.grade_source === "original");
 	return (
@@ -339,7 +346,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					{tu("verdict.brokenComparison")}
 				</p>
 			)}
-			<RunFailureCard run={run} detail={detail} />
+			<RunFailureCard run={run} detail={detail} group={failureGroup.data?.failure} />
 			<div className="flex flex-col gap-4" data-testid="run-summary">
 				{(!detail.sealed || !plainVerified) && (
 					<div className="flex flex-wrap items-center gap-2">

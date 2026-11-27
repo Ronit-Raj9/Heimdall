@@ -28,6 +28,7 @@ describe("run page helpers (lane 5a)", () => {
 		const ev = runCrumbs({ task: "t08", expId: "e_1", expName: "Nightly", evaluationId: "ev_1", evaluationName: "Q4", labels });
 		expect(ev.map((c) => c.label)).toEqual(["Evaluations", "Q4", "Nightly", "Run t08"]);
 		expect(ev[1].params).toEqual({ evalId: "ev_1" });
+		expect(ev[2].search).toEqual({ from: "eval" });
 	});
 
 	it("builds the rerun search from the setup of the run's arm", () => {

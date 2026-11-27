@@ -1,3 +1,4 @@
+import { Dialog } from "@/components/ui/dialog";
 import { GovDialog } from "@/components/govern/govDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,23 +74,25 @@ export function ReplayDialog({
 }) {
 	const { t } = useTranslation("runDebug");
 	return (
-		<GovDialog
+		<Dialog
 			open={open}
-			onClose={onClose}
+			onOpenChange={(next) => !next && onClose()}
 			title={t("actions.replayConfirmTitle")}
 			description={t("actions.replayConfirm")}
 			closeLabel={t("fork.close")}
+			size="sm"
 			testId="replay-dialog"
-		>
-			<div className="flex justify-end gap-2">
-				<Button variant="outline" onClick={onClose} dataTestId="replay-cancel">
-					{t("actions.replayCancel")}
-				</Button>
-				<Button onClick={() => void onConfirm()} disabled={busy} isLoading={busy} dataTestId="replay-start">
-					{t("actions.replayStart")}
-				</Button>
-			</div>
-		</GovDialog>
+			footer={
+				<>
+					<Button variant="outline" onClick={onClose} dataTestId="replay-cancel">
+						{t("actions.replayCancel")}
+					</Button>
+					<Button onClick={() => void onConfirm()} disabled={busy} isLoading={busy} dataTestId="replay-start">
+						{t("actions.replayStart")}
+					</Button>
+				</>
+			}
+		/>
 	);
 }
 

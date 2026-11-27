@@ -30,6 +30,8 @@ export function GatewayLane({ arm, events, complete }: GatewayLaneProps) {
 				<h3 className="text-sm font-semibold">{t("runs.arm", { arm })}</h3>
 			</div>
 			{!complete && <IncompleteNotice arm={arm} />}
+			{/* M4-59: a setup with no gateway calls gets the one empty line, not a row of zeros. */}
+			{summary.calls.length > 0 && (
 			<dl className="grid grid-cols-3 gap-2 sm:grid-cols-5">
 				<Stat label={t("runs.gateway.requests")} testId={`gateway-${arm}-requests`}>
 					<span className="tabular-nums">{summary.requests}</span>
@@ -47,6 +49,7 @@ export function GatewayLane({ arm, events, complete }: GatewayLaneProps) {
 					<ValueCell value={summary.cost} kind="usd" testId={`gateway-${arm}-cost-value`} />
 				</Stat>
 			</dl>
+			)}
 			{summary.calls.length === 0 ? (
 				<p
 					className="text-muted-foreground rounded-sm border border-dashed px-3 py-4 text-center text-xs"

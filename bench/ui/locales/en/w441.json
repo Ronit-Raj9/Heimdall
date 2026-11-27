@@ -44,9 +44,11 @@
 		"split": "{{passed}} passed, {{failed}} failed",
 		"partial": "Only the first 500 runs were read.",
 		"edit": "Edit checks",
-		"allUnknown": "Checks could not read this run's steps.",
+		"allUnknown": "This run recorded no steps the checks can read, so none of them could tell.",
 		"clearCount": "{{count}} checks not seen",
-		"unknownCount": "{{count}} checks could not tell"
+		"unknownCount": "{{count}} checks could not tell",
+		"sharedReason": "Why: {{reason}}",
+		"noRunsYet": "No runs checked yet"
 	},
 	"editor": {
 		"title": "Edit behaviour checks",

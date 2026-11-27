@@ -52,6 +52,8 @@ export function runCrumbs(input: RunCrumbInput): Crumb[] {
 	const comparison: Crumb = { label: input.expName || input.expId, to: "/experiments/$expId", params: { expId: input.expId } };
 	const run: Crumb = { label: input.labels.run };
 	if (input.evaluationId) {
+		// M1-7: from=eval keeps Evaluations lit in the sidebar on the comparison page.
+		comparison.search = { from: "eval" };
 		return [
 			{ label: input.labels.evaluations, to: "/evaluations" },
 			{ label: input.evaluationName || input.evaluationId, to: "/evaluations/$evalId", params: { evalId: input.evaluationId } },

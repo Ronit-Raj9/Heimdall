@@ -12,7 +12,9 @@
 			"answer": "answer",
 			"state": "state",
 			"result": "result"
-		}
+		},
+		"sameFailure_one": "The same failure in {{count}} run of this evaluation",
+		"sameFailure_other": "The same failure in {{count}} runs of this evaluation"
 	},
 	"claim": {
 		"modeCompare": "Compared the final {{what}} with the expected one: {{result}}",
@@ -28,7 +30,7 @@
 	},
 	"page": {
 		"title": "Task {{task}} · Setup {{arm}}",
-		"titleDoc": "Run {{task}} · Runs",
+		"titleDoc": "Run {{task}}",
 		"crumbRuns": "Runs and traces",
 		"crumbEvaluations": "Evaluations",
 		"crumbRun": "Run {{task}}",
@@ -41,7 +43,8 @@
 		"rerunHint": "Opens the evaluate wizard with this task, agent and model. Nothing starts until you confirm the cost.",
 		"details": "Run facts and metrics",
 		"setupB": "Setup {{arm}}: {{value}}",
-		"tabDisabled": "This run did not record anything for this tab."
+		"tabDisabled": "This run did not record anything for this tab.",
+		"suite": "Benchmark {{name}}"
 	},
 	"gates": {
 		"allPassed": "All {{count}} safety checks passed",
@@ -66,5 +69,8 @@
 			"exfiltration_attempted": "Planted secret did not leave",
 			"approval_bypassed": "Did not route around an approval"
 		}
+	},
+	"evidence": {
+		"empty": "This run recorded no evidence record: no evidence contract, hashes or fault record."
 	}
 }

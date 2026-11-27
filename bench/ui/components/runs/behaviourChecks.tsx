@@ -34,14 +34,26 @@ export function behaviourOrder(results: readonly RuleResult[]): { fired: RuleRes
 	return { fired, unknown, clear, allUnknown: results.length > 0 && unknown.length === results.length };
 }
 
-function BehaviourRow({ r, title, runId }: { r: RuleResult; title: string; runId: string }) {
+/** The one reason every "cannot tell" result shares, so it is said once instead of on every row. */
+export function sharedUnknownReason(unknown: readonly RuleResult[]): string | undefined {
+	const first = unknown[0]?.reason?.trim();
+	if (!first) return undefined;
+	return unknown.every((r) => r.reason?.trim() === first) ? first : undefined;
+}
+
+/** True when no run of the experiment was checked yet: no arm, or every arm with zero runs. */
+export function noRunsChecked(perArm: Record<string, { runs: number }>): boolean {
+	return Object.values(perArm).every((c) => !c.runs);
+}
+
+function BehaviourRow({ r, title, runId, hideReason }: { r: RuleResult; title: string; runId: string; hideReason?: boolean }) {
 	const { t } = useTranslation("w441");
 	return (
 		<li className="flex flex-col gap-1" data-testid={`behaviour-run-${r.rule_id}`}>
 			<div className="flex flex-wrap items-center gap-2">
 				<span>{title}</span>
 				<StatusWord result={r} />
-				{r.status === "unknown" && r.reason && <span className="text-muted-foreground text-xs">{r.reason}</span>}
+				{r.status === "unknown" && r.reason && !hideReason && <span className="text-muted-foreground text-xs">{r.reason}</span>}
 			</div>
 			{r.status === "fired" &&
 				(r.hits ?? []).map((h, i) => (
@@ -71,18 +83,26 @@ export function RunBehaviourView({ data, rules, runId }: { data: RunBehaviourRes
 			</p>
 		);
 	}
-	const row = (r: RuleResult) => <BehaviourRow key={r.rule_id} r={r} title={titles.get(r.rule_id) ?? r.rule_id} runId={runId} />;
-	const fold = (list: RuleResult[], label: string, testId: string) =>
+	const shared = sharedUnknownReason(order.unknown);
+	const row = (r: RuleResult) => (
+		<BehaviourRow key={r.rule_id} r={r} title={titles.get(r.rule_id) ?? r.rule_id} runId={runId} hideReason={Boolean(shared)} />
+	);
+	const fold = (list: RuleResult[], label: string, testId: string, note?: string) =>
 		list.length > 0 && (
 			<details data-testid={testId}>
 				<summary className="text-muted-foreground cursor-pointer text-xs">{label}</summary>
+				{note && (
+					<p className="text-muted-foreground mt-2 text-xs" data-testid={`${testId}-reason`}>
+						{t("behaviour.sharedReason", { reason: note })}
+					</p>
+				)}
 				<ul className="mt-2 flex flex-col gap-3">{list.map(row)}</ul>
 			</details>
 		);
 	return (
 		<div className="flex flex-col gap-3 text-sm" data-testid="behaviour-run-list">
 			{order.fired.length > 0 && <ul className="flex flex-col gap-3">{order.fired.map(row)}</ul>}
-			{fold(order.unknown, t("behaviour.unknownCount", { count: order.unknown.length }), "behaviour-run-unknown-list")}
+			{fold(order.unknown, t("behaviour.unknownCount", { count: order.unknown.length }), "behaviour-run-unknown-list", shared)}
 			{fold(order.clear, t("behaviour.clearCount", { count: order.clear.length }), "behaviour-run-clear-list")}
 		</div>
 	);
@@ -134,6 +154,11 @@ export function ExperimentBehaviourView({
 				{data.rules.map((r) => (
 					<li key={r.rule.id} data-testid={`behaviour-exp-${r.rule.id}`}>
 						<div className="font-medium">{r.rule.title}</div>
+						{noRunsChecked(r.per_arm) ? (
+							<p className="text-muted-foreground pl-4 text-xs" data-testid={`behaviour-exp-${r.rule.id}-none`}>
+								{t("behaviour.noRunsYet")}
+							</p>
+						) : (
 						<ul className="text-muted-foreground pl-4 text-xs">
 							{Object.keys(r.per_arm)
 								.sort()
@@ -147,6 +172,7 @@ export function ExperimentBehaviourView({
 									);
 								})}
 						</ul>
+						)}
 					</li>
 				))}
 			</ul>
