@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ImprovementsView, { ImprovementsTable } from "./improvementsView";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/improveApi")>()),
 	useGetImprovementsQuery: () => okQuery({ improvements: [] }),

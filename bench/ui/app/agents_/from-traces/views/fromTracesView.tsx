@@ -1,4 +1,6 @@
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { InlineError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { LoadError } from "@/components/runs/screenStates";
 import { NewSecretInline, SecretNameField } from "@/app/agents_/new/views/connectForm";
 import { PageHeader } from "@/components/shell";
@@ -441,20 +443,22 @@ export function DraftSection({
 	const { t: tu } = useTranslation("uf2b");
 	const confirm = useConfirm();
 	const [forget, forgetState] = useForgetConnectTracesMutation();
-	// M1-44 (lane S2) brings the shared InlineError; until then the failure shows as a plain alert line.
-	const [forgetError, setForgetError] = useState<string | null>(null);
+	// A failed Forget shows why next to the button (M1-44).
+	const [forgetError, setForgetError] = useState<unknown>(null);
 	const onForget = async () => {
-		const ok = await confirm(tu("traces.forgetConfirm"), {
+		const opts: DestructiveConfirmOptions = {
 			title: tu("traces.forgetConfirmTitle"),
 			confirmLabel: tu("traces.forgetConfirmLabel"),
 			destructive: true,
-		});
+		};
+		const ok = await confirm(tu("traces.forgetConfirm"), opts);
 		if (!ok) return;
 		setForgetError(null);
 		try {
 			await forget().unwrap();
+			notify({ text: tu("traces.forgotten") });
 		} catch (e) {
-			setForgetError(getBenchErrorMessage(e));
+			setForgetError(e);
 		}
 	};
 	return (
@@ -575,11 +579,7 @@ export function DraftSection({
 						)
 					)}
 				</div>
-				{forgetError && (
-					<p role="alert" className="text-chart-error-ink text-sm" data-testid="from-traces-forget-error">
-						{forgetError}
-					</p>
-				)}
+				<InlineError error={forgetError} onRetry={() => void onForget()} testId="from-traces-forget-error" />
 			</div>
 		</StepSection>
 	);

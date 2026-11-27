@@ -6,7 +6,10 @@
 		"notReadyTitle": "This benchmark has no ready task yet. Open it on Benchmarks to finish it.",
 		"confirmTitle": "Start this improvement run?",
 		"confirm": "The run calls your organization's model keys round by round and can spend up to ${{limit}}.",
-		"confirmLabel": "Start run, costs up to ${{limit}}"
+		"confirmLabel": "Start run, costs up to ${{limit}}",
+		"startVerb": "Start run",
+		"confirmText": "The run calls your organization's model keys round by round.",
+		"close": "Close"
 	},
 	"connect": {
 		"help": "An endpoint URL, a curl command, a Git repository, a Docker image or a platform agent id.",
@@ -21,6 +24,7 @@
 		"userAgent": "Requests carry User-Agent heimdall-connect/1.",
 		"emptyPress": "Paste something first.",
 		"firstLookUsd": "About {{minutes}} min, about ${{usd}} on your key",
+		"firstLookVerb": "Start first look",
 		"firstLookConfirmTitle": "Start the first look?",
 		"firstLookConfirm": "The first look runs real tasks on your agent and calls the model on your key.",
 		"firstLookConfirmLabel": "Start, uses your key",
@@ -41,9 +45,11 @@
 		"missingSecret": "Auth token secret: pick a secret name, not the token itself.",
 		"forgetConfirmTitle": "Forget these traces?",
 		"forgetConfirm": "Forget these traces? This cannot be undone.",
-		"forgetConfirmLabel": "Forget traces"
+		"forgetConfirmLabel": "Forget traces",
+		"forgotten": "Traces forgotten."
 	},
 	"agent": {
+		"howItWorks": "How it works",
 		"bandTitle": "Already have an agent running?",
 		"bandEndpoint": "Paste an endpoint or curl",
 		"bandImport": "Import from a platform",

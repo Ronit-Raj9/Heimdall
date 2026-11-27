@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { describe, expect, it } from "vitest";
-import { defaultImprovementName, IMPROVEMENT_NAME, suiteChoices } from "./newImprovementDialog";
+import { defaultImprovementName, IMPROVEMENT_NAME, improvementFormDirty, limitUsd, newForm, suiteChoices } from "./newImprovementDialog";
 
 // Fix wave lane 2b: the improvement form's default name and benchmark options.
 describe("new improvement helpers (fix wave 2b)", () => {
@@ -25,5 +25,14 @@ describe("new improvement helpers (fix wave 2b)", () => {
 		expect(out[3].label).toBe("tb2 (12 tasks)");
 		expect(out[2].notReady).toBe(true);
 		expect(out[3].notReady).toBe(false);
+	});
+
+	it("reads the limit as the paid cap and knows when the form changed", () => {
+		expect(limitUsd("5")).toBe(5);
+		expect(limitUsd("")).toBeNull();
+		expect(limitUsd("0")).toBeNull();
+		expect(limitUsd("abc")).toBeNull();
+		expect(improvementFormDirty(newForm())).toBe(false);
+		expect(improvementFormDirty({ ...newForm(), name: "x" })).toBe(true);
 	});
 });

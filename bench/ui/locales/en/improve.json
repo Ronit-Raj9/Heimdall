@@ -1,5 +1,5 @@
 {
-	"title": "Improvements",
+	"title": "Auto-improve",
 	"subtitle": "Your agent rewrites its own prompt, notes and skills over rounds. Each change is kept only when it wins on tasks the agent never saw.",
 	"loadError": "Could not load improvement runs",
 	"empty": {

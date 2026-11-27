@@ -42,6 +42,9 @@ import {
 import { useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import {
 	DEFAULT_PULL_OPTIONS,
 	defaultParams,
@@ -142,6 +145,36 @@ export function nameProblem(name: string, taken: ReadonlySet<string>): string {
  * New agent wizard (/agents/new?template=): pick a template (one click), the name and model are
  * pre-filled, Create writes agents/<name>.yaml through the project store and opens the agent.
  */
+/** What the new agent form keeps as a session draft: the picked template and what was typed for it. */
+export interface NewAgentDraft {
+	template: string;
+	typedName: string | null;
+	notes: string;
+	params: Record<string, string>;
+}
+
+export const EMPTY_AGENT_DRAFT: NewAgentDraft = { template: "", typedName: null, notes: "", params: {} };
+
+const SECRETISH = /token|password|secret|api_?key/i;
+
+/** The params safe to keep in the draft: never a secret field, nor one whose name says key or token. */
+export function storableParams(tpl: AgentTemplate, params: Record<string, string>): Record<string, string> {
+	const secret = new Set(tpl.params.filter((p) => p.kind === "secret" || SECRETISH.test(p.name)).map((p) => p.name));
+	const out: Record<string, string> = {};
+	for (const [k, v] of Object.entries(params)) if (!secret.has(k) && !SECRETISH.test(k)) out[k] = v;
+	return out;
+}
+
+/** True once the person typed a name or notes, or changed a field from its default. */
+export function agentFormDirty(tpl: AgentTemplate | null, typedName: string | null, notes: string, params: Record<string, string>): boolean {
+	if (!tpl) return false;
+	if (typedName !== null || notes !== "") return true;
+	const base = defaultParams(tpl);
+	const keys = new Set([...Object.keys(base), ...Object.keys(params)]);
+	for (const k of keys) if ((base[k] ?? "") !== (params[k] ?? "")) return true;
+	return false;
+}
+
 export default function NewAgentView() {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tu } = useTranslation("agentsUx");
@@ -185,6 +218,13 @@ export default function NewAgentView() {
 	const problem = nameProblem(name, takenIds);
 	const nameTaken = takenIds.has(name);
 	const prevDefault = useRef("");
+	// The typed input survives a reload or Back (X-81); secret fields are never stored.
+	const [draft, updateDraft, clearDraft] = useFormDraft<NewAgentDraft>("newAgent", EMPTY_AGENT_DRAFT);
+	// True once the draft was read back for the current template: only then is the form saved again.
+	const [hydrated, setHydrated] = useState(false);
+	const restored = useRef(false);
+	const [sent, setSent] = useState(false);
+	useLeaveGuard(!sent && agentFormDirty(tpl, typedName, notes, params));
 
 	// Picking a template pre-fills the rest, so Create is the only other click.
 	useEffect(() => {
@@ -193,12 +233,27 @@ export default function NewAgentView() {
 		setTypedName((cur) => (cur === null || cur === prevDefault.current ? null : cur));
 		prevDefault.current = defaultName;
 		setModel({ provider: (tpl.providers[0] ?? "openai") as ProviderId, model: tpl.default_model });
-		setParams(defaultParams(tpl));
+		if (!restored.current && draft.template === tpl.id) {
+			// First template of this visit is the one of the stored draft: put the typed input back.
+			setTypedName(draft.typedName);
+			setNotes(draft.notes);
+			setParams({ ...defaultParams(tpl), ...draft.params });
+		} else {
+			setParams(defaultParams(tpl));
+		}
+		restored.current = true;
+		setHydrated(true);
 		setPullOpts(DEFAULT_PULL_OPTIONS);
 		setPreview(null);
 		testState.reset();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tpl]);
+
+	useEffect(() => {
+		if (!tpl || !hydrated || sent) return;
+		updateDraft({ template: tpl.id, typedName, notes, params: storableParams(tpl, params) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [tpl, hydrated, typedName, notes, params]);
 
 	const nameOk = ID_RE.test(name);
 	const missingParam = tpl ? missingParams(tpl, params).length > 0 : true;
@@ -262,6 +317,11 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes), create_only: true }) : await create(body);
 		if ("data" in res && res.data) {
+			// Created: drop the draft and the leave guard before opening the new agent.
+			flushSync(() => {
+				setSent(true);
+				clearDraft();
+			});
 			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id, keep: "1" } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}

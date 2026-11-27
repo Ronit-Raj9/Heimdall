@@ -4,7 +4,7 @@ import { mutation, okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
 import { NewImprovementDialog } from "./newImprovementDialog";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetAgentsQuery: () => okQuery({ agents: [] }),

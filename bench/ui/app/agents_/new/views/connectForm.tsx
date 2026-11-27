@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { usePreviewEndpointMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
@@ -81,6 +82,24 @@ export function missingFieldLabels(tpl: AgentTemplate, params: Params): { labels
 		.filter((n) => !(wrapEither && n === "repo_url" && !tpl.params.find((p) => p.name === n)?.required))
 		.map((n) => tpl.params.find((p) => p.name === n)?.label ?? n);
 	return { labels: [...new Set(labels)], wrapEither };
+}
+
+/** G1: a field may carry `details`, the protocol detail behind its one-sentence help (optional; older servers send none). */
+export function paramDetails(p: TemplateParam): string | undefined {
+	const d = (p as TemplateParam & { details?: string }).details;
+	return typeof d === "string" && d.trim() ? d : undefined;
+}
+
+/** The "How it works" fold under a field, when the server sent details. */
+function ParamDetails({ p }: { p: TemplateParam }) {
+	const { t: tu } = useTranslation("uf2b");
+	const d = paramDetails(p);
+	if (!d) return null;
+	return (
+		<DetailsDisclosure label={tu("agent.howItWorks")} testId={`param-${p.name}-details`} contentClassName="mt-1">
+			<p className="text-muted-foreground text-xs whitespace-pre-line">{d}</p>
+		</DetailsDisclosure>
+	);
 }
 
 /** A pasted value that looks like a real key rather than a secret name: an sk- prefix, or longer than 30 characters. */
@@ -262,6 +281,7 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 					{p.kind === "secret" && !p.help?.includes("Settings > Secrets") ? ` ${t("new.secretHelp")}` : ""}
 				</span>
 			)}
+			<ParamDetails p={p} />
 			{p.kind === "secret" && <NewSecretInline param={p.name} onSaved={onChange} />}
 		</div>
 	);

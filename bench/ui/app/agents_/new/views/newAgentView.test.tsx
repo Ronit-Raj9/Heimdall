@@ -92,6 +92,7 @@ vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession:
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
+	useBlocker: () => undefined,
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 

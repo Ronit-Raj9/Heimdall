@@ -3,8 +3,8 @@ import "@/lib/i18n";
 import type { AgentTemplate } from "@/lib/types/agentBuilder";
 import { Globe, Network, Package, SquareTerminal } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { looksLikeKey, missingFieldLabels } from "./connectForm";
-import { agentIdFromName, templateGroups, templateIcon } from "./newAgentView";
+import { looksLikeKey, missingFieldLabels, paramDetails } from "./connectForm";
+import { agentFormDirty, agentIdFromName, storableParams, templateGroups, templateIcon } from "./newAgentView";
 
 const tpl = (id: string, category: AgentTemplate["category"], adapter = "command", params: AgentTemplate["params"] = []): AgentTemplate => ({
 	id,
@@ -56,5 +56,31 @@ describe("new agent gallery (fix wave 2b)", () => {
 		expect(looksLikeKey("sk-abc")).toBe(true);
 		expect(looksLikeKey("x".repeat(31))).toBe(true);
 		expect(looksLikeKey("MY_AGENT_TOKEN")).toBe(false);
+	});
+});
+
+describe("new agent draft (fix wave 2b, X-81)", () => {
+	const t = tpl("http-url", "bring-your-own", "remote_http", [
+		{ name: "endpoint_url", label: "Endpoint", default: "" },
+		{ name: "auth", label: "Auth", kind: "secret" },
+		{ name: "api_key_header", label: "Header", default: "Authorization" },
+	] as AgentTemplate["params"]);
+	it("never keeps secret fields in the draft", () => {
+		expect(storableParams(t, { endpoint_url: "https://x", auth: "sk-1", api_key_header: "X" })).toEqual({ endpoint_url: "https://x" });
+	});
+	it("is dirty only after a change from the defaults", () => {
+		expect(agentFormDirty(null, "x", "", {})).toBe(false);
+		expect(agentFormDirty(t, null, "", { api_key_header: "Authorization" })).toBe(false);
+		expect(agentFormDirty(t, null, "", { api_key_header: "Authorization", endpoint_url: "https://x" })).toBe(true);
+		expect(agentFormDirty(t, "mine", "", {})).toBe(true);
+	});
+});
+
+describe("field details (G1, M2-80)", () => {
+	it("reads details as optional", () => {
+		const base = { name: "endpoint_url", label: "Endpoint", required: true } as AgentTemplate["params"][number];
+		expect(paramDetails(base)).toBeUndefined();
+		expect(paramDetails({ ...base, details: "  " } as never)).toBeUndefined();
+		expect(paramDetails({ ...base, details: "POST with JSON." } as never)).toBe("POST with JSON.");
 	});
 });

@@ -6,13 +6,17 @@ import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
 import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { type ImprovementSpecBody, useCreateImprovementMutation, useEstimateImprovementMutation } from "@/lib/store/apis/improveApi";
-import i18n from "@/lib/i18n";
 import type { ImprovementEstimate } from "@/lib/types/improve";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { Dialog } from "@/components/ui/dialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import type { SuiteSummary } from "@/lib/types/bench";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 import { EstimateCard, estimateBlock } from "./estimateCard";
 import { PRESETS, type PresetName, PresetPicker } from "./presetPicker";
@@ -214,8 +218,19 @@ export interface NewImprovementFormProps {
 	busy?: boolean;
 	/** The server's refusal, shown under the form. */
 	error?: string;
-	onSubmit(): void;
+	onSubmit(): void | Promise<unknown>;
 	onCancel(): void;
+}
+
+/** The spending limit as dollars for the paid button; null when not a positive number yet. */
+export function limitUsd(limit: string): number | null {
+	const n = Number(limit);
+	return limit.trim() !== "" && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** True once the person changed anything from the empty form (the leave guard asks then). */
+export function improvementFormDirty(f: ImprovementForm): boolean {
+	return JSON.stringify(f) !== JSON.stringify(newForm());
 }
 
 /** The dialog's form (A2.9), without data fetching. Exported for tests. */
@@ -237,7 +252,6 @@ export function NewImprovementForm({
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
 	const { t: tu } = useTranslation("uf2b");
-	const ids = useId();
 	const choices: SuiteChoice[] = suites.map((s) => (typeof s === "string" ? { value: s, label: s } : s));
 	const readyChoices = choices.filter((c) => !c.notReady);
 	const notReadyChoices = choices.filter((c) => c.notReady);
@@ -259,23 +273,15 @@ export function NewImprovementForm({
 	};
 	return (
 		<form
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby={`${ids}-title`}
-			className="bg-card text-card-foreground flex max-h-[90vh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-lg border p-5 text-left shadow-lg"
-			data-testid="new-improvement-dialog"
+			aria-label={t("create.title")}
+			className="flex flex-col gap-4 text-left"
+			data-testid="new-improvement-form"
 			onSubmit={(e) => {
+				// Enter never starts paid work: only the Start button (which asks first) does.
 				e.preventDefault();
-				if (!block && !busy) onSubmit();
 			}}
 		>
-			<div className="flex flex-col gap-2">
-				<h2 id={`${ids}-title`} className="text-lg font-semibold">
-					{t("create.title")}
-				</h2>
-				<p className="text-muted-foreground text-sm">{t("create.description")}</p>
-				<ImprovementCli testId="new-improvement-cli" />
-			</div>
+			<ImprovementCli testId="new-improvement-cli" />
 			<label className="flex flex-col gap-1 text-sm">
 				<span className="text-foreground font-medium">{t("create.name")}</span>
 				<Input
@@ -415,7 +421,7 @@ export function NewImprovementForm({
 				</p>
 			)}
 			{/* Sticky footer: the estimate stays right above the paid Start button however long the form is. */}
-			<div className="bg-card sticky bottom-0 -mx-5 -mb-5 flex flex-col gap-3 border-t px-5 pt-3 pb-5" data-testid="new-improvement-footer">
+			<div className="bg-card sticky bottom-0 -mx-6 -mb-6 flex flex-col gap-3 border-t px-6 pt-3 pb-6" data-testid="new-improvement-footer">
 				<EstimateCard estimate={estimate} loading={estimating} error={estimateError} model={model} waiting={problems.length > 0} />
 				<div className="flex flex-wrap items-center justify-end gap-2">
 				{block && (
@@ -426,9 +432,17 @@ export function NewImprovementForm({
 				<Button type="button" variant="ghost" onClick={onCancel} data-testid="new-improvement-cancel">
 					{t("create.cancel")}
 				</Button>
-				<Button type="submit" disabled={block !== undefined || busy} title={block} data-testid="new-improvement-submit">
-					{t("create.submit", { limit: form.limit })}
-				</Button>
+				<PaidButton
+					verb={tu("improve.startVerb")}
+					capUsd={limitUsd(form.limit)}
+					confirm="always"
+					confirmText={tu("improve.confirmText")}
+					disabled={block !== undefined || busy}
+					isLoading={busy}
+					title={block}
+					onConfirm={onSubmit}
+					testId="new-improvement-submit"
+				/>
 				</div>
 			</div>
 		</form>
@@ -443,19 +457,20 @@ export function NewImprovementForm({
  */
 export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const navigate = useNavigate();
-	const [form, setForm] = useState<ImprovementForm>(newForm);
+	const { t } = useTranslation("improve");
+	const { t: tu } = useTranslation("uf2b");
+	// Kept in the session while open, so a reload or a slip of the Back button does not lose it.
+	const [form, setForm, clearDraft] = useFormDraft<ImprovementForm>("newImprovement", newForm());
+	const [open, setOpen] = useState(true);
+	// Off once the run is created, so opening the new run does not ask "Leave this page?".
+	const [sent, setSent] = useState(false);
+	useLeaveGuard(!sent && improvementFormDirty(form));
 	const agentsQ = useGetAgentsQuery();
 	// The picker needs only each benchmark id and version: the light list never waits for a pack load.
 	const suitesQ = useGetSuitesLightQuery();
 	const config = useGetAgentConfigQuery(form.agent, { skip: !form.agent });
 	const [create, state] = useCreateImprovementMutation();
 	const [estimate, est] = useEstimateImprovementMutation();
-	const confirm = useConfirm();
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
 	const complete = improvementFormProblems(form).length === 0;
 	const body = complete ? JSON.stringify(improvementSpec(form)) : "";
 	// The estimate shown must be for the current form: a newer change makes it stale until it answers.
@@ -474,15 +489,13 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const suites = suiteChoices(suitesQ.data?.suites ?? []);
 	const agentFiles = form.agent && config.data && !config.isFetching ? (config.data.fields.files ?? []) : undefined;
 	const submit = async () => {
-		// The run spends the organization's model keys: never start it on one click. Phase B of the
-		// fix wave swaps this plain confirm for the shared PaidButton.
-		const ok = await confirm(i18n.t("improve.confirm", { ns: "uf2b", limit: form.limit }), {
-			title: i18n.t("improve.confirmTitle", { ns: "uf2b" }),
-			confirmLabel: i18n.t("improve.confirmLabel", { ns: "uf2b", limit: form.limit }),
-		});
-		if (!ok) return;
+		// The run spends the organization's model keys: PaidButton asked first (confirm="always").
 		try {
 			const run = await create(improvementSpec(form)).unwrap();
+			flushSync(() => {
+				setSent(true);
+				clearDraft();
+			});
 			onClose();
 			void navigate({ to: "/improvements/$improvementId", params: { improvementId: run.id } });
 		} catch {
@@ -490,7 +503,18 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 		}
 	};
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="new-improvement-backdrop">
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				setOpen(next);
+				if (!next) onClose();
+			}}
+			title={t("create.title")}
+			description={t("create.description")}
+			closeLabel={tu("improve.close")}
+			size="lg"
+			testId="new-improvement-dialog"
+		>
 			<NewImprovementForm
 				form={form}
 				onChange={setForm}
@@ -503,9 +527,9 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 				estimateError={current && est.error ? getBenchErrorMessage(est.error) : undefined}
 				busy={state.isLoading}
 				error={state.error ? getBenchErrorMessage(state.error) : undefined}
-				onSubmit={() => void submit()}
+				onSubmit={submit}
 				onCancel={onClose}
 			/>
-		</div>
+		</Dialog>
 	);
 }
