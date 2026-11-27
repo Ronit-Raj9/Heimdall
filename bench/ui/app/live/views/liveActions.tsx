@@ -14,6 +14,8 @@ import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { useId, useState } from "react";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { useTranslation } from "react-i18next";
+import { formatUsd } from "@/lib/money";
+import "@/app/schedules/views/ufrjI18n";
 import { SetupCard, Step } from "@/components/inbox/featureHero";
 import { Activity } from "lucide-react";
 
@@ -35,9 +37,28 @@ export interface LiveActionsProps {
 	configured: boolean;
 }
 
+/** The judge's per-pull session cap when the live scoring settings set none (livescore/pull.go judgeMax). */
+export const JUDGE_DEFAULT_MAX_PER_PULL = 20;
+
+/**
+ * The "Also grade with a model" label (Q-219): paid, how many sessions one pull grades at most, and
+ * what caps the dollars. The server may report its own cap as judge.max_per_pull and judge.max_usd;
+ * without them the default session cap applies and the judge key's budget caps the cost. Pure.
+ */
+export function judgeLabel(
+	t: (key: string, o?: Record<string, unknown>) => string,
+	judge: { max_per_pull?: number; max_usd?: number } | undefined,
+	hosted: boolean,
+): string {
+	const count = judge?.max_per_pull && judge.max_per_pull > 0 ? judge.max_per_pull : JUDGE_DEFAULT_MAX_PER_PULL;
+	if (judge?.max_usd && judge.max_usd > 0) return t("live.judgeCapped", { count, usd: formatUsd(judge.max_usd) });
+	return t(hosted ? "live.judgeKeyBudgetHosted" : "live.judgeKeyBudget", { count });
+}
+
 /** Pull and compare as background jobs (livescore.pull, livescore.compare). */
 export function LiveActions({ hosted, configured, check }: LiveActionsProps) {
 	const { t } = useTranslation("liveinbox");
+	const { t: tr } = useTranslation("ufrj");
 	const refresh = useRefreshLive();
 	const [judge, setJudge] = useState(false);
 	const [restart, setRestart] = useState(false);
@@ -60,7 +81,7 @@ export function LiveActions({ hosted, configured, check }: LiveActionsProps) {
 						{(!check || check.judge) && (
 							<label className="text-muted-foreground flex items-center gap-1 text-xs">
 								<input type="checkbox" checked={judge} onChange={(e) => setJudge(e.target.checked)} data-testid="live-judge" />
-								{hosted ? t("live.actions.judgeHosted") : t("live.actions.judge")}
+								{judgeLabel((k, o) => String(tr(k as "live.judgeKeyBudget", o)), check?.judge as { max_per_pull?: number; max_usd?: number } | undefined, Boolean(hosted))}
 							</label>
 						)}
 						{judge && check?.judge && !check.judge.key_ready && (

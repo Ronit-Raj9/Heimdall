@@ -32,6 +32,11 @@ import { useTranslation } from "react-i18next";
 import "@/components/platform/ufintI18n";
 import i18n from "@/lib/i18n";
 
+/** Whether the new drift monitor form opens on arrival: only when the link names an agent. Pure. */
+export function formOpensFromLink(agent: string | null | undefined): boolean {
+	return Boolean(agent && agent.trim());
+}
+
 /**
  * Drift canaries: /canaries?name=. A small pinned suite re-run on a schedule through the gateway
  * and tested against a known-good baseline (docs/drift-canary.md). The list shows every canary's
@@ -47,9 +52,9 @@ export default function CanariesView() {
 	const unknown = !list.isFetching && unknownCanary(data, name);
 	const open = unknown ? null : (name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null));
 	const { t: u } = useTranslation("ux13");
-	// Q-50: "Watch this agent for drift" links here with ?agent=: the new monitor form opens with it picked.
-	const [agentParam] = useQueryState("agent", parseAsString);
-	const [formOpen, setFormOpen] = useState(Boolean(agentParam));
+	// "Watch this agent for drift" links here with ?agent=: the new monitor form opens with that agent (R6-2).
+	const [agentParam, setAgentParam] = useQueryState("agent", parseAsString);
+	const [formOpen, setFormOpen] = useState(() => formOpensFromLink(agentParam));
 	const [editing, setEditing] = useState<CanaryDefinition | null>(null);
 	const schedules = useGetSchedulesQuery();
 	const paused = pausedCanaries(schedules.data?.rows);
@@ -72,9 +77,13 @@ export default function CanariesView() {
 			{formOpen && (
 				<NewCanaryForm
 					initialAgent={agentParam ?? undefined}
-					onClose={() => setFormOpen(false)}
+					onClose={() => {
+						setFormOpen(false);
+						void setAgentParam(null);
+					}}
 					onCreated={(n) => {
 						setFormOpen(false);
+						void setAgentParam(null);
 						void setName(n);
 					}}
 				/>

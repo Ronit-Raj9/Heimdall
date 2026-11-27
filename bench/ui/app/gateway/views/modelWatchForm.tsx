@@ -4,7 +4,10 @@ import { Input } from "@/components/ui/input";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { errorMessage, useGetSchedulesQuery, useSaveSchedulesMutation } from "@/lib/store/apis/schedulesApi";
 import type { Schedule, SchedulesFile } from "@/lib/types/schedules";
+import { zoneOptions } from "@/components/canaries/howOften";
+import { browserZone, nextRuns } from "@/lib/utils/cron";
 import { useId, useState } from "react";
+import "@/app/schedules/views/ufrjI18n";
 import { useTranslation } from "react-i18next";
 import type { NewModelWatchFields } from "./modelWatchCard";
 import "./uf7cI18n";
@@ -20,6 +23,8 @@ export interface WatchForm {
 	match: string;
 	check: "daily" | "hourly";
 	maxUsdPerDay: string;
+	/** The zone the daily 06:00 check runs in (Q-272); empty means UTC. */
+	timezone?: string;
 }
 
 export const EMPTY_WATCH_FORM: WatchForm = {
@@ -80,6 +85,7 @@ export function watchSchedule(f: WatchForm, taken: readonly string[]): WatchBuil
 			evaluation: f.evaluation,
 			cron: WATCH_CRON[f.check],
 			max_usd_per_day: daily,
+			...(f.timezone && f.check === "daily" ? { timezone: f.timezone } : {}),
 			new_models: { providers, current: f.current, usd_per_model: usd, max_per_day: perDay, ...(match ? { match } : {}) },
 		},
 	};
@@ -107,6 +113,31 @@ export function evaluationLabel(ev: Pick<Evaluation, "id" | "created_at" | "spec
 	return [name, date, models].filter((p) => p).join(", ");
 }
 
+/**
+ * The option texts of a list of evaluations (Q-293): the plain label, then the time of day (UTC) for
+ * labels that repeat, then the id for any still alike, so no two options read the same. Pure.
+ */
+export function evaluationLabels(evs: readonly Pick<Evaluation, "id" | "created_at" | "spec">[]): Map<string, string> {
+	const base = evs.map((e) => evaluationLabel(e));
+	const count = (list: string[]) => list.reduce((m, l) => m.set(l, (m.get(l) ?? 0) + 1), new Map<string, number>());
+	const c1 = count(base);
+	const timed = evs.map((e, i) => {
+		if ((c1.get(base[i]) ?? 0) < 2) return base[i];
+		const d = e.created_at ? new Date(e.created_at) : null;
+		const time = d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(11, 16) + " UTC" : "";
+		return time ? `${base[i]}, ${time}` : base[i];
+	});
+	const c2 = count(timed);
+	return new Map(evs.map((e, i) => [e.id, (c2.get(timed[i]) ?? 0) > 1 ? `${timed[i]} (${e.id})` : timed[i]]));
+}
+
+/** The daily 06:00 check of a zone in UTC ("05:00"), for a zone that is not UTC. Pure. */
+export function utcOfDaily(zone: string, from: Date = new Date()): string | null {
+	if (!zone || zone === "UTC") return null;
+	const next = nextRuns("0 6 * * *", zone, 1, from)[0];
+	return next ? next.toISOString().slice(11, 16) : null;
+}
+
 /** The option text of a setup: "A: gpt-6-luna", or the label alone when the arm names no model. Pure. */
 export function setupOptionLabel(ev: Pick<Evaluation, "spec"> | undefined, label: string): string {
 	const model = ev?.spec.arms.find((a) => a.label === label)?.model;
@@ -129,7 +160,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 	);
 }
 
-const selectClass = "h-9 rounded-md border px-2 text-sm";
+// w-full min-w-0: the select stays inside the card on a phone (Q-28).
+const selectClass = "border-input bg-background h-9 w-full min-w-0 rounded-md border px-2 text-sm";
 
 /** The fields of the form. Pure apart from the change callback. */
 export function WatchFormFields({
@@ -143,6 +175,10 @@ export function WatchFormFields({
 }) {
 	const { t } = useTranslation("w4int");
 	const { t: u } = useTranslation("uf7c");
+	const { t: r } = useTranslation("ufrj");
+	const labels = evaluationLabels(evaluations);
+	const zone = form.timezone || "UTC";
+	const utc = utcOfDaily(zone);
 	const providers = providerList(form.providers);
 	const set = <K extends keyof WatchForm>(k: K, v: WatchForm[K]) => onChange({ ...form, [k]: v });
 	const picked = evaluations.find((e) => e.id === form.evaluation);
@@ -150,7 +186,7 @@ export function WatchFormFields({
 		<div className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="model-watch-form">
 			<Row label={t("watchForm.providers")} hint={u("watch.providersHint")}>
 				{(id) => (
-					<div className="flex flex-col gap-2">
+					<div className="flex min-w-0 flex-col gap-2">
 						<select
 							id={id}
 							className={selectClass}
@@ -200,7 +236,7 @@ export function WatchFormFields({
 						<option value="">{t("watchForm.pick")}</option>
 						{evaluations.map((e) => (
 							<option key={e.id} value={e.id}>
-								{evaluationLabel(e)}
+								{labels.get(e.id) ?? evaluationLabel(e)}
 							</option>
 						))}
 					</select>
@@ -253,12 +289,25 @@ export function WatchFormFields({
 			<Row label={t("watchForm.check")}>
 				{(id) => (
 					<select id={id} className={selectClass} value={form.check} onChange={(e) => set("check", e.target.value as WatchForm["check"])}>
-						<option value="daily">{t("watchForm.daily")}</option>
+						<option value="daily">{r("watch.dailyAt", { zone })}</option>
 						<option value="hourly">{t("watchForm.hourly")}</option>
 					</select>
 				)}
 			</Row>
-			<Row label={t("watchForm.maxUsdPerDay")} hint={t("watchForm.maxUsdPerDayHint")}>
+			{form.check === "daily" && (
+					<Row label={r("watch.zone")} hint={utc ? r("watch.utcHint", { zone, utc }) : undefined}>
+						{(id) => (
+							<select id={id} className={selectClass} value={zone} onChange={(e) => set("timezone", e.target.value)} data-testid="model-watch-zone">
+								{zoneOptions(zone).map((z) => (
+									<option key={z} value={z}>
+										{z}
+									</option>
+								))}
+							</select>
+						)}
+					</Row>
+				)}
+				<Row label={t("watchForm.maxUsdPerDay")} hint={t("watchForm.maxUsdPerDayHint")}>
 				{(id) => (
 					<Input
 						id={id}
@@ -278,7 +327,7 @@ export function WatchFormFields({
 /** "Set up a watch": the form, saved as a new evaluation schedule; the server's refusal is shown as it is. */
 export function NewModelWatchForm({ onDone }: { onDone(): void }) {
 	const { t } = useTranslation("w4int");
-	const [form, setForm] = useState<WatchForm>(EMPTY_WATCH_FORM);
+	const [form, setForm] = useState<WatchForm>(() => ({ ...EMPTY_WATCH_FORM, timezone: browserZone() }));
 	const [error, setError] = useState("");
 	const schedules = useGetSchedulesQuery();
 	const evaluations = useListEvaluationsQuery();
@@ -292,7 +341,7 @@ export function NewModelWatchForm({ onDone }: { onDone(): void }) {
 		setError("");
 		try {
 			await save({ file: withWatch(file, built.schedule) }).unwrap();
-			setForm(EMPTY_WATCH_FORM);
+			setForm({ ...EMPTY_WATCH_FORM, timezone: browserZone() });
 			onDone();
 		} catch (e) {
 			setError(errorMessage(e, t("watchForm.saveFailed")));

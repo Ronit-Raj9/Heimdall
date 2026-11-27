@@ -130,6 +130,15 @@ describe("every missing field at once (N81)", () => {
 		expect(html).toContain("pick an agent, a benchmark, the tasks and at least one model");
 	});
 
+	it("starts with the agent from the link (R6-2)", () => {
+		const html = renderToStaticMarkup(
+			<Provider store={newStore()}>
+				<NewCanaryForm initialAgent="codex" />
+			</Provider>,
+		);
+		expect(html).not.toContain('data-testid="canary-new-missing-agent"');
+	});
+
 	it("asks for both spending limits unless Practice mode is ticked", () => {
 		expect(canaryFormProblems({ ...filled(), perRun: "", perDay: "3" }).map((p) => p.key)).toEqual(["canary.problem.budget"]);
 		expect(canaryFormProblems({ ...filled(), perRun: "5", perDay: "3" }).map((p) => p.key)).toEqual(["canary.problem.budgetOrder"]);

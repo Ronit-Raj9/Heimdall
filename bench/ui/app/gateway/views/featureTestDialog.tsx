@@ -18,7 +18,10 @@ import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import type { Experiment, ExperimentPlan } from "@/lib/types/bench";
 import type { GwDraftRequest, GwDraftResponse } from "@/lib/types/gateway";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { formatUsd } from "@/lib/money";
+import { suiteDisplayName } from "@/components/suites/suiteDisplay";
+import { useEffect, useRef, useState } from "react";
+import "@/app/schedules/views/ufrjI18n";
 import { useTranslation } from "react-i18next";
 import "./uf7cI18n";
 import "./w4p6I18n";
@@ -185,6 +188,21 @@ export async function startFeatureTest(calls: FeatureTestCalls, exp: Experiment)
 
 type Prepared = { draft: GwDraftResponse; plan: ExperimentPlan };
 
+/** The plan's minutes when the time is observed, even when the cost is not. Pure. */
+export function planMinutes(plan: ExperimentPlan): number | null {
+	if (plan.est_wall_s?.state !== "observed" || plan.est_wall_s.v === null) return null;
+	return Math.max(1, Math.round((plan.est_wall_s.v as number) / 60));
+}
+
+/**
+ * The estimate against the budget (Q-295 on the gateway): the budget caps the test, so an estimate
+ * above it means the test may stop before it ends. Both amounts in the button's format. Pure.
+ */
+export function overBudget(estUsd: number | null | undefined, budget: number): { est: string; budget: string } | null {
+	if (estUsd == null || !(budget > 0) || !(estUsd > budget)) return null;
+	return { est: formatUsd(estUsd), budget: formatUsd(budget) };
+}
+
 /** The plan's estimate in dollars and minutes, when both are observed. Pure. */
 export function planEstimate(plan: ExperimentPlan): { usd: number; minutes: number } | null {
 	if (plan.est_usd?.state !== "observed" || plan.est_usd.v === null || plan.est_wall_s?.state !== "observed" || plan.est_wall_s.v === null)
@@ -195,23 +213,36 @@ export function planEstimate(plan: ExperimentPlan): { usd: number; minutes: numb
 /** The confirmation sentence: the estimate and the cap, or the cap alone when the estimate is not known. Pure. */
 export function confirmText(t: (key: "dialog.confirm" | "dialog.confirmUnknown", o: { est?: string; budget: string }) => string, plan: ExperimentPlan, budget: number) {
 	const est = planEstimate(plan);
+	// The same format as the button's "up to $5.00" (one helper for every amount here).
 	return est
-		? t("dialog.confirm", { est: est.usd.toFixed(2), budget: budget.toFixed(2) })
-		: t("dialog.confirmUnknown", { budget: budget.toFixed(2) });
+		? t("dialog.confirm", { est: formatUsd(est.usd).slice(1), budget: formatUsd(budget).slice(1) })
+		: t("dialog.confirmUnknown", { budget: formatUsd(budget).slice(1) });
 }
 
 /** The estimate, notes, plan refusals and the confirmation, shown as soon as the form is complete. Pure. */
 export function PreparedView({ prepared, budget, confirming }: { prepared: Prepared; budget: number; confirming: boolean }) {
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
+	const { t: r } = useTranslation("ufrj");
 	const { notes } = prepared.draft;
 	const { plan } = prepared;
 	const est = planEstimate(plan);
+	const minutes = planMinutes(plan);
+	const over = overBudget(est?.usd, budget);
 	return (
 		<div className="flex flex-col gap-3 text-sm" data-testid="feature-test-prepared">
 			<p data-testid="feature-test-estimate">
-				{est ? u("dialog.estimateLine", { usd: est.usd.toFixed(2), minutes: est.minutes }) : u("dialog.estimateLineUnknown")}
+				{est
+					? u("dialog.estimateLine", { usd: formatUsd(est.usd).slice(1), minutes: est.minutes })
+					: minutes !== null
+						? r("gw.estimateUnknownCost", { minutes })
+						: r("gw.estimateUnknownBoth")}
 			</p>
+			{over && (
+				<p className="text-chart-warning-ink" data-testid="feature-test-over-budget">
+					{r("gw.overBudget", over)}
+				</p>
+			)}
 			{notes.length > 0 && (
 				<div className="flex flex-col gap-1" data-testid="feature-test-notes">
 					<p className="font-medium">{t("dialog.notes")}</p>
@@ -241,14 +272,24 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 	);
 }
 
-/** The text of a benchmark option: its name and task count. Pure. */
+/** The text of a benchmark option: its display name (as on /failure-tests) and task count. Pure. */
 export function suiteLabel(u: (key: "dialog.suiteOption", o: { name: string; count: number }) => string, s: { id: string; task_count?: number }) {
-	return u("dialog.suiteOption", { name: s.id, count: s.task_count ?? 0 });
+	return u("dialog.suiteOption", { name: suiteDisplayName(s.id), count: s.task_count ?? 0 });
 }
 
-/** The text of an agent option: its name and its model when it has one. Pure. */
-export function agentLabel(u: (key: "dialog.agentOption", o: { name: string; model: string }) => string, a: { id: string; model?: string }) {
-	return a.model ? u("dialog.agentOption", { name: a.id, model: a.model }) : a.id;
+/**
+ * Whether every task of a benchmark passed the readiness check (Q-298): the comparison plan refuses a
+ * benchmark with a task that has not, so such a benchmark is marked and cannot be picked. A benchmark
+ * that reports no task count is taken as ready (the plan still decides). Pure.
+ */
+export function suiteReady(s: { task_count?: number; admitted_count?: number }): boolean {
+	if (!(Number(s.task_count) > 0) || s.admitted_count === undefined) return true;
+	return s.admitted_count >= Number(s.task_count);
+}
+
+/** The agent option's name; the model is shown beside it as a hint (Q-207). Pure. */
+export function agentLabel(a: { id: string }) {
+	return a.id;
 }
 
 /** The raw error, for the Details fold under the server's message. Pure. */
@@ -284,6 +325,7 @@ export function FeatureTestDialog({
 }) {
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
+	const { t: r } = useTranslation("ufrj");
 	const navigate = useNavigate();
 	const suites = useGetSuitesLightQuery(undefined, { skip: !open });
 	const agents = useGetAgentsQuery(undefined, { skip: !open });
@@ -291,13 +333,27 @@ export function FeatureTestDialog({
 	const [plan] = usePlanExperimentMutation();
 	const [create] = useCreateExperimentMutation();
 	const [start] = useStartExperimentMutation();
-	const [form, setForm] = useState<FeatureTestForm>(() => ({ ...EMPTY, ...initial }));
 	const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+	const [form, setForm] = useState<FeatureTestForm>(() => ({ ...EMPTY, ...initial }));
+	// "Agent's own model" or a model picked for both setups (Q-299): the picker is shown only when asked,
+	// because it fills itself with the server's default model.
+	const [ownModel, setOwnModel] = useState(!initial?.model);
+	const firstField = useRef<HTMLButtonElement>(null);
+	// Each feature starts from an empty form (Q-297): nothing is kept from the last feature's test.
+	const [formFeature, setFormFeature] = useState(feature);
+	if (formFeature !== feature) {
+		setFormFeature(feature);
+		setForm({ ...EMPTY, ...initial });
+		setOwnModel(!initial?.model);
+		setTouched(new Set());
+	}
 	const [prepared, setPrepared] = useState<Prepared | null>(null);
 	const [estimating, setEstimating] = useState(false);
 	const [error, setError] = useState<unknown>(null);
 	const [showTests, setShowTests] = useShowTests();
 	const suiteList = pickableSuites(suites.data?.suites ?? [], showTests);
+	const readySuites = suiteList.shown.filter(suiteReady);
+	const notReadySuites = suiteList.shown.filter((s) => !suiteReady(s));
 	const agentList = pickableAgents(agents.data?.agents ?? [], showTests);
 	const calls: FeatureTestCalls = {
 		draft: (req) => draft(req).unwrap(),
@@ -364,8 +420,14 @@ export function FeatureTestDialog({
 			closeLabel={u("dialog.close")}
 			testId="feature-test-dialog"
 			size="lg"
+			initialFocus={firstField}
 			footer={
 				<div className="flex flex-wrap items-start justify-end gap-2">
+					{estimating && (
+						<span className="text-muted-foreground mr-auto self-center text-xs" data-testid="feature-test-estimating-footer">
+							{u("dialog.estimating")}
+						</span>
+					)}
 					<Button type="button" variant="outline" onClick={onClose}>
 						{t("dialog.cancel")}
 					</Button>
@@ -390,17 +452,27 @@ export function FeatureTestDialog({
 						<span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>
 					</span>
 					<Select value={form.suite || undefined} onValueChange={(v) => set({ suite: v }, "suite")}>
-						<SelectTrigger className="w-full" aria-required data-testid="feature-test-suite">
+						<SelectTrigger ref={firstField} className="w-full" aria-required aria-label={t("dialog.benchmark")} data-testid="feature-test-suite">
 							<SelectValue placeholder={t("dialog.pick")} />
 						</SelectTrigger>
 						<SelectContent>
-							{suiteList.shown.map((s) => (
-								<SelectItem key={s.id} value={suiteOption(s)}>
+							{readySuites.map((s) => (
+								<SelectItem key={s.id} value={suiteOption(s)} title={s.id}>
 									{suiteLabel((k, o) => String(u(k, o)), s)}
+								</SelectItem>
+							))}
+							{notReadySuites.map((s) => (
+								<SelectItem key={s.id} value={suiteOption(s)} title={s.id} disabled data-testid={`feature-test-suite-not-ready-${s.id}`}>
+									{r("gw.suiteNotReady", { name: suiteDisplayName(s.id), ready: s.admitted_count ?? 0, count: s.task_count ?? 0 })}
 								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
+					{notReadySuites.length > 0 && (
+						<span className="text-muted-foreground text-xs" data-testid="feature-test-not-ready-count">
+							{r("gw.notReadyCount", { count: notReadySuites.length })}
+						</span>
+					)}
 					{needed("suite")}
 				</label>
 				<label className="flex flex-col gap-1">
@@ -409,13 +481,14 @@ export function FeatureTestDialog({
 						<span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>
 					</span>
 					<Select value={form.base || undefined} onValueChange={(v) => set({ base: v }, "base")}>
-						<SelectTrigger className="w-full" aria-required data-testid="feature-test-agent">
+						<SelectTrigger className="w-full" aria-required aria-label={t("dialog.agent")} data-testid="feature-test-agent">
 							<SelectValue placeholder={t("dialog.pick")} />
 						</SelectTrigger>
 						<SelectContent>
 							{agentList.shown.map((a) => (
 								<SelectItem key={a.id} value={a.path}>
-									{agentLabel((k, o) => String(u(k, o)), a)}
+									{agentLabel(a)}
+									{a.model && <span className="text-muted-foreground ml-2 text-xs">{a.model}</span>}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -427,12 +500,31 @@ export function FeatureTestDialog({
 						{modelRequired ? u("dialog.modelRequired") : t("dialog.model")}
 						{modelRequired && <span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>}
 					</span>
-					<ModelPicker
-						value={form.model ? { provider: form.provider || "openai", model: form.model } : null}
-						onChange={(v) => set({ model: v.model, provider: v.provider }, "model")}
-						purpose="agent"
-						testId="feature-test-model-picker"
-					/>
+					{!modelRequired && (
+						<Select
+							value={ownModel ? "own" : "pick"}
+							onValueChange={(v) => {
+								setOwnModel(v === "own");
+								if (v === "own") set({ model: "", provider: "" }, "model");
+							}}
+						>
+							<SelectTrigger className="w-full" aria-label={t("dialog.model")} data-testid="feature-test-model-mode">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="own">{r("gw.ownModel")}</SelectItem>
+								<SelectItem value="pick">{r("gw.pickModel")}</SelectItem>
+							</SelectContent>
+						</Select>
+					)}
+					{(modelRequired || !ownModel) && (
+						<ModelPicker
+							value={form.model ? { provider: form.provider || "openai", model: form.model } : null}
+							onChange={(v) => set({ model: v.model, provider: v.provider }, "model")}
+							purpose="agent"
+							testId="feature-test-model-picker"
+						/>
+					)}
 					<span className="text-muted-foreground text-xs">{modelRequired ? u("dialog.modelNeeded") : u("dialog.modelHint")}</span>
 					{needed("model", u("dialog.needModel"))}
 				</div>
@@ -454,7 +546,7 @@ export function FeatureTestDialog({
 									/>
 								) : o.kind === "yesno" ? (
 									<Select value={form.options[o.key] || "yes"} onValueChange={(v) => setOption(o.key, v)}>
-										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full">
+										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full" aria-label={opt(o.key, "label")}>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
@@ -464,7 +556,7 @@ export function FeatureTestDialog({
 									</Select>
 								) : o.kind === "budgetPick" ? (
 									<Select value={form.options[o.key] || undefined} onValueChange={(v) => setOption(o.key, v)}>
-										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full">
+										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full" aria-label={opt(o.key, "label")}>
 											<SelectValue placeholder={t("dialog.pick")} />
 										</SelectTrigger>
 										<SelectContent>

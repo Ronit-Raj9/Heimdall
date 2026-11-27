@@ -23,14 +23,15 @@ const row = {
 
 describe("Watch for new models", () => {
 	it("says when it checks in plain words", () => {
-		expect(cronWords("0 6 * * *")).toBe("every day at 06:00");
+		expect(cronWords("0 6 * * *")).toBe("every day at 06:00 (UTC)");
+		expect(cronWords("0 6 * * *", "Europe/Berlin")).toBe("every day at 06:00 (Europe/Berlin)");
 		expect(cronWords("15 * * * *")).toBe("every hour");
 		expect(cronWords("0 6 * * 1")).toBe("on the schedule 0 6 * * 1");
 	});
 
 	it("shows the sentence, the first-check line and what happened to each model", () => {
 		const empty = render(<ModelWatchView row={row} onRetry={() => undefined} />);
-		expect(empty).toContain("Heimdall checks Bifrost&#x27;s model catalog every day at 06:00.");
+		expect(empty).toContain("Heimdall checks Bifrost&#x27;s model catalog every day at 06:00 (UTC).");
 		expect(empty).toContain("runs ev_core on it next to sonnet, once, with a budget of $5.00");
 		expect(empty).toContain("The first check only records the models that exist today. Nothing runs until a new one appears.");
 		const st: GwWatchState = {

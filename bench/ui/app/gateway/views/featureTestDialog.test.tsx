@@ -125,8 +125,10 @@ describe("Feature test dialog", () => {
 	it("shows names in the selects and hides test benchmarks", () => {
 		const u = (k: string, o: Record<string, unknown>) => `${k}:${JSON.stringify(o)}`;
 		expect(suiteLabel(u, { id: "swe-lite", task_count: 120 })).toBe('dialog.suiteOption:{"name":"swe-lite","count":120}');
-		expect(agentLabel(u, { id: "codex", model: "gpt-6" })).toBe('dialog.agentOption:{"name":"codex","model":"gpt-6"}');
-		expect(agentLabel(u, { id: "codex", model: "" })).toBe("codex");
+		// Q-289: the display name, as on /failure-tests.
+		expect(suiteLabel(u, { id: "hd-harbor-tb2", task_count: 89 })).toContain('"name":"Terminal-Bench 2"');
+		// Q-207: the agent's name; its model is a separate hint.
+		expect(agentLabel({ id: "codex" })).toBe("codex");
 		expect(pickableSuites([{ id: "zz-test-a" }, { id: "swe-lite" }])).toEqual({ shown: [{ id: "swe-lite" }], hidden: 1 });
 		expect(pickableSuites([{ id: "zz-test-a" }, { id: "swe-lite" }], true).shown).toHaveLength(2);
 		const agents = [

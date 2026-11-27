@@ -25,7 +25,7 @@
 	"schedules": {
 		"heroTitle": "",
 		"heroMessage": "Pick a comparison, a time and a daily spending limit. Heimdall starts it for you.",
-		"heroAction": "Add a schedule",
+		"heroAction": "Add a repeat run",
 		"newAction": "Add schedule",
 		"stepWhat": "What to run",
 		"stepWhen": "When",

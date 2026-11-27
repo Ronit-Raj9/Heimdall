@@ -34,6 +34,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, Minus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/schedules/views/ufrjI18n";
 
 export type AuthMode = "bearer" | "raw" | "header";
 
@@ -72,7 +73,20 @@ export function formProblem(f: McpForm): "url" | "header" | null {
 	return null;
 }
 
-/** True when the address is a full http or https URL; checked on press, not by disabling the button (M5-50). */
+/** The most requests one check sends (mcptest.DefaultMaxCalls), said beside the button (Q-290). */
+export const MCP_MAX_REQUESTS = 80;
+
+/**
+ * Whether the address shows its problem and holds the button (Q-290): a typed address that is not a
+ * full http or https URL with a host does, as soon as it is typed; an empty one only after a press. Pure.
+ */
+export function urlState(raw: string, pressed: boolean): { bad: boolean; blocks: boolean } {
+	const typed = raw.trim() !== "";
+	const bad = !validUrl(raw) && (typed || pressed);
+	return { bad, blocks: typed && !validUrl(raw) };
+}
+
+/** True when the address is a full http or https URL with a host. */
 export function validUrl(raw: string): boolean {
 	try {
 		const u = new URL(raw.trim());
@@ -483,10 +497,13 @@ export function McpTestView() {
 	const set = (p: Partial<McpForm>) => setForm(p);
 	const problem = formProblem(form);
 	const { t: t5 } = useTranslation("uf5b");
+	const { t: tr } = useTranslation("ufrj");
 	const [pressed, setPressed] = useState(false);
-	// The button stays enabled; a press with a missing or broken address says what to type (M5-50).
-	const urlBad = pressed && !validUrl(form.url);
-	const inspectWhy = problem === "header" ? tw("mcp.headerNeeded") : null;
+	// A typed address that is not a URL is said at once and holds the button (Q-290); an empty one is
+	// said on a press, so the button stays usable to learn what to type (M5-50).
+	const url = urlState(form.url, pressed);
+	const urlBad = url.bad;
+	const inspectWhy = url.blocks ? t5("mcp.badUrl") : problem === "header" ? tw("mcp.headerNeeded") : null;
 	const address = hostedMcpAddress(typeof window !== "undefined" ? window.location.origin : undefined);
 	useLeaveGuard(mcpFormDirty(form) && report === null);
 	const run = async () => {
@@ -612,13 +629,13 @@ export function McpTestView() {
 					</span>
 				</label>
 				<p className="text-muted-foreground max-w-prose text-xs" data-testid="mcp-inspect-note">
-					{t("form.inspectNote")}
+					{tr("mcp.inspectNote", { count: MCP_MAX_REQUESTS })}
 					<span className="block">{t5("mcp.youGet")}</span>
 				</p>
 				<div className="flex flex-wrap items-center gap-3">
 					<Button
 						onClick={() => void run()}
-						disabled={st.isLoading}
+						disabled={st.isLoading || url.blocks}
 						aria-describedby={inspectWhy ? "mcp-inspect-why" : undefined}
 						data-testid="mcp-inspect"
 					>
