@@ -155,8 +155,8 @@
 			"p": "{{changed}} of {{total}} tasks changed. Chance this is luck: {{p}} (we call it real below {{alpha}}).",
 			"noP": "No p value: there is no common task.",
 			"approx": "(approximate)",
-			"minP_one": "Only {{count}} task changed, too few to tell a real change from luck. Add tasks.",
-			"minP_other": "Only {{count}} tasks changed, too few to tell a real change from luck. Add tasks."
+			"minP_one": "Only {{count}} task changed, too few to tell a real change from luck: the chance of luck can be no lower than {{p}}, and it must be below {{alpha}}. Add tasks.",
+			"minP_other": "Only {{count}} tasks changed, too few to tell a real change from luck: the chance of luck can be no lower than {{p}}, and it must be below {{alpha}}. Add tasks."
 		},
 		"conclusion": {
 			"b_better": "B is better",
@@ -441,7 +441,7 @@
 		},
 		"footnote": {
 			"title": "About this board",
-			"generated": "Generated {{time}}. Sorted by {{metric}}.",
+			"generated": "Generated {{time}}. Sorted by {{metric}}; tiers split where the chance the gap is luck is below {{alpha}}.",
 			"rankClaim": "Rank alone does not prove one agent beats another. Only the Behind group means an agent is clearly worse than the leader.",
 			"scopeAll": "Scope all: each entry is measured over its own tasks, so two success rates can rest on different tasks. Tiers still compare each entry with the leader on the tasks both ran.",
 			"scopeCommon_one": "Scope common: every entry is measured over the same {{count}} common task only.",
@@ -1637,7 +1637,7 @@
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
-		"facts": "{{suite}}, {{tasks}} shared tasks",
+		"facts": "{{suite}}, {{tasks}} shared tasks, a difference counts below a luck chance of {{alpha}}",
 		"notSeparable": "Cannot separate",
 		"synthetic": "Synthetic data: scripted agent, scripted model or smoke experiment. These numbers are not findings.",
 		"openVerdict": "Open verdict",

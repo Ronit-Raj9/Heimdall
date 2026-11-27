@@ -45,7 +45,7 @@ function Badge({
 }: React.ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean; tone?: BadgeTone }) {
 	const Comp = asChild ? Slot : "span";
 
-	return <Comp data-slot="badge" data-tone={tone} className={cn(badgeVariants({ variant: tone ? TONE_VARIANT[tone] : variant }), className)} {...props} />;
+	return <Comp data-slot="badge" className={cn(badgeVariants({ variant: tone ? TONE_VARIANT[tone] : variant }), className)} {...props} {...(tone ? { "data-tone": tone } : {})} />;
 }
 
 export { Badge, badgeVariants };

@@ -101,7 +101,7 @@ describe("AgentDiffTab", () => {
 		expect(html).toContain('data-testid="agentdiff-synthetic-banner"');
 		expect(html).toMatch(/data-testid="agentdiff-summary-text"[^>]*>B \(B: code-wins note\) passes one more task than A/);
 		expect(html).toMatch(/data-testid="agentdiff-conclusion"[^>]*>Cannot tell/);
-		expect(html).toContain("the smallest possible p is 0.5");
+		expect(html).toContain("the chance of luck can be no lower than 0.5");
 		expect(html).toMatch(/data-testid="agentdiff-net"[^>]*>Net \+1 tasks/);
 		// Config groups in report order, the redacted marker, a collapsible diff and a hash-only note.
 		const order = ["agentdiff-group-prompt_notes", "agentdiff-group-tools", "agentdiff-group-budgets", "agentdiff-group-gateway"];

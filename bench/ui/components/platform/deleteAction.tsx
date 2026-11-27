@@ -52,7 +52,7 @@ export function DeleteAction({
 		// Visible to everyone, not only screen readers (X-106): a disabled button and its reason.
 		return (
 			<span className="flex flex-col items-start gap-1">
-				<Button size="sm" variant="outline" disabled aria-describedby={`${testId}-admin-only`} dataTestId={testId}>
+				<Button size="sm" variant="outline" disabled aria-describedby={`${testId}-admin-only`} dataTestId={`${testId}-disabled`}>
 					<Trash2 aria-hidden="true" />
 					{label}
 				</Button>
