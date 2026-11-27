@@ -374,7 +374,7 @@ export function RunsTable() {
 			/>
 		) : null;
 
-	const sel = "h-10 w-full md:h-8 md:w-auto";
+	const sel = "h-10 w-full md:h-(--control-h) md:w-auto";
 	const runLink = (row: RunListRow, className?: string) => (
 		<Link
 			to="/runs/$runId"
@@ -408,6 +408,7 @@ export function RunsTable() {
 						placeholder={tu("runs.search")}
 						label={tu("runs.searchLabel")}
 						testId="runs-search"
+						className="md:w-48 2xl:w-64"
 					/>
 					{/* Phones: one search, the other filters behind "Filters (n)" (M5-32). */}
 					<Button
@@ -472,6 +473,13 @@ export function RunsTable() {
 								testId="runs-filter-fault"
 							/>
 						)}
+						<ShowArchivedChip
+							count={archivedCount}
+							on={showArchived}
+							onChange={(on) => void setSearch({ archived: on ? "1" : null, page: null })}
+							className="self-start md:self-auto"
+							testId="runs-show-archived"
+						/>
 					</div>
 					{live > 0 && (
 						<span
@@ -483,13 +491,6 @@ export function RunsTable() {
 						</span>
 					)}
 				</div>
-				<ShowArchivedChip
-					count={archivedCount}
-					on={showArchived}
-					onChange={(on) => void setSearch({ archived: on ? "1" : null, page: null })}
-					className="self-start"
-					testId="runs-show-archived"
-				/>
 				<FilterTokens tokens={tokens} onClear={clear} testId="runs-tokens" />
 			</div>
 
@@ -626,10 +627,10 @@ export function RunsTable() {
 										)}
 										data-testid={`runs-row-${row.run_id}`}
 									>
-										<td className="px-4 py-2">
-											<div className="max-w-44 truncate font-medium lg:max-w-56 xl:max-w-64">{runLink(row)}</div>
+										<td className="px-4 py-1.5">
+											<div className="max-w-44 truncate leading-5 font-medium lg:max-w-56 xl:max-w-64">{runLink(row)}</div>
 											{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-archived-${row.run_id}`} />}
-											<div className="text-muted-foreground max-w-44 truncate text-xs lg:max-w-56 xl:max-w-64" title={row.suite}>
+											<div className="text-muted-foreground max-w-44 truncate text-xs leading-4 lg:max-w-56 xl:max-w-64" title={row.suite}>
 												{runSuiteLabel(row)}
 												{(row as RunListRowNamed).exp_name && (
 													<span data-testid={`runs-exp-${row.run_id}`}> · {(row as RunListRowNamed).exp_name}</span>
@@ -666,7 +667,7 @@ export function RunsTable() {
 										>
 											{timeAgo(row.started, locale)}
 										</td>
-										<td className="w-10 min-w-10 px-2 py-2 text-right">
+										<td className="w-10 min-w-10 px-2 py-1 text-right">
 											<RunRowMenu row={row} testId={`runs-row-${row.run_id}`} />
 										</td>
 									</tr>

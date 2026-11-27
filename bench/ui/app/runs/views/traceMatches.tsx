@@ -201,7 +201,7 @@ export function TraceSearchInput({ value, onChange, delay = 300 }: { value: stri
 		return () => clearTimeout(id);
 	}, [draft, delay, onChange]);
 	return (
-		<label className="relative min-w-48 flex-1 sm:max-w-sm" title={t("search.help")}>
+		<label className="relative w-full md:w-48 2xl:w-64" title={t("search.help")}>
 			<span className="sr-only">{t("search.label")}</span>
 			<FileSearch
 				className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
@@ -215,7 +215,7 @@ export function TraceSearchInput({ value, onChange, delay = 300 }: { value: stri
 				aria-label={t("search.label")}
 				aria-describedby="trace-search-help"
 				data-testid="runs-trace-search"
-				className="border-input bg-card placeholder:text-muted-foreground focus-visible:ring-ring/40 h-8 w-full rounded-md border pr-2.5 pl-8 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+				className="border-input bg-card placeholder:text-muted-foreground focus-visible:ring-ring/40 h-(--control-h) w-full rounded-md border pr-2.5 pl-8 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
 			/>
 			<span id="trace-search-help" className="sr-only">
 				{t("search.help")}

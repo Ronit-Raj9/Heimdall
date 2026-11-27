@@ -2,6 +2,8 @@ import { ValueCell } from "@/components/valueCell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Value, ValueKind } from "@/lib/types/bench";
 import "@/app/leaderboard/views/uf4bI18n";
+import { FoldedRows } from "@/components/ui/facts";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { type StripMetricName, visibleStripMetrics } from "./runs.utils";
 
@@ -20,21 +22,26 @@ export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 	const { t: tu } = useTranslation("uf4b");
 	// M4-58: one legend line names where the numbers come from, instead of a tag in every cell.
 	const sources = metricSources(lanes);
-	return (
-		<div className="flex min-w-0 flex-col gap-1">
-		<Table data-testid="run-metric-strip" stickyColumns={1}>
+	const metrics = visibleStripMetrics(lanes);
+	// Round 3 rule 9: a measurement no setup recorded folds behind one line instead of a row of "unknown".
+	const recorded = metrics.filter((m) => !notRecorded(lanes, m.name));
+	const missing = metrics.filter((m) => notRecorded(lanes, m.name));
+	// Rule 7: label and values stay close; the table grows with the number of setups, not the page.
+	const cap = lanes.length <= 1 ? "max-w-[40rem]" : lanes.length <= 3 ? "max-w-[56rem]" : undefined;
+	const table = (rows: typeof metrics, testId?: string) => (
+		<Table data-testid={testId} stickyColumns={1}>
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("runs.metrics.metric")}</TableHead>
 					{lanes.map(({ arm }) => (
-						<TableHead key={`head-${arm}`} className="text-right">
+						<TableHead key={`head-${arm}`} numeric>
 							{t("runs.arm", { arm })}
 						</TableHead>
 					))}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{visibleStripMetrics(lanes).map((metric) => {
+				{rows.map((metric) => {
 					const { name } = metric;
 					const family = "family" in metric && metric.family;
 					return (
@@ -44,26 +51,38 @@ export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 									{t(`runs.metrics.${name}`)}
 								</span>
 							</TableCell>
-							{lanes.map(({ arm, metrics }) => {
-								const value = metrics[name];
-								return (
-									<TableCell key={`${name}-${arm}`} className="text-right">
-										<ValueCell value={value} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
-									</TableCell>
-								);
-							})}
+							{lanes.map(({ arm, metrics }) => (
+								<TableCell key={`${name}-${arm}`} numeric>
+									<ValueCell value={metrics[name]} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
+								</TableCell>
+							))}
 						</TableRow>
 					);
 				})}
 			</TableBody>
 		</Table>
-		{sources.length > 0 && (
-			<p className="text-muted-foreground text-xs" data-testid="run-metric-sources">
-				{tu("metrics.sources", { list: sources.join(", ") })}
-			</p>
-		)}
+	);
+	return (
+		<div className={cn("flex min-w-0 flex-col gap-1", cap)}>
+			{recorded.length > 0 && table(recorded, "run-metric-strip")}
+			<FoldedRows count={missing.length} className={recorded.length > 0 ? "px-4 pb-2" : "px-4 py-2"} testId="run-metric-folded">
+				{table(missing, recorded.length > 0 ? undefined : "run-metric-strip")}
+			</FoldedRows>
+			{sources.length > 0 && (
+				<p className="text-muted-foreground px-4 pb-2 text-xs" data-testid="run-metric-sources">
+					{tu("metrics.sources", { list: sources.join(", ") })}
+				</p>
+			)}
 		</div>
 	);
+}
+
+/** True when no setup recorded this measurement (every lane's value is missing or unknown without bounds). Pure. */
+export function notRecorded(lanes: MetricStripProps["lanes"], name: string): boolean {
+	return lanes.every(({ metrics }) => {
+		const v = metrics[name];
+		return !v || (v.state === "unknown" && !v.bounds);
+	});
 }
 
 /** The distinct evidence sources of every shown number, in first-seen order. Pure. */

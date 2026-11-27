@@ -1,7 +1,9 @@
+import type { OverflowMenuItem } from "@/components/agents/overflowMenu";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { BENCH_API_BASE } from "@/lib/store/apis/fixtures";
 import { ChevronDown, Download } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { runTraceUrl } from "./traceView.utils";
 
@@ -11,7 +13,32 @@ const ITEMS = [
   { format: "jsonl", ext: "steps.jsonl" },
 ] as const;
 
-/** The run page Export menu: the run's trace as JSON, OTLP JSON, or one step per line. */
+/** Starts a file download of url as name (a menu item is a button, not a link). */
+function download(url: string, name: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** The three trace downloads as menu items: JSON, OTLP JSON (only once sealed), one step per line. */
+export function runExportItems(runId: string, sealed: boolean, t: TFunction<"runTrace">): OverflowMenuItem[] {
+  return ITEMS.map(({ format, ext }) => {
+    const disabled = format === "otlp" && !sealed;
+    return {
+      label: t(`export.${format}`),
+      icon: Download,
+      disabled,
+      disabledReason: disabled ? t(`export.${format}Note`) : undefined,
+      onSelect: () => download(runTraceUrl(BENCH_API_BASE, runId, format), `${runId}.${ext}`),
+      testId: `run-export-${format}`,
+    };
+  });
+}
+
+/** The run trace Export menu, on the shared dropdown: JSON, OTLP JSON, or one step per line. */
 export function RunExportMenu({
   runId,
   sealed,
@@ -20,73 +47,18 @@ export function RunExportMenu({
   sealed: boolean;
 }) {
   const { t } = useTranslation("runTrace");
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
   return (
-    <div className="relative" ref={ref} data-testid="run-export">
-      <Button
-        variant="outline"
-        size="sm"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        data-testid="run-export-button"
-      >
-        <Download aria-hidden="true" />
-        {t("export.button")}
-        <ChevronDown aria-hidden="true" />
-      </Button>
-      {open && (
-        <ul
-          role="menu"
-          className="bg-popover absolute right-0 z-20 mt-1 flex w-64 flex-col rounded-xl border p-1 shadow-md"
-        >
-          {ITEMS.map(({ format, ext }) => {
-            const disabled = format === "otlp" && !sealed;
-            return (
-              <li key={format} role="none">
-                <a
-                  role="menuitem"
-                  href={
-                    disabled
-                      ? undefined
-                      : runTraceUrl(BENCH_API_BASE, runId, format)
-                  }
-                  download={`${runId}.${ext}`}
-                  aria-disabled={disabled}
-                  onClick={() => setOpen(false)}
-                  data-testid={`run-export-${format}`}
-                  className={
-                    disabled
-                      ? "flex cursor-not-allowed flex-col rounded-lg px-3 py-2 opacity-50"
-                      : "hover:bg-accent flex flex-col rounded-lg px-3 py-2"
-                  }
-                >
-                  <span className="text-sm font-medium">
-                    {t(`export.${format}`)}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {t(`export.${format}Note`)}
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+    <DropdownMenu
+      label={t("export.button")}
+      items={runExportItems(runId, sealed, t)}
+      testId="run-export"
+      trigger={(props) => (
+        <Button {...props} variant="outline" size="sm" dataTestId="run-export-button">
+          <Download aria-hidden="true" />
+          {t("export.button")}
+          <ChevronDown aria-hidden="true" />
+        </Button>
       )}
-    </div>
+    />
   );
 }
