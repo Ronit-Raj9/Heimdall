@@ -33,7 +33,7 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 	// The log stream can end a moment before the job row turns terminal, so
 	// keep polling the row until it has (a stopped poll left "Running" up).
 	const [rowDone, setRowDone] = useState(false);
-	const job = useGetJobQuery(jobId, { pollingInterval: log.ended && rowDone ? 0 : JOB_PANEL_POLL_MS });
+	const job = useGetJobQuery(jobId, { pollingInterval: log.ended && rowDone ? 0 : JOB_PANEL_POLL_MS, skipPollingIfUnfocused: true });
 	useEffect(() => {
 		setRowDone(Boolean(job.data && !isActiveJob(job.data)));
 	}, [job.data]);

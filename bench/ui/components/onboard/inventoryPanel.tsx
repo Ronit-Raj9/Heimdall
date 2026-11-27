@@ -12,7 +12,7 @@ import { w4m5Text } from "@/components/onboard/w4m5I18n";
 import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
 import type { RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
@@ -108,6 +108,19 @@ export function MatchChips({ matches, active, onPick }: { matches: OnboardMatch[
 	);
 }
 
+/**
+ * M2-112c: a typed Name gives the benchmark its title and, until the id box was edited by
+ * hand, an id made from it (the preview line under the id box shows the result).
+ */
+export function planForName(
+	plan: OnboardPlan,
+	name: string,
+	idEdited: boolean,
+	known: Parameters<typeof suggestSuiteId>[1],
+): OnboardPlan {
+	return idEdited ? { ...plan, title: name } : { ...plan, title: name, suite: suggestSuiteId(name, known) };
+}
+
 /** The line under the Benchmark id box: the rule, a refusal, or what drafting into this id does. */
 function suiteIdLine(
 	check: SuiteIdCheck,
@@ -154,6 +167,8 @@ export function InventoryPanel({
 	const idCheck = suiteIdCheck(plan.suite, known, suitesLight.data?.reserved_ids);
 	const idLine = suiteIdLine(idCheck, plan.suite, tx);
 	const idLineId = useId();
+	// M2-112c: the id follows the Name until it is typed by hand.
+	const [idEdited, setIdEdited] = useState(false);
 	const estimate = estimateLine(tx, inv, plan.grader);
 	const { t: tf } = useTranslation("uf2a");
 	// M6-54: rubric grading needs a judge model before drafting can start.
@@ -255,11 +270,23 @@ export function InventoryPanel({
 				<div className="flex flex-col gap-3 rounded-lg border p-3" data-testid="onboard-plan">
 					<div className="flex flex-wrap gap-3">
 						<label className="flex flex-col gap-1 text-xs">
+							<span className="font-medium">{t("plan.name")}</span>
+							<Input
+								value={plan.title ?? inv.title}
+								onChange={(e) => onPlan(planForName(plan, e.target.value, idEdited, known))}
+								data-testid="onboard-plan-name"
+							/>
+							<span className="text-muted-foreground max-w-xs">{t("plan.nameHint")}</span>
+						</label>
+						<label className="flex flex-col gap-1 text-xs">
 							<span className="font-medium">{t("plan.suite")}</span>
 							<Input
 								value={plan.suite}
 								// M2-112c: what is typed stays as typed; the check line names a rule it breaks.
-								onChange={(e) => set({ suite: e.target.value })}
+								onChange={(e) => {
+									setIdEdited(true);
+									set({ suite: e.target.value });
+								}}
 								placeholder="my-benchmark"
 								aria-invalid={idLine.error || undefined}
 								aria-describedby={idLineId}

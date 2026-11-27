@@ -165,7 +165,7 @@ export default function ConnectView() {
 	const [polling, setPolling] = useState(false);
 	// N105: an answer field the user picked counts as a mapping Save may write.
 	const [userMapped, setUserMapped] = useState(false);
-	const polled = useGetVerifyQuery(jobId ?? "", { skip: !jobId, pollingInterval: polling ? VERIFY_POLL_MS : 0 });
+	const polled = useGetVerifyQuery(jobId ?? "", { skip: !jobId, pollingInterval: polling ? VERIFY_POLL_MS : 0, skipPollingIfUnfocused: true });
 	const verify = jobId ? (polled.data ?? inline) : inline;
 	const verifyDone = verify ? isTerminalJob(verify.status) : false;
 	useEffect(() => {

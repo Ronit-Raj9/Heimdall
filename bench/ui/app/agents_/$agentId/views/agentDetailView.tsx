@@ -259,7 +259,7 @@ export default function AgentDetailView() {
 						>
 							{version === null ? t("detail.noVersion") : `v${version}`}
 						</span>
-						{state && <CheckPill state={state} testId="agent-detail-status" />}
+						{state && <CheckPill state={state} runs={agent ? agentRunsTotal(agent) : undefined} testId="agent-detail-status" />}
 					</>
 				}
 				breadcrumbs={[{ label: tb("detail.back"), to: "/agents" }, { label: agentId }]}
