@@ -313,6 +313,20 @@ func (h *findingsHandler) add(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, status, errTypeOf(status), msg)
 		return
 	}
+	if req.Source == "check" {
+		// ref is <check id>:<comparison id>, checked by fromCheck.
+		if _, expID, ok := strings.Cut(req.Ref, ":"); ok {
+			f.Experiment = expID
+		}
+	} else if f.Experiment == "" && len(f.Runs) > 0 {
+		// The comparison and setup the finding's failed runs came from, so
+		// Check the fix does not ask for them (M7-27).
+		var rows []findings.RunRow
+		for _, r := range h.walk().byExp {
+			rows = append(rows, r...)
+		}
+		findings.SetOrigin(f, rows)
+	}
 	got, created, err := findings.Add(h.store(), *f, h.by(ctx), h.now())
 	if err != nil {
 		h.sendErr(ctx, "", err)

@@ -8,6 +8,8 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/sharelinks"
 	"github.com/valyala/fasthttp"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -214,5 +216,21 @@ func TestEvaluationChildCause(t *testing.T) {
 	fillChildCauses(ev)
 	if ev.Children[0].Cause != engine.CauseImageMissing || ev.Children[1].Cause != "" {
 		t.Fatalf("causes %+v", ev.Children)
+	}
+}
+
+func TestFindingAddRecordsOrigin(t *testing.T) {
+	r, root, _, _ := w443Setup(t, w443NewDoc)
+	rep := `{"id":"job1","exp_id":"e_test","items":[{"id":"i0","run_id":"r_t01_A","title":"t","hypothesis":"h","kind":"agent_mistake","origin":"model"}],
+	"groups":[{"title":"Skips the tests","kind":"agent_mistake","items":["i0"],"runs":1,"tasks":["coding-core/t01"]}]}`
+	if err := os.MkdirAll(filepath.Join(root, "investigations"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "investigations", "job1.json"), []byte(rep), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, body := doAgentOps(r, "POST", APIPrefix+"/findings", "application/json", []byte(`{"source":"investigation","ref":"job1:0"}`))
+	if code != fasthttp.StatusCreated || body["experiment"] != "e_test" {
+		t.Fatalf("finding %d %v", code, body)
 	}
 }
