@@ -396,7 +396,7 @@ describe("fault table (N57)", () => {
 		expect(html).toContain("Change from normal");
 		expect(html).not.toContain(">Drop<");
 		expect(html).toContain("no change");
-		expect(html).toContain("how it changed from a normal run of the same tasks");
+		expect(html).toContain("Change from a normal run of the same tasks");
 		expect(html).not.toContain("report-reliability-unpaired");
 	});
 
@@ -463,7 +463,7 @@ describe("ReportCard thrown-out runs (fix wave 3, N215)", () => {
 		const html = renderToStaticMarkup(<ReportCard report={thrown} />);
 		expect(html).toContain("No score: every run was thrown out by a safety check");
 		expect(html).toContain(
-			"Thrown out: 24 runs failed the model check (the provider answered with a different model than the one asked for). Not counted in the score.",
+			"Thrown out: 24 runs failed the model check (provider served a different model). Not counted.",
 		);
 		expect(html).toContain('data-testid="report-card-thrown-out-link"');
 		expect(html).toContain('href="/experiments/e_eval_5rcc"');

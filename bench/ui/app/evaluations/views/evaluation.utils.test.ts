@@ -230,10 +230,10 @@ describe("stored result, kind and runs text (N161, N142)", () => {
 	it("names the runs that could not run", () => {
 		expect(childRunsText(t, { total: 30, done: 30, running: 0, failed: 0 }, false)).toBe("30 of 30 runs done");
 		expect(childRunsText(t, { total: 30, done: 29, running: 0, failed: 1 }, false)).toBe(
-			"29 of 30 runs scored, 1 could not run (infrastructure error)",
+			"29 of 30 runs scored, 1 infrastructure error",
 		);
 		expect(childRunsText(t, { total: 30, done: 20, running: 3, failed: 2 }, true)).toBe(
-			"20 of 30 runs scored, 2 could not run (infrastructure error), 3 running",
+			"20 of 30 runs scored, 2 infrastructure errors, 3 running",
 		);
 		expect(childRunsText(t, { total: 30, done: 20, running: 3, failed: 0 }, true)).toBe("20 of 30 runs done, 3 running");
 	});

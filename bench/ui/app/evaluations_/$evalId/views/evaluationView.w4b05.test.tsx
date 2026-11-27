@@ -73,7 +73,7 @@ describe("evaluation page first look note (w4b05)", () => {
 	it("shows the evaluation's task count", () => {
 		const html = render(<EvaluationBody evaluation={base} />);
 		expect(html).toContain('data-testid="first-look-note"');
-		expect(html).toContain("First look: 2 tasks.");
+		expect(html).toContain("First look: 2 tasks, too few for a verdict.");
 	});
 	it("shows no note when the task count is not known", () => {
 		const html = render(<EvaluationBody evaluation={{ ...base, spec: { ...base.spec, tasks_per_benchmark: 0 } }} />);

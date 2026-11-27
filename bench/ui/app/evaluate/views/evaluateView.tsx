@@ -472,7 +472,6 @@ function EvaluateWizard() {
 		<section className={cn(pageWidthClass("read"), "flex flex-col gap-4")} data-page-width="read" data-testid="evaluate-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				breadcrumbs={[{ label: t("crumbList"), to: "/evaluations" }, { label: t("crumbNew") }]}
 				actions={
 					// PageHeader wraps its actions itself (M3-50): no local wrapper.

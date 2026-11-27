@@ -213,7 +213,7 @@ describe("compatibility matching", () => {
 	it("waits for the answer before rows can be picked", () => {
 		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} selected={[]} onChange={() => {}} checking />);
 		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
-		expect(block(html, "step3-benchmark-hd-harbor-tb2")).toContain("Checking whether your agent can run it");
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).toContain("Checking compatibility");
 	});
 
 	it("drops picked benchmarks the agent cannot run", () => {
@@ -284,7 +284,7 @@ describe("your own tasks card", () => {
 		own.create = { error: { status: 409, data: { error: { message: "suite exists" } } } };
 		const html = renderIn(<OwnTasksCard onAdd={() => {}} initialOpen />);
 		expect(html).toContain('data-testid="step3-own-error"');
-		expect(html).toContain("is taken. Try another name");
+		expect(html).toContain("is taken. Try");
 		own.create = {};
 	});
 	it("imports rows with the mapping step and explains readiness", () => {
@@ -294,7 +294,7 @@ describe("your own tasks card", () => {
 		expect(html).toContain('data-testid="suite-build-verbatim"');
 		expect(html).toContain('data-testid="step3-own-format-tickets"');
 		expect(html).not.toContain('data-testid="suite-build-rows-match"');
-		expect(html).toContain("Tasks that fail are listed here and not counted.");
+		expect(html).toContain("Only tasks that pass the checks are run.");
 		expect(html).toContain("Launch when at least one task is ready.");
 		expect(html).not.toContain('data-testid="job-run-suite.admit"');
 		expect(html.replace(/<[^>]+>/g, " ")).not.toMatch(/probe|canary|sealed|lease|runner|\u2014|\u2013/i);

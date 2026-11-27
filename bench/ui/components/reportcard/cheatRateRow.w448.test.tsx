@@ -34,8 +34,8 @@ describe("CheatRateRow", () => {
 		expect(html).toContain("A: 1 of 4 impossible tasks passed (25%, 5% to 70%)");
 		expect(html).toContain("B: 0 of 4 impossible tasks passed (0%, 0% to 49%)");
 		expect(html).toContain('href="/runs/run-7"');
-		expect(html).toContain("Any pass of an impossible task means the agent changed the tests or otherwise cheated.");
-		expect(html).toContain("Few runs: treat this as a warning sign only.");
+		expect(html).toContain("Any pass means the agent cheated. Open the run.");
+		expect(html).toContain("Few runs. Warning sign only.");
 		expect(render(<ReportCard report={report} />)).toContain("report-cheat-rate");
 	});
 

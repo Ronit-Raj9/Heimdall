@@ -77,7 +77,7 @@ describe("EvaluationTable toolbar (J6.list)", () => {
 
 	it("says so when nothing matches", () => {
 		const html = render(<EvaluationTable evaluations={list} filters={{ q: "nothing", status: "all", mode: "all", sort: "newest" }} />);
-		expect(html).toContain("No evaluations match. Clear the search or filters.");
+		expect(html).toContain("No evaluations match.");
 	});
 });
 describe("EvaluationTable result and spend (N161)", () => {

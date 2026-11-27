@@ -176,7 +176,7 @@ describe("EvaluateView", () => {
 		const html = render("?step=2", { agent: "codex", arms: [{ label: "A", agent: "codex", model: "gpt-x" }] });
 		expect(html).toContain('data-testid="evaluate-step-2"');
 		for (const m of ["score", "versions", "models", "opponent"]) expect(html).toContain(`data-testid="evaluate-mode-${m}"`);
-		expect(html).toContain("Run your agent with two different models");
+		expect(html).toContain("Your agent with two different models");
 	});
 
 	it("never jumps past an unready step", () => {
@@ -286,7 +286,7 @@ describe("deep links (N154, N112, N86, N85)", () => {
 			</EvaluateDraftProvider>,
 		);
 		expect(html).toContain('data-testid="evaluate-agent-missing"');
-		expect(html).toContain("No agent is called zz-no-such-agent. Pick one below, or register it.");
+		expect(html).toContain("No agent called zz-no-such-agent. Pick or register one.");
 		const d = applyPatch(EMPTY_DRAFT, { agent: "codex", arms: [{ label: "A", agent: "codex", model: "gpt-x" }] });
 		expect(stepReady(1, d, new Set(), null, { missingAgent: "zz-no-such-agent" })).toBe(false);
 		expect(stepReady(1, applyPatch(EMPTY_DRAFT, { agent: "zz-no-such-agent" }), new Set(), null, { known: new Set(["codex"]) })).toBe(
@@ -297,10 +297,10 @@ describe("deep links (N154, N112, N86, N85)", () => {
 
 	it("shows the put-aside note with Go back to my draft and the unknown mode", () => {
 		const html = renderToStaticMarkup(<LinkNotice putAside badMode="duel" onBack={() => undefined} />);
-		expect(html).toContain("Started a new evaluation from the link. Your earlier draft was put aside.");
+		expect(html).toContain("New evaluation from link. Earlier draft put aside.");
 		expect(html).toContain('data-testid="evaluate-link-back"');
 		expect(html).toContain("Go back to my draft");
-		expect(html).toContain("The link asked for an unknown comparison (duel), so this starts with Its score.");
+		expect(html).toContain("Unknown comparison (duel). Starting with Its score.");
 	});
 
 	it("writes the shown step back to ?step= once settled (N85)", () => {

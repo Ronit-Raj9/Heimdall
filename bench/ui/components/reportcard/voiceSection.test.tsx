@@ -36,7 +36,7 @@ describe("voice section", () => {
 		};
 		const html = renderToStaticMarkup(<ReportCard report={report} />);
 		expect(html).toContain('data-testid="report-voice"');
-		expect(html).toContain("Call quality, measured by Heimdall");
+		expect(html).toContain("Measured by a simulated caller on the audio");
 		expect(html).toContain("640 ms");
 		expect(html).toContain("12.5 s");
 		expect(html).toContain("75%");

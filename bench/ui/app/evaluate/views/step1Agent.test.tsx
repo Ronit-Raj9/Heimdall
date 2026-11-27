@@ -53,7 +53,7 @@ describe("Step1Agent", () => {
 		expect(version).toBeLessThan(html.indexOf('data-testid="evaluate-mcp-server"'));
 		expect(html).toContain("zz-test-loop selected");
 		expect(html).toContain("Version of zz-test-loop");
-		expect(html).toContain("This agent has 2 saved versions. Latest is v2.");
+		expect(html).toContain("2 saved versions. Latest is v2.");
 	});
 
 	it("has no bar before an agent is picked", () => {
@@ -66,7 +66,7 @@ describe("Step1Agent", () => {
 	it("hides test agents without an unasked note (N97, M3-49)", () => {
 		const html = render({});
 		expect(html).not.toContain('data-testid="evaluate-agents-own-option-storm"');
-		expect(html).not.toContain("Test agents such as oracle and noop are not listed");
+		expect(html).not.toContain("Test agents such as oracle and noop are hidden");
 		expect(html).toContain('type="radio"');
 	});
 });
