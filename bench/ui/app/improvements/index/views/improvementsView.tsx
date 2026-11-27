@@ -14,13 +14,21 @@ import { Plus, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { isLiveImprovement, listPollMs } from "@/components/improvements/improvementPoll";
 import { useTranslation } from "react-i18next";
+import { ArchiveRowMenu } from "@/components/ui/archiveAction";
+import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip, useShowArchived, withoutArchived } from "@/components/ui/showArchivedChip";
+import { archivedCountOf, archivedParam, isArchived } from "@/lib/store/apis/archiveApi";
+
+/** A list row with the optional archive field (phase D decision 6). */
+type ArchivedRow = { archived_at?: string | null };
 
 /** /improvements: every improvement run with status, rounds, versions kept and held-out gain. */
 export default function ImprovementsView() {
 	const { t } = useTranslation("improve");
 	// Fast polling only while a run is live (M1-62).
 	const [anyLive, setAnyLive] = useState(true);
-	const list = useGetImprovementsQuery(undefined, { pollingInterval: listPollMs(anyLive), skipPollingIfUnfocused: true });
+	// Archived runs are hidden unless ?archived=1 (phase D decision 6).
+	const [showArchived, setShowArchived] = useShowArchived();
+	const list = useGetImprovementsQuery(showArchived ? archivedParam(true) : undefined, { pollingInterval: listPollMs(anyLive), skipPollingIfUnfocused: true });
 	useEffect(() => {
 		if (list.data) setAnyLive(list.data.improvements.some((r) => isLiveImprovement(r.status)));
 	}, [list.data]);
@@ -52,7 +60,23 @@ export default function ImprovementsView() {
 			) : list.error || !list.data ? (
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="improvements-error" />
 			) : (
-				<ImprovementsTable rows={list.data.improvements} admin={admin} onCreate={() => setCreating(true)} />
+				<>
+					<ShowArchivedChip
+						count={
+							archivedCountOf(list.data) ??
+							(showArchived ? withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), true).archived : undefined)
+						}
+						on={showArchived}
+						onChange={setShowArchived}
+						className="self-start"
+						testId="improvements-show-archived"
+					/>
+					<ImprovementsTable
+						rows={withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), showArchived).shown}
+						admin={admin}
+						onCreate={() => setCreating(true)}
+					/>
+				</>
 			)}
 		</section>
 	);
@@ -62,6 +86,7 @@ export default function ImprovementsView() {
 export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: ImprovementSummary[]; admin?: boolean; onCreate?: () => void }) {
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
+	const { t: ta } = useTranslation("ufd5");
 	if (rows.length === 0) {
 		// The shared empty state (M2-109): admins get the New improvement run action; the command
 		// line stays inside its own disclosure below.
@@ -92,11 +117,14 @@ export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: Imp
 						<th className="px-3 py-2 font-medium">{t("list.commits")}</th>
 						<th className="px-3 py-2 font-medium">{t("list.gain")}</th>
 						<th className="px-3 py-2 text-right font-medium">{t("list.spend")}</th>
+						<th className="w-10 px-2 py-2">
+							<span className="sr-only">{ta("archive.actions")}</span>
+						</th>
 					</tr>
 				</thead>
 				<tbody>
 					{rows.map((r) => (
-						<tr key={r.id} className="hover:bg-muted/40 border-b last:border-0">
+						<tr key={r.id} className={`hover:bg-muted/40 border-b last:border-0 ${isArchived(r as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""}`}>
 							<td className="px-3 py-2">
 								<Link
 									to="/improvements/$improvementId"
@@ -105,6 +133,11 @@ export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: Imp
 								>
 									{r.name}
 								</Link>
+								{isArchived(r as ArchivedRow) && (
+									<span className="ml-2 align-middle">
+										<ArchivedPill at={(r as ArchivedRow).archived_at} testId={`improvement-archived-${r.id}`} />
+									</span>
+								)}
 							</td>
 							<td className="text-muted-foreground px-3 py-2 font-mono text-xs">{r.agent}</td>
 							<td className="px-3 py-2">
@@ -133,6 +166,9 @@ export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: Imp
 								</span>
 							</td>
 							<td className="px-3 py-2 text-right tabular-nums">{usd(r.total_usd)}</td>
+							<td className="px-2 py-2 text-right">
+								<ArchiveRowMenu kind="improvement" id={r.id} name={r.name} archivedAt={(r as ArchivedRow).archived_at} testId={`improvement-row-${r.id}`} />
+							</td>
 						</tr>
 					))}
 				</tbody>

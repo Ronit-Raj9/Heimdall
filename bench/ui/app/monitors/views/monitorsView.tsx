@@ -3,6 +3,7 @@ import { MonitorCertDetail } from "@/components/integrity/monitorCertification";
 import { GovDialog } from "@/components/govern/govDialog";
 import { EmptyState } from "@/components/shell/emptyState";
 import { MonitorCards } from "./monitorCards";
+import { MonitorTestDelete } from "./monitorTestDelete";
 import { LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { useTranslation } from "react-i18next";
 export default function MonitorsView() {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
-	const [cert] = useQueryState("cert", parseAsString);
+	const [cert, setCert] = useQueryState("cert", parseAsString);
 	const [certifying, setCertifying] = useState(false);
 	// While the list is empty its empty state carries the one "certify" action, so the header does not repeat it (M7-68).
 	const list = useListMonitorCertificationsQuery();
@@ -39,7 +40,7 @@ export default function MonitorsView() {
 				}
 				breadcrumbs={cert ? [{ label: tu("monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
 			/>
-			{cert ? <CertificationScreen certId={cert} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} />}
+			{cert ? <CertificationScreen certId={cert} onDeleted={() => (void setCert(null), void list.refetch())} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} />}
 			<p
 				className="text-muted-foreground line-clamp-2 max-w-3xl text-xs"
 				data-testid="monitors-disclaimer"
@@ -96,19 +97,20 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 	);
 }
 
-function CertificationScreen({ certId }: { certId: string }) {
+function CertificationScreen({ certId, onDeleted }: { certId: string; onDeleted(): void }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
 	const q = useGetMonitorCertificationQuery(certId);
 	return (
 		<div className="flex flex-col gap-4">
-			<div>
+			<div className="flex flex-wrap items-start justify-between gap-2">
 				<Button variant="ghost" size="sm" asChild>
 					<Link to="/monitors" data-testid="monitors-back">
 						<ArrowLeft className="size-4" aria-hidden="true" />
 						{tu("monitors.back")}
 					</Link>
 				</Button>
+				{q.data && <MonitorTestDelete certId={certId} name={q.data.monitor?.name || certId} onDeleted={onDeleted} />}
 			</div>
 			{q.isLoading ? (
 				<Skeleton className="h-96 w-full" data-testid="monitor-cert-loading" />

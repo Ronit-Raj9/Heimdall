@@ -9,6 +9,9 @@ import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/c
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
 import { useGetAgentsQuery, useListRunsQuery } from "@/lib/store/apis/benchApi";
+import { archivedCountOf, isArchived } from "@/lib/store/apis/archiveApi";
+import { ArchiveRowMenu } from "@/components/ui/archiveAction";
+import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip } from "@/components/ui/showArchivedChip";
 import type { RunListParams, RunListRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -43,6 +46,8 @@ const parsers = {
 	page: parseAsInteger,
 	sort: parseAsString,
 	dir: parseAsString,
+	/** Phase D decision 6: archived runs are hidden unless ?archived=1. */
+	archived: parseAsString,
 };
 
 export type RunSortKey = NonNullable<RunListParams["sort"]>;
@@ -92,6 +97,7 @@ export function runsRequest(
 		fault?: string | null;
 		sort?: string | null;
 		dir?: string | null;
+		archived?: string | null;
 	},
 	page: number | null,
 ): RunListParams {
@@ -106,6 +112,7 @@ export function runsRequest(
 	if (f.arm) params.arm = f.arm;
 	if (f.agent) params.agent = f.agent;
 	if (f.fault) params.fault = f.fault;
+	if (f.archived === "1") (params as RunListParams & { archived?: "include" }).archived = "include";
 	const p = Math.max(1, page ?? 1);
 	if (p > 1) params.offset = (p - 1) * RUNS_PAGE;
 	return params;
@@ -257,7 +264,16 @@ export function runSuiteLabel(row: RunListRowNamed): string {
 }
 
 /** /runs: live runs on top, toolbar filters in the URL, a search box, and one click to open a run. */
+/** A run row with the optional archive field (phase D decision 6). */
+type ArchivedRun = { archived_at?: string | null };
+
+/** The row's Archive or Unarchive menu; a running run is refused by the server, and its reason shows. */
+function RunRowMenu({ row, testId }: { row: RunListRow; testId: string }) {
+	return <ArchiveRowMenu kind="run" id={row.run_id} name={runTaskLabel(row)} archivedAt={(row as ArchivedRun).archived_at} testId={testId} />;
+}
+
 export function RunsTable() {
+	const { t: ta } = useTranslation("ufd5");
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
 	const { t: tw } = useTranslation("w4m4");
@@ -275,7 +291,18 @@ export function RunsTable() {
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const agentsQuery = useGetAgentsQuery();
 	const sorted = parseRunSort(search.sort, search.dir) !== null;
-	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent, sorted), [list.data, search.q, search.agent, sorted]);
+	const showArchived = search.archived === "1";
+	const rows = useMemo(
+		() =>
+			orderRuns(
+				(list.data?.runs ?? []).filter((r) => showArchived || !isArchived(r as ArchivedRun)),
+				search.q,
+				search.agent,
+				sorted,
+			),
+		[list.data, search.q, search.agent, sorted, showArchived],
+	);
+	const archivedCount = archivedCountOf(list.data) ?? (showArchived ? (list.data?.runs ?? []).filter((r) => isArchived(r as ArchivedRun)).length : undefined);
 	const onSort = (key: RunSortKey) => void setSearch({ ...nextRunSort(search, key), page: null });
 	const agents = useMemo(
 		() =>
@@ -449,6 +476,13 @@ export function RunsTable() {
 						</span>
 					)}
 				</div>
+				<ShowArchivedChip
+					count={archivedCount}
+					on={showArchived}
+					onChange={(on) => void setSearch({ archived: on ? "1" : null, page: null })}
+					className="self-start"
+					testId="runs-show-archived"
+				/>
 				<FilterTokens tokens={tokens} onClear={clear} testId="runs-tokens" />
 			</div>
 
@@ -501,7 +535,7 @@ export function RunsTable() {
 						{rows.map((row) => (
 							<li
 								key={row.run_id}
-								className={cn("hover:bg-muted/50 flex cursor-pointer flex-col gap-1 px-4 py-2", !row.sealed && "bg-chart-info/5")}
+								className={cn("hover:bg-muted/50 flex cursor-pointer flex-col gap-1 px-4 py-2", !row.sealed && "bg-chart-info/5", isArchived(row as ArchivedRun) && ARCHIVED_ROW_CLASS)}
 								onClick={(e) => onRowClick(e, row)}
 								data-testid={`runs-mrow-${row.run_id}`}
 							>
@@ -518,6 +552,10 @@ export function RunsTable() {
 									<span className="tabular-nums">{costCell(row)}</span>
 									<span aria-hidden="true">·</span>
 									<span className="whitespace-nowrap">{timeAgo(row.started, locale)}</span>
+									{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-marchived-${row.run_id}`} />}
+									<span className="ml-auto">
+										<RunRowMenu row={row} testId={`runs-mrow-${row.run_id}`} />
+									</span>
 								</div>
 							</li>
 						))}
@@ -564,6 +602,9 @@ export function RunsTable() {
 										className="hidden px-3 text-right lg:table-cell"
 									/>
 									<SortHeader label={tu("runs.col.when")} sortKey="started" current={search} onSort={onSort} className="px-4 text-right" />
+									<th scope="col" className="w-10 px-2">
+										<span className="sr-only">{ta("archive.actions")}</span>
+									</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -571,11 +612,16 @@ export function RunsTable() {
 									<tr
 										key={row.run_id}
 										onClick={(e) => onRowClick(e, row)}
-										className={cn("hover:bg-muted/50 cursor-pointer border-b transition-colors last:border-0", !row.sealed && "bg-chart-info/5")}
+										className={cn(
+											"hover:bg-muted/50 cursor-pointer border-b transition-colors last:border-0",
+											!row.sealed && "bg-chart-info/5",
+											isArchived(row as ArchivedRun) && ARCHIVED_ROW_CLASS,
+										)}
 										data-testid={`runs-row-${row.run_id}`}
 									>
 										<td className="max-w-64 px-4 py-2">
 											<div className="truncate font-medium">{runLink(row)}</div>
+											{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-archived-${row.run_id}`} />}
 											<div className="text-muted-foreground truncate text-xs" title={row.suite}>
 												{runSuiteLabel(row)}
 												{(row as RunListRowNamed).exp_name && (
@@ -611,6 +657,9 @@ export function RunsTable() {
 											title={row.started ? new Date(row.started).toLocaleString(locale) : undefined}
 										>
 											{timeAgo(row.started, locale)}
+										</td>
+										<td className="px-2 py-2 text-right">
+											<RunRowMenu row={row} testId={`runs-row-${row.run_id}`} />
 										</td>
 									</tr>
 								))}

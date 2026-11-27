@@ -25,6 +25,7 @@ import { activeNavItem } from "@/lib/constants/navigation";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
+import { useArchiveItems } from "@/components/ui/archiveAction";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
@@ -188,6 +189,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	);
 	usePageTitle(titleForTab ? `${titleForTab} · ${String(section)} · Heimdall` : undefined);
 	const deleteItem = useDeleteExperimentItem(expId, titleForTab ?? expId, live, setDeleteError);
+	// Phase D decision 6: Archive sits above Delete in the More menu.
+	const archive = useArchiveItems({ kind: "experiment", id: expId, name: titleForTab ?? expId, archivedAt: (status.data as { archived_at?: string | null } | undefined)?.archived_at, testId: "experiment" });
 	const copyId = async () => {
 		setCopyError(null);
 		try {
@@ -362,11 +365,13 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					},
 					...exportItems.items,
 					{ label: tu("header.copyId", { id: expId }), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
+					...archive.items.map((item) => ({ ...item, separatorBefore: true })),
 					deleteItem,
 				]}
 			/>
 
 			<InlineError error={headerError} testId="experiment-header-error" />
+			{archive.alert}
 			{canMember && <RegradeAction expId={expId} open={regradeOpen} onOpenChange={setRegradeOpen} hideButton />}
 
 			{system && (
