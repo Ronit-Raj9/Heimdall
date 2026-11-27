@@ -13,7 +13,7 @@ describe("extendTexts", () => {
 		expect(label).toBe("Extend by 65 tasks, about $7.17");
 		expect(confirm).not.toMatch(/\$/);
 		expect(confirm).toContain("130 runs");
-		expect(confirm).toContain("limits the spend");
+		expect(confirm).toContain("which caps spend");
 	});
 	it("leaves the price out of the label when it is not known", () => {
 		expect(extendTexts(t, "trials", 2, "tries", { runs: 32, cost: null }).label).toBe("Extend by 2 more tries");

@@ -37,6 +37,6 @@ describe("Analysis tab job buttons (p06-3)", () => {
 		for (const spec of ANALYSIS_JOBS) expect(seen.props.some((p) => p.kind === spec.kind)).toBe(true);
 		const kinds = new Set(ANALYSIS_JOBS.map((s) => s.kind));
 		for (const p of seen.props.filter((p) => kinds.has(p.kind as never)))
-			expect(p.confirm).toMatch(/^Start .+ now\? It runs in the background and replaces the earlier result\.$/);
+			expect(p.confirm).toMatch(/^Start .+ now\? It replaces the earlier result\.$/);
 	});
 });

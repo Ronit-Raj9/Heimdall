@@ -404,7 +404,6 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 
 				<Disclosure
 					title={tPage("sections.diagnostics")}
-					description={tPage(arms.length > 2 ? "sectionHints.diagnosticsMany" : "sectionHints.diagnostics")}
 					icon={Activity}
 					testId="verdict-diagnostics"
 				>
@@ -414,7 +413,6 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				{!scored && (
 					<Disclosure
 						title={tPage(arms.length > 2 ? "sections.changesMany" : "sections.changes")}
-						description={tPage("sectionHints.changes")}
 						icon={GitCompare}
 						testId="verdict-config-diff"
 					>
@@ -428,7 +426,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					</Disclosure>
 				)}
 
-				<Disclosure title={tPage("sections.policy")} description={tPage("sectionHints.policy")} icon={Scale} testId="verdict-policy">
+				<Disclosure title={tPage("sections.policy")} icon={Scale} testId="verdict-policy">
 					<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
 				</Disclosure>
 
@@ -453,7 +451,6 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				{/* M4-8, M4-16: Measurements and Advanced statistics in one section at the end, for statisticians. */}
 				<Disclosure
 					title={tf("verdict.forStatisticians")}
-					description={tf("verdict.forStatisticiansHint")}
 					icon={Sigma}
 					testId="verdict-statistics"
 				>

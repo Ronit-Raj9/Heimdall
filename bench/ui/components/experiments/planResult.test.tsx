@@ -49,7 +49,7 @@ describe("PlanResult", () => {
 		expect(html).toContain(">24<");
 		expect(html).toContain(">62.4 pp<");
 		expect(html).toContain('data-testid="plan-mde-assumed-sd"');
-		expect(html).toContain("Uses an assumed SD of 0.3");
+		expect(html).toContain("Assumed SD 0.3");
 		expect(html).toContain('data-testid="plan-condition-stale-notes"');
 	});
 

@@ -17,7 +17,7 @@ describe("CostTab (J7.cost)", () => {
 		expect(html).toContain('data-testid="pareto-stub"');
 		expect(html).not.toContain("cost-explain-stub");
 		expect(html).toContain('data-testid="cost-explain-one-arm"');
-		expect(html).toContain("Why the cost moved compares two setups. This run has one setup.");
+		expect(html).toContain("Needs two setups. This run has one.");
 	});
 	it("shows the cost explanation with two setups", () => {
 		const html = render(<CostTab expId="e1" arms={["A", "B"]} />);

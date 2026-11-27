@@ -28,7 +28,7 @@
 			"title": "Blame",
 			"description": "Find which agent caused each multi-agent failure.",
 			"button": "Compute blame",
-			"single": "One agent per setup, nothing to blame."
+			"single": "One agent per setup. Blame is for team runs."
 		},
 		"clusters": {
 			"title": "Failure clusters",

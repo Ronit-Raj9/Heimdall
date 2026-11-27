@@ -45,7 +45,7 @@ export function IntegrityTab({ expId }: { expId: string }) {
 				<AwarenessSection expId={expId} arms={arms} />
 			</Section>
 			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-				<Section title={t("integrity.monitors.title")} description={t("integrity.monitors.forExperiment")} testId="verdict-monitors">
+				<Section title={t("integrity.monitors.title")} testId="verdict-monitors">
 					<ExperimentMonitorsSection expId={expId} />
 				</Section>
 				<Section title={t("integrity.compliance.title")} description={t("integrity.compliance.description")} testId="verdict-compliance">

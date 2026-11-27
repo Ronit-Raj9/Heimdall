@@ -147,7 +147,7 @@ function ConditionRuns({
 	const arms = grid.data?.arms ?? [];
 
 	return (
-		<Section title={t("receipts.runs.title")} description={t("receipts.runs.description")} testId="receipts-runs-section">
+		<Section title={t("receipts.runs.title")} testId="receipts-runs-section">
 			{grid.isLoading ? (
 				<SlowSkeleton rows={4} testId="receipts-runs-loading" onRetry={() => void grid.refetch()} />
 			) : grid.error ? (

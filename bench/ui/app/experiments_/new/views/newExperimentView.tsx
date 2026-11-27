@@ -104,7 +104,6 @@ export default function NewExperimentView() {
 			/>
 			{/* M4-69 (P4-14): until the forms merge, point a two-versions comparison at the guided form. */}
 			<p className="text-muted-foreground -mt-3 text-sm" data-testid="new-experiment-versions-hint">
-				{tu("form.versionsHint")}{" "}
 				<Link to={"/evaluate?mode=versions" as never} className="text-primary font-medium hover:underline">
 					{tu("form.versionsLink")}
 				</Link>
@@ -238,10 +237,7 @@ function LiveProgress({ expId, capUsd, onNew }: { expId: string; capUsd: number 
 						testId="experiment-progress-error"
 					/>
 				) : (
-					<div className="flex flex-col gap-1">
-						<ExperimentProgressCard status={status.data} capUsd={capUsd} onNew={onNew} />
-						<p className="text-muted-foreground text-[11px]">{t("experiments.new.progress.description")}</p>
-					</div>
+					<ExperimentProgressCard status={status.data} capUsd={capUsd} onNew={onNew} />
 				)}
 			</CardContent>
 		</Card>

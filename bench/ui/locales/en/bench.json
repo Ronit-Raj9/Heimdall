@@ -3402,7 +3402,7 @@
 		},
 		"runs": {
 			"title": "Human reviews",
-			"description": "Change the score only with Human reviewed selected."
+			"description": "They change the score only when Human reviewed is selected."
 		}
 	},
 	"routing": {

@@ -105,7 +105,7 @@ describe("VerdictSummary cost and tokens (D8.cost)", () => {
 		expect(at(lost, "verdict-summary-cost-A")).toBe("Not known: gateway log incomplete");
 		expect(lost).not.toContain("no price set");
 		expect(at(show({ armMetrics: unknown("2 of 5 cost rows unpriced") }), "verdict-summary-cost-A")).toBe(
-			"Not known: this model has no price set",
+			"Not known: no price set",
 		);
 	});
 });
@@ -163,7 +163,7 @@ describe("VerdictSummary setups, guard and running headlines (fix wave 3, N244, 
 		const html = render({ decision: "regressed", action: "hold", basis: "guard", guards: [guardFail] });
 		expect(head(html)).toBe("B broke a safety rule on t02");
 		expect(html).not.toContain("worse by");
-		expect(html).toContain("Hold off. A safety rule or safety check failed");
+		expect(html).toContain("Hold off. A safety rule or check failed");
 	});
 
 	it("prints the setup's name next to its letter", () => {
@@ -185,7 +185,7 @@ describe("VerdictSummary setups, guard and running headlines (fix wave 3, N244, 
 			invalid_reasons: ["gate model_fidelity fired in 3 of 3 runs (100.0%) of arm B, above 5%"],
 		});
 		expect(head(html)).toBe(
-			"Test was broken: the model gateway answered 3 of 3 runs of setup B with a different model than the one asked for (model check). This is not the agent&#x27;s fault; fix it and press Re-check.",
+			"Test was broken: the gateway used a different model in 3 of 3 runs of setup B. Fix it and press Re-check.",
 		);
 	});
 

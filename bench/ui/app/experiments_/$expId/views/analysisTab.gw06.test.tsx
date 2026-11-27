@@ -46,7 +46,7 @@ beforeEach(() => {
 describe("Re-check summary in plain words (N61)", () => {
 	it("says a score run has no release decision", () => {
 		const s = summarizeAnalysisResult(t, check, { status: "succeeded", result: { decision: "score", action: "no_decision" } });
-		expect(s).toBe("Score saved. This comparison has one setup, so there is no release decision.");
+		expect(s).toBe("Score saved. One setup, no release decision.");
 	});
 	it("names the verdict, the action and the rule set file", () => {
 		const ok = summarizeAnalysisResult(t, check, {
@@ -86,11 +86,11 @@ describe("Blame counts (N62)", () => {
 describe("AnalysisTab on a one-setup score run (N61, N62, N63)", () => {
 	it("shows the score sentence, lists unscanned runs and disables blame on single-agent setups", () => {
 		const html = render(<AnalysisTab expId="e_x" />);
-		expect(html).toContain("Score saved. This comparison has one setup, so there is no release decision.");
+		expect(html).toContain("Score saved. One setup, no release decision.");
 		expect(html).toContain("2 runs not scanned");
 		expect(html).toContain('href="/runs/r_infra"');
 		expect(html).toContain("no agent text");
-		expect(html).toContain("Each setup here runs one agent, so there is no blame to split. Blame is for team runs.");
+		expect(html).toContain("One agent per setup. Blame is for team runs.");
 		expect(tagOf(html, "job-run-blame.run")).toMatch(/\sdisabled=""/);
 	});
 	it("keeps blame available on a team run", () => {

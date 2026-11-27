@@ -404,11 +404,11 @@ function hint(
 	t: TFn,
 	tr: (k: string, o?: Record<string, unknown>) => string,
 ): string | null {
-	if (partial) return t("summary.partialHint");
+	if (partial) return t("summary.partialHint") || null;
 	// Q-140: the server's setups note is statistics; the page says it in plain words.
 	if (isSetupsVerdict(verdict))
 		return verdict.decision === "invalid" ? t("summary.invalidHint") : verdict.setups ? plainSetupsNote(verdict.setups, tr) : null;
-	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint");
+	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint") || null;
 	if (verdict.decision === "invalid" && !verdict.invalid_reasons?.length) return t("summary.invalidHint");
 	return null;
 }

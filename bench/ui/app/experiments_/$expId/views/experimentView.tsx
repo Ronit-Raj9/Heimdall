@@ -441,7 +441,6 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					data-testid="experiment-evaluation-note"
 				>
 					<Layers className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					<span className="min-w-0 flex-1">{tf("page.evaluationNote")}</span>
 					<Link
 						to="/evaluations/$evalId"
 						params={{ evalId: evaluationId }}

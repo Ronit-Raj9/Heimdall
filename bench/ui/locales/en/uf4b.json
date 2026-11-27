@@ -34,7 +34,7 @@
 	},
 	"form": {
 		"versionsHint": "",
-		"versionsLink": "Use Evaluate, Is my new version better.",
+		"versionsLink": "Compare two versions in Evaluate",
 		"openCreated": "Open comparison (not started)",
 		"mobileBar_one": "{{count}} setup, up to {{runs}} runs",
 		"mobileBar_other": "{{count}} setups, up to {{runs}} runs",
