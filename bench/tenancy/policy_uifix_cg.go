@@ -9,3 +9,7 @@ func init() {
 func init() {
 	OrgPolicy[key("GET", api+"/evaluations/{id}/card")] = org(viewer)
 }
+
+func init() {
+	OrgPolicy[key("GET", api+"/gateway/mcp-options")] = org(viewer)
+}
