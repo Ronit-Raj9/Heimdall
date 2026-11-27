@@ -24,8 +24,8 @@ const CatalogImportKind = "catalog.import"
 // BenchCatalogList is GET /benchmarks/catalog.
 type BenchCatalogList struct {
 	Entries    []BenchCatalogEntry `json:"entries"`
-	SourceRoot bool                 `json:"source_available"` // the server found its bench folder
-	Starter    []string             `json:"starter_agents"`
+	SourceRoot bool                `json:"source_available"` // the server found its bench folder
+	Starter    []string            `json:"starter_agents"`
 }
 
 // BenchCatalogEntry is one catalog entry as the list shows it. Internal

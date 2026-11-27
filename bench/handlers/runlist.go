@@ -29,40 +29,40 @@ const (
 // Cost, steps, tool calls and tokens are read from metrics.json for the rows
 // of the page only; each is absent while the run has no observed value.
 type RunListRow struct {
-	RunID     string          `json:"run_id"`
-	ExpID     string          `json:"exp_id"`
-	PairID    string          `json:"pair_id"`
-	Suite     string          `json:"suite"`
-	Track     string          `json:"track,omitempty"`   // the suite's track; empty when the suite could not be loaded
-	Output    string          `json:"output,omitempty"`  // diff | answer | state | artifact; empty when the suite could not be loaded
-	Grading   string          `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
-	Task      string          `json:"task"`
-	TaskTitle string          `json:"task_title,omitempty"` // the task's title from its suite; empty when the suite could not be loaded or the task has none
+	RunID     string `json:"run_id"`
+	ExpID     string `json:"exp_id"`
+	PairID    string `json:"pair_id"`
+	Suite     string `json:"suite"`
+	Track     string `json:"track,omitempty"`   // the suite's track; empty when the suite could not be loaded
+	Output    string `json:"output,omitempty"`  // diff | answer | state | artifact; empty when the suite could not be loaded
+	Grading   string `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
+	Task      string `json:"task"`
+	TaskTitle string `json:"task_title,omitempty"` // the task's title from its suite; empty when the suite could not be loaded or the task has none
 	// SuiteTitle is the benchmark's catalog title; empty when the catalog has
 	// none. ExpName is the name of the evaluation or comparison the run
 	// belongs to (its frozen plan); empty when it has none.
-	SuiteTitle string `json:"suite_title,omitempty"`
-	ExpName    string `json:"exp_name,omitempty"`
-	Arm       string          `json:"arm"`
-	Condition string          `json:"condition"`
-	Trial     int             `json:"trial"`
-	Attempt   int             `json:"attempt"`
-	Counted   bool            `json:"counted"`
-	Sealed    bool            `json:"sealed"`
-	Outcome   schemas.Outcome `json:"outcome"`
-	Y         schemas.Value   `json:"y"`
-	CostUSD   *schemas.Value  `json:"cost_usd,omitempty"`   // absent for a run with no metrics.json yet
-	Steps     *float64        `json:"steps,omitempty"`      // metrics.json steps; absent when not observed
-	ToolCalls *float64        `json:"tool_calls,omitempty"` // metrics.json tool_calls; absent when not observed
-	Tokens    *float64        `json:"tokens,omitempty"`     // metrics.json tokens; absent when not observed
-	ConfigID  string          `json:"config_id"`
-	Model     string          `json:"model,omitempty"`         // the arm's model from the experiment manifest
-	AgentVer  string          `json:"agent_version,omitempty"` // the agent's own version string, when it declares one
-	Version   int             `json:"version,omitempty"`       // the registered agent version (v1, v2) whose config hash matches; 0 when none
-	Fault     string          `json:"fault,omitempty"`         // the fault injected in this run (model-down, broken-tool, misleading-instruction or the probe family); empty for a clean run
-	Started   *time.Time      `json:"started,omitempty"`
-	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
-	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
+	SuiteTitle string          `json:"suite_title,omitempty"`
+	ExpName    string          `json:"exp_name,omitempty"`
+	Arm        string          `json:"arm"`
+	Condition  string          `json:"condition"`
+	Trial      int             `json:"trial"`
+	Attempt    int             `json:"attempt"`
+	Counted    bool            `json:"counted"`
+	Sealed     bool            `json:"sealed"`
+	Outcome    schemas.Outcome `json:"outcome"`
+	Y          schemas.Value   `json:"y"`
+	CostUSD    *schemas.Value  `json:"cost_usd,omitempty"`   // absent for a run with no metrics.json yet
+	Steps      *float64        `json:"steps,omitempty"`      // metrics.json steps; absent when not observed
+	ToolCalls  *float64        `json:"tool_calls,omitempty"` // metrics.json tool_calls; absent when not observed
+	Tokens     *float64        `json:"tokens,omitempty"`     // metrics.json tokens; absent when not observed
+	ConfigID   string          `json:"config_id"`
+	Model      string          `json:"model,omitempty"`         // the arm's model from the experiment manifest
+	AgentVer   string          `json:"agent_version,omitempty"` // the agent's own version string, when it declares one
+	Version    int             `json:"version,omitempty"`       // the registered agent version (v1, v2) whose config hash matches; 0 when none
+	Fault      string          `json:"fault,omitempty"`         // the fault injected in this run (model-down, broken-tool, misleading-instruction or the probe family); empty for a clean run
+	Started    *time.Time      `json:"started,omitempty"`
+	SealedAt   *time.Time      `json:"sealed_at,omitempty"`
+	Error      string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
 	// Paired marks a run whose experiment compares two or more setups and is
 	// not a debug run, so "Compare Setup A and B" has two sides to show.
 	Paired bool `json:"paired,omitempty"`
