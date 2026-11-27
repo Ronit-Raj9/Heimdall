@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({ adaptive: {} as unknown, verdict: {} as unknown 
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => api.adaptive }));
 // M4-34: the Actions tab reads one benchmark (GET /suites/{id}).
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: undefined }),
 	useGetSuiteQuery: () => ({ data: undefined, isLoading: false }),
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({

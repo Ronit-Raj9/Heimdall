@@ -7,7 +7,6 @@ import { AUDIT_MAX_BYTES, useAuditTableMutation } from "@/lib/store/apis/analysi
 import { getBenchErrorMessage, useGetClustersQuery, useGetExperimentQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
 import { NotScannedList } from "@/components/integrity/awarenessPanel";
 import { useGetAwarenessQuery } from "@/lib/store/apis/integrityApi";
-import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import type {
 	AnalysisJobKind,
 	AnalysisView,
@@ -37,6 +36,7 @@ import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { useLiveJob } from "@/components/experiments/liveJob";
 
 /** The search value of the Analysis tab (?tab=analysis). */
 export const ANALYSIS_TAB_ID = "analysis";
@@ -419,7 +419,8 @@ function ClusterBars({ clusters, total }: { clusters: readonly { signature: stri
 			{clusters.map((c) => (
 				<li key={c.signature} className="flex flex-col gap-1">
 					<span className="flex items-baseline justify-between gap-3">
-						<span className="truncate" title={`${c.signature}: ${c.title}`}>
+						{/* M4-39: two lines, not one cut at 25 characters on a phone. */}
+						<span className="line-clamp-2 min-w-0 break-words" title={`${c.signature}: ${c.title}`}>
 							{c.title}
 						</span>
 						<span className="text-xs font-semibold tabular-nums">{c.count}</span>
@@ -448,11 +449,7 @@ function AnalysisJobCard({
 }) {
 	const { t } = useTranslation("analysis");
 	const [jobId, setJobId] = useState<string | null>(null);
-	const job = useGetJobQuery(jobId ?? "", {
-		skip: !jobId,
-		pollingInterval: ANALYSIS_JOB_POLL_MS,
-		skipPollingIfUnfocused: true,
-	});
+	const job = useLiveJob(jobId, ANALYSIS_JOB_POLL_MS);
 	const status = job.data && job.data.id === jobId ? job.data.status : undefined;
 	const ended = status ? TERMINAL.has(status) : false;
 	const handled = useRef<string | null>(null);

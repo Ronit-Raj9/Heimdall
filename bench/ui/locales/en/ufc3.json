@@ -1,0 +1,10 @@
+{
+	"matrix": {
+		"tiedRank": "={{rank}}",
+		"tiedRankHint": "Tied with the leader: the numbers cannot separate these setups. Tied setups are listed cheapest first.",
+		"notMeasuredNote": "Solves every time is not measured for {{count}} setup: it needs 2 or more tries per task.",
+		"notMeasuredNote_other": "Solves every time is not measured for {{count}} setups: they need 2 or more tries per task.",
+		"cardRank": "Rank {{rank}}",
+		"whatDiffers": "What differs"
+	}
+}

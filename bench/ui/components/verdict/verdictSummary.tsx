@@ -43,7 +43,8 @@ const INK = {
 	neutral: "text-foreground",
 } as const satisfies Record<Tone, string>;
 
-const BAR = ["bg-chart-cat-1", "bg-chart-cat-2", "bg-chart-cat-3"] as const;
+// M1-30: A blue (--chart-1), B amber (--chart-2), told apart under deuteranopia; the letter sits by the bar.
+const BAR = ["bg-chart-1", "bg-chart-2", "bg-chart-cat-3"] as const;
 
 export interface VerdictSummaryProps {
 	verdict: Verdict;
@@ -229,18 +230,23 @@ function ArmPanel({
 					{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}
 				</span>
 			</div>
-			<div
-				className="bg-muted h-2.5 w-full overflow-hidden rounded-full"
-				role="meter"
-				aria-label={t("summary.passRate")}
-				aria-valuemin={0}
-				aria-valuemax={100}
-				aria-valuenow={rate === null ? undefined : Math.round(rate * 100)}
-			>
+			<div className="flex items-center gap-2">
+				<span className="text-muted-foreground w-3 shrink-0 font-mono text-xs font-semibold" aria-hidden="true">
+					{arm.length <= 2 ? arm : arm.slice(0, 1).toUpperCase()}
+				</span>
 				<div
-					className={cn("h-full rounded-full transition-all", colour)}
-					style={{ width: `${rate === null ? 0 : Math.min(100, rate * 100)}%` }}
-				/>
+					className="bg-muted h-2.5 w-full overflow-hidden rounded-full"
+					role="meter"
+					aria-label={t("summary.passRate")}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-valuenow={rate === null ? undefined : Math.round(rate * 100)}
+				>
+					<div
+						className={cn("h-full rounded-full transition-all", colour)}
+						style={{ width: `${rate === null ? 0 : Math.min(100, rate * 100)}%` }}
+					/>
+				</div>
 			</div>
 			<span className="text-muted-foreground text-xs">
 				{ratio ? t("summary.passCount", { num: ratio.num, den: ratio.den }) : t("summary.passRate")}

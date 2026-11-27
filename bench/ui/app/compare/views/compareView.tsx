@@ -28,7 +28,7 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useGetCatalogQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
+import { useGetCatalogQuery, useGetExperimentQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
 import { frozenSuiteRef, type Pair, type PairResponse, type PairRun, type RunProvenance } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft, FlaskConical } from "lucide-react";
@@ -50,6 +50,7 @@ export default function CompareView() {
 	// p06-1: ?a=<run>&b=<run> compares two runs of any pairs; one pair opens that pair (history replace).
 	const [runA, setRunA] = useQueryState("a", parseAsString.withOptions({ history: "replace" }));
 	const [runB, setRunB] = useQueryState("b", parseAsString.withOptions({ history: "replace" }));
+	const expName = useExperimentName(expParam);
 	const openPair = useCallback(
 		(id: string) => {
 			void setPairId(id, { history: "replace" });
@@ -68,7 +69,8 @@ export default function CompareView() {
 						? [
 								{ label: t("runs.list.title"), to: "/runs" },
 								{
-									label: expParam,
+									// M5-7: the comparison's name when the status has one, else its id.
+									label: expName ?? expParam,
 									to: "/experiments/$expId",
 									params: { expId: expParam },
 								},
@@ -352,8 +354,15 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 	);
 }
 
+/** A comparison's name from its cached status, or undefined (no id, loading, failed, no name). */
+function useExperimentName(expId: string | null | undefined): string | undefined {
+	const status = useGetExperimentQuery(expId ?? skipToken);
+	return status.data?.name?.trim() || undefined;
+}
+
 function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode }) {
 	const { t } = useTranslation("bench");
+	const expName = useExperimentName(pair.exp_id);
 	return (
 		<div className="flex flex-col gap-2">
 			{back}
@@ -372,7 +381,8 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 			</div>
 			<p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 				<span>
-					{t("runs.experimentLabel")} <EntityLink kind="experiment" id={pair.exp_id} />
+					{/* M4-65: the comparison by name; the id stays in the link's title. */}
+					{t("runs.experimentLabel")} <EntityLink kind="experiment" id={pair.exp_id}>{expName}</EntityLink>
 				</span>
 				<span className="flex flex-wrap items-center gap-x-2">
 					{pair.runs.map((run) => (

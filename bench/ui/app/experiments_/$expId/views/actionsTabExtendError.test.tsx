@@ -12,6 +12,7 @@ vi.mock("@/lib/store/apis/adaptiveApi", () => ({
 }));
 // M4-34: the Actions tab reads one benchmark (GET /suites/{id}).
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: undefined }),
 	useGetSuiteQuery: () => ({ data: undefined, isLoading: false }),
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({

@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EntityLink } from "@/components/shell";
 import { CopyId } from "@/components/ui/copyId";
 import { EmptyMark } from "@/components/ui/emptyMark";
@@ -13,6 +14,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import "@/components/verdict/hw09I18n";
+import "@/components/matrix/ufc3I18n";
 import { observedNumber, resilienceTone, successBar, tierOf } from "./leaderboard.utils";
 
 // Cells of one leaderboard row. Every measured number goes through ValueCell or the same
@@ -48,13 +50,20 @@ export function TierBadge({ entry }: { entry: Pick<LeaderboardEntry, "rank" | "t
 	);
 }
 
-/** Agent config id, model, arm label, short config hash, and a synthetic badge when the runs were scripted. */
+/**
+ * Agent config id, model, arm label, short config hash, and a synthetic badge when the runs were
+ * scripted. showHash false leaves the hash out (the comparison matrix, M4-53); "What differs" is a
+ * 32 px button either way.
+ */
 export function AgentCell({
 	entry,
+	showHash = true,
 }: {
 	entry: Pick<LeaderboardEntry, "rank" | "agent" | "model" | "label" | "config_hash" | "synthetic">;
+	showHash?: boolean;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: tc } = useTranslation("ufc3");
 	return (
 		// M4-107: name, then model and version under it, narrow enough for a phone column.
 		<div className="flex min-w-0 flex-col gap-0.5 sm:min-w-48" data-testid={`leaderboard-agent-${entry.rank}`}>
@@ -74,15 +83,19 @@ export function AgentCell({
 			<span className="text-muted-foreground font-mono text-xs break-all">{entry.model}</span>
 			<div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
 				{entry.label && <span className="max-w-56 truncate">{entry.label}</span>}
-				<CopyId
-					value={entry.config_hash}
-					display={shortHash(entry.config_hash)}
-					title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}
-					className="text-[11px]"
-				/>
-				<Link to="/agents" search={{ tab: "diff", b: entry.config_hash }} className="text-primary hover:underline">
-					{t("agentDiff.link.diff")}
-				</Link>
+				{showHash && (
+					<CopyId
+						value={entry.config_hash}
+						display={shortHash(entry.config_hash)}
+						title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}
+						className="text-[11px]"
+					/>
+				)}
+				<Button variant="outline" size="sm" className="h-8" asChild>
+					<Link to="/agents" search={{ tab: "diff", b: entry.config_hash }} data-testid={`leaderboard-diff-${entry.rank}`}>
+						{tc("matrix.whatDiffers")}
+					</Link>
+				</Button>
 			</div>
 		</div>
 	);
@@ -167,10 +180,37 @@ export function SuccessCell({
  * pass^k with k = trials. Fewer than 2 tries per task measures no reliability: "Not measured", hatched,
  * with how many tries ran (fix wave 3, N245 and N295); "solved all k tries" only under a known value.
  */
-export function ReliabilityCell({ entry }: { entry: Pick<LeaderboardEntry, "rank" | "reliability" | "trials"> }) {
+export function ReliabilityCell({
+	entry,
+	inline = false,
+}: {
+	entry: Pick<LeaderboardEntry, "rank" | "reliability" | "trials">;
+	/** A line under another cell: no per-cell "needs tries" note, the table says it once (M4-54). */
+	inline?: boolean;
+}) {
 	const { t } = useTranslation("bench");
 	const { t: t9 } = useTranslation("hw09");
 	const known = observedNumber(entry.reliability) !== null;
+	if (entry.trials < 2 && inline) {
+		return (
+			<span
+				className="bench-hatched text-muted-foreground rounded-sm border border-dashed px-1 text-xs"
+				data-state="unknown"
+				data-testid={`leaderboard-reliability-${entry.rank}`}
+				title={t9("reliability.needsTries", { k: entry.trials })}
+			>
+				{t9("reliability.notMeasured")}
+			</span>
+		);
+	}
+	if (inline) {
+		return (
+			<span className="inline-flex items-baseline gap-1" data-testid={`leaderboard-reliability-${entry.rank}`}>
+				<ValueCell value={entry.reliability} kind="rate" />
+				{known && <span className="text-muted-foreground font-mono text-[11px]">{t("leaderboard.cell.passK", { k: entry.trials })}</span>}
+			</span>
+		);
+	}
 	if (entry.trials < 2) {
 		return (
 			<div className="flex flex-col items-end gap-0.5" data-testid={`leaderboard-reliability-${entry.rank}`}>

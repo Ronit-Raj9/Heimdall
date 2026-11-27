@@ -1,6 +1,7 @@
 import { CompareRefsForm } from "@/components/experiments/compareRefsForm";
 import { MigrateForm } from "@/components/experiments/migrateForm";
 import { ActionCard } from "@/components/experiments/compareActionCard";
+import { FollowUpJob } from "@/components/experiments/followUpJob";
 import { groupFaults } from "@/app/evaluate/views/step4Setup";
 import { Input } from "@/components/ui/input";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
@@ -20,7 +21,6 @@ import "@/components/verdict/hw09I18n";
 import "@/app/compare/views/w4m3I18n";
 import { wholeNumberProblem } from "@/lib/inputChecks";
 import { usePartialSuiteRefetch } from "@/app/experiments_/new/views/partialRefetch";
-import { PaidFollowUpJob } from "./paidFollowUpJob";
 
 export interface ActionsTabProps {
 	expId: string;
@@ -281,14 +281,13 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 						)}
 					</>
 				)}
-				<PaidFollowUpJob
+				<FollowUpJob
 					kind="experiment.extend"
 					params={startParams}
 					label={t("extend.run")}
 					// M4-33: the shared PaidButton asks with the runs and the price before anything starts.
 					confirm={confirmText}
-					estimateRuns={estimate.runs}
-					estimateUsd={estimate.cost}
+					paid={{ estimateRuns: estimate.runs, estimateUsd: estimate.cost }}
 					missing={parent || broken ? undefined : (problem ?? t("extend.notInconclusive"))}
 					testId="actions-extend-job"
 				/>
@@ -405,12 +404,13 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 						</label>
 					</>
 				)}
-				<PaidFollowUpJob
+				<FollowUpJob
 					kind="probe.run"
 					params={params}
 					label={t("probe.run")}
 					confirm={t("probe.confirm", { expId })}
 					missing={t("probe.tickOne")}
+					paid={{}}
 					testId="actions-probe-job"
 				/>
 			</div>

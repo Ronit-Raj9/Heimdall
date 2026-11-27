@@ -2,6 +2,7 @@ import { costSentence } from "@/components/platform/confirmDialog";
 import { Input } from "@/components/ui/input";
 import { paidLabel } from "@/components/ui/paidButton";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { useGetGithubRefsQuery, useGetGithubStatusQuery, useListGithubReposQuery } from "@/lib/store/apis/githubApi";
 import { compareRefsParams, compareRefsProblem, REF_TRIALS_MAX, REF_TRIALS_MIN } from "@/lib/types/refCompare";
 import "@/app/leaderboard/views/uf4bI18n";
@@ -10,6 +11,11 @@ import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FollowUpJob } from "./followUpJob";
+
+/** The benchmark refs "id@version" the suggestions list, sorted, each once. Pure. */
+export function suiteChoices(suites: readonly { id: string; version?: string }[] | undefined): string[] {
+	return [...new Set((suites ?? []).map((s) => (s.version ? `${s.id}@${s.version}` : s.id)))].sort();
+}
 
 /**
  * Compare one agent at two git refs (gap lane G07): the experiment.compare-refs job reads the
@@ -39,6 +45,7 @@ export function CompareRefsForm({
 	const repos = useListGithubReposQuery(connected ? 1 : skipToken);
 	const [picked, setAgent] = useState(initialAgent);
 	const [suite, setSuite] = useState(initialSuite);
+	const suites = useGetSuitesLightQuery();
 	const [repo, setRepo] = useState("");
 	const [refA, setRefA] = useState("");
 	const [refB, setRefB] = useState("");
@@ -104,8 +111,15 @@ export function CompareRefsForm({
 						value={suite}
 						onChange={(e) => setSuite(e.target.value)}
 						placeholder="coding-core@1.0.0"
+						list={`${uid}-suites`}
 						data-testid={`${testId}-suite`}
 					/>
+					{/* M4-93: the known benchmarks as suggestions; free text still works. */}
+					<datalist id={`${uid}-suites`} data-testid={`${testId}-suite-options`}>
+						{suiteChoices(suites.data?.suites).map((ref) => (
+							<option key={ref} value={ref} />
+						))}
+					</datalist>
 				</label>
 				<label className={`${field} sm:col-span-2`} htmlFor={`${uid}-repo`}>
 					{t("compare.repo")}

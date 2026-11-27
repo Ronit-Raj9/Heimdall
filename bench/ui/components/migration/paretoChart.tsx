@@ -1,5 +1,5 @@
 import { getLocale } from "@/lib/i18n";
-import type { Pareto } from "@/lib/types/bench";
+import type { Pareto, ParetoPoint } from "@/lib/types/bench";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { costText, formatShare, formatUsd, observed, paretoModel, type PlacedParetoPoint } from "./pareto.utils";
@@ -25,7 +25,8 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 	const { frame } = model;
 	const right = frame.width - frame.right;
 	const bottom = frame.height - frame.bottom;
-	const frontier = pareto.points.filter((p) => p.frontier).map((p) => p.label || p.id);
+	const names = useMemo(() => paretoPointNames(pareto.points), [pareto.points]);
+	const frontier = pareto.points.filter((p) => p.frontier).map((p) => names.get(p.id) ?? p.id);
 
 	return (
 		<figure className="flex min-w-0 flex-col gap-3" data-testid={testId}>
@@ -80,7 +81,7 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 						/>
 					)}
 					{model.placed.map((p) => (
-						<Point key={p.point.id} placed={p} locale={locale} testId={testId} />
+						<Point key={p.point.id} placed={p} locale={locale} testId={testId} name={names.get(p.point.id) ?? p.point.id} />
 					))}
 				</svg>
 			</div>
@@ -113,7 +114,7 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 							data-testid={`${testId}-point-${p.id}`}
 							data-frontier={p.frontier ? "true" : undefined}
 						>
-							<span className="font-mono">{p.label || p.id}</span>{" "}
+							<span title={p.label || undefined}>{names.get(p.id) ?? p.id}</span>{" "}
 							{!p.placed
 								? t("migration.pareto.notPlaced", { reason: p.reason })
 								: p.frontier
@@ -132,10 +133,25 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 	);
 }
 
-function Point({ placed, locale, testId }: { placed: PlacedParetoPoint; locale: string; testId: string }) {
+/**
+ * One name per setup on every tab (M4-4): "A (gpt-5.6-terra)", the setup id with its model, or
+ * with its agent when every point runs the same model; the id alone when neither tells more. Pure.
+ */
+export function paretoPointNames(points: readonly Pick<ParetoPoint, "id" | "agent" | "model">[]): Map<string, string> {
+	const models = new Set(points.map((p) => p.model).filter(Boolean));
+	const sameModel = points.length > 1 && models.size === 1;
+	return new Map(
+		points.map((p) => {
+			const detail = (sameModel ? p.agent : p.model) || p.model || p.agent;
+			return [p.id, detail && detail !== p.id ? `${p.id} (${detail})` : p.id] as const;
+		}),
+	);
+}
+
+function Point({ placed, locale, testId, name }: { placed: PlacedParetoPoint; locale: string; testId: string; name: string }) {
 	const { point, x, y, interval } = placed;
 	const color = point.frontier ? "var(--color-chart-cat-1)" : "var(--color-chart-neutral)";
-	const tip = `${point.label || point.id}: ${costText(point.x, locale) ?? ""}, ${formatShare(observed(point.y), locale) ?? ""}`;
+	const tip = `${name}: ${costText(point.x, locale) ?? ""}, ${formatShare(observed(point.y), locale) ?? ""}`;
 	return (
 		<g data-testid={`${testId}-mark`} data-frontier={point.frontier ? "true" : "false"} opacity={point.frontier ? 1 : 0.7}>
 			<title>{tip}</title>
@@ -152,7 +168,7 @@ function Point({ placed, locale, testId }: { placed: PlacedParetoPoint; locale: 
 				<circle cx={x} cy={y} r={4.5} fill="var(--color-background)" stroke={color} strokeWidth={1.5} />
 			)}
 			<text x={x + 8} y={y - 8} fontSize={11} fill="currentColor" className="text-foreground">
-				{point.label || point.id}
+				{name}
 			</text>
 			<circle cx={x} cy={y} r={12} fill="transparent" />
 		</g>

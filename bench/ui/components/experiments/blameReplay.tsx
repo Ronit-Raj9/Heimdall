@@ -1,11 +1,10 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
-import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import type { BlameReplayJobParams, BlameReplayResult } from "@/lib/types/refCompare";
-import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLiveJob } from "./liveJob";
 
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
 
@@ -20,10 +19,7 @@ export function BlameReplay({ expId }: { expId: string }) {
 	const agents = useGetAgentsQuery();
 	const [stub, setStub] = useState("");
 	const [jobId, setJobId] = useState<string | null>(null);
-	const job = useGetJobQuery(jobId ?? skipToken, {
-		pollingInterval: 3000,
-		skipPollingIfUnfocused: true,
-	});
+	const job = useLiveJob(jobId, 3000);
 	const done = job.data?.status ? TERMINAL.has(job.data.status) : false;
 	const result = done && job.data?.status === "succeeded" ? (job.data.result as BlameReplayResult | undefined) : undefined;
 	const params: BlameReplayJobParams = stub ? { exp_id: expId, stub } : { exp_id: expId };

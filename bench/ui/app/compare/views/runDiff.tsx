@@ -197,7 +197,7 @@ function OutcomePill({ outcome }: { outcome: Outcome }) {
 			className={cn(
 				"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
 				tone === "pass" && "bg-chart-success/15 text-chart-success-ink",
-				tone === "zero" && "bg-destructive/10 text-destructive",
+				tone === "zero" && "bg-danger/10 text-danger-ink",
 				tone === "unknown" && "bg-muted text-muted-foreground",
 			)}
 		>
