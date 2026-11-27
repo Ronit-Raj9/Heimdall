@@ -20,15 +20,16 @@
 			"check": "Readiness check",
 			"custom": "Custom comparison",
 			"monitor": "Monitor this agent",
-			"compareModels": "Compare models for this agent"
+			"compareModels": "Compare models for this agent",
+			"monitorDrift": "Watch this agent for drift"
 		}
 	},
 	"runs": {
 		"loadError": "Could not load this agent's runs",
 		"empty": "This agent has no runs yet. Evaluate it to see how it does on each task.",
 		"evaluate": "Evaluate this agent",
-		"summary_one": "{{count}} run, newest first",
-		"summary_other": "{{count}} runs, newest first",
+		"summary_one": "All runs (all versions): {{count}}, newest first",
+		"summary_other": "All runs (all versions): {{count}}, newest first",
 		"failedOnly": "Only runs that did not pass",
 		"col": {
 			"when": "Started",
@@ -44,6 +45,7 @@
 		"page": "Page {{page}} of {{pages}}"
 	},
 	"setup": {
+		"noLimit": "No limit",
 		"instructions": "Instructions",
 		"instructionsHint": "What the agent is told to do: its prompt and notes files.",
 		"description": "What this agent does",
@@ -114,6 +116,9 @@
 		"description": "How often the agent looped, claimed done without checking or ignored an error, with example runs.",
 		"noPatterns_one": "No failure pattern seen in {{count}} run.",
 		"noPatterns_other": "No failure pattern seen in {{count}} runs.",
+		"noRepeated_one": "No repeated failure pattern. {{count}} run failed: see below.",
+		"noRepeated_other": "No repeated failure pattern. {{count}} runs failed: see below.",
+		"injectedOutage": "(the injected outage)",
 		"pattern": {
 			"pattern_loop": "Loops",
 			"pattern_unverified_finish": "Said done without checking",
@@ -178,6 +183,7 @@
 		"costUnknown": "cost unknown",
 		"estimating": "Estimating...",
 		"launch": "Run failure test",
+		"launchUpTo": "Run failure test, up to {{cost}}",
 		"launching": "Starting...",
 		"pastTitle": "Past failure tests",
 		"pastHint": "Score under each fault and the change from a clean run.",

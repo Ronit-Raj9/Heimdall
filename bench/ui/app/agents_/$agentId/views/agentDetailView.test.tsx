@@ -4,7 +4,7 @@ import { LOCAL_SESSION, type SessionInfo } from "@/lib/session/sessionContext";
 import { errorQuery, mutation, okQuery, render } from "@/lib/testing/render";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it, vi } from "vitest";
-import AgentDetailView from "./agentDetailView";
+import AgentDetailView, { deleteDialogOpen } from "./agentDetailView";
 
 const state = vi.hoisted(() => ({ configMissing: false }));
 
@@ -68,13 +68,17 @@ describe("agent page tabs opened from the menu", () => {
 });
 
 describe("delete agent", () => {
-	it("?delete=1 opens the confirmation for an agent of this project", () => {
+	// M2-41: a pasted ?delete=1 never opens the dialog; the menu pick on the page does.
+	it("a pasted ?delete=1 opens no confirmation", () => {
 		state.configMissing = false;
 		const html = page("?delete=1");
-		expect(html).toContain('data-testid="delete-agent-dialog"');
-		expect(html).toContain("Delete agent zz-test-loop?");
-		expect(html).toContain("Its settings file is removed. Past runs, results and saved versions stay.");
-		expect(html).toContain("Keep agent");
+		expect(html).not.toContain('data-testid="delete-agent-dialog"');
+	});
+
+	it("opens only when the menu set the param on this page", () => {
+		expect(deleteDialogOpen("1", false)).toBe(true);
+		expect(deleteDialogOpen("1", true)).toBe(false);
+		expect(deleteDialogOpen(null, false)).toBe(false);
 	});
 
 	it("is not offered for a built-in agent (no settings file in the project)", () => {
@@ -88,5 +92,14 @@ describe("delete agent", () => {
 		const viewer = { ...LOCAL_SESSION, authMode: "hosted", signedIn: true, role: "viewer" } as SessionInfo;
 		const html = page("?delete=1", viewer);
 		expect(html).not.toContain('data-testid="delete-agent-dialog"');
+	});
+});
+
+describe("agent page heading (M2-30)", () => {
+	it("the h1 holds the agent name only; the version chip sits outside it", () => {
+		const html = page("");
+		const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+		expect(h1.replace(/<[^>]+>/g, "")).toBe("zz-test-loop");
+		expect(html).toContain('data-testid="agent-detail-version"');
 	});
 });

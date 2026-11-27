@@ -14,6 +14,7 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentCompatibilityQuery, useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
 import { Activity, Bug, Copy, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, PencilLine, ShieldAlert, Trash2 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
@@ -36,12 +37,17 @@ export function latestVersion(versions: ReadonlyArray<{ version: number }> | und
 	return list.length === 0 ? null : Math.max(...list.map((v) => v.version));
 }
 
+/** Whether the delete dialog shows: the menu set ?delete on this page, not a pasted link (M2-41). */
+export function deleteDialogOpen(param: string | null, pasted: boolean): boolean {
+	return param !== null && !pasted;
+}
+
 /**
  * One agent (/agents/$agentId?tab=): name, version, capabilities, one primary Evaluate button and a
  * "more" menu, then Report card (default), Versions, Runs, Setup, Tools and Pull requests (test on
  * every pull request). ?tab=checks (the readiness check) and ?tab=compare-models open from the menu and
- * then show as the last tab. ?delete=1 (the menu's "Delete agent") asks to delete the agent; it is
- * offered only to members, and only for an agent whose settings file lives in this project (built-in
+ * then show as the last tab. ?delete=1, set by the menu's "Delete agent" on this page, asks to delete
+ * the agent (a pasted link with it opens nothing); it is offered only to members, and only for an agent whose settings file lives in this project (built-in
  * library agents have none). ?copy=duplicate and ?copy=rename (the menu's "Duplicate agent" and "Rename agent")
  * ask for a new name under the same rule.
  */
@@ -58,6 +64,14 @@ export default function AgentDetailView() {
 	const config = useGetAgentConfigQuery(agentId, { skip: !writable });
 	const canDelete = writable && config.isSuccess;
 	const [deleteParam, setDeleteParam] = useQueryState("delete", parseAsString.withOptions({ history: "replace" }));
+	// A pasted or bookmarked ?delete=1 never opens the delete dialog (M2-41): the param present on the
+	// first render is dropped; only the menu's "Delete agent", picked on this page, opens it.
+	const [pastedDelete, setPastedDelete] = useState(() => deleteParam !== null);
+	useEffect(() => {
+		if (!pastedDelete) return;
+		if (deleteParam !== null) void setDeleteParam(null);
+		else setPastedDelete(false);
+	}, [pastedDelete, deleteParam, setDeleteParam]);
 	const [copyParam, setCopyParam] = useQueryState("copy", parseAsString.withOptions({ history: "replace" }));
 	const [, setTabParam] = useQueryState("tab", parseAsString.withOptions({ history: "replace" }));
 	const copyMode = copyParam === "rename" ? "rename" : copyParam === "duplicate" ? "duplicate" : null;
@@ -81,6 +95,8 @@ export default function AgentDetailView() {
 		{ id: "config", label: t("detail.tabs.setup"), hidden: true },
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
+	// The same rule as the live monitor list: an agent that owns its model sits behind a remote endpoint.
+	const endpointAgent = agent?.owns_model === true;
 	const state = agent ? (agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id))) : null;
 	if (!agentLoading && !agent) {
 		return (
@@ -99,25 +115,16 @@ export default function AgentDetailView() {
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="agent-detail-screen">
 			<PageHeader
-				title={
-					<span className="flex min-w-0 items-center gap-3">
-						<AgentAvatar name={agentId} size="lg" />
-						<span className="truncate">{agentId}</span>
-						<span
-							className="bg-muted text-muted-foreground shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-medium"
-							data-testid="agent-detail-version"
-							title={version === null ? t("detail.noVersionHint") : undefined}
-						>
-							{version === null ? t("detail.noVersion") : `v${version}`}
-						</span>
-					</span>
-				}
+				// The heading is the agent's name only (M2-30): the avatar sits before it, hidden from
+				// screen readers, and the version chip sits beside it with the check pill.
+				title={<span className="block truncate">{agentId}</span>}
+				icon={<AgentAvatar name={agentId} size="lg" />}
 				subtitle={
 					agent ? (
-						<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-							<span className="inline-flex items-center gap-1.5">
-								{Icon && <Icon className="size-3.5" aria-hidden="true" />}
-								{adapterLabel(agent.adapter)}
+						<span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+							<span className="inline-flex min-w-0 items-center gap-1.5">
+								{Icon && <Icon className="size-3.5 shrink-0" aria-hidden="true" />}
+								<span className="truncate">{adapterLabel(agent.adapter)}</span>
 							</span>
 							{agent.model && (
 								<span className="inline-flex items-center gap-1.5 font-mono text-xs" data-testid="agent-detail-model">
@@ -127,7 +134,7 @@ export default function AgentDetailView() {
 							)}
 							{capabilities.length > 0 && (
 								<span
-									className="inline-flex flex-wrap items-center gap-1"
+									className="hidden flex-wrap items-center gap-1 sm:inline-flex"
 									data-testid="agent-detail-capabilities"
 									aria-label={tb("detail.capabilities")}
 								>
@@ -147,7 +154,18 @@ export default function AgentDetailView() {
 						tb("detail.subtitle", { id: agentId })
 					)
 				}
-				meta={state && <CheckPill state={state} testId="agent-detail-status" />}
+				meta={
+					<>
+						<span
+							className="bg-muted text-muted-foreground shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-medium"
+							data-testid="agent-detail-version"
+							title={version === null ? t("detail.noVersionHint") : undefined}
+						>
+							{version === null ? t("detail.noVersion") : `v${version}`}
+						</span>
+						{state && <CheckPill state={state} testId="agent-detail-status" />}
+					</>
+				}
 				breadcrumbs={[{ label: tb("detail.back"), to: "/agents" }, { label: agentId }]}
 				actions={
 					<div className="flex items-center gap-2">
@@ -190,13 +208,22 @@ export default function AgentDetailView() {
 									icon: Bug,
 									testId: "agent-detail-why-fail",
 								},
-								{
-									label: t("detail.menu.monitor"),
-									to: "/scheduled-checks",
-									search: { tab: "live", agent: agentId },
-									icon: Activity,
-									testId: "agent-detail-monitor",
-								},
+								// Only an agent with a remote endpoint can be live monitored; any other gets the drift form (M7-54).
+								endpointAgent
+									? {
+											label: t("detail.menu.monitor"),
+											to: "/scheduled-checks",
+											search: { tab: "live", agent: agentId },
+											icon: Activity,
+											testId: "agent-detail-monitor",
+										}
+									: {
+											label: t("detail.menu.monitorDrift"),
+											to: "/scheduled-checks",
+											search: { tab: "drift", agent: agentId },
+											icon: Activity,
+											testId: "agent-detail-monitor",
+										},
 								{
 									label: t("detail.menu.check"),
 									to: "/agents/$agentId",
@@ -245,7 +272,7 @@ export default function AgentDetailView() {
 					</div>
 				}
 			/>
-			{canDelete && deleteParam !== null && (
+			{canDelete && deleteDialogOpen(deleteParam, pastedDelete) && (
 				<DeleteAgentDialog agentId={agentId} onClose={() => void setDeleteParam(null)} onDeleted={() => void navigate({ to: "/agents" })} />
 			)}
 			{canDelete && copyMode !== null && (
@@ -276,7 +303,7 @@ export default function AgentDetailView() {
 					) : active === "runs" ? (
 						<AgentRunsTab agentId={agentId} />
 					) : active === "setup" || active === "config" ? (
-						<ConfigTab agentId={agentId} />
+						<ConfigTab agentId={agentId} checkFailed={state === "failed" || state === "broken"} />
 					) : (
 						<ReportCardTab agentId={agentId} />
 					)

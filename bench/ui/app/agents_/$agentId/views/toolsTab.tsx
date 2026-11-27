@@ -16,8 +16,11 @@ import {
 } from "@/lib/store/apis/agentopsApi";
 import { MCP_FORMATS, scanMCPJob, type AgentMCPResponse, type AgentSkill, type SkillScanResult } from "@/lib/types/agentops";
 import type { TFunction } from "i18next";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
+import { FileArchive } from "lucide-react";
+import "./uf2cI18n";
 import { type AgentOpsTabProps, Field, OpsSection, useAgentId } from "./agentOps.shared";
 
 const MAX_ZIP_MB = 50;
@@ -50,6 +53,7 @@ export function ToolsTab(props: AgentOpsTabProps = {}) {
 		<div className="space-y-4" data-testid="agent-tools-tab">
 			<SkillsSection id={id} />
 			<MCPSection id={id} />
+			<GatewayLink />
 		</div>
 	);
 }
@@ -144,6 +148,8 @@ function SkillFindings({ skill }: { skill: AgentSkill }) {
 
 export function SkillsSection({ id, initial = initialSkillForm }: { id: string; initial?: SkillForm }) {
 	const { t } = useTranslation("agentops");
+	const { t: tu } = useTranslation("uf2c");
+	const fileInput = useRef<HTMLInputElement>(null);
 	const confirm = useConfirm();
 	const { data, error, isLoading } = useGetAgentSkillsQuery(id);
 	const [upload, { isLoading: uploading }] = useUploadAgentSkillMutation();
@@ -192,7 +198,7 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 	};
 
 	return (
-		<OpsSection title={t("tools.skills.title")} hint={t("tools.skills.hint", { dir })} testId="agent-skills-section">
+		<OpsSection title={t("tools.skills.title")} hint={<span className="block max-w-prose">{t("tools.skills.hint", { dir })}</span>} testId="agent-skills-section">
 			{isLoading ? (
 				<p className="text-muted-foreground text-xs">{t("tools.skills.loading")}</p>
 			) : error ? (
@@ -247,14 +253,27 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 			)}
 			<RoleGate min="member">
 				<div className="flex flex-wrap items-end gap-3">
+					{/* A styled button opens the hidden file input and shows the picked name (M2-55). */}
 					<Field label={t("tools.skills.zip")}>
 						<input
 							key={form.inputKey}
+							ref={fileInput}
 							type="file"
 							accept=".zip,application/zip"
+							className="sr-only"
+							tabIndex={-1}
 							onChange={(e) => pick(e.target.files?.[0] ?? null)}
 							data-testid="agent-skill-file"
 						/>
+						<span className="flex min-w-0 items-center gap-2">
+							<Button type="button" size="sm" variant="outline" onClick={() => fileInput.current?.click()} data-testid="agent-skill-choose">
+								<FileArchive aria-hidden="true" />
+								{tu("tools.chooseZip")}
+							</Button>
+							<span className="text-muted-foreground max-w-48 truncate text-xs" data-testid="agent-skill-file-name">
+								{file ? file.name : tu("tools.noFile")}
+							</span>
+						</span>
 					</Field>
 					<Field label={t("tools.skills.name")}>
 						<Input
@@ -268,9 +287,16 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 						<input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
 						{t("tools.skills.replace")}
 					</label>
-					<Button disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
-						{uploading ? t("tools.skills.uploading") : t("tools.skills.upload")}
-					</Button>
+					<span className="flex flex-col gap-1">
+						<Button disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
+							{uploading ? t("tools.skills.uploading") : t("tools.skills.upload")}
+						</Button>
+						{!file && (
+							<span className="text-muted-foreground text-xs" data-testid="agent-skill-upload-hint">
+								{tu("tools.chooseFirst")}
+							</span>
+						)}
+					</span>
 				</div>
 			</RoleGate>
 			{file && problem && <p className="text-destructive text-xs">{problem}</p>}
@@ -290,6 +316,7 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 
 function MCPSection({ id }: { id: string }) {
 	const { t } = useTranslation("agentops");
+	const { t: tu } = useTranslation("uf2c");
 	const { data, error, isLoading } = useGetAgentMCPQuery(id);
 	const [save, { isLoading: saving }] = usePutAgentMCPMutation();
 	const [form, setForm] = useState(() => ({
@@ -311,7 +338,7 @@ function MCPSection({ id }: { id: string }) {
 	};
 
 	return (
-		<OpsSection title={t("tools.mcp.title")} hint={t("tools.mcp.hint")} testId="agent-mcp-section">
+		<OpsSection title={t("tools.mcp.title")} hint={<span className="block max-w-prose">{t("tools.mcp.hint")}</span>} testId="agent-mcp-section">
 			{isLoading ? (
 				<p className="text-muted-foreground text-xs">{t("tools.mcp.loading")}</p>
 			) : error ? (
@@ -349,11 +376,25 @@ function MCPSection({ id }: { id: string }) {
 							className="border-input bg-background min-h-40 rounded-md border p-2 font-mono text-xs"
 							value={form.servers_yaml}
 							onChange={(e) => setForm({ ...form, servers_yaml: e.target.value })}
-							placeholder={SERVERS_EXAMPLE}
+							placeholder={tu("tools.noServers")}
 							spellCheck={false}
 							data-testid="agent-mcp-servers"
 						/>
 					</Field>
+					{/* The example is inserted on demand, never shown as if it were real config (M2-56). */}
+					{form.servers_yaml.trim() === "" && (
+						<div>
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								onClick={() => setForm({ ...form, servers_yaml: SERVERS_EXAMPLE })}
+								data-testid="agent-mcp-insert-example"
+							>
+								{tu("tools.insertExample")}
+							</Button>
+						</div>
+					)}
 					<ServerList data={data} />
 					<div className="flex flex-wrap items-center gap-3">
 						<RoleGate min="member">
@@ -365,6 +406,11 @@ function MCPSection({ id }: { id: string }) {
 							<JobRunButton {...scanMCPJob(data.servers_file)} label={t("tools.mcp.scan")} variant="outline" />
 						)}
 						{dirty && <span className="text-muted-foreground text-xs">{t("tools.mcp.saveFirst")}</span>}
+						{!dirty && (
+							<span className="text-muted-foreground text-xs" data-testid="agent-mcp-nothing-changed">
+								{tu("tools.nothingChanged")}
+							</span>
+						)}
 					</div>
 					{message && (
 						<p className={message.ok ? "text-xs text-green-700" : "text-destructive text-xs"} data-testid="agent-mcp-message">
@@ -374,6 +420,19 @@ function MCPSection({ id }: { id: string }) {
 				</>
 			)}
 		</OpsSection>
+	);
+}
+
+/** The way to the gateway report card, which shows what the agent's tool calls did (X-91). */
+function GatewayLink() {
+	const { t } = useTranslation("uf2c");
+	return (
+		<p className="text-muted-foreground max-w-prose text-sm" data-testid="agent-tools-gateway">
+			{t("tools.gatewayIntro")}{" "}
+			<Link to="/gateway" className="text-primary underline-offset-4 hover:underline" data-testid="agent-tools-gateway-link">
+				{t("tools.gatewayLink")}
+			</Link>
+		</p>
 	);
 }
 

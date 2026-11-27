@@ -30,6 +30,10 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	getBenchErrorMessage: () => "error",
 }));
 
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: { suites: [] } }),
+	useGetSuiteQuery: () => ({ data: undefined }),
+}));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useListJobsQuery: () => ({ data: { jobs: [] } }) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/components/platform/useJobLog", () => ({ useJobLog: () => ({ lines: [] }) }));
