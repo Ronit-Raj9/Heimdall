@@ -51,7 +51,7 @@ describe("SharedView", () => {
 
 	it("tells the visitor when a link expired or never existed", () => {
 		api.shared = errorQuery(410, "expired");
-		expect(render(<SharedView token="t" />, signedOutSession())).toContain("expired or was turned off");
+		expect(render(<SharedView token="t" />, signedOutSession())).toContain("Link expired or turned off.");
 		api.shared = errorQuery(404, "nope");
 		expect(render(<SharedView token="t" />, signedOutSession())).toContain("does not exist");
 	});

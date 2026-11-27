@@ -1,6 +1,6 @@
 {
 	"title": "Reference scores",
-	"subtitle": "Known agents on built-in benchmarks.",
+	"subtitle": "",
 	"tab": "Reference",
 	"loading": "Loading reference scores...",
 	"loadError": "Could not load the reference scores",

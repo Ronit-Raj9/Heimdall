@@ -38,6 +38,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	const overview = useGetPublicOverviewQuery();
 	const hosted = session.authMode === "hosted";
+	const wide = pathname === "/library" || pathname.startsWith("/library/");
 	const active = (to: string) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
 
 	return (
@@ -49,7 +50,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 				{t("nav.label")}
 			</a>
 			<header className="bg-background/85 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-40 border-b backdrop-blur">
-				<div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 md:px-8">
+				<div className={cn("mx-auto flex h-14 items-center gap-6 px-4 md:px-8", wide ? "max-w-[1440px]" : "max-w-6xl")}>
 					<Link to="/" className="flex shrink-0 items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]" data-testid="public-brand">
 						<span className="bg-foreground text-background flex size-7 items-center justify-center rounded-lg">
 							<HeimdallMark className="size-4.5" />
@@ -108,11 +109,13 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 					))}
 				</nav>
 			</header>
-			<main id="bench-main" tabIndex={-1} className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-10 outline-none md:px-8 md:py-14" data-bench-content>
+			<main id="bench-main" tabIndex={-1} className={cn("mx-auto flex w-full flex-1 flex-col px-4 py-10 outline-none md:px-8 md:py-14", wide ? "max-w-[1440px]" : "max-w-6xl")}
+				data-bench-content
+			>
 				{children}
 			</main>
 			<footer className="border-t" data-testid="public-footer">
-				<div className="text-muted-foreground mx-auto grid max-w-6xl gap-8 px-4 py-10 text-sm md:grid-cols-[1.5fr_1fr_1fr] md:px-8">
+				<div className={cn("text-muted-foreground mx-auto grid gap-8 px-4 py-10 text-sm md:grid-cols-[1.5fr_1fr_1fr] md:px-8", wide ? "max-w-[1440px]" : "max-w-6xl")}>
 					<div className="flex flex-col gap-2">
 						<span className="text-foreground flex items-center gap-2 font-semibold">
 							<HeimdallMark className="size-4" />
@@ -158,7 +161,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 /** A public page's title block. */
 export function SiteHeader({ title, subtitle, children, testId }: { title: string; subtitle?: string; children?: ReactNode; testId?: string }) {
 	return (
-		<header className="flex flex-col gap-3 pb-8" data-testid={testId}>
+		<header className={cn("flex flex-col gap-3", subtitle || children ? "pb-8" : "pb-0")} data-testid={testId}>
 			<h1 className="text-3xl font-semibold tracking-[-0.025em] text-balance md:text-4xl">{title}</h1>
 			{subtitle && <p className="text-muted-foreground max-w-2xl text-base leading-relaxed text-pretty">{subtitle}</p>}
 			{children}

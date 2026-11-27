@@ -30,7 +30,7 @@
 	},
 	"quickstart": {
 		"title": "Get started",
-		"subtitle": "Build the CLI, then run four commands.",
+		"subtitle": "",
 		"step": "Step {{n}}",
 		"copy": "Copy command",
 		"copied": "Copied",

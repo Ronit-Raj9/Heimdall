@@ -73,7 +73,7 @@ describe("DocsView", () => {
 		api.selected = "zz-nope";
 		api.doc = errorQuery(404, "no guide named zz-nope: GET /api/bench/docs lists them");
 		const html = render(<DocsView />);
-		expect(html).toContain("There is no guide named zz-nope. Pick one from the list.");
+		expect(html).toContain("No guide named zz-nope.");
 		expect(html).not.toContain("Retry");
 		expect(html).not.toContain('data-testid="doc-error"');
 	});

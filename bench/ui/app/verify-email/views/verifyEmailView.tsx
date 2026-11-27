@@ -76,7 +76,7 @@ export default function VerifyEmailView({ token }: { token?: string }) {
 			<div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-xl">
 				<MailCheck className="size-5" aria-hidden="true" />
 			</div>
-			<AuthHeading title={t("verify.title")} subtitle={t("verify.subtitle")} />
+			<AuthHeading title={t("verify.title")} />
 			{state.isError && <AuthError title={t("verify.error")} message={getBenchErrorMessage(state.error)} testId="verify-error" />}
 			<Button size="lg" className="h-10 w-full" isLoading={state.isLoading} onClick={() => void onConfirm()} dataTestId="verify-submit">
 				{state.isLoading ? t("verify.confirming") : t("verify.confirm")}

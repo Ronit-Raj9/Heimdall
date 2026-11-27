@@ -72,7 +72,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			<ModeBadge variant="dot" mode={data?.mode} isLoading={isLoading} isError={isError} className="hidden sm:inline-flex" />
 			{canStart && (
 				<Button asChild size="sm" className="max-sm:size-8 max-sm:px-0" dataTestId="header-evaluate">
-					<Link to={"/evaluate" as never} aria-label={t("shell.evaluateHint")} title={t("shell.evaluateHint")}>
+					<Link to={"/evaluate" as never} aria-label={t("shell.evaluate")}>
 						<Plus aria-hidden="true" />
 						<span className="hidden sm:inline">{t("shell.evaluate")}</span>
 					</Link>

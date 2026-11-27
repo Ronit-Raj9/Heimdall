@@ -69,7 +69,7 @@ export default function LoginView({
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="login-screen">
-			<AuthHeading title={tu("login.title")} subtitle={tu("login.subtitle")} />
+			<AuthHeading title={tu("login.title")} />
 			{expired && (
 				<p className="bg-muted/50 text-foreground flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm" role="status" data-testid="login-expired">
 					<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

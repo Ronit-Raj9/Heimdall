@@ -24,7 +24,7 @@ export default function SecurityView() {
 	};
 	return (
 		<section className="flex min-w-0 flex-col gap-10" data-testid="security-view">
-			<SiteHeader title={t("security.title")} subtitle={t("security.subtitle")} />
+			<SiteHeader title={t("security.title")} />
 			<div className="bg-card flex flex-col gap-4 rounded-xl border p-6 md:flex-row md:items-center md:justify-between" data-testid="security-report">
 				<div className="flex max-w-2xl flex-col gap-1.5">
 					<h2 className="text-lg font-semibold">{t("security.report.title")}</h2>

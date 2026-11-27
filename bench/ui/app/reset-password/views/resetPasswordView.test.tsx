@@ -48,7 +48,7 @@ describe("ResetPasswordView", () => {
 		api.reset = errorQuery(404, "reset link not found");
 		const html = render(<ResetPasswordView token="t" />, signedOutSession());
 		expect(html).toContain('data-testid="reset-invalid"');
-		expect(html).toContain("Ask your organization owner for a new link.");
+		expect(html).toContain("Ask your owner for a new link.");
 		expect(html).toContain('data-testid="reset-sign-in"');
 	});
 	it("shows loading, then the server's refusal", () => {

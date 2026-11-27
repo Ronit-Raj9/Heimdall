@@ -28,7 +28,7 @@
 		"error": "Could not finish",
 		"local": "No login needed",
 		"localBody": "Local server, the CLI uses its write token. Run: echo \"$BENCH_WRITE_TOKEN\" | heimdall login -with-token",
-		"notACode": "Not a sign-in code. Codes are 8 letters, like BCDF-GHJK."
+		"notACode": "Not a sign-in code. Codes are 8 letters with no vowels, like BCDF-GHJK."
 	},
 	"ide": {
 		"tab": "IDE",

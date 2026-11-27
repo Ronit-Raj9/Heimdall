@@ -34,7 +34,7 @@
 	"landing": {
 		"eyebrow": "Agent benchmarking",
 		"title": "Benchmark the agent you ship.",
-		"body": "Report cards with cost per task, gating every pull request.",
+		"body": "Report cards with intervals and cost per task. Gate every pull request on them.",
 		"ctaSignUp": "Get started",
 		"ctaSignIn": "Sign in",
 		"ctaDocs": "Read the docs",

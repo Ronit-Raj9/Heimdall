@@ -11,10 +11,7 @@ export default function ReferenceView() {
 	}, [t]);
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="reference-page">
-			<header className="flex flex-col gap-1">
-				<h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-				<p className="text-muted-foreground max-w-3xl text-sm text-pretty">{t("subtitle")}</p>
-			</header>
+			<h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
 			<ReferenceBoardPanel />
 		</section>
 	);

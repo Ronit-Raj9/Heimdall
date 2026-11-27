@@ -155,7 +155,7 @@ export default function DocsView() {
 					{t("docs.title")}
 				</p>
 			) : (
-				<PageHeader title={t("docs.title")} subtitle={t("docs.subtitle")} testId="docs-header" />
+				<PageHeader title={t("docs.title")} testId="docs-header" />
 			)}
 			{list.isLoading ? (
 				<BlockSkeleton rows={6} testId="docs-loading" />

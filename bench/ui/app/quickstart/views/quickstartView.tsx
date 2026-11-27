@@ -92,7 +92,6 @@ export default function QuickstartView() {
 		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8")} data-testid="quickstart-view">
 			<PageHeader
 				title={tu("quickstart.title")}
-				subtitle={tu("quickstart.subtitle")}
 				breadcrumbs={[{ label: t("home.title"), to: "/" }, { label: tu("quickstart.title") }]}
 				testId="quickstart-header"
 			/>
