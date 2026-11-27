@@ -29,7 +29,7 @@ describe("MatrixTable with one try per task", () => {
 		const html = renderToStaticMarkup(<MatrixTable rows={rows} />);
 		expect(html).not.toContain("solved all 1 tries");
 		expect(html).toContain(">Not measured<");
-		expect(html).toContain("needs 2 or more tries per task; this ran 1");
+		expect(html).toContain("needs 2+ tries per task, this ran 1");
 		expect(html).toContain("1 of 2 tasks solved");
 	});
 });

@@ -42,7 +42,7 @@ describe("LeaderboardTable", () => {
 	it("puts the tier reason and the Holm-adjusted p in the tier badge's accessible name", () => {
 		const html = render();
 		expect(row(html, 4)).toContain('aria-label="Behind: p 0.012 on 8 common tasks. Chance the gap to the leader is luck: 0.012."');
-		expect(row(html, 1)).toContain("Leader: every other entry is compared with this one.");
+		expect(row(html, 1)).toContain("Leader. Others are compared with it.");
 	});
 
 	it("draws success with its interval and passes", () => {
@@ -60,7 +60,7 @@ describe("LeaderboardTable", () => {
 		expect(custom).toContain("bench-hatched");
 		// One try per task measures no reliability (fix wave 3, N245, N295): never "solved all 1 tries".
 		expect(custom).toContain(">Not measured<");
-		expect(custom).toContain("needs 2 or more tries per task; this ran 1");
+		expect(custom).toContain("needs 2+ tries per task, this ran 1");
 		expect(custom).not.toContain("solved all 1 tries");
 		const mini = row(html, 5);
 		expect(mini).toMatch(/data-testid="leaderboard-metric-5-cost_per_success".*?data-state="not_applicable"/);
@@ -97,7 +97,7 @@ describe("LeaderboardTable", () => {
 			[3, 2],
 			[4, 1],
 		]);
-		expect(html).toContain("Behind: clearly worse than the leader");
+		expect(html).toContain("Clearly behind");
 		expect(html).toContain('colSpan="16"');
 	});
 

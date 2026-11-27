@@ -19,8 +19,7 @@ describe("TrendsBoard", () => {
 
 	it("says where the numbers come from and how many runs were rejected", () => {
 		const html = renderToStaticMarkup(<TrendsBoard data={data} />);
-		expect(html).toContain("never this index");
-		expect(html).toContain("1 run is left out because its files were changed after saving.");
+		expect(html).toContain("1 run left out: files changed after saving.");
 	});
 
 	it("shows the empty state below two points, with the point count", () => {
@@ -29,7 +28,7 @@ describe("TrendsBoard", () => {
 			expect(html).toContain('data-testid="trends-empty"');
 			expect(html).not.toContain('data-testid="trends-chart"');
 		}
-		expect(renderToStaticMarkup(<TrendsBoard data={truncated(data, 1)} />)).toContain("Only 1 point matches these filters.");
+		expect(renderToStaticMarkup(<TrendsBoard data={truncated(data, 1)} />)).toContain("Only 1 point. A trend needs 2.");
 		expect(renderToStaticMarkup(<TrendsBoard data={truncated(data, 2)} />)).toContain('data-testid="trends-chart"');
 	});
 

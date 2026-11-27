@@ -11,7 +11,7 @@ describe("readiness estimate (Q-57)", () => {
 		const inv = { estimate: { tasks: 27, readiness_runs: 81, judge_calls: 0, assist_usd: 0 } } as OnboardInventory;
 		const line = estimateLine(tx, inv, "answer_match");
 		expect(line).toContain("81 readiness runs");
-		expect(line).toContain("cost nothing.");
+		expect(line).toContain("Both are free.");
 		expect(line).not.toMatch(/\bmin\b/);
 	});
 });

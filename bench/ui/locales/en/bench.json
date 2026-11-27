@@ -442,7 +442,7 @@
 		"footnote": {
 			"title": "About this board",
 			"generated": "Generated {{time}}. Sorted by {{metric}}. Tiers split where gap luck is below {{alpha}}.",
-			"rankClaim": "Rank alone proves nothing. Only Behind means clearly worse.",
+			"rankClaim": "Rank alone does not prove one agent beats another. Only Behind means clearly worse.",
 			"scopeAll": "Scope all: entries use their own tasks. Tiers compare on shared tasks.",
 			"scopeCommon_one": "Scope common: every entry is measured over the same {{count}} common task only.",
 			"scopeCommon_other": "Scope common: every entry is measured over the same {{count}} common tasks only.",
@@ -2902,7 +2902,7 @@
 			"toggleHint": "Held-out tasks only. Never counted on the public board.",
 			"banner": "Held-out board",
 			"bannerHint": "Held-out tasks only. Never mixed into the public board.",
-			"off": "This server does not serve the held-out board.",
+			"off": "Held-out board off: server config sets held_out.visible to false.",
 			"backToPublic": "Show the public board"
 		},
 		"quarantine": {
@@ -3630,7 +3630,7 @@
 		"pullError": "Could not read new sessions",
 		"evidenceLabel": "User traffic",
 		"unconfigured": "Not set up. Use Set up live scoring.",
-		"problem": "Settings file unreadable. Open Set up live scoring to replace it.",
+		"problem": "Live scoring is off: settings file unreadable. Open Set up live scoring to replace it.",
 		"result": {
 			"better": "Better",
 			"worse": "Worse",

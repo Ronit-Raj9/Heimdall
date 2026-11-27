@@ -80,7 +80,6 @@ function Footnote({ data }: { data: Trends }) {
 	const locale = getLocale();
 	return (
 		<div className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="trends-footnote">
-			<p>{t("trends.footnote.source")}</p>
 			{data.indexed_at && <p>{t("trends.footnote.indexedAt", { time: formatDate(data.indexed_at, locale) })}</p>}
 			{data.rejected > 0 && <p data-testid="trends-rejected">{t("trends.footnote.rejected", { count: data.rejected })}</p>}
 		</div>

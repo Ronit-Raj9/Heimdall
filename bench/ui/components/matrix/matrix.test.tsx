@@ -135,11 +135,11 @@ describe("MatrixPairGrid", () => {
 		expect(ac).toContain("font-bold");
 		expect(ac).toContain(">0.006<");
 		expect(ac).toContain("separated: 10 of 12 tasks differ");
-		expect(ac).toContain("Row minus column +40 pp on 12 common tasks, 10 differ");
+		expect(ac).toContain("+40 pp on 12 tasks, 10 differ");
 
 		const ca = cell(html, "C", "A");
 		expect(ca).toContain('data-tone="bad"');
-		expect(ca).toContain("Row minus column -40 pp");
+		expect(ca).toContain("-40 pp on");
 
 		const ab = cell(html, "A", "B");
 		expect(ab).toContain('data-state="not-significant"');
@@ -161,7 +161,7 @@ describe("MatrixReport", () => {
 		expect(html).toContain('data-testid="matrix-not-separable"');
 		expect(html).toContain(">Cannot separate<");
 		// Lane 4a phase B (M4-46): a plain sentence first; the server's note sits under For statisticians.
-		expect(html).toContain("Only 4 shared tasks, too few to tell these setups apart.");
+		expect(html).toContain("Only 4 shared tasks, too few to separate setups.");
 		expect(html).toContain(fixture.note.replace("<", "&lt;"));
 		expect(html.indexOf("matrix-not-separable")).toBeLessThan(html.indexOf('data-testid="matrix-table"'));
 		expect(html).toContain('data-testid="matrix-synthetic"');
