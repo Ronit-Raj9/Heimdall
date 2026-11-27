@@ -2,7 +2,7 @@
 	"policies": {
 		"notRuleSet": "Not a rule set, it holds schedules. Ignore it or fix it in Edit.",
 		"title": "Release rules",
-		"subtitle": "Checks a new version must pass before it ships.",
+		"subtitle": "",
 		"new": "New rule set",
 		"empty": "No release rules yet.",
 		"createDefault": "Start from the default rules",
@@ -19,7 +19,7 @@
 		"name": "Name",
 		"description": "Description",
 		"onUnknown": "When there is not enough data to check a rule",
-		"onUnknownDefault": "Default (too few runs warns, missing data blocks)",
+		"onUnknownDefault": "Default: few runs warn, no data blocks",
 		"onUnknownBlock": "Block the release",
 		"onUnknownWarn": "Only warn",
 		"checksTitle": "Rules",

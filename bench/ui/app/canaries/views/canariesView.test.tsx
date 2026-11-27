@@ -37,7 +37,7 @@ describe("CanariesBody", () => {
 		);
 		expect(html).toContain('data-testid="canaries-empty"');
 		expect(html).toContain("canary init");
-		expect(html).toContain("Catch your agent or model quietly getting worse");
+		expect(html).toContain("Catch quiet regressions");
 	});
 
 	it("marks a paused drift monitor in the list", () => {
@@ -77,7 +77,7 @@ describe("CanaryActions", () => {
 		expect(html).not.toContain('data-testid="canary-pause"');
 		expect(html).not.toContain('data-testid="canary-resume"');
 		expect(html).toContain('data-testid="canary-no-schedule"');
-		expect(html).toContain("This drift monitor runs only when you press Check now, so there is nothing to pause.");
+		expect(html).toContain("Runs only on Check now. Nothing to pause.");
 		expect(render({ ...def, schedule: { cron: "0 6 * * *" } })).not.toContain('data-testid="canary-no-schedule"');
 	});
 
@@ -102,7 +102,7 @@ describe("unknown drift monitor name (N76)", () => {
 	it("says the name is unknown and offers every drift monitor", () => {
 		const html = renderToStaticMarkup(<UnknownCanaryNotice name="x" onShowAll={() => {}} />);
 		expect(html).toContain('role="status"');
-		expect(html).toContain("No drift monitor is called x. It may have been deleted.");
+		expect(html).toContain("No drift monitor called x. It may be deleted.");
 		expect(html).toContain('data-testid="canary-unknown-show-all"');
 		expect(html).toContain("Show all drift monitors");
 	});

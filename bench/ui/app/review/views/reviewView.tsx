@@ -40,7 +40,7 @@ export default function ReviewView() {
 
 	return (
 		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="review-screen">
-			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{tu("review.subtitle")}</span>} />
+			<PageHeader title={t("review.title")} />
 			<div className="flex flex-wrap items-end gap-3">
 				<ExperimentSelect
 					picker={picker}

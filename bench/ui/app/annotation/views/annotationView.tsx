@@ -181,7 +181,6 @@ export default function AnnotationView() {
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-8")} data-page-width="wide" data-testid="annotation-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				actions={
 					writable && !creating ? (
 						<Button onClick={() => setCreating(true)} data-testid="annotation-new">
@@ -385,7 +384,7 @@ function CreateQueueSettings({ onCancel, onCreated }: { onCancel: () => void; on
 	const fixedWhy = fixedProblem(choice.assignment, new Set(named).size, form.reviewers);
 	const body = () => queueRequest({ ...form, assignment: choice.assignment, labellers: named });
 	return (
-		<Section title={t("create.title")} description={t("create.description")} testId="annotation-create">
+		<Section title={t("create.title")} testId="annotation-create">
 			<form
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
@@ -406,7 +405,7 @@ function CreateQueueSettings({ onCancel, onCreated }: { onCancel: () => void; on
 						data-testid="annotation-create-name"
 					/>
 				</Field>
-				<Field label={t("create.benchmark")} hint={t("create.benchmarkHint")}>
+				<Field label={t("create.benchmark")}>
 					<NativeSelect
 						value={form.benchmark}
 						onChange={(e) => set("benchmark", e.target.value)}

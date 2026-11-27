@@ -56,7 +56,7 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 					</p>
 				)}
 				{quick > 0 && (
-					<label className="text-muted-foreground mb-3 inline-flex items-center gap-2 text-xs" title={tf("releases.showQuickHint")}>
+					<label className="text-muted-foreground mb-3 inline-flex items-center gap-2 text-xs">
 						<input
 							type="checkbox"
 							checked={showQuick}

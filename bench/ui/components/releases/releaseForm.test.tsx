@@ -101,7 +101,7 @@ describe("ReleaseForm", () => {
 
 	it("names each blocker", () => {
 		const html = render("no_decision", "block", { approver: "maya" });
-		expect(html).toContain("The result is no_decision, not ship.");
+		expect(html).toContain("Result is no_decision. Release needs ship.");
 		expect(html).toContain("The release rules block this release.");
 		expect(html).not.toContain('data-testid="release-override-reason"');
 	});
@@ -173,7 +173,7 @@ describe("ReleaseForm says why the button is off (N170)", () => {
 	});
 	it("when the result says not to release", () => {
 		const html = form({ verdict: { analysisId: "a_1", decision: "inconclusive", action: "hold" }, initialValues: { approver: "ana" } });
-		expect(html).toContain("Tick Release anyway and give a reason to continue.");
+		expect(html).toContain("Tick Release anyway and give a reason.");
 	});
 	it("not at all when the button is on", () => {
 		const html = form({ verdict: { analysisId: "a_1", decision: "improved", action: "ship" }, initialValues: { approver: "ana" } });

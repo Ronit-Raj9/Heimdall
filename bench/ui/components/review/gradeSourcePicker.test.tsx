@@ -11,6 +11,6 @@ describe("GradeSourcePicker", () => {
 		expect(html).toMatch(/aria-pressed="false"[^>]*data-testid="gs-original"/);
 		expect(html).toMatch(/aria-pressed="false"[^>]*data-testid="gs-latest"/);
 		expect(html).toContain("Human reviewed");
-		expect(html).toContain("Re-scores are not applied");
+		expect(html).toContain("No re-scores");
 	});
 });

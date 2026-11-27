@@ -44,7 +44,7 @@ describe("AwarenessPanel", () => {
 	it("says silence is not proof when nothing matched", () => {
 		const html = renderToStaticMarkup(<AwarenessPanel report={{ ...report, examples: [], not_scanned: [] }} arms={["A", "B"]} />);
 		expect(html).toContain('data-testid="awareness-no-examples"');
-		expect(html).toContain("unverbalized");
+		expect(html).toContain("Not proof it did not notice");
 		expect(html).not.toContain("awareness-not-scanned");
 	});
 });

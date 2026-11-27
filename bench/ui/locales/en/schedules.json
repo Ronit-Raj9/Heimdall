@@ -63,7 +63,7 @@
 	},
 	"alerts": {
 		"title": "Alerts",
-		"description": "Sent when results get worse or a run fails. Store the address as a secret, then pick it.",
+		"description": "Sent when results get worse or a run fails. Store the address in Settings > Secrets, then pick it.",
 		"empty": "No alerts set up yet.",
 		"urlEnv": "Alert address secret",
 		"urlEnvPlaceholder": "SLACK_WEBHOOK_URL",
@@ -137,7 +137,7 @@
 		"deleteConfirm": "Delete drift monitor {{name}}? Its baseline and check history go too.",
 		"missing": "Pick an agent, benchmark, tasks and a model. Set both limits or tick Practice mode.",
 		"problem": {
-			"name": "Name: lowercase letters, digits, - or _, max 48.",
+			"name": "Name: lowercase letters, digits, - or _, max 48 characters.",
 			"agent": "Pick an agent.",
 			"suite": "Pick a benchmark.",
 			"tasks": "Pick the tasks to check, or choose all tasks.",
@@ -154,7 +154,7 @@
 		"suitePick": "Pick a benchmark",
 		"suitesLoading": "Loading benchmarks...",
 		"suitesEmpty": "No benchmarks yet. Pick one from the catalog.",
-		"pausedNote": "Paused. Check now still works.",
+		"pausedNote": "Paused. Scheduled checks stop. Check now still works.",
 		"noSchedulePause": "Runs only on Check now. Nothing to pause.",
 		"unknown": "No drift monitor called {{name}}. It may be deleted.",
 		"showAll": "Show all drift monitors",

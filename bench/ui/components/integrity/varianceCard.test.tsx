@@ -32,12 +32,12 @@ describe("VarianceCard", () => {
 	it("falls back to the verdict's SD on an analysis without a card", () => {
 		const html = render(verdictWith({ variance: undefined, mde_assumed_sd: true, sd: 0.3 }));
 		expect(html).toContain('data-source="assumed"');
-		expect(html).toContain("predates the noise-floor card");
+		expect(html).toContain("Older analysis. MDE above uses");
 		expect(html).toContain("0.30");
 	});
 	it("says no A/A arm ran when the SD is assumed", () => {
 		const html = render(verdictWith({ variance: variance({}) }));
-		expect(html).toContain("No same-setup check ran");
+		expect(html).toContain("No A/A run");
 		expect(html).toContain("assumed");
 		expect(html).not.toContain('data-testid="variance-aa-tasks"');
 	});

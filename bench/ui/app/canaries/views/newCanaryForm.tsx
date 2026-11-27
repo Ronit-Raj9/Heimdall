@@ -651,7 +651,6 @@ export function NewCanaryForm({
 					))
 				)}
 			</fieldset>
-			<span className="text-muted-foreground">{c("canary.thresholdNote")}</span>
 		</div>
 	);
 	return (

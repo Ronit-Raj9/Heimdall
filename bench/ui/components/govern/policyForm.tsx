@@ -217,7 +217,7 @@ export function checkSentence(c: PolicyCheck, tu: TFunction<"u14">): string {
 	);
 }
 
-const chipSelect = "border-input bg-background h-8 rounded-md border px-2 text-xs";
+const chipSelect = "text-xs";
 
 function CheckRow({
 	index,
@@ -251,8 +251,9 @@ function CheckRow({
 				</span>
 				<span className="text-muted-foreground">{tu("policies.when")}</span>
 				{/* M7-69: the metric is picked from the known list, never typed; an unknown saved one stays shown. */}
-				<select
-					className={cn(chipSelect, "max-w-full min-w-0")}
+				<NativeSelect
+					className={chipSelect}
+					wrapperClassName="max-w-full min-w-0"
 					aria-label={t("policies.metric")}
 					title={metricLabel(check.metric, tu)}
 					value={check.metric}
@@ -266,8 +267,8 @@ function CheckRow({
 							{metricLabel(m, tu)}
 						</option>
 					))}
-				</select>
-				<select
+				</NativeSelect>
+				<NativeSelect
 					className={chipSelect}
 					aria-label={t("policies.kind")}
 					value={kind}
@@ -279,19 +280,19 @@ function CheckRow({
 					<option value="max">{t("policies.kindMax")}</option>
 					<option value="min">{t("policies.kindMin")}</option>
 					<option value="equals">{t("policies.kindEquals")}</option>
-				</select>
+				</NativeSelect>
 				{numeric && (
 					<Input
 						type="number"
 						step="any"
 						aria-label={t("policies.threshold")}
-						className="h-8 w-24 text-xs"
+						className="h-(--control-h) w-24 text-xs"
 						value={thresholdOf(check) ?? 0}
 						onChange={(e) => onChange({ ...check, [kind]: Number(e.target.value) })}
 						data-testid={`policy-check-threshold-${index}`}
 					/>
 				)}
-				<select
+				<NativeSelect
 					className={chipSelect}
 					aria-label={t("policies.condition")}
 					title={t("policies.conditionHint")}
@@ -307,9 +308,9 @@ function CheckRow({
 					{!isListedCondition(check.condition) && (
 						<option value={check.condition}>{t("policies.conditionCustom", { id: check.condition })}</option>
 					)}
-				</select>
+				</NativeSelect>
 				<span className="text-muted-foreground">{tu("policies.then")}</span>
-				<select
+				<NativeSelect
 					className={cn(chipSelect, warn ? "text-chart-warning-ink" : "text-chart-error-ink")}
 					aria-label={t("policies.severity")}
 					value={check.severity || "block"}
@@ -317,7 +318,7 @@ function CheckRow({
 				>
 					<option value="block">{t("policies.severityBlock")}</option>
 					<option value="warn">{t("policies.severityWarn")}</option>
-				</select>
+				</NativeSelect>
 				<span className="ml-auto flex items-center gap-1">
 					<Button
 						type="button"

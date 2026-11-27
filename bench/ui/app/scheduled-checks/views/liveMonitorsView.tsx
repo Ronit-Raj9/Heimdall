@@ -51,7 +51,6 @@ export default function LiveMonitorsView() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-monitors-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				actions={
 					!showForm ? (
 						<Button size="sm" onClick={() => setFormOpen(true)} data-testid="live-monitor-new">

@@ -22,7 +22,6 @@ export default function ScheduledChecksPage() {
 		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-4")} data-page-width="wide" data-testid="scheduled-checks-page">
 			<PageHeader
 				title={m("checks.title")}
-				subtitle={m("checks.subtitle")}
 				actions={
 					// Q-273: the gateway's model watch is a check too; it lives on the Gateway page.
 					<Link

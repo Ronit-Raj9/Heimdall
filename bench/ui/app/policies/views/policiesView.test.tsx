@@ -67,7 +67,7 @@ describe("new rule set file name", () => {
 	it("says a taken name is taken and keeps Save disabled", () => {
 		const html = render(<PolicyEditor isNew file="my-release-policy.yaml" taken={["my-release-policy.yaml"]} />);
 		expect(html).toContain('data-testid="policy-file-taken"');
-		expect(html).toContain("A rule set with this file name already exists. Pick another name.");
+		expect(html).toContain("File name taken. Pick another.");
 		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="policy-save"|<button[^>]*data-testid="policy-save"[^>]*disabled=""/);
 	});
 });

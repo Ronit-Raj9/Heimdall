@@ -35,7 +35,7 @@ describe("CompliancePacks", () => {
 	});
 
 	it("points to the Write button when there is no pack yet", () => {
-		expect(render(<CompliancePacks />)).toContain("Write compliance report");
+		expect(render(<CompliancePacks />)).toContain("No compliance report yet.");
 	});
 
 	it("shows the server's error with a retry", () => {

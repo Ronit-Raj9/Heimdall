@@ -10,7 +10,7 @@ describe("repeat run cost, one definition per number (R6-3)", () => {
 		expect(c).toEqual({ perRun: "$0.0050", dailyLimit: "$0.01", monthMax: "$0.30", runsADay: 1 });
 		const { key, values } = repeatCostText(c);
 		expect(i18n.t(key, { ns: "ufrj", ...values })).toBe(
-			"Expected cost of one run: $0.0050 (what the last run cost). Daily limit: $0.01, so at most 1 run a day. The most it can spend in a month: $0.30.",
+			"One run costs about $0.0050. Daily limit $0.01, at most 1 run a day. Monthly max $0.30.",
 		);
 	});
 	it("lets the limit stop extra runs and says when the run cost is not known", () => {

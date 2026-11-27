@@ -58,7 +58,6 @@ export default function PoliciesView() {
 		<section className="flex w-full flex-col gap-8" data-testid="policies-screen">
 			<PageHeader
 				title={t("policies.title")}
-				subtitle={t("policies.subtitle")}
 				actions={
 					<RoleGate min="member" fallback={null}>
 						<Button onClick={startNew} data-testid="policies-new">
