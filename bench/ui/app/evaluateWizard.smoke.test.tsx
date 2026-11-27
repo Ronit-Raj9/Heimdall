@@ -312,5 +312,5 @@ describe.skipIf(!wizardFile)("evaluate wizard smoke", () => {
 		expect(pages[3]).toMatch(/claude-sonnet-4-5|deepseek/);
 		expect(pages[3]).toMatch(/1\.25|2\.50?|20 runs|\b20\b/);
 		expect(pages[4]).toMatch(/launch/i);
-	});
+	}, 20_000); // Five full steps plus the free check panel (decision 2); the whole suite runs it under load.
 });
