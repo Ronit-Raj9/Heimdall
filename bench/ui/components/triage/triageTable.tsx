@@ -7,6 +7,14 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { share, shareDiffPoints } from "./triage.utils";
 
+/**
+ * A pattern's name, the same one the By agent version tab uses (agentFirst failures.pattern.*), so one
+ * rule has one name on both tabs (V7-6); the server's label for a pattern that set has no name for.
+ */
+export function patternName(group: Pick<TriageGroup, "pattern" | "label">, named: (key: string) => string | undefined): string {
+	return named(group.pattern) ?? group.label;
+}
+
 export interface TriageTableProps {
 	groups: readonly TriageGroup[];
 	/** Arm order; the difference column is arms[1] minus arms[0]. */
@@ -22,6 +30,9 @@ export interface TriageTableProps {
  */
 export function TriageTable({ groups, arms, selected, onSelect }: TriageTableProps) {
 	const { t } = useTranslation("bench");
+	const { t: af } = useTranslation("agentFirst");
+	const name = (group: TriageGroup) =>
+		patternName(group, (key) => (af(`failures.pattern.${key}` as never, { defaultValue: "" }) as string) || undefined);
 	const locale = getLocale();
 	const [armA, armB] = arms;
 	const showDiff = arms.length >= 2;
@@ -52,9 +63,8 @@ export function TriageTable({ groups, arms, selected, onSelect }: TriageTablePro
 						<TableRow key={group.pattern} data-testid={`triage-row-${group.pattern}`} data-state={open ? "selected" : undefined}>
 							<TableCell className="max-w-md align-top whitespace-normal">
 								<div className="flex flex-col gap-0.5">
-									<span className="text-foreground font-medium">{group.label}</span>
-									<span className="text-muted-foreground font-mono text-[11px]">{group.pattern}</span>
-									<span className="text-muted-foreground text-xs">{group.description}</span>
+									<span className="text-foreground font-medium">{name(group)}</span>
+									<span className="text-muted-foreground text-sm">{group.description}</span>
 								</div>
 							</TableCell>
 							{arms.map((arm) => (
@@ -78,7 +88,7 @@ export function TriageTable({ groups, arms, selected, onSelect }: TriageTablePro
 									type="button"
 									aria-expanded={open}
 									aria-controls="triage-drilldown"
-									aria-label={t(open ? "triage.table.hideAria" : "triage.table.showAria", { pattern: group.label })}
+									aria-label={t(open ? "triage.table.hideAria" : "triage.table.showAria", { pattern: name(group) })}
 									onClick={() => onSelect(open ? null : group.pattern)}
 									data-testid={`triage-show-${group.pattern}`}
 									className={cn(

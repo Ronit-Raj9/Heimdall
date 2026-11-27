@@ -81,7 +81,7 @@
 		"startPaid": "Start, up to ${{cap}} (uses your model key)",
 		"ask": "Start an investigation of {{name}}? A model reads its failed runs and spends at most ${{cap}} of your model key.",
 		"yes": "Yes, start",
-		"findOutPaid": "Find out why (paid)",
+		"findOutPaid": "Find out why (paid, up to {{cap}} by default)",
 		"loadError": "Could not load the investigations",
 		"spent": "spent ${{usd}}",
 		"stopped": "stopped: {{reason}}",

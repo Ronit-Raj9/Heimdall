@@ -1,6 +1,7 @@
 import { withOrgParam } from "./orgParam";
 import type { DatasetComparison } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
+import type { FailurePatterns } from "./failurePatternsApi";
 
 export type { DatasetBenchmark, DatasetComparison } from "@/lib/types/bench";
 
@@ -794,6 +795,21 @@ export function evaluationReportUrl(arg: EvaluationReportArg): string {
 	return withOrgParam(qs ? `${base}?${qs}` : base);
 }
 
+/**
+ * GET /evaluations/{id}/card (Q-121): the report card tab in one call. Each part is what its own
+ * route answers; a part that failed on the server is left out, so read every one as optional.
+ */
+export interface EvaluationCard {
+	evaluation: Evaluation;
+	report?: Report;
+	failure_patterns?: FailurePatterns;
+}
+
+/** URL for GET /evaluations/{id}/card, with the same where filters as the report. */
+export function evaluationCardUrl(arg: EvaluationReportArg): string {
+	return evaluationReportUrl(arg).replace(/\/report(?=\?|$)/, "/card");
+}
+
 /** One arm's Bifrost numbers over every benchmark; an absent count was not observed by any run. */
 export interface ReportBifrostRow {
 	arm: string;
@@ -1064,6 +1080,16 @@ export const evaluationsApi = benchApi
 				query: (arg) => evaluationReportUrl(arg),
 				providesTags: (_r, _e, arg) => [{ type: "Evaluations", id: `${typeof arg === "string" ? arg : arg.id}/report` }],
 			}),
+			getEvaluationCard: builder.query<EvaluationCard, EvaluationReportArg>({
+				query: (arg) => evaluationCardUrl(arg),
+				providesTags: (_r, _e, arg) => {
+					const id = typeof arg === "string" ? arg : arg.id;
+					return [
+						{ type: "Evaluations", id },
+						{ type: "Evaluations", id: `${id}/report` },
+					];
+				},
+			}),
 			getAgentReportCard: builder.query<Report & { models?: string[] }, { agent: string; version?: number; model?: string }>({
 				query: (params) => agentReportCardRequest(params),
 				transformResponse: (body: unknown) => unwrapAgentReportCard(body),
@@ -1080,6 +1106,7 @@ export const {
 	useSnapshotAgentVersionMutation,
 	useListEvaluationsQuery,
 	useGetEvaluationQuery,
+	useGetEvaluationCardQuery,
 	useCreateEvaluationMutation,
 	useCancelEvaluationMutation,
 	useRaiseEvaluationBudgetMutation,
