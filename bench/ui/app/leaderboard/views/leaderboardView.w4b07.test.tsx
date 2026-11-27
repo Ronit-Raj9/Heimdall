@@ -25,6 +25,11 @@ vi.mock("@/lib/store", async (importOriginal) => ({
 	useGetSuitesQuery: () => okQuery({ mode: "live", suites: [] }),
 }));
 
+// M4-34: the leaderboard reads the light suites list.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => okQuery({ mode: "live", suites: [] }),
+}));
+
 vi.mock("@/components/migration/migrationReport", () => ({ LeaderboardParetoPanel: () => null }));
 
 describe("LeaderboardTab unknown benchmark", () => {

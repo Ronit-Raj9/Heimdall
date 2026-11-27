@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { nextTableSort, sortRows, type TableSort } from "@/components/ui/useTableSort";
 import { AgentBoardTable, AgentBoardToolbar, agentFirstDir, agentSortAccessors, scoreKey } from "./agentBoard";
-import { ALL, filterParam, formatCost, formatShare, reportCardSearch } from "./agentBoard.utils";
+import { ALL, boardRanks, filterParam, formatCost, formatCostPerRun, formatShare, reportCardSearch, rowKey, sameAgent, scoreState, showRange } from "./agentBoard.utils";
 
 const rows: AgentLeaderboardRow[] = [
 	{
@@ -45,10 +45,11 @@ describe("agent board", () => {
 		expect(html).toContain("gpt-5.4-mini");
 		expect(html).toContain("42%");
 		expect(html).toContain("30% to 52%");
-		expect(html).toContain("not run");
+		expect(html).toContain("not measured");
+		expect(html).toContain("$0.12 per run");
 		expect(html).toContain("$0.12");
-		expect(html).toContain(">Terminal<");
-		expect(html).toContain(">Coding<");
+		expect(html).toContain(">Terminal (solved)<");
+		expect(html).toContain(">Coding (solved)<");
 		expect(html.match(/data-testid="agent-board-baseline"/g)?.length).toBe(1);
 		expect(html).toContain(">built-in<");
 		expect(html).toContain('title="A ready-made agent from the Heimdall library"');
@@ -75,8 +76,12 @@ describe("agent board", () => {
 		expect(html).toContain("4 of 6 runs unpriced");
 		expect(html).toContain("no price for model deepseek-chat");
 		expect(html).not.toContain("$0<");
+		// A too-small sample never prints a percent or a range.
+		expect(html).toContain("Too few runs (6)");
+		expect(html).not.toContain("60% to 100%");
+		// Without a filter the rank column still shows, ranked by the All score.
 		const plain = renderToStaticMarkup(<AgentBoardTable rows={rows} capabilities={["coding"]} onOpen={() => undefined} />);
-		expect(plain).not.toContain(">Rank<");
+		expect(plain).toContain(">Rank<");
 	});
 
 	it("labels a simulated-customer row and keys it apart from the scripted row", () => {
@@ -148,5 +153,58 @@ describe("agent board", () => {
 			url: "/leaderboard/agents",
 			params: { capability: "coding" },
 		});
+	});
+
+	it("marks no runs as not measured, never Safety 0%", () => {
+		const none: AgentLeaderboardRow = {
+			...rows[0],
+			agent: "fresh",
+			capabilities: { safety: { score: 0, ci_low: 0, ci_high: 0, runs: 0, tasks: 0, ranked: false } },
+		};
+		const html = renderToStaticMarkup(<AgentBoardTable rows={[none]} capabilities={["safety"]} onOpen={() => undefined} />);
+		expect(html).toContain('data-testid="agent-board-not-measured"');
+		expect(html).not.toContain("0%");
+		expect(scoreState(undefined)).toBe("notMeasured");
+		expect(scoreState({ runs: 0, ranked: false })).toBe("notMeasured");
+		expect(scoreState({ runs: 3, ranked: false })).toBe("tooFew");
+		expect(scoreState({ runs: 30, ranked: true })).toBe("ranked");
+		expect(showRange(0.2, 0.2)).toBe(false);
+		expect(showRange(0.2, 0.5)).toBe(true);
+	});
+
+	it("ranks by the All score, shares a place on overlap and marks a clear best", () => {
+		const mk = (agent: string, score: number, low: number, high: number, cost: number | null = 0.1): AgentLeaderboardRow => ({
+			...rows[0],
+			agent,
+			cost_usd: cost,
+			capabilities: { coding: { score, ci_low: low, ci_high: high, runs: 20, tasks: 10, ranked: true } },
+		});
+		const a = mk("a", 0.9, 0.85, 0.95);
+		const b = mk("b", 0.5, 0.4, 0.6);
+		const c = mk("c", 0.45, 0.35, 0.55);
+		const r = boardRanks([c, a, b]);
+		expect(r.get(rowKey(a))).toEqual({ rank: 1, tied: false, best: true });
+		expect(r.get(rowKey(b))).toEqual({ rank: 2, tied: false, best: false });
+		expect(r.get(rowKey(c))).toEqual({ rank: 2, tied: true, best: false });
+		// Row 1 overlapping row 2: no best mark.
+		expect(boardRanks([b, c]).get(rowKey(b))?.best).toBe(false);
+		const html = renderToStaticMarkup(<AgentBoardTable rows={[a, b, c]} capabilities={["coding"]} onOpen={() => undefined} />);
+		expect(html.match(/data-testid="agent-board-best"/g)?.length).toBe(1);
+		expect(html).toContain(">=2<");
+		expect(html).toContain('data-testid="agent-board-bar"');
+	});
+
+	it("titles rows by model when every row is the same agent, and prints cost with 2 significant digits", () => {
+		const other: AgentLeaderboardRow = { ...rows[0], model: "gpt-5.4" };
+		expect(sameAgent([rows[0], other])).toBe(true);
+		expect(sameAgent(rows)).toBe(false);
+		const html = renderToStaticMarkup(<AgentBoardTable rows={[rows[0], other]} capabilities={["coding"]} onOpen={() => undefined} />);
+		expect(html).toContain('data-testid="agent-board-agent-line"');
+		expect(html).not.toContain('data-testid="agent-board-col-model"');
+		expect(formatCostPerRun(0.00234)).toBe("$0.0023");
+		expect(formatCostPerRun(0.002)).toBe("$0.0020");
+		expect(formatCostPerRun(0.1234)).toBe("$0.12");
+		expect(formatCostPerRun(3.2)).toBe("$3.20");
+		expect(formatCostPerRun(null)).toBe("-");
 	});
 });

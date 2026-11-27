@@ -31,7 +31,9 @@ import { groupSuitesByTrack, isJudgedSuite, suiteFactsById } from "@/components/
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
-import { useGetLeaderboardQuery, useGetSuitesQuery } from "@/lib/store";
+import { useGetLeaderboardQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import "./uf4bI18n";
 import type { LeaderboardParams, LeaderboardResponse } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
@@ -127,7 +129,8 @@ export function LeaderboardTab() {
 	// held_out shows the separate held-out board; absent is the public board (suite health area).
 	const [split, setSplit] = useQueryState("split", parseAsStringLiteral(["held_out"] as const));
 	// Track and grading come from the suites on disk; the board itself carries neither.
-	const suitesQuery = useGetSuitesQuery();
+	// M4-34: the light list (no per-task lists) carries track, grading and held-out counts; the full list was 24.5 MB.
+	const suitesQuery = useGetSuitesLightQuery();
 	const facts = useMemo(() => suiteFactsById(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
 	// U3: the held-out board is served only with held_out.visible; offer it only when some suite has held-out tasks the server shows.
 	const heldOutBoard = useMemo(() => heldOutBoardOffered(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
@@ -254,14 +257,30 @@ export function LeaderboardTab() {
 					)}
 				</div>
 			) : (
-				<Board data={data} isFetching={board.isFetching} onShowSynthetic={() => void setSynthetic("only")} />
+				<Board
+					data={data}
+					isFetching={board.isFetching}
+					onShowSynthetic={() => void setSynthetic("only")}
+					onResetFilters={hasFilters ? resetFilters : undefined}
+				/>
 			)}
 			{data && data.entries.length > 0 && <LeaderboardParetoPanel params={params} />} {/* W6 cost against verified success */}
 		</section>
 	);
 }
 
-function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardResponse; isFetching: boolean; onShowSynthetic: () => void }) {
+function Board({
+	data,
+	isFetching,
+	onShowSynthetic,
+	onResetFilters,
+}: {
+	data: LeaderboardResponse;
+	isFetching: boolean;
+	onShowSynthetic: () => void;
+	/** Set when a filter is on: an empty board then says no row matches and offers to clear. */
+	onResetFilters?: () => void;
+}) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u12");
 	const [compact, setCompact] = useState(true);
@@ -299,7 +318,7 @@ function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardRespons
 				}
 			>
 				{entries.length === 0 ? (
-					<EmptyBoard data={data} onShowSynthetic={onShowSynthetic} />
+					<EmptyBoard data={data} onShowSynthetic={onShowSynthetic} onResetFilters={onResetFilters} />
 				) : (
 					<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
 						<LeaderboardTable rows={rows} faults={faults} sort={sort} onSort={onSort} alpha={data.alpha} compact={compact} />
@@ -312,8 +331,28 @@ function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardRespons
 }
 
 /** Says why the board is empty; on a live-only board, offers the synthetic runs that may exist. */
-function EmptyBoard({ data, onShowSynthetic }: { data: LeaderboardResponse; onShowSynthetic: () => void }) {
+function EmptyBoard({
+	data,
+	onShowSynthetic,
+	onResetFilters,
+}: {
+	data: LeaderboardResponse;
+	onShowSynthetic: () => void;
+	onResetFilters?: () => void;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
+	// M4-111: "no row matches these filters" is not "no data".
+	if (onResetFilters && data.synthetic !== "exclude" && (data.suites ?? []).length > 0) {
+		return (
+			<div className="flex flex-col items-start gap-2" data-testid="leaderboard-no-match">
+				<p className="text-muted-foreground text-sm">{tu("leaderboard.noMatch")}</p>
+				<Button variant="outline" size="sm" onClick={onResetFilters} dataTestId="leaderboard-no-match-reset">
+					{tu("leaderboard.clearFilters")}
+				</Button>
+			</div>
+		);
+	}
 	if (data.synthetic === "exclude") {
 		return (
 			<div className="flex flex-col items-center gap-3 rounded-sm border border-dashed px-4 py-6" data-testid="leaderboard-empty-live">

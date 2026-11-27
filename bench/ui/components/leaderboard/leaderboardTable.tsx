@@ -47,7 +47,8 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 			<TableHeader>
 				<TableRow className="hover:bg-transparent">
 					{head("rank", t("leaderboard.table.rank"), undefined, "left")}
-					{!compact && <TableHead>{t("leaderboard.table.tier")}</TableHead>}
+					{/* M4-107: below sm the tier column hides (the rank cell keeps the tier band), so the score stays in view. */}
+					{!compact && <TableHead className="hidden sm:table-cell">{t("leaderboard.table.tier")}</TableHead>}
 					{head("agent", t("leaderboard.table.agent"), undefined, "left")}
 					{head("success", t("leaderboard.table.success"), t("leaderboard.table.successHint"), "left")}
 					{head("reliability", t("leaderboard.table.reliability"), t("leaderboard.table.reliabilityHint"))}
@@ -97,7 +98,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 									{entry.rank}
 								</TableCell>
 								{!compact && (
-									<TableCell className="align-top">
+									<TableCell className="hidden align-top sm:table-cell">
 										<TierBadge entry={entry} />
 									</TableCell>
 								)}
