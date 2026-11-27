@@ -3,12 +3,13 @@ import "./w441I18n";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGetPairDivergenceQuery, type PairDivergenceResponse, type SideAfter } from "@/lib/store/apis/behaviourApi";
+import { formatUsd } from "@/lib/money";
 import { useTranslation } from "react-i18next";
 
-/** Dollars with two to four decimals, or the "not known" words. */
+/** Dollars in the one money format (formatUsd), or the "not known" words. */
 function costText(v: number | undefined, unknown: string): string {
 	if (v === undefined || v === null) return unknown;
-	return `$${v.toFixed(v !== 0 && Math.abs(v) < 0.01 ? 4 : 2)}`;
+	return formatUsd(v);
 }
 
 /** The first point where the two runs of a pair did something different (lane I28). */

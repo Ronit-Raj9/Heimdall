@@ -1,5 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Dialog } from "@/components/ui/dialog";
+import { formatUsd } from "@/lib/money";
+import { CircleDollarSign } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Options for one confirmation: labels default to the platform catalog's confirmDialog keys. */
@@ -7,9 +10,22 @@ export interface ConfirmOptions {
 	title?: string;
 	confirmLabel?: string;
 	cancelLabel?: string;
-	/** Paints the confirm button red, for deletes and other changes that cannot be undone. */
+	/**
+	 * Paints the confirm button red, for deletes and other changes that cannot be undone. Give a
+	 * title that names the thing ("Delete secret prod-key?"): the generic title is only a fallback.
+	 */
 	destructive?: boolean;
+	/**
+	 * For paid work: the most it can spend (the cap the server enforces). null means unknown (it
+	 * uses the person's model key); undefined means the action is not paid.
+	 */
+	costUsd?: number | null;
+	/** One sentence under the cost line, for example the estimate ("About 24 runs, about $1.20."). */
+	costLine?: string;
 }
+
+/** A destructive confirmation must name what it deletes: the type a page lane moves to (X-104). */
+export type DestructiveConfirmOptions = ConfirmOptions & { destructive: true; title: string };
 
 export type ConfirmFn = (message: string, opts?: ConfirmOptions) => Promise<boolean>;
 
@@ -93,15 +109,21 @@ export interface ConfirmDialogProps {
 	onKey?(key: string): boolean;
 }
 
-/** The modal itself: an alertdialog with focus on Confirm, Escape or the backdrop cancels. */
+/** The cost sentence of a paid confirmation, or null when the action is not paid. */
+export function costSentence(t: (k: string, o?: Record<string, unknown>) => string, costUsd: number | null | undefined): string | null {
+	if (costUsd === undefined) return null;
+	return costUsd === null ? t("confirm.bodyUnknown", { ns: "paid" }) : t("confirm.body", { ns: "paid", cap: formatUsd(costUsd) });
+}
+
+/**
+ * The modal itself: an alertdialog through the shared Dialog (focus trapped, app behind inert),
+ * focus on Confirm; Escape cancels in the capture phase so a dialog that opened it stays open.
+ * The backdrop does not cancel (an alertdialog), Cancel and Escape do.
+ */
 export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }: ConfirmDialogProps) {
 	const { t } = useTranslation("platform");
-	const titleId = useId();
-	const descId = useId();
 	const okRef = useRef<HTMLButtonElement>(null);
 	useEffect(() => {
-		const prev = typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
-		okRef.current?.focus();
 		const handle = (e: KeyboardEvent) => {
 			const handled = onKey ? onKey(e.key) : e.key === "Escape" && (onCancel(), true);
 			if (handled) {
@@ -110,34 +132,36 @@ export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }
 			}
 		};
 		window.addEventListener("keydown", handle, true);
-		return () => {
-			window.removeEventListener("keydown", handle, true);
-			prev?.focus?.();
-		};
+		return () => window.removeEventListener("keydown", handle, true);
 	}, [onKey, onCancel]);
+	const cost = costSentence(t as never, opts.costUsd);
 	return (
-		<div
-			className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-			data-testid="confirm-dialog-backdrop"
-			onMouseDown={(e) => {
-				if (e.target === e.currentTarget) onCancel();
-			}}
-		>
-			<div
-				role="alertdialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				aria-describedby={descId}
-				className="bg-card text-card-foreground w-full max-w-md space-y-4 rounded-lg border p-5 text-left shadow-lg"
-				data-testid="confirm-dialog"
-			>
-				<h2 id={titleId} className="text-sm font-semibold">
-					{opts.title ?? t("confirmDialog.title")}
-				</h2>
-				<p id={descId} className="text-muted-foreground text-sm break-words whitespace-pre-wrap">
-					{message}
-				</p>
-				<div className="flex justify-end gap-2">
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onCancel()}
+			role="alertdialog"
+			size="sm"
+			hideClose
+			closeLabel={t("confirmDialog.cancel")}
+			initialFocus={okRef}
+			title={opts.title ?? t("confirmDialog.title")}
+			testId="confirm-dialog"
+			description={
+				<div className="space-y-2">
+					<p className="break-words whitespace-pre-wrap">{message}</p>
+					{cost && (
+						<p className="text-foreground flex items-start gap-2 font-medium" data-testid="confirm-dialog-cost">
+							<CircleDollarSign className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+							<span>
+								{cost}
+								{opts.costLine ? ` ${opts.costLine}` : ""}
+							</span>
+						</p>
+					)}
+				</div>
+			}
+			footer={
+				<>
 					<Button type="button" variant="outline" onClick={onCancel} dataTestId="confirm-dialog-cancel">
 						{opts.cancelLabel ?? t("confirmDialog.cancel")}
 					</Button>
@@ -150,8 +174,8 @@ export function ConfirmDialog({ message, opts = {}, onConfirm, onCancel, onKey }
 					>
 						{opts.confirmLabel ?? t("confirmDialog.ok")}
 					</Button>
-				</div>
-			</div>
-		</div>
+				</>
+			}
+		/>
 	);
 }

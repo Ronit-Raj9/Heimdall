@@ -124,7 +124,7 @@
 		"localTitle": "Settings",
 		"localBody": "This server runs in local mode: one organization, and changes need the write token. Members, access tokens and the activity log come with hosted mode.",
 		"tabs": {
-			"keys": "API keys",
+			"keys": "Model keys",
 			"runners": "Workers",
 			"usage": "Usage",
 			"files": "Files",
@@ -137,7 +137,7 @@
 			"github": "GitHub",
 			"audit": "Activity log",
 			"org": "Organization",
-			"account": "Account",
+			"account": "Password",
 			"admin": "Server admin",
 			"billing": "Billing"
 		},
@@ -445,7 +445,7 @@
 			"running": "Running",
 			"succeeded": "Finished",
 			"failed": "Failed",
-			"cancelled": "Stopped"
+			"cancelled": "Cancelled"
 		},
 		"kinds": {
 			"experiment_run": "Comparison run",
