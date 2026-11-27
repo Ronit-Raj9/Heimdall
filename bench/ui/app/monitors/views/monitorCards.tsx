@@ -11,7 +11,7 @@ export function MonitorCards({ certs }: { certs: MonitorCertificationSummary[] }
 	const { t } = useTranslation("u14");
 	const locale = getLocale();
 	return (
-		<ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="monitor-cert-list">
+		<ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-testid="monitor-cert-list">
 			{certs.map((c) => {
 				const h = c.headline;
 				const warnings = c.warnings?.length ?? 0;

@@ -163,7 +163,7 @@ export default function SchedulesView() {
 	};
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="schedules-screen">
+		<section className="flex w-full min-w-0 flex-col gap-6" data-testid="schedules-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

@@ -20,7 +20,7 @@ export default function ExperimentListView() {
 	const validity = useGetValidityQuery();
 	const changed = validity.data?.entries.filter((e) => e.flipped).length ?? 0;
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="experiments-screen">
+		<div className="flex w-full flex-col gap-6" data-testid="experiments-screen">
 			<PageHeader
 				title={t("experiments.list.title")}
 				subtitle={tx("subtitle")}

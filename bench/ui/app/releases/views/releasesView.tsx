@@ -61,7 +61,7 @@ export default function ReleasesView() {
 	}, [releaseParam, list.length]);
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="releases-screen">
+		<section className="flex w-full flex-col gap-8" data-testid="releases-screen">
 			{/* Q-71: the h1 and subtitle are the page's, above the tabs; this tab keeps its action row. */}
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				{releases.isSuccess ? (
