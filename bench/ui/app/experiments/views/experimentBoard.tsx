@@ -49,6 +49,7 @@ import { cheaperArm } from "@/components/verdict/armCost";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { archivedCountOf, archivedParam, isArchived } from "@/lib/store/apis/archiveApi";
 import { ArchiveRowMenu } from "@/components/ui/archiveAction";
+import { useBulkArchive } from "./bulkArchive";
 import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip, withoutArchived } from "@/components/ui/showArchivedChip";
 import type { ArmStat, ExperimentRow } from "@/lib/types/serverFields";
 import { useTranslation } from "react-i18next";
@@ -129,7 +130,12 @@ const STATUSES: readonly {
 
 /** "agent model vs agent model" from the setups, else the arm ids; empty when neither is known (M4-67). */
 export function setupsLine(e: Pick<ExperimentStatus, "setups" | "arms">): string {
-	if (e.setups && e.setups.length > 0) return e.setups.map((s) => [s.agent, s.model].filter(Boolean).join(" ")).join(" vs ");
+	if (e.setups && e.setups.length > 0) {
+		const parts = e.setups.map((s) => [s.agent, s.model].filter(Boolean).join(" "));
+		// Q-254: setups that share agent and model differ in something else (a fault): name each by its arm.
+		const same = parts.length > 1 && parts.every((p) => p === parts[0]);
+		return (same ? e.setups.map((s, i) => `${parts[i]} (${s.arm})`) : parts).join(" vs ");
+	}
 	return e.arms && e.arms.length > 0 ? e.arms.join(" vs ") : "";
 }
 
@@ -350,8 +356,11 @@ export function ExperimentBoard() {
 	const clear = () => void setFilters({ q: null, state: null, suite: null, agent: null, model: null, result: null, page: null });
 	// M1-59: 50 rows per page; any filter change goes back to page 1.
 	const slice = pageSlice(shown, Number(filters.page) || 1);
-	const setFilter = (patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests" | "archived", string | null>>) =>
-		void setFilters({ ...patch, page: null });
+	// Q-169: pick rows and archive them together.
+	const bulk = useBulkArchive();
+	const setFilter = (
+		patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests" | "archived", string | null>>,
+	) => void setFilters({ ...patch, page: null });
 	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
 	const tokens = (
 		[
@@ -475,8 +484,19 @@ export function ExperimentBoard() {
 						</label>
 					)}
 				</div>
-				<ShowTestsChip count={hiddenTests} on={showTests} onChange={(on) => setFilter({ tests: on ? "1" : null })} testId="experiment-show-tests" />
-				<ShowArchivedChip count={archivedCount} on={showArchived} onChange={(on) => setFilter({ archived: on ? "1" : null })} className="self-start" testId="experiment-show-archived" />
+				<ShowTestsChip
+					count={hiddenTests}
+					on={showTests}
+					onChange={(on) => setFilter({ tests: on ? "1" : null })}
+					testId="experiment-show-tests"
+				/>
+				<ShowArchivedChip
+					count={archivedCount}
+					on={showArchived}
+					onChange={(on) => setFilter({ archived: on ? "1" : null })}
+					className="self-start"
+					testId="experiment-show-archived"
+				/>
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
@@ -506,111 +526,121 @@ export function ExperimentBoard() {
 					testId="experiment-list-no-match"
 				/>
 			) : (
-				<div className="bg-card overflow-hidden rounded-xl border">
-					<div
-						className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
-						aria-hidden="true"
-					>
-						<span>{t("col.experiment")}</span>
-						<span>{t("col.status")}</span>
-						<span>{t("col.verdict")}</span>
-						<span className="text-right">{t("col.runs")}</span>
-						<span className="text-right">{t("col.cost")}</span>
-						<span className="text-right">{t("col.when")}</span>
-						<span />
-					</div>
-					<ul className="divide-y" data-testid="experiment-table" aria-label={tb("experiments.list.tableLabel")}>
-						{slice.rows.map((e) => {
-							const when = e.started_at ?? e.frozen_at;
-							const title = named.get(e.exp_id) ?? e.exp_id;
-							const kind = experimentKind(e);
-							const archivedAt = (e as ArchivedRow).archived_at;
-							return (
-								<li
-									key={e.exp_id}
-									className={`${isArchived(e as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""} hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-4 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] md:items-center md:gap-4`}
-									data-testid={`experiment-row-${e.exp_id}`}
-								>
-									<span className="flex min-w-0 items-center gap-3">
-										<span className="flex min-w-0 flex-col">
-											<EntityLink
-												kind="experiment"
-												id={e.exp_id}
-												className="text-foreground truncate font-sans text-sm font-semibold after:absolute after:inset-0"
-												testId={`experiment-row-${e.exp_id}-name`}
-											>
-												<span title={title}>{title}</span>
-											</EntityLink>
-											{isArchived(e as ArchivedRow) && (
-												<span className="mt-1">
-													<ArchivedPill at={archivedAt} testId={`experiment-row-${e.exp_id}-archived`} />
-												</span>
-											)}
-											<span className="text-muted-foreground truncate text-xs">
-												{suiteName(e.suite)}
-												{systemExperiment(e) ? (
-													<span> · {t("system.tag")}</span>
-												) : isDebugExperiment(e) ? (
-													<span> · {t("debug.tag")}</span>
-												) : (
-													setupsLine(e) && <span data-testid={`experiment-row-${e.exp_id}-setups`}> · {setupsLine(e)}</span>
+				<>
+					{bulk.bar}
+					<div className="bg-card overflow-hidden rounded-xl border">
+						<div
+							className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
+							aria-hidden="true"
+						>
+							<span>{t("col.experiment")}</span>
+							<span>{t("col.status")}</span>
+							<span>{t("col.verdict")}</span>
+							<span className="text-right">{t("col.runs")}</span>
+							<span className="text-right">{t("col.cost")}</span>
+							<span className="text-right">{t("col.when")}</span>
+							<span />
+						</div>
+						<ul className="divide-y" data-testid="experiment-table" aria-label={tb("experiments.list.tableLabel")}>
+							{slice.rows.map((e) => {
+								const when = e.started_at ?? e.frozen_at;
+								const title = named.get(e.exp_id) ?? e.exp_id;
+								const kind = experimentKind(e);
+								const archivedAt = (e as ArchivedRow).archived_at;
+								return (
+									<li
+										key={e.exp_id}
+										className={`${isArchived(e as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""} hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-4 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] md:items-center md:gap-4`}
+										data-testid={`experiment-row-${e.exp_id}`}
+									>
+										<span className="flex min-w-0 items-center gap-3">
+											{bulk.box(e.exp_id, title)}
+											<span className="flex min-w-0 flex-col">
+												<EntityLink
+													kind="experiment"
+													id={e.exp_id}
+													className="text-foreground truncate font-sans text-sm font-semibold after:absolute after:inset-0"
+													testId={`experiment-row-${e.exp_id}-name`}
+												>
+													<span title={title}>{title}</span>
+												</EntityLink>
+												{isArchived(e as ArchivedRow) && (
+													<span className="mt-1">
+														<ArchivedPill at={archivedAt} testId={`experiment-row-${e.exp_id}-archived`} />
+													</span>
 												)}
+												<span className="text-muted-foreground truncate text-xs">
+													{suiteName(e.suite)}
+													{systemExperiment(e) ? (
+														<span> · {t("system.tag")}</span>
+													) : isDebugExperiment(e) ? (
+														<span> · {t("debug.tag")}</span>
+													) : (
+														setupsLine(e) && <span data-testid={`experiment-row-${e.exp_id}-setups`}> · {setupsLine(e)}</span>
+													)}
+												</span>
 											</span>
 										</span>
-									</span>
-									<span className="flex flex-wrap items-center gap-2 md:contents">
-										<span>
-											{/* The results index counts only scored runs, so a debug run reads "created, 0 runs" there (N247): its kind says enough. */}
-											{!(kind === "debug" && e.state === "created") && (
-												<StatusPill raw={e.state} testId={`experiment-row-${e.exp_id}-state`} />
-											)}
-										</span>
-										<span>
-											{kind ? (
-												<KindPill kind={kind} testId={`experiment-row-${e.exp_id}-kind`} />
-											) : (
-												// A running comparison has no result yet: an analysis of its first runs is not final (N197).
-												<VerdictPill
-													decision={e.state === "running" || e.state === "analyzing" ? undefined : e.decision}
-													testId={`experiment-row-${e.exp_id}-decision`}
-													arms={e.arms}
-													stats={(e as ExperimentRow).arm_stats}
+										<span className="flex flex-wrap items-center gap-2 md:contents">
+											<span>
+												{/* The results index counts only scored runs, so a debug run reads "created, 0 runs" there (N247): its kind says enough. */}
+												{!(kind === "debug" && e.state === "created") && (
+													<StatusPill raw={e.state} testId={`experiment-row-${e.exp_id}-state`} />
+												)}
+											</span>
+											<span>
+												{kind ? (
+													<KindPill kind={kind} testId={`experiment-row-${e.exp_id}-kind`} />
+												) : (
+													// A running comparison has no result yet: an analysis of its first runs is not final (N197).
+													<VerdictPill
+														decision={e.state === "running" || e.state === "analyzing" ? undefined : e.decision}
+														testId={`experiment-row-${e.exp_id}-decision`}
+														arms={e.arms}
+														stats={(e as ExperimentRow).arm_stats}
+													/>
+												)}
+											</span>
+											<span className="ml-auto md:ml-0 md:flex md:justify-end">{kind !== "debug" && <RunsProgress e={e} />}</span>
+											<span className="text-right text-sm">
+												{e.spent_usd?.state === "observed" ? (
+													<>
+														<span className="text-muted-foreground mr-1 text-xs md:hidden">{tu("list.cost")}</span>
+														<ValueCell value={e.spent_usd} kind="usd" />
+													</>
+												) : (
+													// M4-71: an unknown cost is words with a pointer to the price list, not a hatched stripe.
+													<span
+														className="text-muted-foreground text-xs"
+														title={tu("list.notPricedHint")}
+														data-testid={`experiment-row-${e.exp_id}-not-priced`}
+													>
+														{tu("list.notPriced")}
+													</span>
+												)}
+											</span>
+											<span
+												className="text-muted-foreground text-right text-xs whitespace-nowrap tabular-nums"
+												title={formatWhen(when, locale) ?? undefined}
+											>
+												{formatRelative(when, locale) ?? ""}
+											</span>
+											<span className="md:flex md:justify-end">
+												<ArchiveRowMenu
+													kind="experiment"
+													id={e.exp_id}
+													name={title}
+													archivedAt={archivedAt}
+													testId={`experiment-row-${e.exp_id}`}
 												/>
-											)}
+											</span>
 										</span>
-										<span className="ml-auto md:ml-0 md:flex md:justify-end">{kind !== "debug" && <RunsProgress e={e} />}</span>
-										<span className="text-right text-sm">
-											{e.spent_usd?.state === "observed" ? (
-												<>
-													<span className="text-muted-foreground mr-1 text-xs md:hidden">{tu("list.cost")}</span>
-													<ValueCell value={e.spent_usd} kind="usd" />
-												</>
-											) : (
-												// M4-71: an unknown cost is words with a pointer to the price list, not a hatched stripe.
-												<span
-													className="text-muted-foreground text-xs"
-													title={tu("list.notPricedHint")}
-													data-testid={`experiment-row-${e.exp_id}-not-priced`}
-												>
-													{tu("list.notPriced")}
-												</span>
-											)}
-										</span>
-										<span
-											className="text-muted-foreground text-right text-xs whitespace-nowrap tabular-nums"
-											title={formatWhen(when, locale) ?? undefined}
-										>
-											{formatRelative(when, locale) ?? ""}
-										</span>
-										<span className="md:flex md:justify-end">
-											<ArchiveRowMenu kind="experiment" id={e.exp_id} name={title} archivedAt={archivedAt} testId={`experiment-row-${e.exp_id}`} />
-										</span>
-									</span>
-								</li>
-							);
-						})}
-					</ul>
-				</div>
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				</>
 			)}
 			<p className="text-muted-foreground text-xs tabular-nums" data-testid="experiment-list-count">
 				{t("count", { shown: shown.length, total: all.length })}

@@ -11,7 +11,9 @@ describe("PolicyScorecard without a release rule set (p05-1)", () => {
 	it("speaks to web users, with no terminal flag", () => {
 		const html = renderToStaticMarkup(<PolicyScorecard policy={null} expId="e_x" />);
 		expect(html).not.toContain("-policy");
-		expect(html).toContain("Releases page");
+		// Round 2 Q-60: the sentence is replaced by a link to Releases, Rules.
+		expect(html).toContain("Pick a rule set");
+		expect(html).toContain("policy-scorecard-pick-rules");
 	});
 });
 

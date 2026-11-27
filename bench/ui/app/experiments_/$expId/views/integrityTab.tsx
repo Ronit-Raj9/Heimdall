@@ -3,7 +3,6 @@ import { AwarenessSection, ExperimentMonitorsSection } from "@/components/integr
 import "@/components/integrity/gw06I18n";
 import { VarianceCard } from "@/components/integrity/varianceCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BlockSkeleton } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { armOrder } from "@/components/verdict/verdict.utils";
 import { useGetGridQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
@@ -14,6 +13,7 @@ import "@/components/verdict/uf4aI18n";
 import { useTranslation } from "react-i18next";
 import { gradeQuery, useGradeChoice } from "./gradeChoice";
 import { Section } from "./verdictTab";
+import { SlowSkeleton } from "./slowSkeleton";
 
 /** The Integrity tab (eval integrity area, S2): the noise floor, eval awareness, monitor certifications and the compliance pack. */
 export function IntegrityTab({ expId }: { expId: string }) {
@@ -26,7 +26,7 @@ export function IntegrityTab({ expId }: { expId: string }) {
 		<div className="flex flex-col gap-6" data-testid="integrity-screen">
 			<FlaggedRunsCard expId={expId} />
 			{verdict.isLoading ? (
-				<BlockSkeleton rows={3} testId="integrity-variance-loading" />
+				<SlowSkeleton rows={3} testId="integrity-variance-loading" onRetry={() => void verdict.refetch()} />
 			) : (
 				verdict.data && (
 					<div className="flex flex-col gap-2">

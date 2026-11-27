@@ -27,7 +27,7 @@ import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { LoadError } from "@/components/runs/screenStates";
 import { VerdictSummary, costNumbers, thrownByArm } from "@/components/verdict/verdictSummary";
 import { NoiseFloorLine } from "@/components/integrity/varianceCard";
-import { cheaperArm } from "@/components/verdict/armCost";
+import { cheaperArm, observedNumber } from "@/components/verdict/armCost";
 import "@/components/verdict/uf4aI18n";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
 import { EXPERIMENT_POLL_MS, useGetExperimentQuery, useGetVerdictQuery as useVerdictForPicker } from "@/lib/store/apis/benchApi"; // the grade picker reads benchApi directly
@@ -285,30 +285,17 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-content" data-exp-id={payload.exp_id}>
-			<div className="flex flex-wrap items-center justify-between gap-3">
+			{payload.mode === "synthetic" && (
 				<div className="flex flex-wrap items-center gap-2">
-					{payload.mode === "synthetic" && (
-						<span
-							className="bg-chart-warning/10 text-chart-warning-ink inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-							title={tPage("header.practiceHint")}
-							data-testid="verdict-practice-mode"
-						>
-							{tPage("header.practice")}
-						</span>
-					)}
-					<details className="group text-xs" data-testid="verdict-details">
-						<summary
-							className="text-muted-foreground hover:text-foreground cursor-pointer list-none select-none"
-							title={tPage("header.detailsHint")}
-						>
-							{tPage("header.details")}
-						</summary>
-						<div className="mt-2">
-							<VerdictHeaderStrip payload={payload} />
-						</div>
-					</details>
+					<span
+						className="bg-chart-warning/10 text-chart-warning-ink inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+						title={tPage("header.practiceHint")}
+						data-testid="verdict-practice-mode"
+					>
+						{tPage("header.practice")}
+					</span>
 				</div>
-			</div>
+			)}
 			{grade && grade !== latest?.id && (
 				<p
 					className="border-chart-info/40 bg-chart-info/5 text-foreground flex flex-wrap items-center gap-2 rounded-sm border px-3 py-2 text-xs"
@@ -325,16 +312,6 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 						{t("verdict.source.backToOriginal")}
 					</Button>
 				</p>
-			)}
-
-			{showPromote(partial) && (
-				<ExperimentVerdictPromote
-					expId={payload.exp_id}
-					arms={arms}
-					evaluationId={evaluationId}
-					decision={payload.verdict.decision}
-					cheaperB={cheaperArm(arms, costNumbers(arms, armCost, diagnostics.data?.arm_metrics))?.arm === arms[1]}
-				/>
 			)}
 
 			<VerdictTabNotes
@@ -360,12 +337,43 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					armMetrics={diagnostics.data?.arm_metrics}
 					metricsStatus={diagnostics.isError ? "error" : diagnostics.isLoading ? "loading" : undefined}
 					armCost={armCost}
+					// Q-153: runs thrown out for cheating, under each setup's pass count.
+					thrown={thrownByArm(grid.data?.rows)}
 					onNext={onNext}
 				/>
 			)}
 			{!partial && isSetupsVerdict(payload.verdict) && (
-				<SetupsTable setups={payload.verdict.setups} arms={arms} naive={payload.naive} names={names} />
+				<SetupsTable
+					setups={payload.verdict.setups}
+					arms={arms}
+					naive={payload.naive}
+					names={names}
+					costs={Object.fromEntries(arms.map((arm) => [arm, observedNumber(diagnostics.data?.arm_metrics?.[arm]?.cost_usd)]))}
+				/>
 			)}
+			{/* Q-77, V4-7: the promote button and the Details strip sit under the verdict, never above it. */}
+			<div className="flex flex-wrap items-start justify-between gap-3" data-testid="verdict-footer">
+				<details className="group text-xs" data-testid="verdict-details">
+					<summary
+						className="text-muted-foreground hover:text-foreground cursor-pointer list-none select-none"
+						title={tPage("header.detailsHint")}
+					>
+						{tPage("header.details")}
+					</summary>
+					<div className="mt-2">
+						<VerdictHeaderStrip payload={payload} />
+					</div>
+				</details>
+				{showPromote(partial) && (
+					<ExperimentVerdictPromote
+						expId={payload.exp_id}
+						arms={arms}
+						evaluationId={evaluationId}
+						decision={payload.verdict.decision}
+						cheaperB={cheaperArm(arms, costNumbers(arms, armCost, diagnostics.data?.arm_metrics))?.arm === arms[1]}
+					/>
+				)}
+			</div>
 
 			<div className="flex flex-col gap-3">
 				{/* M4-8: one line says which grades every section below reads, in place of a pill on each row. */}
@@ -375,7 +383,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				{!scored && (
 					<Disclosure
 						title={tPage("sections.guards")}
-						description={tPage("sectionHints.guards")}
+						description={tPage(arms.length > 2 ? "sectionHints.guardsMany" : "sectionHints.guards")}
 						icon={Shield}
 						meta={guardMeta(payload.verdict.guards)}
 						testId="verdict-guards-section"
@@ -390,7 +398,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 
 				<Disclosure
 					title={tPage("sections.diagnostics")}
-					description={tPage("sectionHints.diagnostics")}
+					description={tPage(arms.length > 2 ? "sectionHints.diagnosticsMany" : "sectionHints.diagnostics")}
 					icon={Activity}
 					testId="verdict-diagnostics"
 				>
@@ -399,7 +407,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 
 				{!scored && (
 					<Disclosure
-						title={tPage("sections.changes")}
+						title={tPage(arms.length > 2 ? "sections.changesMany" : "sections.changes")}
 						description={tPage("sectionHints.changes")}
 						icon={GitCompare}
 						testId="verdict-config-diff"
@@ -422,13 +430,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
 
 				{/* The grid shows each run's sealed outcome; a regrade does not change it, and the tag says so. */}
-				<Disclosure
-					title={tPage("sections.tasks")}
-					description={tPage("sectionHints.tasks")}
-					icon={Table2}
-					action={tag("verdict-grid-source", true)}
-					testId="verdict-grid"
-				>
+				<Disclosure title={tPage("sections.tasks")} description={tPage("sectionHints.tasks")} icon={Table2} testId="verdict-grid">
 					{grid.isLoading ? (
 						<TableSkeleton testId="verdict-grid-loading" />
 					) : grid.isError || !grid.data ? (

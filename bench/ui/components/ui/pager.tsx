@@ -64,13 +64,44 @@ export function Pager({ page, pageCount, onPage, rangeText, testId, className }:
 	);
 }
 
-/** The list count at the right of a toolbar: "12 of 80", plus "(9 hidden)" when test items are hidden. */
-export function ListCount({ shown, total, hidden, testId, className }: { shown: number; total: number; hidden?: number; testId: string; className?: string }) {
+type CountT = (key: string, opts?: Record<string, unknown>) => string;
+
+/**
+ * The list count text. "12 of 80", plus "(9 hidden)" when test items are hidden; when every item
+ * is shown and only test items are hidden it reads "59 benchmarks, 21 test items hidden" instead
+ * of "59 of 59 (21 hidden)" (Q-56). Pure.
+ */
+export function listCountText(t: CountT, shown: number, total: number, hidden?: number, noun?: string): string {
+	const fmt = (n: number) => n.toLocaleString("en-US");
+	if (hidden && shown === total) {
+		return noun
+			? t("listCount.allShownHidden", { ns: "platform", total: fmt(total), noun, count: hidden })
+			: t("listCount.allShownHiddenNoNoun", { ns: "platform", total: fmt(total), count: hidden });
+	}
+	const base = t("list.count", { ns: "ui", shown: fmt(shown), total: fmt(total) });
+	return hidden ? `${base} ${t("list.hidden", { ns: "ui", count: hidden })}` : base;
+}
+
+/** The list count at the right of a toolbar (see listCountText). noun names the items, plural: "benchmarks". */
+export function ListCount({
+	shown,
+	total,
+	hidden,
+	noun,
+	testId,
+	className,
+}: {
+	shown: number;
+	total: number;
+	hidden?: number;
+	noun?: string;
+	testId: string;
+	className?: string;
+}) {
 	const { t } = useTranslation("ui");
 	return (
 		<span className={cn("text-muted-foreground text-xs whitespace-nowrap tabular-nums", className)} data-testid={testId}>
-			{t("list.count", { shown: shown.toLocaleString("en-US"), total: total.toLocaleString("en-US") })}
-			{hidden ? ` ${t("list.hidden", { count: hidden })}` : ""}
+			{listCountText(t as unknown as CountT, shown, total, hidden, noun)}
 		</span>
 	);
 }

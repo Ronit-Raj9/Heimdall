@@ -6,6 +6,7 @@ import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
 import { PaidButton } from "@/components/ui/paidButton";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import { draftOr, useDraftSync } from "./draftSync";
 import { PlanEstimate } from "@/components/experiments/planEstimate";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,9 @@ interface Planned {
 	plan: ExperimentPlan;
 }
 
+/** Where the YAML-free form's draft is kept (Q-150). */
+export const FORM_DRAFT_KEY = "newComparison.form";
+
 /** The experiment form, the planner and the create-and-start action. */
 export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGroups, onStarted }: ExperimentFormProps) {
 	const { t } = useTranslation("bench");
@@ -129,6 +133,14 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
 	const [started, setStarted] = useState(false);
 	useLeaveGuard(formState.isDirty && !started);
+	// Q-150: the typed input is kept as a draft beside the leave guard; a reload puts it back as changed fields.
+	useDraftSync(FORM_DRAFT_KEY, values, formState.isDirty, started);
+	useEffect(() => {
+		const draft = draftOr<Partial<ExperimentFormValues>>(FORM_DRAFT_KEY, {});
+		for (const k of Object.keys(draft) as (keyof ExperimentFormValues)[]) setValue(k, draft[k] as never, { shouldDirty: true });
+		// Once, on mount: later defaults fill only untouched fields (above).
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const stale = planned !== null && planIsStale(planned.experiment, values, ready);
 	// N43: after a Plan press, every field still to fix is named next to the button.

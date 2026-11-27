@@ -2,6 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
+import { useBusyGuard } from "@/lib/hooks/useBusyGuard";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
@@ -41,13 +42,28 @@ function Button({
 	children,
 	isLoading = false,
 	dataTestId,
+	busyGuard = false,
 	...props
 }: React.ComponentProps<"button"> &
 	VariantProps<typeof buttonVariants> & {
 		asChild?: boolean;
 		isLoading?: boolean;
 		dataTestId?: string;
+		/**
+		 * One request per press (Q-221): when onClick returns a promise, the button stays busy and
+		 * ignores further clicks until it settles. Use it on create, save and start buttons.
+		 */
+		busyGuard?: boolean;
 	}) {
+	const guard = useBusyGuard();
+	const { onClick } = props;
+	const guardedClick =
+		busyGuard && onClick
+			? (e: React.MouseEvent<HTMLButtonElement>) => {
+					void guard.run(() => onClick(e) as unknown);
+				}
+			: onClick;
+	isLoading = isLoading || (busyGuard && guard.busy);
 	// A busy button keeps its label, so it does not change width, and cannot be pressed twice.
 	// With asChild the child is the only node Slot accepts, so the spinner is left out there.
 	return (
@@ -58,6 +74,7 @@ function Button({
 			asChild={asChild}
 			dataTestId={dataTestId}
 			{...props}
+			onClick={guardedClick}
 			disabled={props.disabled || isLoading}
 			aria-busy={isLoading || undefined}
 		>

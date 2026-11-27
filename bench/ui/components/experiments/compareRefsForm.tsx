@@ -12,6 +12,12 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FollowUpJob } from "./followUpJob";
 
+/** The server's message for a failed repos call (409: GitHub needs reconnecting), else null. Pure. */
+export function githubReposError(error: unknown): string | null {
+	const e = error as { data?: { error?: { message?: string } } } | undefined;
+	return e?.data?.error?.message || null;
+}
+
 /** The benchmark refs "id@version" the suggestions list, sorted, each once. Pure. */
 export function suiteChoices(suites: readonly { id: string; version?: string }[] | undefined): string[] {
 	return [...new Set((suites ?? []).map((s) => (s.version ? `${s.id}@${s.version}` : s.id)))].sort();
@@ -39,7 +45,11 @@ export function CompareRefsForm({
 	const uid = useId();
 	const agents = useGetAgentsQuery();
 	const status = useGetGithubStatusQuery();
-	const connected = status.data?.connected === true;
+	// Round 2 (RG): the status may carry state and hint; needs_reconnect means the stored token cannot be read,
+	// so the repos are not asked for (they would answer 409) and the hint says what to do. Read as optional.
+	const facts = status.data as (typeof status.data & { state?: string }) | undefined;
+	const reconnect = facts?.state === "needs_reconnect";
+	const connected = status.data?.connected === true && !reconnect;
 	// A hosted project has no git history of its own: only a GitHub repository can be compared (fix wave 2, N67).
 	const hosted = status.data?.hosted === true;
 	const repos = useListGithubReposQuery(connected ? 1 : skipToken);
@@ -79,8 +89,14 @@ export function CompareRefsForm({
 		const r = repos.data?.repos.find((x) => x.full_name === full);
 		if (r && !refA) setRefA(r.default_branch);
 	};
+	const reposError = repos.error ? githubReposError(repos.error) : null;
 	return (
 		<div className="flex flex-col gap-3" data-testid={testId}>
+			{(reconnect || reposError) && (
+				<p className="text-muted-foreground text-sm" role="note" data-testid={`${testId}-github-note`}>
+					{reconnect ? status.data?.hint || reposError : reposError}
+				</p>
+			)}
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className={field} htmlFor={`${uid}-agent`}>
 					{t("compare.agent")}

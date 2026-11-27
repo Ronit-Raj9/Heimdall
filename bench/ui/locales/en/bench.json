@@ -4004,7 +4004,8 @@
 			"run": "Open run {{id}}",
 			"suite": "Open benchmark {{id}}",
 			"task": "Open task {{id}}",
-			"agent": "Open agent {{id}}"
+			"agent": "Open agent {{id}}",
+			"suiteGone": "Benchmark {{suite}} was deleted"
 		},
 		"status": {
 			"noDecision": "No result yet",

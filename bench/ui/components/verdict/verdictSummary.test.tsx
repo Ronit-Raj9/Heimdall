@@ -84,11 +84,12 @@ describe("VerdictSummary cost and tokens (D8.cost)", () => {
 
 	it("renders the live payload shape", () => {
 		const html = show({ armMetrics: live });
-		// Lane 4a phase B (M4-2): the diagnostics cost is a median, so the average reads not known and the median is the second value.
-		expect(at(html, "verdict-summary-cost-A")).toBe("Not known");
-		expect(at(html, "verdict-summary-median-A")).toBe("Median $0.0035");
+		// Round 2 Q-49: without the mean the known median is the headline under "Median cost per run", never "Not known".
+		expect(at(html, "verdict-summary-cost-A")).toBe("$0.0035");
+		expect(html).toContain("Median cost per run");
+		expect(html).not.toContain('data-testid="verdict-summary-median-A"');
 		expect(at(html, "verdict-summary-tokens-A")).toBe("23,128");
-		expect(at(html, "verdict-summary-median-B")).toBe("Median $0.0017");
+		expect(at(html, "verdict-summary-cost-B")).toBe("$0.0017");
 	});
 
 	it("says loading and load failure instead of a missing price", () => {
@@ -140,7 +141,9 @@ describe("VerdictSummary setups, guard and running headlines (fix wave 3, N244, 
 		const html = three({ decision: "inconclusive", action: "no_decision", setups });
 		expect(head(html)).toBe("Cannot tell A, B and C apart yet");
 		expect(html).toContain("B broke a safety rule on t02.");
-		expect(html).toContain("Cannot separate any two arms");
+		// Round 2 Q-140: the server's statistics note is said in plain words.
+		expect(html).toContain("too few to tell these setups apart");
+		expect(html).not.toContain("smallest possible p");
 		expect(html).not.toContain("is worse by");
 		for (const arm of ["A", "B", "C"]) expect(html).toContain(`data-testid="verdict-summary-arm-${arm}"`);
 	});

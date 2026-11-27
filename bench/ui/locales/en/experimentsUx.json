@@ -4,7 +4,7 @@
 	"quickRun": "Quick run on {{suite}}",
 	"armsVs": "{{arms}} on {{suite}}",
 	"noSuite": "an unknown benchmark",
-	"searchPlaceholder": "Search comparisons",
+	"searchPlaceholder": "Search",
 	"evaluationChild": "{{evaluation}} · {{suite}}",
 	"chips": {
 		"label": "Filter by status",

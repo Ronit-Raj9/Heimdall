@@ -2,7 +2,7 @@ import { ReceiptFunnel } from "@/components/receipts/receiptFunnel";
 import { catalogProbeFor } from "@/components/receipts/receipts.utils";
 import { RunReceiptPanel } from "@/components/receipts/runReceiptPanel";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery } from "@/lib/store/apis/benchApi";
@@ -15,6 +15,7 @@ import { EntityLink } from "@/components/shell/entityLink";
 import { parseAsString, useQueryState } from "nuqs";
 import { probeLayerLabel } from "@/components/receipts/receipts.utils";
 import { useTranslation } from "react-i18next";
+import { SlowSkeleton } from "./slowSkeleton";
 
 /**
  * The Receipts tab (DESIGN.md 18 screen 3): for each probe condition, how far the fault got per arm,
@@ -40,7 +41,8 @@ function ExperimentReceipts({ expId, suite }: { expId: string; suite?: string })
 	const diagnostics = useGetDiagnosticsQuery(expId);
 	const catalog = useGetCatalogQuery();
 
-	if (diagnostics.isLoading) return <BlockSkeleton rows={8} testId="receipts-diagnostics-loading" />;
+	if (diagnostics.isLoading)
+		return <SlowSkeleton rows={8} testId="receipts-diagnostics-loading" onRetry={() => void diagnostics.refetch()} />;
 	if (diagnostics.error || !diagnostics.data) {
 		return (
 			<LoadError
@@ -147,7 +149,7 @@ function ConditionRuns({
 	return (
 		<Section title={t("receipts.runs.title")} description={t("receipts.runs.description")} testId="receipts-runs-section">
 			{grid.isLoading ? (
-				<BlockSkeleton rows={4} testId="receipts-runs-loading" />
+				<SlowSkeleton rows={4} testId="receipts-runs-loading" onRetry={() => void grid.refetch()} />
 			) : grid.error ? (
 				<LoadError
 					title={t("receipts.runs.gridError")}

@@ -4,8 +4,9 @@ import "@/components/verdict/uf4aI18n";
 import { MigrationReportView } from "@/components/migration/migrationReport";
 import { ApplyPanel } from "@/components/modelswitch/applyPanel";
 import { ModeBadge } from "@/components/modeBadge";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
+import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useListPoliciesQuery } from "@/lib/store/apis/governApi";
@@ -18,6 +19,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import "./fw11I18n";
 import "./hw10I18n";
+import { SlowSkeleton } from "./slowSkeleton";
 
 /**
  * The Migration tab (docs/model-migration.md): moving from one arm to the others. ?from= is one arm
@@ -111,7 +113,14 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 						</span>
 						<div className="flex flex-wrap gap-1" role="group" aria-labelledby="migration-to-label">
 							{targets.map((arm) => (
-								<ArmChip key={arm} arm={arm} name={names.get(arm)} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
+								<ArmChip
+									key={arm}
+									arm={arm}
+									name={names.get(arm)}
+									active={chosen.includes(arm)}
+									onClick={() => toggle(arm)}
+									testId={`migration-to-${arm}`}
+								/>
 							))}
 						</div>
 					</div>
@@ -121,7 +130,7 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 			</details>
 			{current && <RuleSetLine applied={current.policy} chosen={policy} />}
 			{pending ? (
-				<BlockSkeleton rows={6} testId="migration-report-loading" />
+				<SlowSkeleton rows={6} testId="migration-report-loading" onRetry={() => void report.refetch()} />
 			) : report.error || !current ? (
 				<LoadError title={t("migration.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="migration-error" />
 			) : (
@@ -183,7 +192,8 @@ function RoutingNote({ expId }: { expId: string }) {
 	const { t } = useTranslation("hw10");
 	const { t: tf } = useTranslation("uf4a");
 	return (
-		<p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm" role="note" data-testid="migration-routing-note">
+		// X-98, Q-104: the notice uses the one callout.
+		<Alert tone="info" testId="migration-routing-note">
 			{t("routingNote")} {/* M4-32: the line leads somewhere: the Actions tab, where a model switch is started. */}
 			<Link
 				to="/experiments/$expId"
@@ -194,7 +204,7 @@ function RoutingNote({ expId }: { expId: string }) {
 			>
 				{tf("migration.openActions")}
 			</Link>
-		</p>
+		</Alert>
 	);
 }
 
@@ -223,9 +233,9 @@ export function MigrationApply({ evaluationId }: { evaluationId: string }) {
 		const reason = errorText(q.error);
 		if (!reason) return null;
 		return (
-			<p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm" role="note" data-testid="migration-apply-unavailable">
+			<Alert tone="info" testId="migration-apply-unavailable">
 				{t("apply.unavailable", { reason })}
-			</p>
+			</Alert>
 		);
 	}
 	if (!q.data.ready) return null;

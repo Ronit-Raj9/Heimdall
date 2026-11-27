@@ -95,6 +95,6 @@ describe("ModelSwitchReportView", () => {
 		expect(html).toContain('data-testid="model-switch-latency-chart"');
 		expect(html).toContain("800 ms");
 		expect(html).toContain("gpt-b is not placed: latency unknown");
-		expect(html).toContain("On the latency frontier");
+		expect(html).toContain("Fastest for its quality");
 	});
 });

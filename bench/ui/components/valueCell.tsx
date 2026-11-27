@@ -30,8 +30,9 @@ export function ValueCell({ value, kind, className, testId, focusable = true }: 
 	const view = describeValue(value, kind, getLocale());
 
 	if (view.state === "observed") {
-		// The evidence level is readable on hover and by assistive technology, not only in a data
-		// attribute, so a bare number still says where it was measured (DESIGN.md 8.1 rule 6).
+		// The evidence level is readable on hover (the title), not only in a data attribute, so a bare
+		// number still says where it was measured (DESIGN.md 8.1 rule 6). No inline text: an
+		// "(Evidence: ...)" suffix after every cost read as noise (Q-45).
 		const provenance = view.evidence ? t(`value.evidence.${view.evidence}`, { defaultValue: view.evidence }) : undefined;
 		const cell = (
 			<span
@@ -46,12 +47,11 @@ export function ValueCell({ value, kind, className, testId, focusable = true }: 
 				tabIndex={provenance ? (focusable ? 0 : -1) : undefined}
 				className={cn(
 					"tabular-nums",
-					provenance && "focus-visible:ring-ring/50 cursor-help rounded-[2px] focus-visible:ring-[3px] focus-visible:outline-none",
+					provenance && "focus-visible:ring-ring/50 cursor-help rounded-xs focus-visible:ring-[3px] focus-visible:outline-none",
 					className,
 				)}
 			>
 				{view.text}
-				{provenance && <span className="sr-only"> ({provenance})</span>}
 			</span>
 		);
 		return provenance ? <ObservedProvenance cell={cell} provenance={provenance} /> : cell;

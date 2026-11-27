@@ -14,6 +14,8 @@ import {
 	type ValueKind,
 } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
+import "@/components/experiments/ufrcI18n";
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { TONE_CLASS, formatSignedPp, shortHash, type Tone } from "./verdict.utils";
@@ -59,11 +61,20 @@ export interface PolicyScorecardProps {
 /** The release policy under the verdict card: the overall decision, then one row per check. */
 export function PolicyScorecard({ policy, expId, metrics, runPairs, onOpenPair, className }: PolicyScorecardProps) {
 	const { t } = useTranslation("bench");
+	const { t: tr } = useTranslation("ufrc");
 
 	if (!policy) {
 		return (
 			<p className={cn("text-muted-foreground text-sm", className)} data-testid="policy-scorecard-none">
-				{t("policy.none")}
+				{t("policy.none")} {/* Q-60: the rule sets live on Releases, under Rules. */}
+				<Link
+					to="/releases"
+					search={{ tab: "rules" } as never}
+					className="text-primary font-medium hover:underline"
+					data-testid="policy-scorecard-pick-rules"
+				>
+					{tr("policy.pickRules")}
+				</Link>
 			</p>
 		);
 	}

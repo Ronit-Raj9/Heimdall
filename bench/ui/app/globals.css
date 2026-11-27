@@ -656,6 +656,15 @@
 		overflow: visible !important;
 		height: auto !important;
 	}
+	/* Collapsed sections print open (Q-42): details bodies and closed collapsible content show. */
+	details > *:not(summary),
+	[data-state="closed"][role="region"] {
+		display: block !important;
+	}
+	details::details-content {
+		content-visibility: visible;
+		display: block;
+	}
 	body {
 		background: white;
 		color: black;

@@ -86,6 +86,8 @@ export interface EntityLinkProps {
 	testId?: string;
 	/** -1 keeps the link out of the Tab order (a row that is itself focusable, M7-36). */
 	tabIndex?: number;
+	/** The suite (or the task's suite) is known to be deleted: plain text, no dead-end link (Q-76). */
+	suiteGone?: boolean;
 }
 
 /**
@@ -93,15 +95,17 @@ export interface EntityLinkProps {
  * so ids are always clickable and always lead to the same place. With nothing to link to (a task
  * without its suite) it renders the id as plain mono text.
  */
-export function EntityLink({ kind, id, suite, children, short, className, testId, tabIndex }: EntityLinkProps) {
+export function EntityLink({ kind, id, suite, children, short, className, testId, tabIndex, suiteGone }: EntityLinkProps) {
 	const { t } = useTranslation("bench");
 	const target = entityTarget(kind, id, { suite });
 	const shown = children ?? (short && id.length > short ? `${id.slice(0, short)}…` : id);
 	const mono = children === undefined;
 	const label = t(`shell.entity.${kind}`, { id });
-	if (!target) {
+	const gone = suiteGone && (kind === "task" || kind === "suite");
+	if (!target || gone) {
+		const goneTitle = gone ? t("shell.entity.suiteGone", { suite: suiteIdOf(kind === "suite" ? id : (suite ?? id)) }) : id;
 		return (
-			<span className={cn(mono && "font-mono text-[0.92em]", "text-foreground", className)} title={id} data-testid={testId}>
+			<span className={cn(mono && "font-mono text-[0.92em]", "text-foreground", className)} title={goneTitle} data-testid={testId}>
 				{shown}
 			</span>
 		);

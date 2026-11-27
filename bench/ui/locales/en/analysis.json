@@ -10,7 +10,7 @@
 		"cancelled": "Cancelled",
 		"openLog": "Show log",
 		"check": {
-			"title": "Re-check verdict",
+			"title": "Check the verdict again",
 			"description": "Re-analyze saved runs and save a fresh verdict.",
 			"button": "Run check"
 		},
@@ -33,12 +33,12 @@
 		"clusters": {
 			"title": "Failure clusters",
 			"description": "Group failed runs across experiments by cause.",
-			"button": "Rebuild clusters"
+			"button": "Group the failures again"
 		},
 		"index": {
 			"title": "Results index",
 			"description": "Rebuild the index behind trends, search and leaderboard.",
-			"button": "Rebuild index"
+			"button": "Update the search index"
 		}
 	},
 	"result": {

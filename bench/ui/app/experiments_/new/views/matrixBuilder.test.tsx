@@ -10,6 +10,9 @@ import { MatrixBuilder } from "./matrixBuilder";
 import { defaultBuilderValues } from "./matrixBuilderSchema";
 
 vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testing/modelPickerStub"));
+vi.mock("@/components/models/groupedModelPicker", () => ({
+	GroupedModelPicker: ({ testId }: { testId?: string }) => <div data-testid={testId} />,
+}));
 vi.mock("@/components/experiments/experiments.utils", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/components/experiments/experiments.utils")>()),
 	readWriteToken: () => "",
