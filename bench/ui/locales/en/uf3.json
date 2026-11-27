@@ -15,5 +15,8 @@
 	},
 	"picker": {
 		"keyOk": "Key: {{label}} ...{{last4}}"
+	},
+	"link": {
+		"task": "Running {{task}} again: one task of {{suite}}, one try. The evaluation picks the task itself, so it can be a different task of the same benchmark."
 	}
 }

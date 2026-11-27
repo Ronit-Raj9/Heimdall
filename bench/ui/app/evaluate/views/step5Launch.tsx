@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
 import {
 	type EvaluationArm,
@@ -8,7 +7,9 @@ import {
 	useEstimateEvaluationQuery,
 	useGetBenchFaultsQuery,
 } from "@/lib/store/apis/evaluationsApi";
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { formatUsd } from "@/lib/money";
+import { notify } from "@/lib/notify";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -19,6 +20,7 @@ import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from ".
 import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
 import { FAULTS, specProblem } from "./step4Setup";
+import { isRoughEstimate } from "./evaluate.utils";
 
 /** Wizard step 5: a plain summary of the evaluation, an optional budget and the Launch button. */
 
@@ -130,11 +132,22 @@ export function addKeyHref(provider: string | undefined): string {
 /** The extra step 5 lines from the estimate (M3-28): runs and minutes, and what happens after Launch. */
 export function estimateLines(
 	t: (key: string, opts?: Record<string, unknown>) => string,
-	est: { runs: number; est_minutes?: { low: number; high: number } } | undefined,
+	est:
+		| {
+				runs: number;
+				est_minutes?: { low: number; high: number };
+				est_cost_usd?: { low: number; high: number; known?: boolean };
+				per_benchmark?: readonly object[] | null;
+		  }
+		| undefined,
 ): string[] {
 	const out: string[] = [];
 	if (est && est.runs > 0 && est.est_minutes) {
 		out.push(t("launch.runsTime", { runs: est.runs, min: Math.max(1, Math.round(est.est_minutes.low)), max: Math.max(1, Math.round(est.est_minutes.high)) }));
+	}
+	// A rough list price guess is labelled as rough (G1 estimate_basis, M3-28).
+	if (est?.est_cost_usd && isRoughEstimate(est)) {
+		out.push(t("launch.rough", { low: formatUsd(est.est_cost_usd.low), high: formatUsd(est.est_cost_usd.high) }));
 	}
 	out.push(t("launch.landing"));
 	return out;
@@ -187,7 +200,6 @@ export interface Step5LaunchProps {
 
 export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 	const { t } = useTranslation("evaluate");
-	const confirm = useConfirm();
 	const navigate = useNavigate();
 	const [create, state] = useCreateEvaluationMutation();
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
@@ -225,18 +237,19 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [seeded, advice]);
 
+	const runs = estimate.data?.runs ?? 0;
+	// The most the launch can spend: the typed budget, else the default cap of each benchmark.
+	const capUsd = typedBudget ?? DEFAULT_BENCHMARK_BUDGET * Math.max(1, spec.benchmarks.length);
 	const launch = async () => {
-		// Launch starts paid work, so it asks once with the most it can spend (lane rules: never on one click).
-		const runs = estimate.data?.runs ?? 0;
-		const ok = await confirm(
-			typedBudget ? t("launchConfirm", { runs, usd: `$${typedBudget}` }) : t("launchConfirmDefault", { runs }),
-			{ title: t("launchConfirmTitle"), confirmLabel: t("launchConfirmOk"), cancelLabel: t("launchKeep") },
-		);
-		if (!ok) return;
 		const typed = nameValue.trim();
 		const body: EvaluationSpec = { ...spec, name: typed || spec.name.trim() || summaryLines(spec, faultCatalog)[0].replace(/\.$/, "") };
 		const res = await create(body);
-		if ("data" in res && res.data) void navigate({ href: `/evaluations/${encodeURIComponent(res.data.id)}` });
+		if ("data" in res && res.data) {
+			// The draft is done once the evaluation exists (M4-88).
+			draft?.reset();
+			notify({ text: t("started", { ns: "toast", name: body.name }) });
+			void navigate({ href: `/evaluations/${encodeURIComponent(res.data.id)}` });
+		}
 	};
 
 	return (
@@ -327,9 +340,20 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 
 			{(() => {
 				const button = (
-					<Button onClick={() => void launch()} disabled={!ready || budgetIssue !== "" || state.isLoading} data-testid="step5-launch-button">
-						{state.isLoading ? t("launching") : typedBudget ? t("launchPaid", { usd: `$${typedBudget}` }) : t("launchPlain")}
-					</Button>
+					// Launch starts paid work: the shared paid button names the cap and always asks first (M3-23, Spec 11).
+					<PaidButton
+						verb={t("launchVerb")}
+						capUsd={capUsd}
+						estimateRuns={runs > 0 ? runs : undefined}
+						estimateUsd={cost?.known ? cost.high : null}
+						estimateAt="title"
+						confirm="always"
+						confirmText={typedBudget ? t("launchConfirm", { runs, usd: formatUsd(typedBudget) }) : t("launchConfirmDefault", { runs })}
+						disabled={!ready || budgetIssue !== ""}
+						isLoading={state.isLoading}
+						onConfirm={launch}
+						testId="step5-launch-button"
+					/>
 				);
 				const reason = !ready ? (
 					<p className="text-muted-foreground text-xs" data-testid="step5-not-ready">

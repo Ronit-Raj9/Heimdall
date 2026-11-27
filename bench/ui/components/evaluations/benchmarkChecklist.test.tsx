@@ -2,8 +2,13 @@ import "@/lib/i18n";
 
 import type { AgentCompatibility } from "@/lib/store/apis/evaluationsApi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { BenchmarkChecklist, type ChecklistSuite } from "./benchmarkChecklist";
+import { describe, expect, it, vi } from "vitest";
+
+// The empty block links to the benchmark status page.
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+
+const { BenchmarkChecklist } = await import("./benchmarkChecklist");
+import type { ChecklistSuite } from "./benchmarkChecklist";
 
 const suites: ChecklistSuite[] = [
 	{ id: "hd-harbor-bfcl", description: "Function calling", admitted_count: 12, builtin: true, source: "library", track: "terminal" },
@@ -43,7 +48,7 @@ describe("BenchmarkChecklist (N124)", () => {
 		expect(html).toContain("Checking whether your agent can run it...");
 	});
 	it("says so when no benchmark is ready", () => {
-		expect(render({ suites: [suites[2]] })).toContain("No benchmark has ready tasks yet.");
+		expect(render({ suites: [suites[2]] })).toContain("No benchmark is ready yet");
 		expect(render({ suites: [], loading: true })).toContain("Loading benchmarks...");
 	});
 });

@@ -1,4 +1,5 @@
 import { compatFor, compatibilityMap, groupBenchmarks, incompatibleReason, isGpuBenchmark } from "@/app/evaluate/views/step3Benchmarks";
+import { EmptyState } from "@/components/shell/emptyState";
 import { suiteDisplayDescription, suiteDisplayName } from "@/components/suites/suiteDisplay";
 import type { AgentCompatibility } from "@/lib/store/apis/evaluationsApi";
 import type { SuiteSummary } from "@/lib/types/bench";
@@ -106,7 +107,7 @@ export function BenchmarkChecklist({
 					data-disabled={disabled || undefined}
 					title={s.id}
 					className={cn(
-						"flex min-h-11 items-center gap-3 rounded-md px-2 py-1 text-sm sm:min-h-9",
+						"flex min-h-11 w-full items-center gap-3 rounded-md px-2 py-2 text-sm sm:min-h-9",
 						disabled ? "text-muted-foreground cursor-not-allowed" : "hover:bg-muted/60 cursor-pointer",
 					)}
 				>
@@ -118,9 +119,10 @@ export function BenchmarkChecklist({
 						onChange={() => onToggle(s.id)}
 					/>
 					<span className="min-w-0 flex-1">
-						<span className="flex items-baseline justify-between gap-3">
+						{/* Phones: the ready count goes under the name, so nothing runs off the side (M5-41). */}
+						<span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
 							<span className="truncate font-medium">{suiteDisplayName(s.id)}</span>
-							<span className={cn("shrink-0 text-xs tabular-nums", n ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400")}>
+							<span className={cn("shrink-0 text-xs tabular-nums", n ? "text-muted-foreground" : "text-warning-ink")}>
 								{n ? `${plural(n, "ready task")}` : "No ready tasks"}
 							</span>
 						</span>
@@ -146,10 +148,15 @@ export function BenchmarkChecklist({
 				</div>
 			);
 		}
+		// The shared empty block with the way to the benchmark status (M3-36, M3-46).
 		return (
-			<p className="text-muted-foreground text-sm">
-				No benchmark has ready tasks yet. Benchmarks that are not ready yet are listed on the Benchmarks page.
-			</p>
+			<EmptyState
+				title={t("benchmarks.noneReadyTitle")}
+				body={t("benchmarks.noneReadyBody")}
+				action={{ label: t("benchmarks.seeStatus"), to: "/suites" }}
+				compact
+				testId={`${testIdPrefix}-none-ready`}
+			/>
 		);
 	}
 	return (

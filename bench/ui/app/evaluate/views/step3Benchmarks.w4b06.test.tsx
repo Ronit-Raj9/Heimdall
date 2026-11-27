@@ -3,6 +3,8 @@ import "@/lib/i18n";
 import { okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+
 const calls = vi.hoisted(() => ({ light: 0, full: 0 }));
 
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({

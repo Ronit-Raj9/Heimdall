@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { ShowTestsChip } from "@/components/ui/toolbar";
+import { isTestObject, withoutTests } from "@/lib/testObjects";
 import { Button } from "@/components/ui/button";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { BASELINE_AGENTS, useGetAgentVersionsQuery, type Capability } from "@/lib/store/apis/evaluationsApi";
@@ -164,7 +166,18 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 	const { draft, update } = useEvaluateDraft();
 	const q = useGetAgentsQuery();
 	const all = (q.data?.agents ?? []) as AgentWithCaps[];
-	const { own, builtin } = splitAgents(all);
+	const split = splitAgents(all);
+	// The project's own test agents ("zz-test-...", stub agents) hide behind a chip (M1-18). The wizard keeps its URL
+	// for the draft, so the switch is page state here, not ?tests=1.
+	const [showTests, setShowTests] = useState(false);
+	const ownSplit = withoutTests(
+		split.own,
+		// The picked agent always stays in view, even a test agent a link or a stored draft chose.
+		(a) => a.id !== draft.agent && isTestObject(a.id, { description: (a as { description?: string }).description }),
+		showTests,
+	);
+	const own = ownSplit.shown;
+	const builtin = split.builtin;
 
 	const pick = (a: AgentWithCaps) => {
 		onPicked?.();
@@ -241,7 +254,10 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 					)}
 					<section className="flex flex-col gap-3">
 						<div className="flex flex-wrap items-center justify-between gap-2">
-							<h3 className="text-sm font-semibold">{t("agent.yours")}</h3>
+							<span className="flex flex-wrap items-center gap-2">
+								<h3 className="text-sm font-semibold">{t("agent.yours")}</h3>
+								<ShowTestsChip count={ownSplit.hidden} on={showTests} onChange={setShowTests} testId="evaluate-show-tests" />
+							</span>
 							{own.length > 0 && (
 								<Button asChild variant="outline" size="sm">
 									<Link to="/agents/new" search={{ return: REGISTER_RETURN } as never} data-testid="evaluate-register">

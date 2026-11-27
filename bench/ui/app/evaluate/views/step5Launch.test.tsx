@@ -141,7 +141,9 @@ describe("Step5Launch", () => {
 		expect(html).not.toContain("No limit");
 		expect(html).toContain("Empty means the default: each benchmark stops at $5.");
 		expect(tagOf(html, "step5-launch-button")).not.toContain('disabled=""');
-		expect(html).toContain("Launch evaluation");
+		// Launch is the shared paid button (M3-23): it names the default cap of each benchmark and asks first.
+		expect(tagOf(html, "step5-launch-button")).toContain('data-paid="true"');
+		expect(html).toMatch(/Launch, up to \$\d+/);
 	});
 
 	it("disables Launch until the spec is ready and shows server errors", () => {

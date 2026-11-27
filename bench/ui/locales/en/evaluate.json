@@ -283,7 +283,8 @@
 		"summary": "{{agent}} on {{benchmarks}} benchmarks, {{runs}} runs",
 		"skippedTitle": "Left out",
 		"skipped": "{{benchmark}}: {{reason}}",
-		"done": "Evaluation started"
+		"done": "Evaluation started",
+		"rough": "Rough estimate from list prices, since this setup has no past runs here: about {{low}} to {{high}}."
 	},
 	"list": {
 		"title": "Evaluations",
@@ -435,5 +436,7 @@
 		"noHistory": "No past runs to estimate cost from"
 	},
 	"crumbList": "Evaluations",
-	"crumbNew": "New evaluation"
+	"crumbNew": "New evaluation",
+	"launchVerb": "Launch",
+	"footerSummaryRough": "{{benchmarks}} benchmarks, {{runs}} runs, roughly {{low}} to {{high}} (list prices), about {{min}} min"
 }

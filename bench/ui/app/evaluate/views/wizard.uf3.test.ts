@@ -25,6 +25,9 @@ describe("wizard footer (M3-26)", () => {
 		expect(footerSummary(t, 2, est)).toBe("2 benchmarks, 20 runs, about $0.10 to $0.40, about 12 min");
 		expect(footerSummary(t, 2, { ...est, est_cost_usd: { low: 0, high: 0, known: false } })).toBe("2 benchmarks, 20 runs, price not known yet");
 		expect(footerSummary(t, 2, undefined)).toBe("");
+		// A list price guess is labelled rough (G1 estimate_basis).
+		const rough = { ...est, per_benchmark: [{ benchmark: "b", estimate_basis: "list_price" }] };
+		expect(footerSummary(t, 2, rough)).toBe("2 benchmarks, 20 runs, roughly $0.10 to $0.40 (list prices), about 12 min");
 	});
 });
 
@@ -63,5 +66,14 @@ describe("step 5 (M3-27, M3-28)", () => {
 		const lines = estimateLines(t, { runs: 10, est_minutes: { low: 3, high: 8 } });
 		expect(lines[0]).toBe("10 runs, about 3 to 8 min.");
 		expect(lines[1]).toContain("cancel at any time");
+	});
+});
+
+describe("rough list price estimate (M3-28, G1)", () => {
+	it("adds a rough line only when the server marks a list price guess", () => {
+		const base = { runs: 10, est_minutes: { low: 3, high: 8 }, est_cost_usd: { low: 0.1, high: 0.4, known: true } };
+		expect(estimateLines(t, base).some((l) => l.includes("Rough"))).toBe(false);
+		const lines = estimateLines(t, { ...base, per_benchmark: [{ estimate_basis: "list_price" }] });
+		expect(lines).toContain("Rough estimate from list prices, since this setup has no past runs here: about $0.10 to $0.40.");
 	});
 });

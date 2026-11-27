@@ -15,7 +15,7 @@
 	"models": "Allowed models",
 	"modelsHint": "Comma separated. Leave empty to allow any model from this provider.",
 	"budget": "Monthly spending limit (USD)",
-	"budgetHint": "0 means no limit.",
+	"budgetHint": "0 means no limit. At the limit, runs on this key stop and the key shows 'over budget' until the 1st of next month (UTC).",
 	"price": "Price per 1M tokens (USD, optional)",
 	"priceShown": "Your price per 1M tokens: {{input}} input, {{output}} output, {{cache}} cached input",
 	"priceInput": "Input",

@@ -1,3 +1,4 @@
+import { StickyFooter } from "@/components/ui/stickyFooter";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import "@/lib/types/evaluateI18n";
@@ -21,7 +22,7 @@ import {
 	useEvaluateDraft,
 	type EvaluateDraft,
 } from "./evaluateDraft";
-import { asEvaluateStep, EVALUATE_STEPS, latestVersion, type AgentWithCaps, type EvaluateStep } from "./evaluate.utils";
+import { asEvaluateStep, EVALUATE_STEPS, isRoughEstimate, latestVersion, type AgentWithCaps, type EvaluateStep } from "./evaluate.utils";
 import "./gw09I18n";
 import { Step1Agent } from "./step1Agent";
 import { Step2Learn } from "./step2Learn";
@@ -101,12 +102,20 @@ export function nextReason(
 export function footerSummary(
 	t: (key: string, opts?: Record<string, unknown>) => string,
 	benchmarks: number,
-	est: { runs: number; est_cost_usd?: { low: number; high: number; known?: boolean }; est_minutes?: { low: number; high: number } } | undefined,
+	est:
+		| {
+				runs: number;
+				est_cost_usd?: { low: number; high: number; known?: boolean };
+				est_minutes?: { low: number; high: number };
+				per_benchmark?: readonly object[] | null;
+		  }
+		| undefined,
 ): string {
 	if (!est || !(est.runs > 0)) return "";
 	const usd = (n: number) => `$${n < 1 ? n.toFixed(2) : n.toFixed(0)}`;
 	if (!est.est_cost_usd?.known) return t("footerSummaryNoCost", { benchmarks, runs: est.runs });
-	return t("footerSummary", {
+	// A list price guess says so: "roughly ... (list prices)" (G1 estimate_basis, M3-28).
+	return t(isRoughEstimate(est) ? "footerSummaryRough" : "footerSummary", {
 		benchmarks,
 		runs: est.runs,
 		low: usd(est.est_cost_usd.low),
@@ -127,13 +136,18 @@ export function maxReachable(
 	return s;
 }
 
-/** The link parameters /evaluate reads: ?agent=, ?mode=, ?suite=, ?opponent= and ?keep=1 (back from Register your agent). */
+/**
+ * The link parameters /evaluate reads: ?agent=, ?mode=, ?suite=, ?opponent=, ?keep=1 (back from Register your agent),
+ * and ?model= and ?task= (the run page's "Run this task again", which also sends ?step=4, M5-5). ?step= is read on its own.
+ */
 export interface LinkParams {
 	agent: string | null;
 	mode: string | null;
 	suite: string | null;
 	opponent: string | null;
 	keep: string | null;
+	model?: string | null;
+	task?: string | null;
 }
 
 /** What the wizard does with a link (N154, N112, N86; decision D10). */
@@ -156,7 +170,7 @@ export function planLink(
 	agents: readonly AgentWithCaps[] | undefined,
 	stepRaw: number | null,
 ): LinkPlan {
-	if (!p.agent && !p.mode && !p.suite && !p.opponent && !p.keep) return { kind: "none" };
+	if (!p.agent && !p.mode && !p.suite && !p.opponent && !p.keep && !p.model && !p.task) return { kind: "none" };
 	let row: AgentWithCaps | undefined;
 	if (p.agent) {
 		if (!agents) return { kind: "wait" };
@@ -170,7 +184,8 @@ export function planLink(
 	}
 	const { draft: next, badMode } = draftFromLink(p, row);
 	const putAside = draft.agent || draft.benchmarks.length > 0 || draft.pack ? draft : null;
-	const step: EvaluateStep | null = stepRaw != null ? null : p.agent && p.mode ? 2 : p.agent && p.suite ? 3 : null;
+	const step: EvaluateStep | null =
+		stepRaw != null ? null : p.agent && p.suite && p.task ? 4 : p.agent && p.mode ? 2 : p.agent && p.suite ? 3 : null;
 	return { kind: "replace", draft: next, putAside, ...(badMode ? { badMode } : {}), step };
 }
 
@@ -212,6 +227,8 @@ const LINK_PARSERS = {
 	suite: parseAsString,
 	opponent: parseAsString,
 	keep: parseAsString,
+	model: parseAsString,
+	task: parseAsString,
 };
 
 function Stepper({ step, reach, onGo }: { step: EvaluateStep; reach: EvaluateStep; onGo(s: EvaluateStep): void }) {
@@ -236,7 +253,10 @@ function Stepper({ step, reach, onGo }: { step: EvaluateStep; reach: EvaluateSte
 								current ? "border-primary bg-primary/10 text-primary font-medium" : "border-border/70 hover:bg-accent",
 							)}
 						>
+							{/* The circle is decoration; the step number is read as text (M4-95). */}
+							<span className="sr-only">{t("stepOf", { n: s })}: </span>
 							<span
+								aria-hidden="true"
 								className={cn(
 									"flex size-5 items-center justify-center rounded-full text-[11px] font-semibold",
 									current ? "bg-primary text-primary-foreground" : done ? "bg-chart-success/20 text-chart-success-ink" : "bg-muted",
@@ -258,6 +278,7 @@ function EvaluateWizard() {
 	const { t } = useTranslation("evaluate");
 	const { t: tHubs } = useTranslation("hubs");
 	const { t: tFw } = useTranslation("fw26");
+	const { t: tUf } = useTranslation("uf3");
 	const { draft, update, replace, reset } = useEvaluateDraft();
 	const [stepRaw, setStepRaw] = useQueryState("step", parseAsInteger);
 	const [link, setLink] = useQueryStates(LINK_PARSERS);
@@ -269,7 +290,9 @@ function EvaluateWizard() {
 	const agentsQ = useGetAgentsQuery();
 	const agentList = (agentsQ.data as { agents?: AgentWithCaps[] } | undefined)?.agents;
 	const known = useMemo(() => (agentList ? new Set(agentList.map((a) => a.id)) : null), [agentList]);
-	const linkPending = Boolean(link.agent || link.mode || link.suite || link.opponent || link.keep);
+	const linkPending = Boolean(link.agent || link.mode || link.suite || link.opponent || link.keep || link.model || link.task);
+	// The task a "Run this task again" link named (M5-5): shown as a note while the draft still runs one task of its benchmark.
+	const [linkTask, setLinkTask] = useState<{ task: string; suite: string } | null>(null);
 
 	// One effect for every link into the wizard (agent menu, a benchmark's Run button, Test my MCP server, and the
 	// return from Register your agent with keep=1). It runs once per set of link params.
@@ -293,10 +316,11 @@ function EvaluateWizard() {
 			setMissingAgent(null);
 			setReplaced(plan.putAside);
 			setBadMode(plan.badMode ?? null);
+			setLinkTask(link.task && link.suite ? { task: link.task, suite: link.suite } : null);
 			replace(plan.draft);
 			if (plan.step) void setStepRaw(plan.step, { history: stepHistoryMode("fix") });
 		}
-		void setLink({ agent: null, mode: null, suite: null, opponent: null, keep: null }, { history: "replace" });
+		void setLink({ agent: null, mode: null, suite: null, opponent: null, keep: null, model: null, task: null }, { history: "replace" });
 	}, [link, draft, agentList, stepRaw, update, replace, setLink, setStepRaw]);
 
 	const owns = useOwnModelAgents();
@@ -341,16 +365,15 @@ function EvaluateWizard() {
 				subtitle={t("subtitle")}
 				breadcrumbs={[{ label: t("crumbList"), to: "/evaluations" }, { label: t("crumbNew") }]}
 				actions={
-					<div className="flex flex-wrap items-center gap-2">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => (reset(), setReplaced(null), setBadMode(null), setMissingAgent(null), go(1))}
-							data-testid="evaluate-reset"
-						>
-							{t("startOver")}
-						</Button>
-					</div>
+					// PageHeader wraps its actions itself (M3-50): no local wrapper.
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => (reset(), setReplaced(null), setBadMode(null), setMissingAgent(null), setLinkTask(null), go(1))}
+						data-testid="evaluate-reset"
+					>
+						{t("startOver")}
+					</Button>
 				}
 			/>
 			{quickRun && <QuickRunDialog onClose={() => setQuickRun(false)} />}
@@ -365,6 +388,11 @@ function EvaluateWizard() {
 						go(1);
 					}}
 				/>
+			)}
+			{linkTask && draft.benchmarks.includes(linkTask.suite) && draft.tasksPerBenchmark === 1 && (
+				<p role="status" className="text-muted-foreground text-sm" data-testid="evaluate-link-task">
+					{tUf("link.task", { task: linkTask.task, suite: linkTask.suite })}
+				</p>
 			)}
 			<div className="flex flex-col gap-2">
 				<Stepper step={step} reach={reach} onGo={go} />
@@ -395,10 +423,7 @@ function EvaluateWizard() {
 			</div>
 
 			{/* One sticky footer on every step: Back, the reason or summary, and the primary button (M3-26, M1-50). */}
-			<div
-				className="bg-background/95 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 backdrop-blur sm:mx-0 sm:px-0"
-				data-testid="evaluate-footer"
-			>
+			<StickyFooter className="-mx-4 justify-between gap-3 sm:mx-0" testId="evaluate-footer">
 				<Button variant="outline" disabled={step === 1} onClick={() => go((step - 1) as EvaluateStep)} data-testid="evaluate-back">
 					<ArrowLeft />
 					{t("back")}
@@ -434,7 +459,7 @@ function EvaluateWizard() {
 						</Button>
 					</div>
 				)}
-			</div>
+			</StickyFooter>
 		</section>
 	);
 }
