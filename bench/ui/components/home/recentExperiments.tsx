@@ -9,6 +9,7 @@ import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { TrackBadge } from "./homeBits";
 import { humanExperimentName, type ExperimentListItem } from "./home.utils";
+import { isTestObject } from "@/lib/testObjects";
 
 /** The newest experiments that are not running: suite icon, name, verdict and when it started. */
 export function RecentExperiments({
@@ -19,10 +20,12 @@ export function RecentExperiments({
 	trackOf?: (suite: string | undefined) => string | undefined;
 }) {
 	const { t } = useTranslation("uf3");
+	// Home hides the project's own test comparisons (M1-18); the comparisons list has the switch to show them.
+	const shown = experiments.filter((exp) => !isTestObject(exp.exp_id) && !isTestObject(exp.name));
 	return (
 		<>
-			<ul className="divide-border/70 flex flex-col divide-y" data-testid="home-recent-list">
-				{experiments.map((exp) => (
+			<ul className="divide-border flex flex-col divide-y" data-testid="home-recent-list">
+				{shown.map((exp) => (
 					<RecentRow key={exp.exp_id} exp={exp} trackOf={trackOf} />
 				))}
 			</ul>
@@ -59,8 +62,11 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 			>
 				<TrackBadge track={trackOf?.(suite)} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground truncate text-sm font-medium">{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}</span>
-					<span className="text-muted-foreground truncate text-xs" data-testid={`home-recent-suite-${exp.exp_id}`}>
+					{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
+					<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
+						{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}
+					</span>
+					<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1" data-testid={`home-recent-suite-${exp.exp_id}`}>
 						{suite ? suiteIdOf(suite) : "-"}
 						<span className="sm:hidden">
 							{" · "}
@@ -93,7 +99,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 					)}
 				</span>
 				<ChevronRight
-					className="text-muted-foreground/60 size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+					className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
 					aria-hidden="true"
 				/>
 			</Link>

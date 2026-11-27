@@ -318,5 +318,13 @@ describe("RecentEvaluations", () => {
 		expect(html).toContain('href="/evaluations/ev_1"');
 		expect(html).toContain("2 benchmarks");
 		expect(tagOf(html, "home-evaluation-status-ev_2")).toContain('data-status="running"');
+		// The shared status pill: the one status word for running.
+		expect(tagOf(html, "home-evaluation-status-ev_2")).toContain('data-slot="status-pill"');
+	});
+	it("hides the project's own test evaluations (M1-18)", () => {
+		const test = ev("ev_t", "2026-11-21T00:00:00Z", "done", [{ label: "A", agent: "zz-test-loop", model: "m" }]);
+		const html = render(<RecentEvaluations evaluations={[...list, test]} />);
+		expect(html).not.toContain('data-testid="home-evaluation-ev_t"');
+		expect(html).toContain('data-testid="home-evaluation-ev_1"');
 	});
 });

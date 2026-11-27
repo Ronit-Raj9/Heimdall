@@ -1,15 +1,20 @@
 import "@/app/evaluations_/$evalId/views/fw08I18n";
 import { PageHeader } from "@/components/shell/pageHeader";
-import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { LoadError, TableSkeleton } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
+import { Pager, pageSlice } from "@/components/ui/pager";
+import { ShowTestsChip } from "@/components/ui/toolbar";
+import { useShowTests, withoutTests } from "@/lib/testObjects";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { CalendarClock, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { useConfirm, type DestructiveConfirmOptions } from "@/components/platform/confirmDialog";
 import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -27,6 +32,7 @@ import {
 	filterEvaluations,
 	formatCreated,
 	isActiveStatus,
+	isTestEvaluation,
 	modeKey,
 	parseEvaluationFilters,
 	type EvaluationFilters,
@@ -45,22 +51,35 @@ export default function EvaluationListView() {
 	const anyActive = (list.data ?? []).some((e) => isActiveStatus(e.status));
 	// A second subscription with polling only while something is still running.
 	useListEvaluationsQuery(undefined, { pollingInterval: anyActive ? EVALUATION_POLL_MS : 0, skip: !anyActive });
+	// The project's own test evaluations are hidden unless ?tests=1 (M1-18).
+	const [showTests, setShowTests] = useShowTests();
+	const { shown, hidden } = withoutTests(list.data ?? [], isTestEvaluation, showTests);
 	const setFilters = (next: EvaluationFilters) =>
-		void navigate({ to: "/evaluations", search: evaluationFiltersSearch(next) as never, replace: true });
+		void navigate({ to: "/evaluations", search: { ...evaluationFiltersSearch(next), ...(showTests ? { tests: "1" } : {}) } as never, replace: true });
+
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluations-screen">
 			{/* No page action: the header's "Evaluate an agent" is the one way in (M3-54). */}
 			<PageHeader title={t("list.title")} subtitle={t("list.subtitle")} />
 			{list.isLoading ? (
-				<BlockSkeleton rows={8} testId="evaluations-loading" />
+				<div data-testid="evaluations-loading">
+					<TableSkeleton rows={8} />
+				</div>
 			) : list.error || !list.data ? (
 				<LoadError title={t("list.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="evaluations-error" />
 			) : (
-				<EvaluationTable evaluations={list.data} filters={filters} onFiltersChange={setFilters} />
+				<EvaluationTable
+					evaluations={shown}
+					filters={filters}
+					onFiltersChange={setFilters}
+					toolbarExtra={<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="evaluations-show-tests" />}
+				/>
 			)}
 		</div>
 	);
 }
+
+export { isTestEvaluation };
 
 const selectClass = "border-input bg-card dark:bg-input/20 h-8 rounded-md border px-2 text-xs shadow-xs outline-none";
 
@@ -70,11 +89,13 @@ function EvaluationToolbar({
 	filters,
 	onChange,
 	shown,
+	extra,
 }: {
 	evaluations: readonly Evaluation[];
 	filters: EvaluationFilters;
 	onChange: (next: EvaluationFilters) => void;
 	shown: number;
+	extra?: ReactNode;
 }) {
 	const { t } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
@@ -158,6 +179,7 @@ function EvaluationToolbar({
 					{tf("list.clear")}
 				</Button>
 			)}
+			{extra}
 			<span className="text-muted-foreground ml-auto text-xs tabular-nums" data-testid="evaluations-shown">
 				{tf("list.shown", { shown, total: evaluations.length })}
 			</span>
@@ -177,18 +199,32 @@ export function EvaluationTable({
 	evaluations,
 	filters = parseEvaluationFilters({}),
 	onFiltersChange = () => undefined,
+	toolbarExtra,
 }: {
 	evaluations: readonly Evaluation[];
 	filters?: EvaluationFilters;
 	onFiltersChange?: (next: EvaluationFilters) => void;
+	/** The show test items chip, beside the filters. */
+	toolbarExtra?: ReactNode;
 }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
 	const [picked, setPicked] = useState<Set<string>>(() => new Set());
 	const [deleting, setDeleting] = useState(false);
 	const [bulkError, setBulkError] = useState<string | null>(null);
-	if (evaluations.length === 0) return <EmptyNote testId="evaluations-empty">{t("list.empty")}</EmptyNote>;
+	const [page, setPage] = useState(1);
+	if (evaluations.length === 0)
+		return (
+			<EmptyState
+				title={t("list.emptyTitle")}
+				body={t("list.empty")}
+				action={{ label: t("list.emptyAction"), to: "/evaluate" }}
+				testId="evaluations-empty"
+			/>
+		);
 	const rows = filterEvaluations(evaluations, filters);
+	// 50 rows a page (M1-59, M3-53); the server sends the whole list today.
+	const slice = pageSlice(rows, page);
 	const repeated = repeatedNames(rows);
 	const deletable = rows.filter((e) => !isActiveStatus(e.status));
 	const toggle = (id: string) =>
@@ -200,9 +236,21 @@ export function EvaluationTable({
 		});
 	return (
 		<div className="flex flex-col gap-3">
-			<EvaluationToolbar evaluations={evaluations} filters={filters} onChange={onFiltersChange} shown={rows.length} />
+			<EvaluationToolbar
+				evaluations={evaluations}
+				filters={filters}
+				onChange={(next) => (setPage(1), onFiltersChange(next))}
+				shown={rows.length}
+				extra={toolbarExtra}
+			/>
 			{rows.length === 0 ? (
-				<EmptyNote testId="evaluations-no-match">{tf("list.noMatch")}</EmptyNote>
+				<EmptyState
+					kind="filtered"
+					title={t("list.noMatchTitle")}
+					body={tf("list.noMatch")}
+					action={{ label: tf("list.clear"), onClick: () => onFiltersChange({ ...filters, q: "", status: "all", mode: "all" }) }}
+					testId="evaluations-no-match"
+				/>
 			) : (
 				<>
 				{picked.size > 0 && (
@@ -232,17 +280,25 @@ export function EvaluationTable({
 									data-testid="evaluations-select-all"
 								/>
 							</TableHead>
-							<TableHead>{t("list.col.name")}</TableHead>
-							<TableHead>{t("list.col.status")}</TableHead>
-							<TableHead className="hidden text-right sm:table-cell">{t("list.col.result")}</TableHead>
-							<TableHead className="hidden text-right sm:table-cell">{t("list.col.spend")}</TableHead>
-							<TableHead className="hidden sm:table-cell">{t("list.col.created")}</TableHead>
-							<TableHead className="hidden xl:table-cell">{t("list.col.agents")}</TableHead>
-							<TableHead className="hidden xl:table-cell">{t("list.col.mode")}</TableHead>
+							<TableHead priority="primary">{t("list.col.name")}</TableHead>
+							<TableHead priority="status">{t("list.col.status")}</TableHead>
+							<TableHead priority="secondary" className="text-right">
+								{t("list.col.result")}
+							</TableHead>
+							<TableHead priority="secondary" className="text-right">
+								{t("list.col.spend")}
+							</TableHead>
+							<TableHead priority="secondary">{t("list.col.created")}</TableHead>
+							<TableHead priority="secondary" className="hidden xl:table-cell">
+								{t("list.col.agents")}
+							</TableHead>
+							<TableHead priority="secondary" className="hidden xl:table-cell">
+								{t("list.col.mode")}
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{rows.map((ev) => {
+						{slice.rows.map((ev) => {
 							const benches = evaluationBenchmarks(ev);
 							const status = evaluationStatusWord(ev);
 							const started = formatCreated(ev.created_at, i18n.language);
@@ -261,7 +317,7 @@ export function EvaluationTable({
 											/>
 										)}
 									</TableCell>
-									<TableCell className="font-medium">
+									<TableCell priority="primary" className="font-medium">
 										<Link
 											to="/evaluations/$evalId"
 											params={{ evalId: ev.id }}
@@ -284,20 +340,20 @@ export function EvaluationTable({
 												.join(" \u00b7 ")}
 										</span>
 									</TableCell>
-									<TableCell>
+									<TableCell priority="status">
 										{status === "notStarted" ? (
 											<EvaluationStatusPill status="notStarted" testId={`evaluation-status-${ev.id}`} />
 										) : (
 											<EvaluationLivePill evaluation={ev} testId={`evaluation-status-${ev.id}`} />
 										)}
 									</TableCell>
-									<TableCell className="hidden text-right tabular-nums sm:table-cell" data-testid={`evaluation-result-${ev.id}`}>
+									<TableCell priority="secondary" className="text-right tabular-nums" data-testid={`evaluation-result-${ev.id}`}>
 										{evaluationResultText(ev)}
 									</TableCell>
-									<TableCell className="hidden text-right tabular-nums sm:table-cell" data-testid={`evaluation-spend-${ev.id}`}>
+									<TableCell priority="secondary" className="text-right tabular-nums" data-testid={`evaluation-spend-${ev.id}`}>
 										{usd(evaluationSpend(ev))}
 									</TableCell>
-									<TableCell className="text-muted-foreground hidden tabular-nums sm:table-cell">
+									<TableCell priority="secondary" className="text-muted-foreground tabular-nums">
 										{started}
 										{ev.schedule && (
 											<span
@@ -310,8 +366,10 @@ export function EvaluationTable({
 											</span>
 										)}
 									</TableCell>
-									<TableCell className="hidden xl:table-cell">{evaluationAgents(ev).join(", ")}</TableCell>
-									<TableCell className="hidden xl:table-cell">
+									<TableCell priority="secondary" className="hidden xl:table-cell">
+										{evaluationAgents(ev).join(", ")}
+									</TableCell>
+									<TableCell priority="secondary" className="hidden xl:table-cell">
 										<EvaluationKindLabel evaluation={ev} />
 									</TableCell>
 								</TableRow>
@@ -319,6 +377,13 @@ export function EvaluationTable({
 						})}
 					</TableBody>
 				</Table>
+				<Pager
+					page={slice.page}
+					pageCount={slice.pageCount}
+					onPage={setPage}
+					rangeText={t("list.pageRange", { first: slice.first, last: slice.last, total: rows.length })}
+					testId="evaluations-pager"
+				/>
 				</>
 			)}
 		</div>
@@ -340,12 +405,13 @@ function BulkDelete({
 	const confirm = useConfirm();
 	const [remove] = useDeleteEvaluationMutation();
 	const run = async () => {
-		const ok = await confirm(t("list.deleteSelectedBody"), {
+		const opts: DestructiveConfirmOptions = {
 			title: t("list.deleteSelectedTitle", { count: ids.length }),
-			confirmLabel: t("list.deleteSelectedOk"),
+			confirmLabel: t("list.deleteSelectedOk", { count: ids.length }),
 			cancelLabel: t("detail.deleteKeep"),
 			destructive: true,
-		});
+		};
+		const ok = await confirm(t("list.deleteSelectedBody"), opts);
 		if (!ok) return;
 		onBusy(true);
 		const failed: string[] = [];
@@ -359,6 +425,8 @@ function BulkDelete({
 			}
 		}
 		onBusy(false);
+		const deleted = ids.length - failed.length;
+		if (deleted > 0) notify({ text: t("list.deletedToast", { count: deleted }) });
 		onDone(failed, lastError);
 	};
 	return (
