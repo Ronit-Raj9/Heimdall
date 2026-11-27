@@ -320,7 +320,7 @@ export function TraceIngestLine() {
 				{u("page.tracesAgents")}
 			</Link>
 			{", "}
-			<Link to="/inbox" className="text-primary hover:underline">
+			<Link to="/failures" className="text-primary hover:underline">
 				{u("page.tracesInbox")}
 			</Link>
 		</p>

@@ -49,7 +49,7 @@ function SameFailureLink({ count, search, testId }: { count: number; search: Rec
   const { t } = useTranslation("uf5a");
   return (
     <Link
-      to="/inbox"
+      to="/failures"
       search={search as never}
       className="text-primary self-start text-sm underline-offset-2 hover:underline"
       data-testid={testId}

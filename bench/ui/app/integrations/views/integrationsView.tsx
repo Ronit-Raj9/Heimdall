@@ -366,7 +366,7 @@ function ProductionTracesCard() {
 					<Link to="/agents/from-traces">{m("integrations.tracesAgents")}</Link>
 				</Button>
 				<Button size="sm" variant="outline" asChild>
-					<Link to="/inbox">{m("integrations.tracesInbox")}</Link>
+					<Link to="/failures">{m("integrations.tracesInbox")}</Link>
 				</Button>
 			</div>
 		</section>

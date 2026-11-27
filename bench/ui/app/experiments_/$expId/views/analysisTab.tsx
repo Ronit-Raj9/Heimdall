@@ -299,7 +299,7 @@ export function AnalysisTab({ expId, gradeSource }: { expId: string; gradeSource
 						className="md:col-span-2"
 						action={
 							<Link
-								to="/inbox"
+								to="/failures"
 								search={{ tab: "clusters", exp: expId } as never}
 								className="text-primary inline-flex items-center gap-1 text-xs font-medium hover:underline"
 								data-testid="analysis-clusters-link"

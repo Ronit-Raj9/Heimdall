@@ -296,7 +296,7 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 					<div className="flex flex-col items-start gap-2 text-sm" data-testid="suite-build-traces">
 						<p className="text-muted-foreground max-w-2xl">{t("add.traces")}</p>
 						<Button asChild size="sm" variant="outline">
-							<Link to="/inbox">{t("add.openInbox")}</Link>
+							<Link to="/failures">{t("add.openInbox")}</Link>
 						</Button>
 					</div>
 				)}

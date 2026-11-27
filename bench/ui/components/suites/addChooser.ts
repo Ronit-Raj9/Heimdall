@@ -6,7 +6,7 @@ export type AddEntryId = "file" | "catalog" | "api" | "create" | "code" | "failu
 
 export interface AddEntry {
 	id: AddEntryId;
-	to: "/suites/add" | "/suites" | "/suites/from-api" | "/suites/new" | "/inbox";
+	to: "/suites/add" | "/suites" | "/suites/from-api" | "/suites/new" | "/failures";
 	search?: Record<string, string>;
 }
 
@@ -16,5 +16,5 @@ export const ADD_ENTRIES: readonly AddEntry[] = [
 	{ id: "api", to: "/suites/from-api" },
 	{ id: "create", to: "/suites/new" },
 	{ id: "code", to: "/suites/new", search: { start: "code" } },
-	{ id: "failures", to: "/inbox" },
+	{ id: "failures", to: "/failures" },
 ];

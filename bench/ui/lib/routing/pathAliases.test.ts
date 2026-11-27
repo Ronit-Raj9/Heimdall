@@ -13,6 +13,9 @@ describe("path aliases (N129, N73)", () => {
 		expect(aliasFor("/labeling")).toBe("/annotation");
 		expect(aliasFor("/drift")).toBe("/scheduled-checks?tab=drift");
 		expect(aliasFor("/live")).toBeUndefined();
+		// /failures is a real route now (M7-1); the old wording lands on its first tab.
+		expect(aliasFor("/failures")).toBeUndefined();
+		expect(aliasFor("/production-failures")).toBe("/failures?tab=production");
 		expect(aliasFor("/no-such-page")).toBeUndefined();
 		expect(aliasFor("/constructor")).toBeUndefined();
 	});

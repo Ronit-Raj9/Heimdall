@@ -18,12 +18,11 @@ describe("navigation", () => {
 			"/failure-tests",
 			"/mcp-test",
 			"/runs",
-			"/why-agents-fail",
+			"/failures",
 			"/leaderboard",
 			"/releases",
 			"/suites",
 			"/annotation",
-			"/inbox",
 			"/live",
 			"/scheduled-checks",
 			"/gateway",
@@ -80,9 +79,10 @@ describe("navigation", () => {
 			["/annotation", "/annotation"],
 			["/annotation/q_1", "/annotation"],
 			["/trends", "/leaderboard"],
-			["/why-agents-fail", "/why-agents-fail"],
-			["/clusters", "/why-agents-fail"],
-			["/triage", "/why-agents-fail"],
+			["/failures", "/failures"],
+			["/why-agents-fail", "/failures"],
+			["/clusters", "/failures"],
+			["/triage", "/failures"],
 			["/canaries", "/scheduled-checks"],
 			["/schedules", "/scheduled-checks"],
 			["/review", "/releases"],
@@ -93,8 +93,8 @@ describe("navigation", () => {
 			["/jobs/j_1", "/settings"],
 			["/admin", "/settings"],
 			["/docs", "/docs"],
-			["/inbox", "/inbox"],
-			["/maxim", "/inbox"],
+			["/inbox", "/failures"],
+			["/maxim", "/failures"],
 			["/gateway", "/gateway"],
 			["/replays", "/experiments"],
 			["/validity", "/releases"],
@@ -111,6 +111,7 @@ describe("navigation", () => {
 		expect(activeNavGroup("/runs/r_1")).toBe("results");
 		expect(activeNavGroup("/catalog")).toBe("benchmarks");
 		expect(activeNavGroup("/live")).toBe("production");
+		expect(activeNavGroup("/inbox")).toBe("results");
 		expect(activeNavGroup("/policies")).toBe("results");
 		expect(activeNavGroup("/jobs/j_1")).toBe("bottom");
 	});
@@ -137,7 +138,13 @@ describe("navigation", () => {
 		expect(pageTitle("/gateway")).toBe("Gateway report card · Heimdall");
 		expect(pageTitle("/validity")).toBe("Changed results · Heimdall");
 		expect(pageTitle("/replays")).toBe("Replay on a new model · Heimdall");
-		expect(pageTitle("/inbox")).toBe("Production failures · Heimdall");
+		expect(pageTitle("/failures")).toBe("Production failures · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "findings" })).toBe("Findings · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "groups" })).toBe("Failure groups · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "patterns" })).toBe("Failure patterns · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "agents" })).toBe("By agent version · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "clusters" })).toBe("Failure groups · Failures · Heimdall");
+		expect(pageTitle("/failures", { tab: "nope" })).toBe("Failures · Heimdall");
 		expect(pageTitle("/evaluate")).toBe("Evaluate an agent · Heimdall");
 		expect(pageTitle("/runs")).toBe("Runs · Heimdall");
 	});

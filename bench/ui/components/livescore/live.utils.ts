@@ -77,5 +77,5 @@ export function seriesRange(all: readonly (number | null)[][], def: LiveSignalDe
 
 /** The inbox page with one item open. */
 export function inboxLink(item: string): string {
-	return `/inbox?item=${encodeURIComponent(item)}`;
+	return `/failures?tab=production&item=${encodeURIComponent(item)}`;
 }

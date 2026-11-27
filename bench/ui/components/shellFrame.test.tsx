@@ -47,13 +47,13 @@ describe("BenchSidebar", () => {
 		expect(tagOf(html, "nav-group-toggle-test")).toContain("Test");
 		expect(tagOf(html, "nav-link-experiments")).toContain('title="Comparisons:');
 		expect(tagOf(html, "nav-link-failure-tests")).toContain('href="/failure-tests"');
-		expect(tagOf(html, "nav-link-why-agents-fail")).toContain('href="/why-agents-fail"');
+		expect(tagOf(html, "nav-link-failures")).toContain('href="/failures"');
 		expect(html).toContain('aria-label="Heimdall navigation"');
 		expect(html).not.toContain("nav-link-new-experiment");
 		expect(html).not.toContain("nav-link-welcome");
 		expect(html).not.toContain("nav-drawer");
 		// Spec 1: the unlinked pages have entries; only the first group toggle is a tab stop.
-		for (const id of ["nav-link-inbox", "nav-link-gateway", "nav-link-docs"]) expect(html).toContain(id);
+		for (const id of ["nav-link-failures", "nav-link-gateway", "nav-link-docs"]) expect(html).toContain(id);
 		expect(tagOf(html, "nav-group-toggle-test")).toContain('tabindex="0"');
 		expect(tagOf(html, "nav-group-toggle-results")).toContain('tabindex="-1"');
 	});

@@ -4085,7 +4085,7 @@
 			"runs": "Every attempt by an agent at a task, step by step. Pick two to compare.",
 			"suites": "Sets of tasks your agents are tested on. Add one from the catalog or import your own.",
 			"labelling": "People label agent answers or judge decisions, with agreement measured, to check and calibrate judges.",
-			"whyAgentsFail": "Where your agents break on benchmarks: failure patterns per version and groups of similar failures.",
+			"whyAgentsFail": "Failures from production and from your test runs, grouped, and tracked until a rerun proves them fixed.",
 			"scheduledChecks": "Small benchmarks re-run on a schedule to catch an agent or model getting worse.",
 			"live": "Scores for real agent sessions as they happen.",
 			"releases": "Which agent version shipped, the runs a person checked, and the rules a version must pass. Open one and press Share to send a link.",
