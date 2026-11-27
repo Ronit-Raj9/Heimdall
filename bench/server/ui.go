@@ -104,7 +104,7 @@ var spaRoots = map[string]bool{
 	"": true, "admin": true, "agents": true, "annotation": true, "calibration": true, "canaries": true,
 	"catalog": true, "clusters": true, "compare": true, "connect": true, "device": true, "docs": true,
 	"downloads": true, "evaluate": true, "evaluations": true, "experiments": true, "failure-tests": true,
-	"files": true, "gateway": true, "imports": true, "improvements": true, "inbox": true, "integrations": true, "invite": true,
+	"failures": true, "files": true, "gateway": true, "imports": true, "improvements": true, "inbox": true, "integrations": true, "invite": true,
 	"jobs": true, "leaderboard": true, "library": true, "live": true, "login": true, "matrix": true,
 	"maxim": true, "mcp-test": true, "migration": true, "models": true, "monitors": true, "operate": true,
 	"policies": true, "pricing": true, "privacy": true, "quickstart": true, "receipts": true, "reference": true,
