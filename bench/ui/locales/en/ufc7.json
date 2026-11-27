@@ -1,0 +1,11 @@
+{
+	"effect": {
+		"runAgain": "Run this test again"
+	},
+	"models": {
+		"add": "Add a model key",
+		"addKeyFor": "Add a model key for {{provider}}",
+		"allowedPick": "Add a model (leave empty for every model)",
+		"allowedRemove": "Remove {{model}}"
+	}
+}

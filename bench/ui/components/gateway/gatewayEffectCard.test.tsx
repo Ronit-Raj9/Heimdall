@@ -7,11 +7,19 @@ import { GatewayEffectCard, GatewayEffectView, detailRows, effectOf } from "./ga
 
 const state = vi.hoisted(() => ({ effect: undefined as unknown }));
 
-vi.mock("@/lib/store/apis/gatewayApi", () => ({
+vi.mock("@/lib/store/apis/gatewayApi", async (orig) => ({
+	effectOf: ((await orig()) as { effectOf: unknown }).effectOf,
 	useGetBifrostSettingQuery: () => ({ data: undefined }),
-}));
-vi.mock("./gatewayEffectQuery", () => ({
+	useGetGatewayReportCardQuery: () => ({ data: undefined }),
 	useGetGatewayEffectOptionalQuery: () => state.effect,
+}));
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...((await orig()) as object),
+	useGetExperimentQuery: () => ({ data: undefined }),
+}));
+vi.mock("@/app/gateway/views/featureTestDialog", () => ({
+	FeatureTestDialog: () => null,
+	suiteOption: (s: { id: string; version?: string }) => (s.version ? `${s.id}@${s.version}` : s.id),
 }));
 
 const effect: GwEffect = {
@@ -82,12 +90,20 @@ describe("GatewayEffectCard", () => {
 		expect(html).toContain("2 entries");
 		expect(effectOf({ effect: null })).toBeNull();
 		expect(effectOf(effect)).toBe(effect);
-		state.effect = okQuery({ effect: null });
+		state.effect = okQuery(null);
 		expect(render(<GatewayEffectCard expId="e1" />)).toBe("");
 	});
 
 	it("says what to do when the effect is unknown", () => {
 		const html = render(<GatewayEffectView effect={{ ...effect, state: "unknown", result: undefined, reason: "no rows" }} />);
 		expect(html).toContain("This test could not show an effect: no rows. Check that the setting is on in Bifrost, then run it again.");
+	});
+
+	it("offers to run an unknown test again, and only then", () => {
+		const unknown = { ...effect, state: "unknown" as const, result: undefined, reason: "no rows" };
+		expect(render(<GatewayEffectView effect={unknown} onRunAgain={() => {}} />)).toContain("Run this test again");
+		expect(render(<GatewayEffectView effect={effect} onRunAgain={() => {}} />)).not.toContain("gateway-effect-run-again");
+		state.effect = okQuery(unknown);
+		expect(render(<GatewayEffectCard expId="e1" />)).toContain('data-testid="gateway-effect-run-again"');
 	});
 });

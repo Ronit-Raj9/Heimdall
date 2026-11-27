@@ -1,4 +1,5 @@
 import "@/components/settings/uf8aI18n";
+import "@/components/gateway/ufc7I18n";
 import { notify } from "@/lib/notify";
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
 import { CredentialKinds } from "@/components/settings/credentialKinds";
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -44,7 +46,7 @@ import type {
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEmbedded } from "@/components/shell/embedded";
 import { cn } from "@/lib/utils";
-import { KeyRound, Pencil, Plus, Sparkles } from "lucide-react";
+import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -100,6 +102,12 @@ export function hintParts(text: string): { text: string; href?: string }[] {
 export function isNegative(v: string): boolean {
 	const n = Number(v.trim());
 	return v.trim() !== "" && Number.isFinite(n) && n < 0;
+}
+
+/** The model list text with one more model, once. Pure. */
+export function addModel(text: string, model: string): string {
+	const list = parseModels(text);
+	return (list.includes(model) ? list : [...list, model]).join(", ");
 }
 
 /** Comma or newline separated model list to an array. */
@@ -183,6 +191,7 @@ export default function ModelsView() {
 	const { t } = useTranslation("models");
 	const { t: tu } = useTranslation("u11");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: tc } = useTranslation("ufc7");
 	const session = useSession();
 	const search = useSearch({ strict: false });
 	const navigate = useNavigate();
@@ -285,7 +294,7 @@ export default function ModelsView() {
 							action={
 								isAdmin
 									? {
-											label: t("add"),
+											label: tc("models.add"),
 											onClick: () => setForm({ provider: firstProvider }),
 										}
 									: { label: t("emptyViewerAction"), to: "/experiments" }
@@ -398,7 +407,7 @@ export default function ModelsView() {
 						</div>
 					</DetailsDisclosure>
 					{form && (
-						<SidePanel title={form.key ? t("editTitle") : t("addTitle")} onClose={() => setForm(null)}>
+						<SidePanel title={form.key ? t("editTitle") : tc("models.add")} onClose={() => setForm(null)}>
 							<KeyForm
 								key={`${form.provider}-${form.key?.id ?? "new"}`}
 								providers={providers}
@@ -514,6 +523,7 @@ function ProviderCard({
 	const { t } = useTranslation("models");
 	const { t: tu } = useTranslation("u11");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: tc } = useTranslation("ufc7");
 	const state = providerKeyState(keys);
 	return (
 		<section
@@ -540,7 +550,7 @@ function ProviderCard({
 						variant="ghost"
 						className="gap-1 max-sm:w-full max-sm:justify-start"
 						onClick={onAdd}
-						aria-label={tl("models.addKeyFor", { provider: name })}
+						aria-label={tc("models.addKeyFor", { provider: name })}
 						data-testid={`provider-add-${provider}`}
 					>
 						<Plus className="size-3.5" aria-hidden="true" />
@@ -840,6 +850,7 @@ function KeyForm({
 }) {
 	const { t } = useTranslation("models");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: tc } = useTranslation("ufc7");
 	const id = useId();
 	const editing = initial.key;
 	const [provider, setProvider] = useState<ProviderId>(initial.provider);
@@ -1122,20 +1133,53 @@ function KeyForm({
 				</div>
 				{!urlRequired && baseUrlField}
 				<div className={field}>
-					<label className={lbl} htmlFor={`${id}-models`}>
-						{t("models")}
-						{optional}
-					</label>
-					<Input
-						id={`${id}-models`}
-						name="heimdall-key-models"
-						autoComplete="off"
-						{...NO_AUTOFILL}
-						value={modelsText}
-						placeholder={modelIds.slice(0, 3).join(", ")}
-						onChange={(e) => setModelsText(e.target.value)}
-						data-testid="model-key-models"
-					/>
+					{modelIds.length > 0 ? (
+						<>
+							<Combobox
+								label={`${t("models")} ${tl("models.optional")}`}
+								items={modelIds.filter((m) => !parseModels(modelsText).includes(m)).map((m) => ({ value: m, label: m }))}
+								value={null}
+								onChange={(v) => v && setModelsText(addModel(modelsText, v))}
+								placeholder={tc("models.allowedPick")}
+								testId="model-key-models"
+							/>
+							{parseModels(modelsText).length > 0 && (
+								<ul className="flex flex-wrap gap-1.5" data-testid="model-key-models-picked">
+									{parseModels(modelsText).map((m) => (
+										<li key={m}>
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												className="h-7 gap-1 px-2 font-mono text-xs"
+												aria-label={tc("models.allowedRemove", { model: m })}
+												onClick={() => setModelsText(parseModels(modelsText).filter((x) => x !== m).join(", "))}
+											>
+												{m}
+												<X className="size-3" aria-hidden />
+											</Button>
+										</li>
+									))}
+								</ul>
+							)}
+						</>
+					) : (
+						<>
+							<label className={lbl} htmlFor={`${id}-models`}>
+								{t("models")}
+								{optional}
+							</label>
+							<Input
+								id={`${id}-models`}
+								name="heimdall-key-models"
+								autoComplete="off"
+								{...NO_AUTOFILL}
+								value={modelsText}
+								onChange={(e) => setModelsText(e.target.value)}
+								data-testid="model-key-models"
+							/>
+						</>
+					)}
 					<p className="text-muted-foreground text-xs">{t("modelsHint")}</p>
 				</div>
 				<div className={field}>

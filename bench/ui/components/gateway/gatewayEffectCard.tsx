@@ -1,10 +1,14 @@
 import { Section } from "@/components/runs/screenStates";
-import { useGetBifrostSettingQuery } from "@/lib/store/apis/gatewayApi";
-import { useGetGatewayEffectOptionalQuery } from "./gatewayEffectQuery";
+import { Button } from "@/components/ui/button";
+import { FeatureTestDialog, suiteOption } from "@/app/gateway/views/featureTestDialog";
+import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { useGetBifrostSettingQuery, useGetGatewayEffectOptionalQuery, useGetGatewayReportCardQuery } from "@/lib/store/apis/gatewayApi";
 import type { GwArmResult, GwBifrostSettingAnswer, GwEffect, GwResult } from "@/lib/types/gateway";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/gateway/views/uf7cI18n";
+import "@/components/gateway/ufc7I18n";
 import { UseInBifrostButton } from "./useInBifrost";
 
 /** Text color of a result word: Saved green, Lost and Failed red, Worked gray (status tokens). */
@@ -100,7 +104,17 @@ function ArmsTable({ arms, control }: { arms: GwArmResult[]; control: string }) 
 }
 
 /** The Effect of one feature test: state, headline, setups, the feature's details and the button. Pure. */
-export function GatewayEffectView({ effect, setting }: { effect: GwEffect; setting?: GwBifrostSettingAnswer }) {
+export function GatewayEffectView({
+	effect,
+	setting,
+	onRunAgain,
+}: {
+	effect: GwEffect;
+	setting?: GwBifrostSettingAnswer;
+	/** Unknown effect: opens the same feature test again (the paid start asks in the dialog). */
+	onRunAgain?: () => void;
+}) {
+	const { t: c } = useTranslation("ufc7");
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
 	const { rows, raw } = detailRows((effect.details ?? {}) as Record<string, unknown>);
@@ -152,6 +166,13 @@ export function GatewayEffectView({ effect, setting }: { effect: GwEffect; setti
 						)}
 					</div>
 				)}
+				{effect.state === "unknown" && onRunAgain && (
+					<div>
+						<Button type="button" variant="outline" size="sm" onClick={onRunAgain} data-testid="gateway-effect-run-again">
+							{c("effect.runAgain")}
+						</Button>
+					</div>
+				)}
 				<div>
 					<UseInBifrostButton setting={setting ? setting.setting : effect.setting} reason={setting?.reason} />
 				</div>
@@ -160,18 +181,25 @@ export function GatewayEffectView({ effect, setting }: { effect: GwEffect; setti
 	);
 }
 
-/** The effect in an answer: the effect itself, or null for the server's {"effect": null} (the comparison used no gateway). Pure. */
-export function effectOf(data: unknown): GwEffect | null {
-	if (!data || typeof data !== "object") return null;
-	if ("effect" in data && !("state" in data)) return ((data as { effect: GwEffect | null }).effect ?? null) as GwEffect | null;
-	return data as GwEffect;
-}
+/** The effect in an answer, null for {"effect": null}: the shared reader beside the query. */
+export { effectOf } from "@/lib/store/apis/gatewayApi";
 
 /** Experiment page: the feature test's Effect. Renders nothing when the comparison is not a feature test (404 or {"effect": null}) or on any error. */
 export function GatewayEffectCard({ expId }: { expId: string }) {
 	const q = useGetGatewayEffectOptionalQuery(expId);
-	const effect = effectOf(q.data);
+	const effect = q.data ?? null;
 	const setting = useGetBifrostSettingQuery(expId, { skip: !effect });
+	const [again, setAgain] = useState(false);
+	const unknown = effect?.state === "unknown";
+	const exp = useGetExperimentQuery(expId, { skip: !unknown });
+	const card = useGetGatewayReportCardQuery(undefined, { skip: !again });
 	if (!effect) return null;
-	return <GatewayEffectView effect={effect} setting={setting.data} />;
+	const name = card.data?.lines?.find((l) => l.feature === effect.feature)?.name ?? effect.feature;
+	const suite = exp.data?.suite?.includes("@") ? exp.data.suite : exp.data?.suite ? suiteOption({ id: exp.data.suite, version: exp.data.suite_version }) : "";
+	return (
+		<>
+			<GatewayEffectView effect={effect} setting={setting.data} onRunAgain={unknown ? () => setAgain(true) : undefined} />
+			{again && <FeatureTestDialog feature={effect.feature} name={name} open initial={{ suite }} onClose={() => setAgain(false)} />}
+		</>
+	);
 }

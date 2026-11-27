@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import "@/components/settings/uf8aI18n";
 import { cn } from "@/lib/utils";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect } from "react";
+import { useScrollEdges } from "@/lib/hooks/useScrollEdges";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AdminContainersPanel, AdminImagesPanel, AdminOrgsPanel, AdminUsagePanel, AdminUsersPanel } from "./adminPanels";
 import { AdminSignupPanel } from "./adminSignupPanel";
@@ -40,6 +41,12 @@ export default function AdminView({
 	useEffect(() => {
 		if (tabParam && tabParam in ADMIN_TAB_ALIASES) void setTab(ADMIN_TAB_ALIASES[tabParam]);
 	}, [tabParam, setTab]);
+	// On a phone the sub tab strip scrolls sideways: fade the hidden edge and keep the active tab in view (M8-2).
+	const strip = useRef<HTMLDivElement>(null);
+	useScrollEdges(strip);
+	useEffect(() => {
+		strip.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+	}, [tab]);
 
 	if (session.authMode === "local") {
 		return (
@@ -59,7 +66,7 @@ export default function AdminView({
 		<div className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="admin-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<Tabs value={tab} onValueChange={(value) => void setTab(adminTab(value) === "overview" ? null : value)} className="gap-6">
-				<TabsList className="max-w-full overflow-x-auto">
+				<TabsList ref={strip} className="max-w-full justify-start overflow-x-auto">
 					{ADMIN_TABS.map((key) => (
 						<TabsTrigger key={key} value={key} data-testid={`admin-tab-${key}`}>
 							{t(`tabs.${key}`)}

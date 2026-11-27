@@ -15,6 +15,7 @@ import ModelsView, {
 	missingCredentialFields,
 	needsBaseUrl,
 	parseModels,
+	addModel,
 } from "./modelsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
@@ -145,7 +146,7 @@ describe("ModelsView", () => {
 		api.q = { models: okQuery({ ...CATALOG, keys: [], default: undefined }) };
 		const html = render(<ModelsView />);
 		expect(html).toContain('data-testid="models-empty"');
-		expect(html).toContain("Add an API key");
+		expect(html).toContain("Add a model key");
 	});
 
 	it("says what to configure when the key store is off", () => {
@@ -316,5 +317,13 @@ describe("default model price hint (F1.price)", () => {
 		} finally {
 			routerState.location.search = {};
 		}
+	});
+});
+
+describe("addModel", () => {
+	it("adds a model once", () => {
+		expect(addModel("", "gpt-5")).toBe("gpt-5");
+		expect(addModel("a, b", "c")).toBe("a, b, c");
+		expect(addModel("a, b", "a")).toBe("a, b");
 	});
 });
