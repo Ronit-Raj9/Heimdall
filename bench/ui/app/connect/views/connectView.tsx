@@ -561,7 +561,7 @@ export default function ConnectView() {
 							<PaidButton
 								verb={verify ? t("verify.again") : t("verify.start")}
 								capUsd={null}
-								confirm="always"
+								confirm="auto"
 								onConfirm={doVerify}
 								isLoading={startState.isLoading || (Boolean(verify) && !verifyDone)}
 								testId="connect-verify-start"

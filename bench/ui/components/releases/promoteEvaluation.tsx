@@ -428,6 +428,7 @@ export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 							estimateUsd={cost != null && cost > 0 ? cost : undefined}
 							estimateAt="title"
 							confirm="always"
+							kind="row"
 							confirmText={repeatAsk(c, zone, cost, m as never, badLimit ? undefined : limit).message}
 							disabled={state.isLoading || badLimit}
 							onConfirm={() => go(c)}

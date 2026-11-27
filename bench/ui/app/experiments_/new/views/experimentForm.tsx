@@ -560,7 +560,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 								verb={t("experiments.new.actions.createAndStart")}
 								capUsd={planned ? planned.experiment.budget.total_usd : null}
 								estimateRuns={planned?.plan.slots}
-								confirm="always"
+								confirm="auto"
 								disabled={blockReason !== null || busy}
 								isLoading={busy}
 								onConfirm={onCreateAndStart}

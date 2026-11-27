@@ -1,6 +1,7 @@
 /**
- * The one list of ways to add a benchmark (M6-41). The header menu on /suites, the chooser on
- * /suites/add and the Import tab all read this list, so every entrance offers the same six.
+ * The one list of ways to add a benchmark (M6-41). The header menu on /suites and the chooser on
+ * /suites/add both read this list, so every entrance offers the same six (the Import tab of /suites
+ * is gone, decision 5; its importers are in the catalog).
  */
 export type AddEntryId = "file" | "catalog" | "api" | "create" | "code" | "failures";
 

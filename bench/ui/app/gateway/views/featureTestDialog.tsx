@@ -373,7 +373,7 @@ export function FeatureTestDialog({
 						verb={u("dialog.startTest")}
 						capUsd={Number.isFinite(budgetUsd) && budgetUsd > 0 ? budgetUsd : null}
 						estimateUsd={est?.usd ?? null}
-						confirm="always"
+						confirm="auto"
 						disabled={estimating || !built.req || !prepared || prepared.plan.errors.length > 0}
 						onConfirm={onStart}
 						testId="feature-test-start"

@@ -103,7 +103,8 @@ export function ModelWatchView({
 													variant="outline"
 													verb={it.state === "failed" ? t("watch.tryAgain") : t("watch.startNow")}
 													capUsd={w.usd_per_model}
-													confirm="always"
+													confirm="auto"
+													kind={it.state === "failed" ? "retry" : "runNow"}
 													estimateAt="title"
 													onConfirm={() => (it.state === "skipped" && onStartNow ? onStartNow(key) : onRetry(key))}
 													testId={`model-watch-retry-${key}`}

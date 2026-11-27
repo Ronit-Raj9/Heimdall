@@ -74,7 +74,7 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 						size="sm"
 						verb={t("experimentActions.resume")}
 						capUsd={null}
-						confirm="always"
+						confirm="auto"
 						isLoading={resumeState.isLoading}
 						onConfirm={async () => {
 							const res = await resume(status.exp_id);
@@ -88,7 +88,7 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 						size="sm"
 						verb={t("experimentActions.start")}
 						capUsd={null}
-						confirm="always"
+						confirm="auto"
 						isLoading={startState.isLoading}
 						onConfirm={async () => {
 							const res = await start(status.exp_id);

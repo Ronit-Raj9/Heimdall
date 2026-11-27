@@ -232,7 +232,7 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 				capUsd={budget > 0 ? budget : null}
 				estimateRuns={estimate.data ? Number(estimate.data.runs) || undefined : undefined}
 				estimateUsd={estCost?.known ? estCost.high : null}
-				confirm="always"
+				confirm="auto"
 				disabled={problem !== null || noBudget || created.isLoading || waiting}
 				isLoading={created.isLoading}
 				aria-describedby={waiting ? "compare-models-launch-why" : undefined}

@@ -67,7 +67,7 @@ export function FollowUpJob({ kind, params, label, confirm, missing, paid, testI
 								capUsd={null}
 								estimateUsd={paid.estimateUsd}
 								estimateRuns={paid.estimateRuns ?? undefined}
-								confirm="always"
+								confirm="auto"
 								confirmText={confirm}
 								disabled={!canUse(session, "member")}
 								isLoading={isLoading}

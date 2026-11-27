@@ -87,7 +87,7 @@ export default function JobsView() {
 		else notify({ text: t("stopped", { ns: "toast", name: title(job) }) });
 	};
 
-	// M2-1, M1-51: Retry calls models again, so the shared PaidButton asks first (confirm="always")
+	// M2-1, M1-51: Retry calls models again, so the shared PaidButton asks first (kind="retry")
 	// and names the spend cap when the job has one; this only sends the job.
 	const doRetry = async (job: Job) => {
 		setRetried(null);
@@ -472,7 +472,8 @@ function JobActions({
 					<PaidButton
 						verb={t("retry")}
 						capUsd={jobBudgetUsd(job)}
-						confirm="always"
+						confirm="auto"
+						kind="retry"
 						confirmText={t("retryConfirmNoBudget", { kind: title })}
 						estimateAt="title"
 						variant="outline"

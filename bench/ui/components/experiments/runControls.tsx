@@ -139,7 +139,7 @@ export function PauseControls({ expId }: { expId: string }) {
 						className="h-7 px-2.5 text-xs"
 						verb={t("resume")}
 						capUsd={null}
-						confirm="always"
+						confirm="auto"
 						estimateAt="title"
 						confirmText={tc("resume.confirm")}
 						isLoading={resumeState.isLoading}
@@ -391,7 +391,8 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
 					className="w-fit"
 					verb={t("rerun.button")}
 					capUsd={null}
-					confirm="always"
+					confirm="auto"
+					kind="retry"
 					estimateAt="title"
 					confirmText={t("rerun.hint")}
 					isLoading={state.isLoading}
@@ -559,7 +560,8 @@ export function RunActions({
 						className="h-7 px-2.5 text-xs"
 						verb={t("run.requeue")}
 						capUsd={null}
-						confirm="always"
+						confirm="auto"
+						kind="retry"
 						estimateAt="title"
 						estimateRuns={1}
 						confirmText={t("run.requeueHint")}
@@ -663,7 +665,7 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 							size="sm"
 							verb={t("resume")}
 							capUsd={null}
-							confirm="always"
+							confirm="auto"
 							estimateAt="title"
 							confirmText={tc("resume.confirm")}
 							isLoading={resumeState.isLoading}
@@ -687,7 +689,8 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 						size="sm"
 						verb={t("rerun.button")}
 						capUsd={null}
-						confirm="always"
+						confirm="auto"
+						kind="retry"
 						estimateAt="title"
 						estimateRuns={(evaluation as EvaluationWithFailures).failed_runs}
 						confirmText={

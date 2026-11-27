@@ -11,6 +11,16 @@ type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 export type PaidConfirmMode = "always" | "auto" | "never";
 
+/**
+ * Where the button sits. form (default): next to the form or panel that showed the cap and the
+ * estimate. row: a row action in a list. retry: a Retry or rerun. runNow: a Run now or Start now.
+ * Row, retry and runNow always ask, whatever the cap, because nothing next to them showed the cost.
+ */
+export type PaidButtonKind = "form" | "row" | "retry" | "runNow";
+
+/** The one threshold (M1-51): a known cap at or under this many USD starts on one click under auto. */
+export const PAID_ONE_CLICK_MAX_USD = 1;
+
 export interface PaidButtonProps extends Omit<ComponentProps<typeof Button>, "onClick" | "children" | "dataTestId"> {
 	/** What the button does, as a verb phrase: "Run failure test". */
 	verb: string;
@@ -22,11 +32,13 @@ export interface PaidButtonProps extends Omit<ComponentProps<typeof Button>, "on
 	estimateRuns?: number;
 	onConfirm(): void | Promise<unknown>;
 	/**
-	 * When to ask first. auto (default): when the cap is over $1 or unknown. The threshold waits for
-	 * the owner's decision (M1-51); pass "always" for row actions, Retry and Run now that sit away
-	 * from the form that showed the estimate.
+	 * When to ask first. auto (default): when the cap is over PAID_ONE_CLICK_MAX_USD, or unknown, or
+	 * the kind is row, retry or runNow. Pass "always" for work with lasting effects (a schedule, a
+	 * replay, an investigation) so it never starts on one click.
 	 */
 	confirm?: PaidConfirmMode;
+	/** Where the button sits (see PaidButtonKind); default form. */
+	kind?: PaidButtonKind;
 	/** One more sentence for the dialog. */
 	confirmText?: string;
 	/**
@@ -39,11 +51,15 @@ export interface PaidButtonProps extends Omit<ComponentProps<typeof Button>, "on
 	testId: string;
 }
 
-/** True when a paid click must be confirmed first. auto: the cap is unknown or over $1. */
-export function needsPaidConfirm(mode: PaidConfirmMode, capUsd: number | null): boolean {
+/**
+ * True when a paid click must be confirmed first. auto: the cap is unknown or over
+ * PAID_ONE_CLICK_MAX_USD, or the button is a row action, a Retry or a Run now.
+ */
+export function needsPaidConfirm(mode: PaidConfirmMode, capUsd: number | null, kind: PaidButtonKind = "form"): boolean {
 	if (mode === "always") return true;
 	if (mode === "never") return false;
-	return capUsd === null || capUsd > 1;
+	if (kind !== "form") return true;
+	return capUsd === null || !Number.isFinite(capUsd) || capUsd > PAID_ONE_CLICK_MAX_USD;
 }
 
 /** The button label: "Run failure test, up to $5.00", or "... (uses your model key)" when no cap is known. */
@@ -75,6 +91,7 @@ export function PaidButton({
 	estimateRuns,
 	onConfirm,
 	confirm = "auto",
+	kind = "form",
 	confirmText,
 	capText,
 	estimateAt = "below",
@@ -95,7 +112,7 @@ export function PaidButton({
 
 	const click = () =>
 		run(async () => {
-			if (needsPaidConfirm(confirm, capUsd)) {
+			if (needsPaidConfirm(confirm, capUsd, kind)) {
 				const ok = await ask([estimate, confirmText].filter(Boolean).join(" ") || tr("costsMoney"), {
 					title: tr("confirm.title", { verb }),
 					confirmLabel: capUsd === null ? tr("confirm.okUnknown", { verb }) : tr("confirm.ok", { verb, cap: formatUsd(capUsd) }),

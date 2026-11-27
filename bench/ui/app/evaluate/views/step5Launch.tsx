@@ -22,6 +22,7 @@ import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from ".
 import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
 import { FAULTS, specProblem } from "./step4Setup";
+import { FreeCheck } from "./freeCheck";
 import { isRoughEstimate } from "./evaluate.utils";
 
 /** Wizard step 5: a plain summary of the evaluation, an optional budget and the Launch button. */
@@ -326,6 +327,9 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 
 			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />
 
+			{/* Decision 2: the free agent check, offered where a new user decides to pay. */}
+			<FreeCheck spec={spec} />
+
 			{state.error ? (
 				<div className="text-chart-error-ink space-y-2 text-sm" role="alert" data-testid="step5-error">
 					<p>{errorMessage(state.error, t("launch.error"))}</p>
@@ -350,14 +354,14 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 
 			{(() => {
 				const button = (
-					// Launch starts paid work: the shared paid button names the cap and always asks first (M3-23, Spec 11).
+					// Launch starts paid work: the shared paid button names the cap and asks first over $1 (M3-23, Spec 11, M1-51).
 					<PaidButton
 						verb={t("launchVerb")}
 						capUsd={capUsd}
 						estimateRuns={runs > 0 ? runs : undefined}
 						estimateUsd={cost?.known ? cost.high : null}
 						estimateAt="title"
-						confirm="always"
+						confirm="auto"
 						confirmText={typedBudget ? t("launchConfirm", { runs, usd: formatUsd(typedBudget) }) : t("launchConfirmDefault", { runs })}
 						disabled={!ready || budgetIssue !== ""}
 						isLoading={state.isLoading}
