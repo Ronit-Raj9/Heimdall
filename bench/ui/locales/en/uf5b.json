@@ -88,7 +88,7 @@
 		"keyNotWorking": "{{name}} (key not working)",
 		"noKey": "{{name}} (no key)",
 		"other": "Other {{name}} model...",
-		"more": "More providers...",
+		"more": "More providers (need a key)...",
 		"open": "open",
 		"openTitle": "Open-weight model",
 		"modelId": "Model id"

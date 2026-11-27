@@ -72,6 +72,6 @@ describe("readiness checklist (fix wave 3, N180, N181)", () => {
 		expect(html).toMatch(/data-testid="job-run-agent\.build"[^>]*disabled|disabled[^>]*data-testid="job-run-agent\.build"/);
 		expect(html).toContain("Pick a benchmark first");
 		expect(html).not.toContain("Name the benchmark this container is for.");
-		expect(html).toContain("Prepares the container on a worker (the shared worker or your own), never on the server.");
+		expect(html).toContain("Runs on a worker, never the server.");
 	});
 });

@@ -72,7 +72,7 @@
 		},
 		"mcp": {
 			"title": "MCP tools",
-			"hint": "List servers to scan them. Tasks decide which servers a run starts.",
+			"hint": "",
 			"loading": "Loading MCP settings...",
 			"format": "Config format",
 			"adapterDefault": "Automatic (recommended)",

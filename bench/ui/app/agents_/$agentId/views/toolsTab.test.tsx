@@ -97,7 +97,7 @@ describe("tools tab skills (fix wave 2, N22 to N24)", () => {
 			record: { decision: "admitted", counts: { block: 0, warn: 1, info: 0 }, findings: [] },
 		};
 		expect(skillUploadMessage(t, clean).text).toBe(
-			"Skill review passed the scan and is installed. Every run of this agent now installs it. 1 warnings, see below.",
+			"Skill review passed the scan. Every run now installs it. 1 warnings, see below.",
 		);
 		expect(skillScanMessage(t, blocked).text).toBe("Blocked by the scan: 2 problems that block, 1 warnings.");
 	});

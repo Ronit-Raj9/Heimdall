@@ -345,7 +345,6 @@ function MCPSection({ id }: { id: string }) {
 			title={t("tools.mcp.title")}
 			hint={
 				<span className="block max-w-prose">
-					{t("tools.mcp.hint")}{" "}
 					{/* The MCP server test page tries one server on its own (M5-52). */}
 					<span data-testid="agent-mcp-test">
 						{tu("tools.mcpTestIntro")}{" "}

@@ -100,7 +100,7 @@
 	},
 	"versions": {
 		"title": "Versions",
-		"description": "Benchmark a version to compare it with another.",
+		"description": "",
 		"note": "Version note",
 		"notePlaceholder": "What changed (optional)",
 		"save": "Save as new version",
@@ -145,7 +145,7 @@
 		"valid": "Settings look good",
 		"checkValid": "Settings are valid.",
 		"savedVersion": "Saved as version {{n}}.",
-		"savedSameVersion": "Saved. Still version {{n}}. Model changes do not make a version.",
+		"savedSameVersion": "Saved. Still version {{n}}. Model and provider changes do not make a version.",
 		"savedNoVersion": "Saved.",
 		"reset": "Discard changes",
 		"conflict": "Someone else changed this file. Reload, then edit again.",
@@ -169,7 +169,7 @@
 	},
 	"ci": {
 		"title": "Test on every pull request",
-		"description": "Each pull request is scored against the live version.",
+		"description": "",
 		"liveVersion": "Live version: v{{version}}.",
 		"noLiveVersion": "No saved version yet. Save the config once.",
 		"provider": "CI service",

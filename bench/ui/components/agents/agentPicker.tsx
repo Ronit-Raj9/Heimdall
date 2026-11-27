@@ -30,10 +30,11 @@ export function AgentPicker({
 	const { t } = useTranslation("agentFirst");
 	const { yours, baselines } = pickableAgents(agents);
 	return (
-		<label className="flex flex-col gap-1.5 text-xs font-medium">
+		<label className="flex w-full flex-col gap-1.5 text-xs font-medium sm:w-auto">
 			{label ?? t("picker.agent")}
 			<NativeSelect
 				className="min-w-56"
+				wrapperClassName="w-full sm:w-auto"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				data-testid={testId}

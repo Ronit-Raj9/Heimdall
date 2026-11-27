@@ -52,7 +52,6 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 			<EmptyState
 				icon={Bot}
 				title={tf("agents.emptyTitle")}
-				body={tf("agents.emptyBody")}
 				action={{ label: tf("agents.fromTemplate"), to: "/agents/new" }}
 				secondary={{ label: tf("agents.connect"), to: "/connect" }}
 				testId="frameworks-empty"
@@ -91,9 +90,6 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 					</TableBody>
 				</Table>
 			</div>
-			<p className="text-muted-foreground text-xs" role="note" data-testid="frameworks-note">
-				{t("agents.frameworks.note")}
-			</p>
 		</div>
 	);
 }

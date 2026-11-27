@@ -62,7 +62,7 @@ describe("FromTracesView", () => {
 		expect(html).toContain('data-testid="from-traces-endpoint-marker"');
 		expect(html).toContain("Step 1 of 2");
 		expect(html).not.toContain("1. Send traces");
-		expect(html).toContain("no prompts, answers or tool arguments. Failures you send to Production failures are different");
+		expect(html).toContain("no prompts, answers or tool arguments. Production failures keep request");
 		expect(html).toContain("export HEIMDALL_INGEST_TOKEN=");
 		// Q-35, Q-316: every line of the rendered block is exported, so pasted values reach the agent.
 		expect(html).toContain("export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://h.example/otlp");

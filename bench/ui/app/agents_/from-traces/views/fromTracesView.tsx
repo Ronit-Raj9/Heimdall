@@ -143,7 +143,6 @@ export default function FromTracesView() {
 		<div className={cn(pageWidthClass("read"), "flex flex-col gap-6")} data-page-width="read" data-testid="from-traces">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				icon={Radio}
 			/>
 			{query.isError ? (
@@ -248,8 +247,7 @@ function EndpointSection({
 			title={t("endpoint.title")}
 			description={
 				<>
-					<p>{t("endpoint.description")}</p>
-					<p className="text-foreground mt-1 flex items-start gap-2 text-sm" data-testid="from-traces-privacy">
+					<p className="text-foreground flex items-start gap-2 text-sm" data-testid="from-traces-privacy">
 						<ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{t("endpoint.privacy")}
 					</p>
@@ -650,7 +648,7 @@ function ConnectSection({ draft, total }: { draft: TraceDraft; total: number }) 
 	const req = connectRequest(draft, { id, url, authSecret });
 	const problem = req ? null : connectProblem({ id, url, authSecret });
 	return (
-		<StepSection n={3} total={total} done={false} title={t("connect.title")} description={t("connect.description")} testId="from-traces-connect">
+		<StepSection n={3} total={total} done={false} title={t("connect.title")} testId="from-traces-connect">
 			<div className="flex max-w-xl flex-col gap-3">
 				<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-id`}>
 					<span className="font-medium">{t("connect.name")}</span>

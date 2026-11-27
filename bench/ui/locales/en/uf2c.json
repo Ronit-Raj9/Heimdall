@@ -11,7 +11,7 @@
 			"budget": "Ran out of budget",
 			"crash": "Crashed",
 			"integrity_violation": "Cheating detected",
-			"infra_error": "Infrastructure error"
+			"infra_error": "Infrastructure error, not the agent"
 		},
 		"noneMatch": "No run matches these filters.",
 		"clearFilters": "Clear filters",
@@ -35,7 +35,7 @@
 		"noChanges": "No changes"
 	},
 	"tools": {
-		"gatewayIntro": "To see what this agent's tool and model calls did across runs, open the",
+		"gatewayIntro": "Tool calls across runs:",
 		"gatewayLink": "Gateway report card",
 		"chooseZip": "Choose a .zip",
 		"noFile": "No file chosen",
@@ -43,7 +43,7 @@
 		"noServers": "No MCP servers yet",
 		"insertExample": "Insert example",
 		"nothingChanged": "Nothing changed",
-		"mcpTestIntro": "To try an MCP server on its own before the agent uses it, open",
+		"mcpTestIntro": "Try one server alone:",
 		"mcpTestLink": "MCP server test"
 	},
 	"versions": {

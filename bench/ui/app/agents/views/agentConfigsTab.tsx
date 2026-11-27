@@ -128,7 +128,6 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 			<EmptyState
 				icon={Bot}
 				title={tf("agents.emptyTitle")}
-				body={tf("agents.emptyBody")}
 				action={{ label: tf("agents.fromTemplate"), to: "/agents/new" }}
 				secondary={{ label: tf("agents.connect"), to: "/connect" }}
 				testId="agents-empty"
@@ -280,7 +279,6 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 										{ta("list.baselines")}{" "}
 										<span className="text-muted-foreground font-normal tabular-nums">({baselines.length})</span>
 									</h2>
-									<p className="text-muted-foreground pl-5.5 text-sm">{ta("list.baselinesHint")}</p>
 								</summary>
 								<div className="mt-3">
 									<AgentTable label={ta("list.baselines")} agents={baselines} jobs={jobs} wanted={wanted} testId="agents-baseline-list" cols={cols} />

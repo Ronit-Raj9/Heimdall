@@ -220,7 +220,7 @@ describe("report card tab", () => {
 		state.reportArgs = [];
 		state.search = { version: "9" };
 		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
-		expect(html).toContain("Version 9 of this agent was not found. Showing the latest version.");
+		expect(html).toContain("Version 9 not found. Showing the latest.");
 		expect(state.reportArgs).toContainEqual({ agent: "codex", version: undefined, model: undefined });
 		state.search = {};
 	});

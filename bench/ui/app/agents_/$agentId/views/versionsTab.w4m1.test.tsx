@@ -20,7 +20,7 @@ describe("versions tab: agent without a settings file (wave 4, p01-2)", () => {
 	it("shows the no file note and no save form", () => {
 		const html = renderToStaticMarkup(<VersionsTab agentId="codex" />);
 		expect(html).toContain('data-testid="versions-no-file"');
-		expect(html).toContain("This agent has no settings file");
+		expect(html).toContain("No settings file");
 		expect(html).not.toContain('data-testid="agent-versions-save"');
 	});
 });

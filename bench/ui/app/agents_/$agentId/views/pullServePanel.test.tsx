@@ -31,7 +31,7 @@ describe("pull agent setup", () => {
 		expect(html).toContain("Serve this agent from your code");
 		expect(html).toContain('data-state="connected"');
 		expect(html).toContain("3 waiting, 1 answering");
-		expect(html).toContain("Evaluations refuse to start a run while no process serves this agent.");
+		expect(html).toContain("Runs do not start while no process serves it.");
 		expect(html).not.toMatch(/[–—]/);
 	});
 
