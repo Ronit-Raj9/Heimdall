@@ -39,7 +39,7 @@ var sealedMetrics = &metricsCache{entries: map[metricsKey]runMetricsRead{}}
 
 // key returns the cache key, false when the read cannot be cached.
 func (c *metricsCache) key(index ReadIndex, runID, sealHash string) (metricsKey, bool) {
-	if index == nil || sealHash == "" || !reflect.TypeOf(index).Comparable() {
+	if index == nil || sealHash == "" || !reflect.ValueOf(index).Comparable() {
 		return metricsKey{}, false
 	}
 	return metricsKey{index: index, runID: runID, sealed: sealHash}, true
