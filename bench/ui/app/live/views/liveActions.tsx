@@ -1,4 +1,6 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import "@/components/platform/ufintI18n";
+import i18n from "@/lib/i18n";
 import { Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +49,14 @@ export function LiveActions({ hosted, configured, check }: LiveActionsProps) {
 					<PullSteps check={check} testId="live-pull-steps" />
 				) : (
 					<span className="flex flex-wrap items-center gap-2" data-testid="live-pull">
-						<JobRunButton kind="livescore.pull" params={{ judge }} label={t("live.actions.pull")} onDone={refresh} />
+						<JobRunButton
+							kind="livescore.pull"
+							params={{ judge }}
+							label={t("live.actions.pull")}
+							// Grading with a model is paid: never on one click.
+							confirm={judge ? i18n.t("live.judgeConfirm", { ns: "ufint" }) : undefined}
+							onDone={refresh}
+						/>
 						{(!check || check.judge) && (
 							<label className="text-muted-foreground flex items-center gap-1 text-xs">
 								<input type="checkbox" checked={judge} onChange={(e) => setJudge(e.target.checked)} data-testid="live-judge" />

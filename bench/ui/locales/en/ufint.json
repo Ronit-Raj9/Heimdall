@@ -9,5 +9,8 @@
 		"revokeShare": "Turn off share link {{name}}?",
 		"removeWorker": "Remove worker {{name}}?",
 		"stopAll": "Stop runs for every organization?"
+	},
+	"live": {
+		"judgeConfirm": "Pull and also grade the new sessions with a model? Grading is paid: it uses your model key."
 	}
 }

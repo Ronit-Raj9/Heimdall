@@ -4,7 +4,8 @@ import type { OnboardInput } from "@/lib/types/onboard";
 import { cn } from "@/lib/utils";
 import { Upload } from "lucide-react";
 import { useFormDraft } from "@/lib/hooks/useFormDraft";
-import { useRef, useState, type ReactNode } from "react";
+import { SecretNameField } from "@/app/agents_/new/views/connectForm";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/suites/uf6aI18n";
 
@@ -38,6 +39,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 	const setRows = (v: string) => updateDraft({ rows: v });
 	const [file, setFile] = useState<File | null>(null);
 	const [connection, setConnection] = useState("");
+	const connId = useId();
 	const [error, setError] = useState("");
 	const pick = useRef<HTMLInputElement>(null);
 	const given = sourceGiven({ link, rows, file });
@@ -86,11 +88,14 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 			{/* X-45: the optional secret sits behind a disclosure, after the source and before the action. */}
 			<details className="text-sm" data-testid="onboard-connection-details">
 				<summary className="text-muted-foreground hover:text-foreground cursor-pointer text-sm">{tf("onboard.privateSource")}</summary>
-				<label className="mt-2 flex flex-col gap-1 text-sm">
-					<span className="font-medium">{t("source.connection")}</span>
-					<Input value={connection} onChange={(e) => setConnection(e.target.value)} data-testid="onboard-connection" />
+				{/* M6-55: a select of the org's saved secrets when there are any, else a typed secret id. */}
+				<div className="mt-2 flex flex-col gap-1 text-sm">
+					<label htmlFor={`${connId}-connection`} className="font-medium">
+						{t("source.connection")}
+					</label>
+					<SecretNameField id={`${connId}-connection`} value={connection} onChange={setConnection} testId="onboard-connection" />
 					<span className="text-muted-foreground text-xs">{t("source.connectionHint")}</span>
-				</label>
+				</div>
 			</details>
 			{error && (
 				<p role="alert" className="text-danger-ink text-xs">

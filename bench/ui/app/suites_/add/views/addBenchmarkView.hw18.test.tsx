@@ -70,6 +70,11 @@ vi.mock("@/lib/store/apis/onboardApi", () => {
 		useGetOnboardDraftQuery: () => ({ data: undefined }),
 	};
 });
+// The source box picks a saved secret (M6-55).
+vi.mock("@/lib/store/apis/secretsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/secretsApi")>()),
+	useListSecretsQuery: () => ({ data: { secrets: [] } }),
+}));
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => ({ data: { mode: "live", suites: [] } }) }));
 
 const tx = (k: string, o?: Record<string, unknown>) => i18n.t(k as never, { ns: "onboard", ...o } as never) as unknown as string;

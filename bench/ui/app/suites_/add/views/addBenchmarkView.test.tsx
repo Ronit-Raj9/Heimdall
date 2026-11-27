@@ -40,6 +40,11 @@ const lightSuites = vi.hoisted(() => ({
 		{ id: "faq", version: "1.0.0", task_count: 4 },
 	] as unknown[],
 }));
+// The source box picks a saved secret (M6-55).
+vi.mock("@/lib/store/apis/secretsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/secretsApi")>()),
+	useListSecretsQuery: () => ({ data: { secrets: [] } }),
+}));
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 	useGetSuitesLightQuery: () => ({ data: { mode: "live", suites: lightSuites.suites } }),
 }));
