@@ -515,7 +515,7 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 			out.Data[p.name] = nil
 			continue
 		}
-		out.Data[p.name] = sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...)
+		out.Data[p.name] = withoutNewSharedFields(p.name, sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
