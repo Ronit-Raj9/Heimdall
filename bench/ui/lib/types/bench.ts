@@ -3898,6 +3898,8 @@ export interface AuthMe {
 	server_admin?: boolean;
 	/** Set for a signed-in user: whether their email is verified (auth/verify.go). Absent on older servers. */
 	email_verified?: boolean;
+	/** False for an account that signs in only with GitHub; older servers leave it out. */
+	has_password?: boolean;
 }
 
 /** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */

@@ -2,7 +2,7 @@
 	"integrity": {
 		"variance": {
 			"title": "Noise floor",
-			"description": "How much the score moves between identical runs, and the smallest effect this experiment could detect.",
+			"description": "How much the score moves between identical runs, and the smallest effect this comparison could detect.",
 			"source": {
 				"measured_aa": "measured from the A/A setup",
 				"assumed": "assumed",
@@ -23,16 +23,16 @@
 				"invalid": "invalid",
 				"score": "not compared"
 			},
-			"noAA": "No A/A setup ran, so the MDE rests on an assumed SD. Set aa: true in the experiment to measure the noise floor.",
+			"noAA": "No same-setup check ran, so the smallest difference this test can see is a guess. Add a run of Setup A against itself to measure the noise.",
 			"harnessNoise": "Two identical setups differed significantly: the harness, not the agent, moved the number. The verdict is invalid.",
 			"band": {
 				"label": "Release effect against the noise floor",
 				"zero": "0",
 				"release": "B - A",
 				"aa": "A2 - A",
-				"mde": "±MDE",
-				"inside": "The release effect is inside ±MDE: this experiment cannot tell it from noise.",
-				"outside": "The release effect is outside ±MDE."
+				"mde": "Smallest difference this test can see",
+				"inside": "The change is smaller than the smallest difference this test can see: it cannot be told apart from noise.",
+				"outside": "The change is larger than the smallest difference this test can see."
 			},
 			"legacy": "This analysis predates the noise-floor card; the MDE above uses {{kind}} SD {{sd}}.",
 			"legacyAssumed": "an assumed",
@@ -59,13 +59,13 @@
 				"agent_stream": "agent stream"
 			},
 			"loadError": "Could not load the awareness scan.",
-			"unavailable": "This server has no awareness scan for the experiment."
+			"unavailable": "This server has no awareness scan for the comparison."
 		},
 		"monitors": {
 			"title": "Monitor certifications",
 			"subtitle": "A monitor or guardrail replayed over labelled saved runs: catch rate on attack runs at a fixed false-positive rate on honest runs.",
 			"disclaimer": "Labels come from deterministic gates: honest means no veto fired, attack means a safety failure test's veto fired. A monitor is scored only on attacks the gates can see.",
-			"forExperiment": "Certifications that replayed this experiment's runs.",
+			"forExperiment": "Certifications that replayed this comparison's runs.",
 			"none": "No certification yet. Run: heimdall monitor certify -monitor <config.yaml> -exp {{exp}}",
 			"noneAll": "No certification yet. Run: heimdall monitor certify -monitor <config.yaml> -exp <id>",
 			"headline": "Catch rate at {{fpr}} FPR",
@@ -122,7 +122,7 @@
 		"synthetic": "Synthetic runs: scripted agents or models, or fixture data. The numbers show the screen works; they are not findings.",
 		"loadError": "Could not compute the agent diff.",
 		"versionsError": "Could not load the agent versions for the pickers.",
-		"noVersions": "No agent version has saved runs yet. Run an experiment, then compare its setups here.",
+		"noVersions": "No agent version has saved runs yet. Run a comparison, then compare its setups here.",
 		"pick": "Pick version A and version B to compare, or open this page from an agent with \"Compare versions\".",
 		"pickA": "{{agent}} has no older version to compare with. Pick version A.",
 		"picker": {
@@ -141,7 +141,7 @@
 			"conditionPlaceholder": "clean",
 			"apply": "Apply",
 			"synthetic": "Include synthetic runs",
-			"syntheticHint": "Count runs of scripted agents, scripted models and smoke experiments. Their numbers are not findings.",
+			"syntheticHint": "Count runs of scripted agents, scripted models and smoke comparisons. Their numbers are not findings.",
 			"suggested": "A is the previous version of {{agent}} ({{version}}). Pick another A to change it.",
 			"agentMode": "Comparing the two newest versions of {{agent}}. Pick A or B to pin them."
 		},
@@ -155,8 +155,8 @@
 			"p": "{{changed}} of {{total}} tasks changed. Chance this is luck: {{p}} (we call it real below {{alpha}}).",
 			"noP": "No p value: there is no common task.",
 			"approx": "(approximate)",
-			"minP_one": "Only {{count}} task changed, too few to tell a real change from luck: the chance of luck can be no lower than {{p}}, and it must be below {{alpha}}. Add tasks.",
-			"minP_other": "Only {{count}} tasks changed, too few to tell a real change from luck: the chance of luck can be no lower than {{p}}, and it must be below {{alpha}}. Add tasks."
+			"minP_one": "Only {{count}} shared task, too few to tell these setups apart. Add tasks.",
+			"minP_other": "Only {{count}} shared tasks, too few to tell these setups apart. Add tasks."
 		},
 		"conclusion": {
 			"b_better": "B is better",
@@ -310,7 +310,7 @@
 		"recorded": "RECORDED",
 		"synthetic": "SYNTHETIC",
 		"liveHint": "Live data from runs on this server.",
-		"recordedHint": "A recorded experiment replayed from disk.",
+		"recordedHint": "A recorded comparison replayed from disk.",
 		"syntheticHint": "Synthetic data for development. Not a benchmark result.",
 		"loading": "Checking the bench server",
 		"offline": "NO SERVER",
@@ -538,7 +538,7 @@
 			"mde": "Minimal detectable effect",
 			"assumedSd": "assumed SD {{sd}}",
 			"observedSd": "SD {{sd}}",
-			"tasksNeeded": "Tasks for a new experiment",
+			"tasksNeeded": "Tasks for a new comparison",
 			"tasksNeededValue_one": "{{count}} task",
 			"tasksNeededValue_other": "{{count}} tasks",
 			"tasksNeededOver": "more than {{count}} tasks",
@@ -579,17 +579,17 @@
 				"ship": "Improved on the primary endpoint, and every guard and integrity check passed.",
 				"holdRegressed": "Regressed on the primary endpoint or a guard failed. The task grid lists the tasks, discordant first.",
 				"holdViolations": "Improved, but a guard failed or integrity regressed. See the guards above.",
-				"no_decision": "Not enough evidence either way. Read the interval and the tasks a new experiment needs.",
-				"fix_harness": "An instrument gate fired: {{gate}}. Fix the harness and run a new experiment.",
-				"fixHarnessUnnamed": "An instrument gate fired. Fix the harness and run a new experiment."
+				"no_decision": "Not enough evidence either way. Read the interval and the tasks a new comparison needs.",
+				"fix_harness": "An instrument gate fired: {{gate}}. Fix the harness and run a new comparison.",
+				"fixHarnessUnnamed": "An instrument gate fired. Fix the harness and run a new comparison."
 			}
 		},
 		"method": {
 			"label": "Method: {{name}}",
 			"pValue": {
 				"name": "exact p-value",
-				"definition": "Exact two-sided sign-flip test: the share of all 2^n sign patterns of the per-task differences whose mean is at least as far from zero as the observed one. Above 22 differing tasks it is estimated from 1,000,000 random sign patterns and marked sampled.",
-				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary measure (the normal run unless the experiment names a fault); the task is the unit, so tries of one task never count as separate wins."
+				"definition": "The chance it is luck: how often the results would differ this much if the two setups were really the same. With more than 22 changed tasks it is estimated from a million random reshuffles and marked as estimated.",
+				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary measure (the normal run unless the comparison names a fault); the task is the unit, so tries of one task never count as separate wins."
 			},
 			"mde": {
 				"name": "minimal detectable effect",
@@ -621,7 +621,7 @@
 				"report": "report",
 				"admission": "admission"
 			},
-			"empty": "No gates ran on this experiment."
+			"empty": "No gates ran on this comparison."
 		},
 		"diagnostics": {
 			"title": "Diagnostics",
@@ -666,7 +666,7 @@
 				"budget": "budget exhausted",
 				"crash": "crash",
 				"refusal": "refusal",
-				"integrity_violation": "integrity violation",
+				"integrity_violation": "Cheating detected",
 				"invalid_evaluator": "invalid evaluator",
 				"infra_error": "infrastructure error",
 				"unknown": "unknown",
@@ -773,10 +773,10 @@
 		},
 		"picker": {
 			"title": "Choose a task to compare",
-			"description": "Tasks from {{exp}}. Tasks where Setup A and B got different results come first.",
-			"noExperiments": "No experiments yet. Create one, or start the server with a recorded experiment.",
-			"noRows": "The task grid of this experiment has no rows yet.",
-			"listError": "Could not load the experiment list.",
+			"description": "Tasks from {{exp}}. Tasks where Setup A and Setup B got different results come first.",
+			"noExperiments": "No comparisons yet. Create one, or start the server with a recorded comparison.",
+			"noRows": "The task grid of this comparison has no rows yet.",
+			"listError": "Could not load the comparison list.",
 			"gridError": "Could not load the task grid.",
 			"task": "Task",
 			"condition": "Fault",
@@ -1630,16 +1630,16 @@
 	},
 	"matrix": {
 		"title": "Model matrix",
-		"subtitle": "Every setup of one experiment in the normal run or under one fault, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
+		"subtitle": "Every setup of one comparison in the normal run or under one fault, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
 		"experiment": "Comparison {{id}}",
-		"noExperiments": "No experiments yet. Plan and run one, then compare its setups here.",
-		"listError": "Could not load experiments",
+		"noExperiments": "No comparisons yet. Plan and run one, then compare its setups here.",
+		"listError": "Could not load comparisons",
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
 		"facts": "{{suite}}, {{tasks}} shared tasks, a difference counts below a luck chance of {{alpha}}",
 		"notSeparable": "Cannot separate",
-		"synthetic": "Synthetic data: scripted agent, scripted model or smoke experiment. These numbers are not findings.",
+		"synthetic": "Synthetic data: scripted agent, scripted model or smoke comparison. These numbers are not findings.",
 		"openVerdict": "Open verdict",
 		"table": {
 			"title": "Setups",
@@ -1841,8 +1841,8 @@
 			"title": "New comparison",
 			"subtitle": "Pick a benchmark and two setups that differ in one setting. Nothing runs until you plan and start.",
 			"catalogError": "Could not load the catalog.",
-			"catalogEmpty": "The catalog has no benchmarks or agents, so no experiment can be planned.",
-			"offline": "This server is offline (replay only): it serves recorded runs and cannot plan or start experiments. Start a live server to launch one.",
+			"catalogEmpty": "The catalog has no benchmarks or agents, so no comparison can be planned.",
+			"offline": "This server is offline (replay only): it serves recorded runs and cannot plan or start comparisons. Start a live server to launch one.",
 			"sections": {
 				"what": "What runs",
 				"arms": "Setups A and B",
@@ -1877,7 +1877,7 @@
 				"tasksAll": "All {{count}} tasks",
 				"tasksChosen": "Chosen tasks",
 				"trials": "Trials",
-				"seed": "Seed",
+				"seed": "Random seed",
 				"concurrency": "Concurrency",
 				"runnerPool": "Worker group",
 				"totalUsd": "Total spend cap (USD)",
@@ -1886,7 +1886,7 @@
 				"tokenHint": "Kept in this tab only. Sent as Authorization: Bearer on plan, estimate, create and start."
 			},
 			"validation": {
-				"nameRequired": "Give the experiment a name.",
+				"nameRequired": "Give the comparison a name.",
 				"suiteRequired": "Choose a benchmark.",
 				"baseRequired": "Choose a base agent.",
 				"labelRequired": "Give the setup a label.",
@@ -1906,12 +1906,12 @@
 			"actions": {
 				"plan": "Plan",
 				"createAndStart": "Create and start",
-				"needsPlan": "Plan the experiment first.",
+				"needsPlan": "Plan the comparison first.",
 				"planStale": "The form changed since the last plan. Plan again before starting.",
 				"blocked": "The plan has errors that block the start.",
 				"needsToken": "Enter the access token to plan and start.",
 				"planError": "Planning failed.",
-				"createError": "Could not create the experiment.",
+				"createError": "Could not create the comparison.",
 				"startError": "Created {{id}}, but could not start it."
 			},
 			"plan": {
@@ -1969,7 +1969,7 @@
 			},
 			"progress": {
 				"title": "Comparison {{id}}",
-				"description": "Live status, refreshed every 2 seconds until the experiment ends.",
+				"description": "Live status, refreshed every 2 seconds until the comparison ends.",
 				"state": {
 					"created": "created",
 					"running": "running",
@@ -1987,7 +1987,7 @@
 				"manifest": "manifest {{hash}}",
 				"openVerdict": "Open the verdict",
 				"newExperiment": "Plan another",
-				"loadError": "Could not load the experiment status."
+				"loadError": "Could not load the comparison status."
 			}
 		},
 		"list": {
@@ -2096,13 +2096,12 @@
 			"submit": "Record release",
 			"error": "Not recorded: {{error}}",
 			"created": "Recorded as {{id}}."
-		},
-		"complianceHint": "Makes a report you can download below."
+		}
 	},
 	"policy": {
 		"title": "Release policy",
 		"description": "Explicit rules the candidate must meet before it ships. A policy only adds requirements; the baseline gates always run.",
-		"none": "No release rule set applies to this comparison. Pick one on the Releases page, under Rules.",
+		"none": "No release rule set applies to this comparison.",
 		"decisionLabel": "Policy decision",
 		"decision": {
 			"allow": "ALLOW",
@@ -2348,12 +2347,12 @@
 		},
 		"empty": {
 			"title": "No failures in the inbox yet.",
-			"pull": "Failures arrive when you press Pull now, when a tool sends them with an ingest token (below), or when you run this in a terminal:",
+			"pull": "Failures arrive when you press Pull now, when a tool sends them with an inbox token (below), or when you run this in a terminal:",
 			"sources": "Where failures come from is listed in {{file}}. Each pull continues where the last one stopped.",
 			"docs": "How it works: {{doc}}.",
 			"filtered": "No failures with this status.",
 			"filteredSource": "No failures from this place with this status.",
-			"first": "No production failures yet. Connect a source to pull them in, or send them in with an ingest token.",
+			"first": "No production failures yet. Connect a source to pull them in, or send them in with an inbox token.",
 			"firstAction": "Connect a source",
 			"filteredState": "No failures with status {{state}}. Show all ({{count}})"
 		},
@@ -2505,7 +2504,7 @@
 		},
 		"lock": {
 			"locked": "Frozen",
-			"unlocked": "Not frozen",
+			"unlocked": "Draft version",
 			"stale": "Changed since frozen",
 			"unknown": "Frozen state not checked",
 			"lockedHint": "The tasks are pinned so every run sees exactly the same version (technical: the lock file matches every file).",
@@ -2601,12 +2600,12 @@
 			"admitted": "Ready",
 			"stale": "Not ready: files changed",
 			"draft": "Check failed",
-			"not_locked": "Not frozen yet",
+			"not_locked": "Draft version",
 			"quarantined": "Paused",
 			"retired": "Retired",
 			"admittedHint": "Passed the readiness check: a correct solution passes and an agent that does nothing fails. The files still match the frozen version.",
 			"staleHint": "Was ready, but its files changed. Freeze again and re-run the readiness check.",
-			"draftHint": "Failed or has not run the readiness check, so it is not used in tests.",
+			"draftHint": "Failed the readiness check, so it is not used in tests.",
 			"not_lockedHint": "This task is not part of the frozen version yet.",
 			"quarantinedHint": "Paused: taken out of new tests while someone looks into it.",
 			"retiredHint": "No longer used in tests.",
@@ -2828,7 +2827,7 @@
 			"importTitle": "Imported from",
 			"notImported": "This benchmark was made here, not imported.",
 			"exportTitle": "Export",
-			"exportDescription": "Download the benchmark as task folders (Harbor format). Hidden checks are left out."
+			"exportDescription": "Download the benchmark as task folders. Hidden checks are left out."
 		},
 		"addFlow": {
 			"title": "Add a benchmark",
@@ -2847,11 +2846,11 @@
 			"not_found": "The server has no health report for this benchmark.",
 			"error": "The health request failed: {{message}}"
 		},
-		"computed": "Computed {{when}} from {{runs}} saved runs across {{experiments}} experiments.",
+		"computed": "Computed {{when}} from {{runs}} saved runs across {{experiments}} comparisons.",
 		"thresholds": "Difficulty is labelled after {{minRuns}} scored runs from {{minConfigs}} agent configs: easy at or above a {{easy}} pass rate, hard at or below {{hard}}. Intervals are Wilson score intervals at {{level}}. Infra trouble means infra failures above {{infra}}; timeouts means timeouts above {{timeout}}.",
 		"stats": {
 			"label": "Benchmark health counts",
-			"heldOut": "Held out",
+			"heldOut": "Private",
 			"heldOutHint": "Tasks whose instruction and files are not served.",
 			"quarantined": "Quarantined",
 			"quarantinedHint": "Tasks kept out of new plans.",
@@ -2894,7 +2893,7 @@
 		"noIssues": "Healthy",
 		"variance": "Agents mixed on it: {{unstable}} of {{configs}}",
 		"varianceHint": "How often the same agent setup both passed and failed. Normal for agents, not a problem with the task.",
-		"heldOut": "Held out",
+		"heldOut": "Private",
 		"heldOutHint": "Held-out task: its instruction and files are not served (server config held_out.visible is false).",
 		"heldOutVisibleHint": "Held-out task, shown because the server config sets held_out.visible.",
 		"heldOutRow": "Title, files and checks are withheld for a held-out task.",
@@ -2903,7 +2902,7 @@
 			"toggle": "Held-out board",
 			"toggleHint": "Show the separate board of held-out tasks. The public board never counts a held-out task.",
 			"banner": "Held-out board",
-			"bannerHint": "Scores from held-out tasks only, from experiments that selected them. They are never mixed into the public board.",
+			"bannerHint": "Scores from held-out tasks only, from comparisons that selected them. They are never mixed into the public board.",
 			"off": "This server does not serve the held-out board: its config sets held_out.visible to false.",
 			"backToPublic": "Show the public board"
 		},
@@ -2940,7 +2939,7 @@
 				"admission_reference": "Reference failed at admission",
 				"oracle_failed": "Oracle run failed"
 			},
-			"evidenceExp": "experiment {{exp}}",
+			"evidenceExp": "comparison {{exp}}",
 			"evidenceRuns": "runs {{runs}}",
 			"difficultyTitle": "Difficulty",
 			"declared": "Declared",
@@ -2989,7 +2988,7 @@
 		"title": "Agents",
 		"subtitle": "Every agent config in agents/, the systems under test.",
 		"synthetic": "Synthetic fixture data. These agent configs are examples for checking the screen.",
-		"loadError": "Could not load the agent configs.",
+		"loadError": "Could not load your agents.",
 		"empty": "No agents yet. Connect an agent or start from a template.",
 		"secretNote": "Environment values are never shown, only variable names. Delivered files are listed by path, never by content.",
 		"label": "Agent configs",
@@ -3007,7 +3006,7 @@
 		"evidenceGateway": "gateway only",
 		"evidenceGatewayHint": "No parser: success, steps, tokens, cost and time come from Bifrost's rows for the run's key.",
 		"model": "Default model",
-		"modelHint": "A placeholder: every experiment sets the model, and a setup may vary it.",
+		"modelHint": "A placeholder: every comparison sets the model, and a setup may vary it.",
 		"scripted": "scripted {{kind}}",
 		"scriptedHint": "A scripted control agent, used by admission and dry runs. Its runs are not findings.",
 		"notes": "Notes file",
@@ -3020,7 +3019,7 @@
 		"envNone": "none",
 		"files": "Delivered files",
 		"runs": "Saved runs",
-		"runsHint": "Saved runs of this config id in any experiment, including dry runs against the scripted model. The leaderboard separates live from synthetic.",
+		"runsHint": "Saved runs of this config id in any comparison, including dry runs against the scripted model. The leaderboard separates live from synthetic.",
 		"runsUnknown": "unknown",
 		"tabs": {
 			"label": "Agent views",
@@ -3273,7 +3272,7 @@
 		"title": "Needs review",
 		"subtitle": "Runs a human should look at. A review sits next to the saved run and never edits its evidence.",
 		"picker": {
-			"loadError": "Could not load the experiments."
+			"loadError": "Could not load the comparisons."
 		},
 		"noExperiments": "No comparison yet. Run one first; any runs that need a person show up here.",
 		"verdictLink": "See the result with reviews applied",
@@ -3462,8 +3461,8 @@
 			}
 		},
 		"minedTitle": "Mined tasks",
-		"minedHint": "Tasks heimdall tasks mine cut from your history. A drafted instruction is a draft: read it, fix it, then mark it reviewed. Reports say how many unreviewed tasks an experiment ran.",
-		"noMined": "No mined tasks yet. Run heimdall tasks mine -limit 10 in your repository.",
+		"minedHint": "Tasks heimdall tasks mine cut from your history. A drafted instruction is a draft: read it, fix it, then mark it reviewed. Reports say how many unreviewed tasks a comparison ran.",
+		"noMined": "No mined tasks yet. Run heimdall tasks mine --limit 10 in your repository.",
 		"unreviewedTotal_one": "{{count}} task has an unreviewed instruction.",
 		"unreviewedTotal_other": "{{count}} tasks have unreviewed instructions.",
 		"allReviewed": "all reviewed",
@@ -3569,7 +3568,7 @@
 		"title": "Trials and tier",
 		"tier_one": "tier {{tier}}: {{count}} task",
 		"tier_other": "tier {{tier}}: {{count}} tasks",
-		"tierNote": "Compare this experiment with one of another tier only on their common tasks.",
+		"tierNote": "Compare this comparison with one of another tier only on their common tasks.",
 		"ruleTask": "adaptive trials: per task",
 		"ruleSequential": "adaptive trials: sequential looks",
 		"extendsCombined": "follow-up of {{exp}}: decided together (pre-declared rule)",
@@ -3603,8 +3602,8 @@
 		"moreOver": "To detect {{pp}} pp you need more than {{total}} tasks in all; runs and cost are not estimated.",
 		"sdAssumed": "SD {{sd}} assumed (no A/A setup).",
 		"sdMeasured": "SD {{sd}} measured from the A/A setup.",
-		"combined": "A follow-up is decided together with this experiment by the pre-declared inverse-normal rule at alpha {{alpha}}.",
-		"exploratory": "No combination rule was declared: a follow-up decides on its own; pooling it with this experiment is exploratory."
+		"combined": "A follow-up is decided together with this comparison by the pre-declared inverse-normal rule at alpha {{alpha}}.",
+		"exploratory": "No combination rule was declared: a follow-up decides on its own; pooling it with this comparison is exploratory."
 	},
 	"export": {
 		"title": "Export",
@@ -3619,8 +3618,8 @@
 		"csv": "Run table (CSV)",
 		"tableNote": "One row per saved run: ids, outcome, cost and every metric; an unobserved metric is empty, never zero.",
 		"traces": "Traces to Langfuse, LangSmith, Braintrust, Datadog, Maxim, Phoenix or Jaeger go from the CLI, with the backend's credentials in your environment:",
-		"harbor": "Harbor task folders (tar.gz)",
-		"harborNote": "The benchmark's admitted public tasks as Harbor tasks. Hidden tests, expected answers and reference solutions are withheld: tests/test.sh exits without a reward.",
+		"harbor": "Task folders as a .tar.gz file",
+		"harborNote": "The benchmark's public, ready tasks as task folders. Hidden tests, expected answers and reference solutions are left out.",
 		"harborCli": "A runnable export carries the hidden tests, so only the CLI writes it, on purpose:"
 	},
 	"live": {
@@ -3700,15 +3699,15 @@
 	},
 	"migration": {
 		"title": "Model migration",
-		"subtitle": "One agent moved from one model to others on a model matrix experiment: a verdict per model pair overall and per stratum (exact sign-flip test, Holm across the strata), cost per verified success and why it moved, behaviour differences, flipped tasks and a recommendation that follows the release policy and is never stronger than the tests.",
-		"listError": "Could not load experiments",
-		"noExperiments": "No experiments yet. Run `heimdall migrate -agent <config> -from <model> -to <model> -suite <suite> -yes`, then read its report here.",
+		"subtitle": "One agent moved from one model to others on a model matrix comparison: a verdict per model pair overall and per stratum (exact sign-flip test, Holm across the strata), cost per verified success and why it moved, behaviour differences, flipped tasks and a recommendation that follows the release policy and is never stronger than the tests.",
+		"listError": "Could not load comparisons",
+		"noExperiments": "No comparisons yet. Run `heimdall migrate -agent <config> -from <model> -to <model> -suite <suite> -yes`, then read its report here.",
 		"experiment": "Comparison {{id}}",
 		"fromLabel": "Old model or setup",
 		"toLabel": "New models or setups",
 		"loadError": "Could not load the migration report",
 		"unknown": "unknown",
-		"synthetic": "Synthetic: scripted agent, scripted model or smoke experiment. The numbers are not findings.",
+		"synthetic": "Synthetic: scripted agent, scripted model or smoke comparison. The numbers are not findings.",
 		"facts": "Benchmark {{suite}}. Old model {{from}} (setup {{arm}}). Overall verdicts on {{condition}}, alpha {{alpha}}.",
 		"policy": "Release policy: {{name}}.",
 		"noPolicy": "No release policy evaluated.",
@@ -3762,7 +3761,7 @@
 		"tasksNeeded_other": "About {{count}} tasks would detect a difference of this size with 80% power.",
 		"behaviour": {
 			"title": "Behaviour (old / new)",
-			"falseCompletion": "False completion",
+			"falseCompletion": "Said done but failed",
 			"rejected": "Rejected requests per run (4xx: malformed request or tool call)",
 			"refusals": "Refusals per run",
 			"retries": "Retries per run",
@@ -3780,7 +3779,7 @@
 			"condition": "Fault",
 			"runs": "Runs (old / new)",
 			"success": "Success (old / new)",
-			"falseCompletion": "False completion (old / new)"
+			"falseCompletion": "Said done but failed (old / new)"
 		},
 		"flipped": {
 			"title_one": "{{count}} flipped task",
@@ -3848,7 +3847,7 @@
 			"artifact": "artifact"
 		},
 		"judged": "judged",
-		"judgedHint": "A vision judge model gave part of this grade. Its verdict counts toward an experiment's verdict only under a calibration record (judge_calibration).",
+		"judgedHint": "A vision judge model gave part of this grade. Its verdict counts toward a comparison's verdict only under a calibration record (judge_calibration).",
 		"capture": "Capture (taken by the bench)",
 		"reference": "Reference (hidden)",
 		"diff": "Difference (red: differs, blue: masked)",
@@ -3943,12 +3942,12 @@
 		"scope": "{{lines}} added lines in {{files}} files, rules {{version}}",
 		"sealed": "From the run's saved code scan evidence.",
 		"recomputed": "Computed now from the run's saved diff (the run predates these rules).",
-		"vetoLevel": "Experiment veto level {{level}}: not reached.",
+		"vetoLevel": "Comparison veto level {{level}}: not reached.",
 		"externalRan": "{{scanner}}: {{results}} results, {{added}} on added lines, exit {{exit}}",
 		"externalFailed": "{{scanner}} failed: {{error}}. Its findings are unknown.",
 		"none": "No security findings on the lines the agent added.",
 		"fromScanner": "from {{scanner}}",
-		"ignored": "(ignored by the experiment)",
+		"ignored": "(ignored by the comparison)",
 		"removed": "(removed line)",
 		"inTest": "(test file)",
 		"diffMissing": "The diff could not be loaded, so the lines are not shown in place.",
@@ -4001,11 +4000,12 @@
 	"shell": {
 		"breadcrumbs": "Breadcrumb",
 		"entity": {
-			"experiment": "Open experiment {{id}}",
+			"experiment": "Open comparison {{id}}",
 			"run": "Open run {{id}}",
 			"suite": "Open benchmark {{id}}",
 			"task": "Open task {{id}}",
-			"agent": "Open agent {{id}}"
+			"agent": "Open agent {{id}}",
+			"suiteGone": "Benchmark {{suite}} was deleted"
 		},
 		"status": {
 			"noDecision": "No result yet",
@@ -4149,7 +4149,7 @@
 			"lock": {
 				"locked": "Frozen",
 				"stale": "Changed since frozen",
-				"unlocked": "Not frozen",
+				"unlocked": "Draft version",
 				"unknown": "Freeze state unknown"
 			},
 			"error": "Failed to load",

@@ -42,3 +42,21 @@ describe("PageHeader breadcrumbs", () => {
 		routerState.location.pathname = "/verdict";
 	});
 });
+describe("PageHeader breadcrumbs on phones (Q-63)", () => {
+	it("hides every crumb but the last below sm", () => {
+		const html = render(
+			<PageHeader
+				title="r_1"
+				breadcrumbs={[
+					{ label: "Runs", to: "/runs" },
+					{ label: "Evaluation e_1", to: "/evaluations" },
+					{ label: "r_1" },
+				]}
+			/>,
+		);
+		const items = html.match(/<li class="[^"]*"/g) ?? [];
+		expect(items.length).toBeGreaterThan(1);
+		expect(items.slice(0, -1).every((li) => li.includes("max-sm:hidden"))).toBe(true);
+		expect(items.at(-1)).not.toContain("max-sm:hidden");
+	});
+});

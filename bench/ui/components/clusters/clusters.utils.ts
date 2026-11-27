@@ -63,6 +63,15 @@ export function shownItems(items: readonly string[] | null | undefined, max = 2)
 	return { shown: list.slice(0, max), more: Math.max(0, list.length - max) };
 }
 
+/**
+ * A fault condition for the Fault column (M7-40): "clean" (no fault injected) reads `none`; a known
+ * fault reads its label from `known`; anything else shows as sent.
+ */
+export function faultLabel(value: string, none: string, known: (fault: string) => string | undefined): string {
+	if (value === "clean") return none;
+	return known(value) ?? value;
+}
+
 /** Every scope, narrowest first. */
 export const CLUSTER_SCOPES = ["single_run", "agent_and_task", "agent", "task", "systemic"] as const satisfies readonly ClusterScope[];
 

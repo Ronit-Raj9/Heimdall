@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import i18n from "@/lib/i18n";
 import { AGENT_ID_MAX, agentNameProblem } from "./agentName";
 import { useCopyAgentMutation } from "@/lib/store/apis/agentDeleteApi";
 import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./fw13I18n";
 
@@ -46,14 +47,9 @@ export function CopyAgentDialog({ agentId, mode, onCopied, onClose }: CopyAgentD
 	const [typed, setTyped] = useState<string | null>(null);
 	const name = typed ?? (mode === "rename" ? agentId : defaultCopyName(agentId, taken));
 	const problem = copyNameProblem(name, agentId, taken);
-	const titleId = useId();
 	const fieldId = useId();
 	const rename = mode === "rename";
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && !isLoading && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose, isLoading]);
+	const inputRef = useRef<HTMLInputElement>(null);
 	const confirm = async () => {
 		if (problem) return;
 		try {
@@ -64,24 +60,18 @@ export function CopyAgentDialog({ agentId, mode, onCopied, onClose }: CopyAgentD
 		}
 	};
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="copy-agent-backdrop">
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-card text-card-foreground w-full max-w-md space-y-4 rounded-lg border p-5 text-left shadow-lg"
-				data-testid="copy-agent-dialog"
-			>
-				<div className="space-y-1">
-					<h2 id={titleId} className="text-lg font-semibold">
-						{rename ? t("copyAgent.titleRename", { id: agentId }) : t("copyAgent.titleDuplicate", { id: agentId })}
-					</h2>
-					<p className="text-muted-foreground text-sm">
-						{rename
-							? t("copyAgent.bodyRename", { new: name || t("copyAgent.newNamePlaceholder"), old: agentId })
-							: t("copyAgent.bodyDuplicate")}
-					</p>
-				</div>
+		// The shared Dialog (Q-31): focus trapped inside, Escape closes, focus returns to the opener.
+		<Dialog
+			open
+			onOpenChange={(open) => !open && !isLoading && onClose()}
+			size="sm"
+			closeLabel={t("copyAgent.cancel")}
+			hideClose
+			initialFocus={inputRef}
+			title={rename ? t("copyAgent.titleRename", { id: agentId }) : t("copyAgent.titleDuplicate", { id: agentId })}
+			description={rename ? t("copyAgent.bodyRename", { new: name || t("copyAgent.newNamePlaceholder"), old: agentId }) : t("copyAgent.bodyDuplicate")}
+			testId="copy-agent-dialog"
+		>
 				<form
 					className="space-y-4"
 					onSubmit={(e) => {
@@ -99,7 +89,7 @@ export function CopyAgentDialog({ agentId, mode, onCopied, onClose }: CopyAgentD
 							onChange={(e) => setTyped(e.target.value.toLowerCase())}
 							aria-invalid={problem !== ""}
 							disabled={isLoading}
-							autoFocus
+							ref={inputRef}
 							data-testid="copy-agent-name"
 						/>
 						{problem && (
@@ -122,7 +112,6 @@ export function CopyAgentDialog({ agentId, mode, onCopied, onClose }: CopyAgentD
 						</Button>
 					</div>
 				</form>
-			</div>
-		</div>
+		</Dialog>
 	);
 }

@@ -449,8 +449,12 @@
 	h3 {
 		text-wrap: balance;
 	}
-	/* Links inside running text are underlined; standalone action links are not. */
-	:where(p, li, dd) a:where(:not([data-slot])) {
+	/*
+	 * Links inside running text are underlined; standalone links are not (Q-5). Only paragraphs,
+	 * definitions and list items of a .prose block count as running text: breadcrumbs, sidebar
+	 * items, card titles and list rows are li or div elements outside .prose and stay plain.
+	 */
+	:where(p, dd, .prose li) a:where(:not([data-slot])) {
 		text-decoration-line: underline;
 	}
 	/* Interactive surfaces ease their colour changes. Zero specificity: any utility wins. */
@@ -651,6 +655,15 @@
 	[data-bench-content] {
 		overflow: visible !important;
 		height: auto !important;
+	}
+	/* Collapsed sections print open (Q-42): details bodies and closed collapsible content show. */
+	details > *:not(summary),
+	[data-state="closed"][role="region"] {
+		display: block !important;
+	}
+	details::details-content {
+		content-visibility: visible;
+		display: block;
 	}
 	body {
 		background: white;

@@ -2,7 +2,8 @@ import "@/lib/i18n";
 
 import i18n from "@/lib/i18n";
 import { describe, expect, it } from "vitest";
-import { readinessOf, statusOf, verdictOf } from "./vocabulary";
+import { CircleCheck } from "lucide-react";
+import { rawValuesOf, readinessOf, statusOf, verdictOf, type StatusState } from "./vocabulary";
 
 // Spec 4: one word, tone and icon per raw state.
 describe("status vocabulary", () => {
@@ -30,5 +31,41 @@ describe("status vocabulary", () => {
 		expect(readinessOf(false).tone).toBe("neutral");
 		expect(verdictOf("regressed").tone).toBe("bad");
 		expect(verdictOf("inconclusive").state).toBe("tooFew");
+	});
+});
+
+// Every run outcome the server sends (bench/schemas/run.go Outcome), plus canary and trace import
+// outcomes. None may fall back to the "no answer" state silently: only "unknown" says so on purpose.
+describe("server outcomes (Q-3)", () => {
+	const SERVER: Record<string, StatusState> = {
+		pass: "finished",
+		fail: "failed",
+		timeout: "failed",
+		budget: "failed",
+		crash: "failed",
+		refusal: "failed",
+		integrity_violation: "failed",
+		invalid_evaluator: "broken",
+		infra_error: "broken",
+		aborted_infra: "broken",
+		unknown: "noAnswer",
+		pinned: "finished",
+		clear: "finished",
+		flagged: "needsYou",
+		invalid: "broken",
+		stale: "needsYou",
+		refused: "failed",
+		error: "failed",
+		ok: "finished",
+	};
+	for (const [raw, state] of Object.entries(SERVER)) {
+		it(`maps ${raw} to ${state}, listed explicitly`, () => {
+			expect(statusOf(raw).state).toBe(state);
+			expect(rawValuesOf(state)).toContain(raw);
+		});
+	}
+	it("gives a solved run the check icon", () => {
+		expect(statusOf("pass").icon).toBe(CircleCheck);
+		expect(statusOf("solved").icon).toBe(CircleCheck);
 	});
 });

@@ -93,6 +93,15 @@ export interface RouteTabsProps {
 }
 
 /**
+ * The scrollLeft that puts a tab in the middle of the strip, clamped to the scroll range. Pure.
+ * stripLeft and tabLeft are viewport x positions; scrollLeft is the strip's current scroll.
+ */
+export function centeredScrollLeft(scrollLeft: number, stripLeft: number, stripWidth: number, tabLeft: number, tabWidth: number, scrollWidth: number): number {
+	const target = scrollLeft + (tabLeft - stripLeft) - (stripWidth - tabWidth) / 2;
+	return Math.max(0, Math.min(Math.max(0, scrollWidth - stripWidth), Math.round(target)));
+}
+
+/**
  * Page level tabs bound to the URL: each tab has its own address, back and reload keep it, and
  * tabs that do not apply are hidden. Arrow keys, Home and End move between tabs (Radix Tabs).
  * On a narrow screen the strip scrolls sideways, fades at the edge that hides tabs, and keeps the
@@ -105,8 +114,13 @@ export function RouteTabs({ tabs, defaultTab, param, history, label, children, c
 	useScrollEdges(list);
 	// The active tab is scrolled into view on load and after every change (X-95).
 	useEffect(() => {
-		const trigger = list.current?.querySelector<HTMLElement>('[data-state="active"]');
-		trigger?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+		const strip = list.current;
+		const trigger = strip?.querySelector<HTMLElement>('[data-state="active"]');
+		if (!strip || !trigger) return;
+		// Centred, so the edge fade never covers the active tab on a phone (Q-105).
+		const s = strip.getBoundingClientRect();
+		const r = trigger.getBoundingClientRect();
+		strip.scrollLeft = centeredScrollLeft(strip.scrollLeft, s.left, s.width, r.left, r.width, strip.scrollWidth);
 	}, [active]);
 	if (active === null) return null;
 	// A link with a tab id this page does not have shows the default tab and says so; choosing a tab

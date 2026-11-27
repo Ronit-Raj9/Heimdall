@@ -1,5 +1,7 @@
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { PaidButton } from "@/components/ui/paidButton";
 import { Input } from "@/components/ui/input";
 import { hasReadyTasks } from "@/app/evaluate/views/step3Benchmarks";
 import "@/app/experiments_/new/views/builderI18n";
@@ -10,8 +12,8 @@ import { useQuickRunMutation } from "@/lib/store/apis/quickrunApi";
 import type { QuickRunRequest, QuickRunResponse } from "@/lib/types/quickrun";
 import "@/lib/types/wizardI18n";
 import { Link } from "@tanstack/react-router";
-import { CircleCheck, Play, SlidersHorizontal, X, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CircleCheck, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const QUICKRUN_DEFAULT_TASKS = 5;
@@ -114,12 +116,6 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 	const tasksV = Number(tasksT);
 	const trialsV = Number(trialsT);
 	const budgetV = Number(budgetT);
-	useEffect(() => {
-		const onKey = closeOnEscape(onClose);
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
-
 	const submit = () => {
 		if (invalid) return;
 		const req = buildQuickRunRequest({
@@ -146,40 +142,17 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 		"border-input bg-background h-9 w-full rounded-lg border px-2.5 text-sm transition-shadow focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none";
 
 	return (
-		<div
-			className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm duration-200"
-			data-testid="quickrun-backdrop"
+		// The shared Dialog (Q-31): focus trapped inside, Escape closes, focus returns to the opener.
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onClose()}
+			closeLabel={t("close")}
+			title={tz("quick.title")}
+			description={tz("quick.intro")}
+			className="max-h-[90vh] overflow-y-auto"
+			testId="quickrun-dialog"
 		>
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby="quickrun-title"
-				className="bg-card text-card-foreground animate-in zoom-in-95 slide-in-from-bottom-2 max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-2xl border p-6 shadow-2xl duration-200"
-				data-testid="quickrun-dialog"
-			>
-				<div className="flex items-start gap-3">
-					<span
-						className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm"
-						aria-hidden="true"
-					>
-						<Zap className="size-5" />
-					</span>
-					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-						<h2 id="quickrun-title" className="text-lg font-semibold tracking-tight">
-							{tz("quick.title")}
-						</h2>
-						<p className="text-muted-foreground text-sm">{tz("quick.intro")}</p>
-					</div>
-					<button
-						type="button"
-						onClick={onClose}
-						className="text-muted-foreground hover:bg-accent hover:text-foreground -mt-1 -mr-1 rounded-lg p-1.5 transition-colors"
-						aria-label={t("close")}
-					>
-						<X className="size-4" aria-hidden="true" />
-					</button>
-				</div>
-
+			<div className="space-y-5 pb-1">
 				{done ? (
 					<div className="animate-in fade-in zoom-in-95 space-y-4 text-sm duration-300" data-testid="quickrun-done">
 						<div className="bg-chart-success/10 border-chart-success/40 flex flex-col items-center gap-2 rounded-xl border p-5 text-center">
@@ -375,15 +348,24 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 							<Button type="button" variant="outline" onClick={onClose}>
 								{t("cancel")}
 							</Button>
-							<Button type="submit" disabled={state.isLoading || invalid} className="min-w-32 shadow-sm" data-testid="quickrun-submit">
-								<Play className={state.isLoading ? "size-4 animate-pulse" : "size-4"} aria-hidden="true" />
-								{state.isLoading ? t("submitting") : t("submit")}
-							</Button>
+							{/* Paid work: the shared paid confirm with the cap, opened on Cancel (Q-32). */}
+							<PaidButton
+								verb={t("submit")}
+								capUsd={invalid ? null : budgetV}
+								estimateRuns={invalid ? undefined : tasksV * trialsV * 2}
+								confirm="always"
+								estimateAt="title"
+								disabled={state.isLoading || invalid}
+								isLoading={state.isLoading}
+								className="min-w-32 shadow-sm"
+								onConfirm={submit}
+								testId="quickrun-submit"
+							/>
 						</div>
 					</form>
 				)}
 			</div>
-		</div>
+		</Dialog>
 	);
 }
 
