@@ -20,15 +20,17 @@ link: it opens **You are invited**.
 
 ## 2. Add your model key
 
-Runs use your organization's own provider keys. There is no free fallback:
-an evaluation on a provider you have no working key for is refused before
-anything runs.
+Runs use your organization's own provider keys. Heimdall never pays for
+model calls with a key of its own: an evaluation on a provider you have no
+working key for is refused before anything runs. To try the steps without a
+key, pick Practice mode in the wizard: a scripted stand-in answers instead of
+a real model, so it is free, but its scores say nothing about a real agent.
 
 1. Open [Settings > Model keys](/settings?tab=keys) from the sidebar.
 2. Press **Add key** on your provider's card.
 3. Paste the API key; optionally set **Allowed models** and a monthly spending limit in USD (0 means no limit).
 4. Press **Save key**.
-5. Press **Test** on the saved key: it makes one cheap call to your provider, and the status must read `works`.
+5. Press **Test** on the saved key: it asks your provider for its model list (a call providers do not charge for where they have one), and the status must read `works`.
 
 The key is stored encrypted on the server. After saving, only its label is
 shown, and nobody can read the value back. A worker gets it only for the
