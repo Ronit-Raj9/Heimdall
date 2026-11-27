@@ -7,6 +7,8 @@ import { useFormDraft } from "@/lib/hooks/useFormDraft";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import "@/components/runs/uf5bI18n";
 import { ftFaultName } from "./gw07I18n";
+import { formatUsd } from "@/lib/money";
+import "@/app/schedules/views/ufrjI18n";
 import { ESTIMATE_DEBOUNCE_MS, FAULTS, estimateText, groupFaults } from "@/app/evaluate/views/step4Setup";
 import { useDebounced } from "@/app/evaluate/views/useDebounced";
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
@@ -162,6 +164,22 @@ export function launchCost(
 	return { capUsd: cap !== undefined && cap > 0 ? cap : null, estimateUsd: c?.known ? Math.max(c.high, c.low) : null, runs };
 }
 
+/**
+ * When the high estimate is above the spending cap the button names (Q-295): the cap and the high
+ * estimate, both in the button's own format, so the line can say the run stops at the cap. Pure.
+ */
+export function capNote(estimate: Pick<Estimate, "est_cost_usd"> | undefined, capUsd: number | null): { cap: string; high: string } | null {
+	const c = estimate?.est_cost_usd;
+	if (!c?.known || capUsd === null || !(capUsd > 0)) return null;
+	const high = Math.max(c.high, c.low);
+	return high > capUsd ? { cap: formatUsd(capUsd), high: formatUsd(high) } : null;
+}
+
+/** The faults the estimate says one or more picked benchmarks cannot take (Q-292). Pure. */
+export function faultsSkippedAny(estimate: Pick<Estimate, "per_benchmark"> | undefined): Set<string> {
+	return new Set((estimate?.per_benchmark ?? []).flatMap((b) => (b.faults_skipped ?? []).map((s) => s.fault)));
+}
+
 /** The empty form of a new failure test. */
 export const EMPTY_FAILURE_TEST: FailureTestForm = {
 	agent: "",
@@ -231,11 +249,11 @@ export function skippedFaultCount(ev: Pick<Evaluation, "children">): number {
 }
 
 /** Before launch: the chosen faults a benchmark cannot take, which add no runs. */
-export function SkippedFaultsNote({ estimate }: { estimate: Estimate }) {
-	const { t } = useTranslation("agentFirst");
+export function SkippedFaultsNote({ estimate, catalog }: { estimate: Estimate; catalog?: readonly { id: string; label: string }[] }) {
+	const { t } = useTranslation("ufrj");
 	const lines = (estimate.per_benchmark ?? []).flatMap((b) => {
 		const byReason = new Map<string, string[]>();
-		for (const s of b.faults_skipped ?? []) byReason.set(s.reason, [...(byReason.get(s.reason) ?? []), ftFaultName(s.fault)]);
+		for (const s of b.faults_skipped ?? []) byReason.set(s.reason, [...(byReason.get(s.reason) ?? []), ftFaultName(s.fault, catalog)]);
 		// The benchmark by its display name, the raw id only as the row's title (M5-48).
 		return [...byReason].map(([reason, faults]) => ({
 			key: `${b.benchmark}-${reason}`,
@@ -249,8 +267,9 @@ export function SkippedFaultsNote({ estimate }: { estimate: Estimate }) {
 	return (
 		<ul className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="ft-faults-skipped">
 			{lines.map((l) => (
-				<li key={l.key} title={l.id}>
-					{t("ft.faultsSkipped", { count: l.faults.length, faults: l.faults.join(", "), benchmark: l.benchmark, reason: l.reason })}
+				// The server's reason names the raw benchmark id, so it is only the row's title (Q-292).
+				<li key={l.key} title={`${l.id}: ${l.reason}`}>
+					{t("ft.faultsSkipped", { count: l.faults.length, faults: l.faults.join(", "), benchmark: l.benchmark })}
 				</li>
 			))}
 		</ul>
@@ -280,12 +299,17 @@ export function FailureTestEstimate({
 	estimate,
 	pending,
 	budgetTyped,
+	capUsd = null,
 }: {
 	problem: ReturnType<typeof formProblem>;
 	estimate: { data?: Estimate; isFetching?: boolean; isError?: boolean; error?: unknown };
 	pending: boolean;
 	budgetTyped: boolean;
+	/** The cap the Run button names; the line says the run stops there when the estimate is higher. */
+	capUsd?: number | null;
 }) {
+	const { t: tr } = useTranslation("ufrj");
+	const over = problem === null && !estimate.isError ? capNote(estimate.data, capUsd) : null;
 	const { t } = useTranslation("agentFirst");
 	const { t: tg } = useTranslation("gw07");
 	const { t: tw } = useTranslation("w4m2");
@@ -307,6 +331,11 @@ export function FailureTestEstimate({
 				</span>
 			) : (
 				<span className="text-muted-foreground">{t("ft.estimating")}</span>
+			)}
+			{over && (
+				<span className="text-chart-warning-ink text-xs" data-testid="ft-cap-note">
+					{tr("ft.capNote", over)}
+				</span>
 			)}
 			{problem === null && !estimate.isError && budgetTyped && estimate.data?.budget && (
 				<span className="text-muted-foreground text-xs" data-testid="ft-budget-line">
@@ -407,11 +436,27 @@ export default function FailureTestsView() {
 	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
 	const budgetTyped = (form.budgetText ?? "").trim() !== "";
 	const shownSuites = visibleSuites(suiteList, query, compatibility, onlyRunnable, form.benchmarks);
-	const notApplicable = faultsNotApplicable(problem === null ? estimate.currentData : undefined);
+	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
+	// Faults a picked benchmark cannot take are greyed and unticked (Q-292). They are remembered for the
+	// benchmark set, so unticking them (which changes the estimate) does not bring them back.
+	const benchKey = [...form.benchmarks].sort().join(",");
+	const [skipped, setSkipped] = useState<{ key: string; faults: string[] }>({ key: "", faults: [] });
+	const skippedNow = problem === null && !pending ? faultsSkippedAny(estimate.currentData) : new Set<string>();
+	const skippedKnown = skipped.key === benchKey ? skipped.faults : [];
+	const skippedNew = [...skippedNow].filter((f) => !skippedKnown.includes(f));
+	useEffect(() => {
+		if (skippedNew.length === 0 && skipped.key === benchKey) return;
+		const all = [...new Set([...skippedKnown, ...skippedNew])];
+		setSkipped({ key: benchKey, faults: all });
+		if (all.some((f) => form.faults.includes(f))) setForm((f) => ({ ...f, faults: f.faults.filter((x) => !all.includes(x)) }));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [benchKey, skippedNew.join(",")]);
+	const notApplicable = new Set([...faultsNotApplicable(problem === null ? estimate.currentData : undefined), ...skippedKnown]);
 	const budgetTotal = estimate.currentData?.budget?.budget_usd || undefined;
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="failure-tests-screen">
+		// On phones the Run bar is fixed to the bottom of the screen (Q-296): the padding keeps the page's end above it.
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8 pb-40 sm:pb-0" data-testid="failure-tests-screen">
 			<PageHeader title={t("ft.title")} subtitle={t("ft.subtitle")} />
 
 			<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
@@ -490,7 +535,7 @@ export default function FailureTestsView() {
 										<div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 min-[420px]:grid-cols-2 md:grid-cols-4">
 											{g.faults.map((fault) => {
 												const helpId = `ft-fault-help-${fault.id}`;
-												const off = notApplicable.has(fault.id);
+												const off = notApplicable.has(fault.id) && !form.faults.includes(fault.id);
 												return (
 													<label
 														key={fault.id}
@@ -505,6 +550,7 @@ export default function FailureTestsView() {
 															type="checkbox"
 															className="accent-primary size-4 shrink-0"
 															checked={form.faults.includes(fault.id)}
+															disabled={off}
 															onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
 															aria-describedby={helpId}
 															data-testid={`ft-fault-${fault.id}`}
@@ -636,7 +682,7 @@ export default function FailureTestsView() {
 							</span>
 						</label>
 					</div>
-					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} />}
+					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} catalog={faultCatalog} />}
 					{createState.isError && (
 						<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
 							{getBenchErrorMessage(createState.error)}
@@ -644,7 +690,7 @@ export default function FailureTestsView() {
 					)}
 					{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
 					<div
-						className="bg-background sticky bottom-0 z-10 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-3 shadow-sm"
+						className="bg-background fixed inset-x-0 bottom-0 z-20 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-3 shadow-sm sm:sticky sm:z-10 sm:rounded-lg sm:border"
 						data-testid="ft-launch-bar"
 					>
 						<FailureTestEstimate
@@ -652,6 +698,7 @@ export default function FailureTestsView() {
 							estimate={{ data: estimate.currentData, isFetching: estimate.isFetching, isError: estimate.isError, error: estimate.error }}
 							pending={pending}
 							budgetTyped={budgetTyped}
+capUsd={cost.capUsd}
 						/>
 						{mayRun && (
 							<PaidButton
@@ -680,7 +727,7 @@ export default function FailureTestsView() {
 				) : past.length === 0 ? (
 					<EmptyState compact body={t("ft.pastEmpty")} testId="ft-past-empty" />
 				) : (
-					<PastTestList evs={past} />
+					<PastTestList evs={past} catalog={faultCatalog} />
 				)}
 			</Section>
 		</section>
@@ -729,7 +776,7 @@ function stoppedWithoutResults(ev: Evaluation): boolean {
 }
 
 /** The past failure tests; stopped ones with no results are hidden by default (D19), with their count. */
-export function PastTestList({ evs }: { evs: readonly Evaluation[] }) {
+export function PastTestList({ evs, catalog }: { evs: readonly Evaluation[]; catalog?: readonly { id: string; label: string }[] }) {
 	const { t } = useTranslation("gw08");
 	const [hideStopped, setHideStopped] = useState(true);
 	const stopped = evs.filter(stoppedWithoutResults).length;
@@ -752,7 +799,7 @@ export function PastTestList({ evs }: { evs: readonly Evaluation[] }) {
 			)}
 			<ul className="flex flex-col gap-3" data-testid="ft-past-list">
 				{shown.map((ev) => (
-					<PastTest key={ev.id} ev={ev} />
+					<PastTest key={ev.id} ev={ev} catalog={catalog} />
 				))}
 			</ul>
 		</div>
@@ -770,7 +817,7 @@ function noResultsKey(ev: Evaluation): "ft.emptyFailed" | "ft.emptyCancelled" | 
 }
 
 /** One past failure test: who, when, status, its faults, and the change from clean per fault once it finished. */
-export function PastTest({ ev }: { ev: Evaluation }) {
+export function PastTest({ ev, catalog }: { ev: Evaluation; catalog?: readonly { id: string; label: string }[] }) {
 	const { t } = useTranslation("agentFirst");
 	const { t: tg } = useTranslation("gw08");
 	const { t: tu } = useTranslation("uf5b");
@@ -803,7 +850,7 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 			</div>
 			{faults.length > 0 && (
 				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-faults`}>
-					{tg("ft.faults", { faults: faults.map((f) => ftFaultName(String(f))).join(", ") })}
+					{tg("ft.faults", { faults: faults.map((f) => ftFaultName(String(f), catalog)).join(", ") })}
 				</p>
 			)}
 			{skipped > 0 && (
@@ -835,7 +882,7 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 							const tone = change.hurt ? "text-chart-error-ink" : change.helped ? "text-chart-success-ink" : "text-muted-foreground";
 							return (
 								<tr key={r.fault} className="border-t">
-									<td className="py-1 pr-3">{ftFaultName(r.fault)}</td>
+									<td className="py-1 pr-3">{ftFaultName(r.fault, catalog)}</td>
 									<td className="py-1 pr-3 text-right font-semibold tabular-nums">{Math.round(s.score * 100)}%</td>
 									<td className={`${tone} py-1 text-right tabular-nums`} data-testid={`ft-past-${ev.id}-change-${r.fault}`}>
 										{change.hurt || change.helped ? tg("ft.vsClean", { change: change.text }) : tg("ft.noChange")}

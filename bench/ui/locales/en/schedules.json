@@ -63,7 +63,7 @@
 	},
 	"alerts": {
 		"title": "Alerts",
-		"description": "A message is sent for every schedule when results get worse or a run fails. The address is not stored here: save it as a secret (Settings > Secrets) and pick its name.",
+		"description": "A message is sent for every repeat run when results get worse or a run fails. The address is not stored here: save it as a secret (Settings > Secrets) and pick its name.",
 		"empty": "No alerts set up yet.",
 		"urlEnv": "Secret holding the alert address",
 		"urlEnvPlaceholder": "SLACK_WEBHOOK_URL",

@@ -2,7 +2,9 @@ import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Collapsible, FeatureHero, Pill, SetupCard, Step, type PillTone } from "@/components/inbox/featureHero";
 import { CalendarClock, Code2, MoreHorizontal, Plus } from "lucide-react";
-import { checkCost, HowOften, howOftenCron, howOftenOf, newHowOften, usd, type HowOftenValue } from "@/components/canaries/howOften";
+import { HowOften, howOftenCron, howOftenOf, newHowOften, type HowOftenValue } from "@/components/canaries/howOften";
+import { repeatCost, repeatCostText } from "./repeatCost";
+import "./ufrjI18n";
 import "@/components/canaries/uf7bI18n";
 import { cronProblem, runsPerDay } from "@/lib/utils/cron";
 import { Button } from "@/components/ui/button";
@@ -85,7 +87,7 @@ export function evaluationOptions(
 
 /**
  * The repeat run picker's options (M7-52): finished evaluations only, grouped by agent, newest
- * first, each "codex score, 22 Nov, 0.71". Exported for tests.
+ * first, each "codex score, 22 Nov, score 71%" (Q-84: never a bare number). Exported for tests.
  */
 export function finishedEvaluationGroups(evaluations: Evaluation[]): { agent: string; options: { id: string; label: string; cost?: number }[] }[] {
 	const done = [...evaluations].filter((ev) => ev.status === "done").sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
@@ -95,7 +97,7 @@ export function finishedEvaluationGroups(evaluations: Evaluation[]): { agent: st
 		const d = new Date(ev.created_at);
 		const date = Number.isNaN(d.getTime()) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 		const score = ev.result?.arms?.[0]?.score;
-		const label = [ev.spec?.name || ev.id, date, score != null ? score.toFixed(2) : ""].filter(Boolean).join(", ");
+		const label = [ev.spec?.name || ev.id, date, score != null ? `score ${Math.round(score * 100)}%` : ""].filter(Boolean).join(", ");
 		const list = groups.get(agent) ?? [];
 		list.push({ id: ev.id, label, ...(ev.result?.cost_usd != null ? { cost: ev.result.cost_usd } : {}) });
 		groups.set(agent, list);
@@ -584,6 +586,7 @@ function AddScheduleForm({
 	const { t: w } = useTranslation("w4m7b");
 	const { t: u } = useTranslation("ux13");
 	const { t: m } = useTranslation("uf7b");
+	const { t: rj } = useTranslation("ufrj");
 	const evaluations = useListEvaluationsQuery();
 	const groups = finishedEvaluationGroups(evaluations.data ?? []);
 	const allOptions = groups.flatMap((g) => g.options);
@@ -604,7 +607,9 @@ function AddScheduleForm({
 	const perRun = what === "evaluation" ? allOptions.find((o) => o.id === s.evaluation)?.cost : undefined;
 	const runs = cron && !cronProblem(cron) ? runsPerDay(cron) : 0;
 	const max = Number(s.max);
-	const cost = perRun && perRun > 0 ? checkCost(runs, perRun, max) : null;
+	// One helper for every amount of the form and its button (R6-3).
+	const cost = repeatCost(perRun, max, runs);
+	const costText = repeatCostText(cost);
 	const ok = missing.length === 0;
 	const why = ok ? null : w("schedules.toAdd", { list: missing.join(", ") });
 	return (
@@ -692,9 +697,7 @@ function AddScheduleForm({
 				</div>
 				{what === "evaluation" && s.evaluation && max > 0 && (
 					<p className="text-muted-foreground text-xs" data-testid="schedule-add-cost">
-						{cost
-							? m("cost.lineLast", { count: cost.runs, perRun: usd(cost.perRun), day: usd(cost.day), month: usd(cost.month) })
-							: m("cost.unknown", { day: usd(max), month: usd(max * 30) })}
+						{rj(costText.key, costText.values)}
 					</p>
 				)}
 				{what === "experiment" && s.max.trim() === "" && (
@@ -710,7 +713,7 @@ function AddScheduleForm({
 						aria-describedby={why ? "schedule-add-why" : undefined}
 						data-testid="schedule-add-submit"
 					>
-						{initial ? t("canary.save") : max > 0 ? m("repeat.createUpTo", { day: usd(cost ? cost.day : max) }) : t("add.submit")}
+						{initial ? t("canary.save") : max > 0 ? m("repeat.createUpTo", { day: cost.dailyLimit ?? "" }) : t("add.submit")}
 					</Button>
 					<WhyDisabled reason={busy ? null : why} testId="schedule-add-why" />
 					{error && (

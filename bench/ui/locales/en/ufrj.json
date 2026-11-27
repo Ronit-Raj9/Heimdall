@@ -1,0 +1,50 @@
+{
+	"ft": {
+		"capNote": "The run stops at the {{cap}} budget; the full run may need up to {{high}}.",
+		"faultsSkipped_one": "{{faults}} does not apply to {{benchmark}} and adds no runs.",
+		"faultsSkipped_other": "{{faults}} do not apply to {{benchmark}} and add no runs."
+	},
+	"gw": {
+		"estimateUnknownCost": "The cost is not known yet; about {{minutes}} minutes. The budget is the most it can spend.",
+		"estimateUnknownBoth": "The cost and the time are not known yet. The budget is the most it can spend, and each run stops at its benchmark's time limit.",
+		"overBudget": "The budget stops this test at {{budget}}. The estimate is {{est}}, so the test may stop before every task has run. Raise the budget to run it all.",
+		"suiteNotReady": "{{name}}, {{ready}} of {{count}} tasks ready (cannot be tested yet)",
+		"notReadyCount_one": "{{count}} benchmark cannot be tested yet: some of its tasks have not passed the readiness check.",
+		"notReadyCount_other": "{{count}} benchmarks cannot be tested yet: some of their tasks have not passed the readiness check.",
+		"ownModel": "Agent's own model",
+		"pickModel": "Pick a model for both setups"
+	},
+	"watch": {
+		"dailyAt": "Every day at 06:00 ({{zone}})",
+		"zone": "Time zone",
+		"utcHint": "06:00 in {{zone}} is {{utc}} UTC."
+	},
+	"mcp": {
+		"inspectNote": "Free: no model is used, so it costs nothing. One check sends at most {{count}} requests to your server, some of them deliberately malformed, and takes under a minute."
+	},
+	"repeat": {
+		"cost": {
+			"known_one": "Expected cost of one run: {{perRun}} (what the last run cost). Daily limit: {{limit}}, so at most {{count}} run a day. The most it can spend in a month: {{month}}.",
+			"known_other": "Expected cost of one run: {{perRun}} (what the last run cost). Daily limit: {{limit}}, so at most {{count}} runs a day. The most it can spend in a month: {{month}}.",
+			"unknownRun": "Expected cost of one run: not known yet. Daily limit: {{limit}}. The most it can spend in a month: {{month}}.",
+			"noLimit": "Expected cost of one run: {{perRun}} (what the last run cost). No daily limit is set.",
+			"none": "Expected cost of one run: not known yet. No daily limit is set."
+		},
+		"scoreOption": "score {{pct}}%"
+	},
+	"live": {
+		"judgeCapped_one": "Also grade with a model (paid: up to {{usd}} for at most {{count}} session a pull)",
+		"judgeCapped_other": "Also grade with a model (paid: up to {{usd}} for at most {{count}} sessions a pull)",
+		"judgeKeyBudget_one": "Also grade with a model (paid: at most {{count}} session a pull; the budget on the judge's model key caps the cost)",
+		"judgeKeyBudget_other": "Also grade with a model (paid: at most {{count}} sessions a pull; the budget on the judge's model key caps the cost)",
+		"judgeKeyBudgetHosted_one": "Also grade with a model (paid with your organization's model key: at most {{count}} session a pull; that key's budget caps the cost)",
+		"judgeKeyBudgetHosted_other": "Also grade with a model (paid with your organization's model key: at most {{count}} sessions a pull; that key's budget caps the cost)"
+	},
+	"monitors": {
+		"runComparison": "Run an evaluation first"
+	},
+	"checks": {
+		"watchLink": "Model watch on the Gateway page",
+		"watchLinkHint": "A model watch tries each new model from your providers on a saved evaluation."
+	}
+}

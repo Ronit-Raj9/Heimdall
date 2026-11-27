@@ -24,11 +24,12 @@ export interface NewModelWatchFields {
 export type WatchScheduleRow = ScheduleRow & { new_models?: NewModelWatchFields };
 
 /** A cron line in plain words: daily and hourly, else the line itself. Pure. */
-export function cronWords(cron: string): string {
+export function cronWords(cron: string, timezone?: string): string {
 	const f = cron.trim().split(/\s+/);
 	if (f.length === 5 && /^\d+$/.test(f[0]) && f.slice(2).every((x) => x === "*")) {
 		if (f[1] === "*") return "every hour";
-		if (/^\d+$/.test(f[1])) return `every day at ${f[1].padStart(2, "0")}:${f[0].padStart(2, "0")}`;
+		// The zone the schedule runs in (Q-272); a schedule with none runs in UTC.
+		if (/^\d+$/.test(f[1])) return `every day at ${f[1].padStart(2, "0")}:${f[0].padStart(2, "0")} (${timezone || "UTC"})`;
 	}
 	return `on the schedule ${cron.trim()}`;
 }
@@ -58,14 +59,14 @@ export function ModelWatchView({
 		<div className="flex flex-col gap-2 text-sm" data-testid={`model-watch-${row.name}`}>
 			<p>
 				{t("watch.text", {
-					schedule: cronWords(row.cron),
+					schedule: cronWords(row.cron, row.timezone),
 					evaluation: row.evaluation ?? row.name,
 					current: w.current,
 					usd: formatUsd(w.usd_per_model),
 				})}
 			</p>
 			{items.length === 0 && <p className="text-muted-foreground">{t("watch.firstCheck")}</p>}
-			{state?.last_error && <p className="text-amber-700 dark:text-amber-400">{t("watch.lastError", { error: state.last_error })}</p>}
+			{state?.last_error && <p className="text-chart-warning-ink">{t("watch.lastError", { error: state.last_error })}</p>}
 			{items.length > 0 && (
 				<table className="w-full text-sm">
 					<thead className="text-muted-foreground text-left text-xs">

@@ -29,7 +29,7 @@ describe("repeat run form (M7-46, M7-52, M7-59)", () => {
 			ev("ev_3", "bot", "done", "2026-11-20T10:00:00Z", 0.5),
 		]);
 		expect(groups.map((g) => g.agent)).toEqual(["codex", "bot"]);
-		expect(groups[0].options).toEqual([{ id: "ev_1", label: "codex score, 22 Nov, 0.71", cost: 0.2 }]);
+		expect(groups[0].options).toEqual([{ id: "ev_1", label: "codex score, 22 Nov, score 71%", cost: 0.2 }]);
 	});
 	it("names alert events in plain words", () => {
 		expect(alertEventLabel("canary_drifted", m)).toBe("A drift monitor dropped");

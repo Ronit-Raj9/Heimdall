@@ -15,11 +15,13 @@ import { ArrowLeft, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
+import "@/app/schedules/views/ufrjI18n";
 
 /** The monitors screen (Eval integrity area, S2): every monitor certification, or one with ?cert=. */
 export default function MonitorsView() {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: tr } = useTranslation("ufrj");
 	const [cert, setCert] = useQueryState("cert", parseAsString);
 	const [certifying, setCertifying] = useState(false);
 	// While the list is empty its empty state carries the one "certify" action, so the header does not repeat it (M7-68).
@@ -55,6 +57,7 @@ export default function MonitorsView() {
 function CertificationList({ certifying, onCertifying }: { certifying: boolean; onCertifying(open: boolean): void }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: tr } = useTranslation("ufrj");
 	const q = useListMonitorCertificationsQuery();
 	const certs = q.data?.certifications ?? [];
 	return (
@@ -72,6 +75,8 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 					icon={ShieldCheck}
 					message={tu("monitors.empty")}
 					action={{ label: tu("monitors.certifyNew"), onClick: () => onCertifying(true) }}
+					// Q-134: a second way forward for someone with nothing to certify yet.
+					secondary={{ label: tr("monitors.runComparison"), to: "/evaluate" }}
 					testId="monitors-empty"
 				/>
 			) : (
@@ -100,6 +105,7 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 function CertificationScreen({ certId, onDeleted }: { certId: string; onDeleted(): void }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: tr } = useTranslation("ufrj");
 	const q = useGetMonitorCertificationQuery(certId);
 	return (
 		<div className="flex flex-col gap-4">

@@ -175,7 +175,9 @@ describe("faults that do not apply", () => {
 		} as unknown as Estimate;
 		const html = render(<SkippedFaultsNote estimate={estimate} />);
 		expect(html).toContain('data-testid="ft-faults-skipped"');
-		expect(html).toContain("Broken tool, Misleading instruction do not apply to BFCL function calling (it has no tools) and add no runs.");
+		// Q-292: the server reason (it may name the raw id) is only the title now.
+		expect(html).toContain("Broken tool, Misleading instruction do not apply to BFCL function calling and add no runs.");
+		expect(html).toContain('title="hd-harbor-bfcl: it has no tools"');
 		expect(render(<SkippedFaultsNote estimate={{ ...estimate, per_benchmark: [] }} />)).toBe("");
 	});
 
