@@ -166,7 +166,7 @@ describe("readiness", () => {
 	it("polls readiness every 15 s while the form is open", () => {
 		render(<FromIssues writable />, hostedSession("member"));
 		expect(READINESS_POLL_MS).toBe(15000);
-		expect(api.readinessArgs).toEqual([undefined, { pollingInterval: 15000 }]);
+		expect(api.readinessArgs).toEqual([undefined, { pollingInterval: 15000, skipPollingIfUnfocused: true }]);
 	});
 
 	it("shows the banner with the message and a Settings > Workers link when no worker is online", () => {

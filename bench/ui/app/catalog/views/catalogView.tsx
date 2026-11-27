@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Library } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryState } from "nuqs";
+import { categoryFromUrl, filterToUrl, sourceFromUrl } from "./catalogUrlFilters";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -701,14 +702,21 @@ export default function CatalogView() {
 	const confirm = useConfirm();
 	const { t: tu } = useTranslation("uf6b");
 	const [uploadDataset] = useUploadCatalogDatasetMutation();
-	const [localFilters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
-	// p12-2: the search term lives in the address (?q=), the other filters stay on the page.
+	// p12-2, X-85: the search term and the category and source filters live in the address.
 	const [q, setQ] = useQueryState("q", parseAsString.withDefault("").withOptions({ history: "replace" }));
-	const filters: CatalogFilters = { ...localFilters, query: q ?? "" };
+	const [categoryParam, setCategoryParam] = useQueryState("category", parseAsString.withOptions({ history: "replace" }));
+	const [sourceParam, setSourceParam] = useQueryState("source", parseAsString.withOptions({ history: "replace" }));
+	const filters: CatalogFilters = {
+		...NO_FILTERS,
+		category: categoryFromUrl(categoryParam),
+		source: sourceFromUrl(sourceParam),
+		query: q ?? "",
+	};
 	const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1).withOptions({ history: "replace" }));
 	const onFilters = (f: CatalogFilters) => {
-		setFilters(f);
 		void setPage(null);
+		if (f.category !== filters.category) void setCategoryParam(filterToUrl(f.category));
+		if (f.source !== filters.source) void setSourceParam(filterToUrl(f.source));
 		if (f.query !== filters.query) void setQ(f.query === "" ? null : f.query);
 	};
 	const [busyId, setBusyId] = useState<string | null>(null);

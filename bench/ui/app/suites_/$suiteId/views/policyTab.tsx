@@ -255,15 +255,24 @@ function GenerateSection({
 	const [budget, setBudget] = useState("0.30");
 	const [jobId, setJobId] = useState("");
 	const [create, state] = useCreateJobMutation();
-	const job = useGetJobQuery(jobId, { skip: !jobId, pollingInterval: 2000 });
+	// M1-62: poll every 5 s only while the job runs and the tab has focus; stop once it ends.
+	const [ended, setEnded] = useState(false);
+	const job = useGetJobQuery(jobId, { skip: !jobId, pollingInterval: jobId && !ended ? 5000 : 0, skipPollingIfUnfocused: true });
 	const j = job.data;
 	const terminal = j && (j.status === "succeeded" || j.status === "failed" || j.status === "cancelled");
+	// currentData: the job of this id, never the last job's result while the new one loads.
+	const cur = job.currentData;
+	const curEnded = !!cur && (cur.status === "succeeded" || cur.status === "failed" || cur.status === "cancelled");
+	if (curEnded !== ended && (curEnded || cur)) setEnded(curEnded);
 	useEffect(() => {
 		if (terminal && j?.status === "succeeded" && !j.result?.estimate) onDone();
 	}, [terminal, j, onDone]);
 	const start = async (estimate: boolean) => {
 		const r = await create({ kind: "policy.generate", params: generateParams({ suite, doc, provider, model, budget }, estimate) });
-		if ("data" in r && r.data) setJobId(r.data.id);
+		if ("data" in r && r.data) {
+			setEnded(false);
+			setJobId(r.data.id);
+		}
 	};
 	const keyOk = isPicked(picked) && keyState === "ok";
 	const ready = !blocked && keyOk && !state.isLoading && (!jobId || terminal);

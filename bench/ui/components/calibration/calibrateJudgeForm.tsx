@@ -3,7 +3,8 @@ import { ModelPicker, type ModelRef, type ProviderId } from "@/components/models
 import { useSession } from "@/lib/session/sessionContext";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { CalibrationStatus, Job } from "@/lib/types/bench";
-import { Link } from "@tanstack/react-router";
+import { KeyMissingNote } from "@/components/models/keyMissingNote";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./hw04I18n";
@@ -76,6 +77,7 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 	const session = useSession();
 	const hosted = session.authMode === "hosted";
 	const models = useGetModelsQuery();
+	const returnTo = useRouterState({ select: (state) => state.location.href });
 	const pinned = status.provider && status.model ? ({ provider: status.provider as ProviderId, model: status.model } as ModelRef) : null;
 	const [model, setModel] = useState<ModelRef | null>(pinned);
 	const [sample, setSample] = useState(0);
@@ -160,12 +162,9 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 				</p>
 			)}
 			{noKey ? (
-				<p className="text-sm" data-testid="calibrate-judge-nokey">
-					{t("noKey", { provider })}{" "}
-					<Link to="/models" search={{ add: provider } as never} className="text-primary underline" data-testid="calibrate-judge-addkey">
-						{t("addKey")}
-					</Link>
-				</p>
+				<div data-testid="calibrate-judge-nokey">
+					<KeyMissingNote provider={provider} returnTo={returnTo} />
+				</div>
 			) : (
 				<div className="flex flex-col gap-3">
 					<JobRunButton

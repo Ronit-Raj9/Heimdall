@@ -23,6 +23,7 @@ import type { SuiteSummary } from "@/lib/types/bench";
 import type { SuiteLintReport } from "@/lib/types/suiteAuthoring";
 import { FileText, Lock } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import "./ufc5I18n";
 import { useTranslation } from "react-i18next";
 import "@/components/suites/uf6aI18n";
 
@@ -361,6 +362,7 @@ function FileEditor({ suiteId, path, onDeleted }: { suiteId: string; path: strin
 function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDir: string; onPicked(p: string): void }) {
 	const { t } = useTranslation("suiteAuthoring");
 	const { t: t6 } = useTranslation("w4m6");
+	const { t: tc } = useTranslation("ufc5");
 	const [dir, setDir] = useState(defaultDir);
 	const [put, putState] = usePutSuiteFileMutation();
 	const [upload, uploadState] = useUploadSuiteZipMutation();
@@ -390,34 +392,38 @@ function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDi
 	const busy = putState.isLoading || uploadState.isLoading;
 	const err = putState.error ?? uploadState.error;
 	return (
-		<div className="flex min-w-0 flex-col gap-2 rounded-md border p-3" data-testid="suite-edit-uploads">
-			<label className="flex flex-col gap-1 text-sm">
-				{t("edit.uploadDir")}
-				<Input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="tasks/t01/repo" data-testid="suite-edit-upload-dir" />
-			</label>
-			<p className="text-muted-foreground text-xs" data-testid="suite-edit-upload-target">
-				{uploadTargetText(t6, dir)}
-			</p>
-			<div className="flex flex-wrap gap-3 text-sm">
-				<label className="flex flex-col gap-1">
-					{t("edit.uploadFile")}
-					<input type="file" disabled={busy} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="suite-edit-upload-file" />
+		// M8-91: "Add file" in the file list is the one primary way; uploads sit behind this disclosure.
+		<details className="min-w-0 rounded-md border p-3" data-testid="suite-edit-uploads">
+			<summary className="text-muted-foreground min-h-11 cursor-pointer py-2 text-sm">{tc("edit.uploadMore")}</summary>
+			<div className="flex min-w-0 flex-col gap-2 pt-2">
+				<label className="flex flex-col gap-1 text-sm">
+					{t("edit.uploadDir")}
+					<Input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="tasks/t01/repo" data-testid="suite-edit-upload-dir" />
 				</label>
-				<label className="flex flex-col gap-1">
-					{t("edit.uploadZip")}
-					<input
-						type="file"
-						accept=".zip,application/zip"
-						disabled={busy || !target}
-						onChange={(e) => void onZip(e.target.files?.[0])}
-						data-testid="suite-edit-upload-zip"
-					/>
-				</label>
+				<p className="text-muted-foreground text-xs" data-testid="suite-edit-upload-target">
+					{uploadTargetText(t6, dir)}
+				</p>
+				<div className="flex flex-wrap gap-3 text-sm">
+					<label className="flex flex-col gap-1">
+						{t("edit.uploadFile")}
+						<input type="file" disabled={busy} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="suite-edit-upload-file" />
+					</label>
+					<label className="flex flex-col gap-1">
+						{t("edit.uploadZip")}
+						<input
+							type="file"
+							accept=".zip,application/zip"
+							disabled={busy || !target}
+							onChange={(e) => void onZip(e.target.files?.[0])}
+							data-testid="suite-edit-upload-zip"
+						/>
+					</label>
+				</div>
+				{busy && <p className="text-muted-foreground text-xs">{t("edit.uploading")}</p>}
+				{msg && <p className="text-sm">{msg}</p>}
+				{err && <p className="text-destructive text-sm">{authoringError(err, t("edit.uploadError"))}</p>}
 			</div>
-			{busy && <p className="text-muted-foreground text-xs">{t("edit.uploading")}</p>}
-			{msg && <p className="text-sm">{msg}</p>}
-			{err && <p className="text-destructive text-sm">{authoringError(err, t("edit.uploadError"))}</p>}
-		</div>
+		</details>
 	);
 }
 

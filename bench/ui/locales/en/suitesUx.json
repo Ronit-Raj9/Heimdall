@@ -15,6 +15,11 @@
 		"fromFailuresHint": "Failed runs you saw in production, turned into tasks.",
 		"fromTracesHint": "Traces exported from another platform."
 	},
+	"environment": {
+		"workspace": "Runs in a workspace container",
+		"node": "Runs in a Node.js container",
+		"host": "Runs on the machine itself"
+	},
 	"runSuite": "Run {{suite}}",
 	"open": "Open {{suite}}",
 	"tasks_one": "{{count}} task",

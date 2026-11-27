@@ -70,6 +70,8 @@ export function normalizeRepo(input: string): string {
 
 /** How often the form refreshes readiness while it is open. */
 export const READINESS_POLL_MS = 15000;
+/** M1-62: a running issue run is read again every 5 s, only while the tab has focus. */
+export const RUN_POLL_MS = 5000;
 
 /** Why Start is blocked on the hosted site, or "" when it is not (no worker taking issuebench.work, or no model gateway). */
 export function startBlocked(r: IssueReadiness | undefined): "" | "worker" | "gateway" {
@@ -122,7 +124,7 @@ export function FromIssues({ writable }: { writable: boolean }) {
 	const [runId, setRunId] = useState("");
 	const [scan, scanState] = useScanIssuesMutation();
 	const [error, setError] = useState("");
-	const readiness = useGetIssueReadinessQuery(undefined, { pollingInterval: READINESS_POLL_MS });
+	const readiness = useGetIssueReadinessQuery(undefined, { pollingInterval: READINESS_POLL_MS, skipPollingIfUnfocused: true });
 	const name = normalizeRepo(repo);
 
 	const onScan = async () => {
@@ -188,7 +190,7 @@ export function FromIssues({ writable }: { writable: boolean }) {
 
 export function RunView({ id, writable, readiness, t }: { id: string; writable: boolean; readiness?: IssueReadiness; t: T }) {
 	const [poll, setPoll] = useState(0);
-	const run = useGetIssueRunQuery(id, { pollingInterval: poll });
+	const run = useGetIssueRunQuery(id, { pollingInterval: poll, skipPollingIfUnfocused: true });
 	const [start, startState] = useStartIssueRunMutation();
 	const [consent, setConsent] = useState(false);
 	// M6-27: provider and model come from the shared model picker (your model keys), not two free text boxes.
@@ -200,7 +202,7 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 	const [error, setError] = useState("");
 	const data = run.data;
 	const running = data?.status === "running";
-	if (running && poll === 0) setPoll(2000);
+	if (running && poll === 0) setPoll(RUN_POLL_MS);
 	if (!running && poll !== 0 && data) setPoll(0);
 	if (!data) return null;
 	const items = data.items ?? [];
@@ -218,7 +220,7 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 		setError("");
 		try {
 			await start({ id, ...startBody(consent, provider, model) }).unwrap();
-			setPoll(2000);
+			setPoll(RUN_POLL_MS);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
 		}

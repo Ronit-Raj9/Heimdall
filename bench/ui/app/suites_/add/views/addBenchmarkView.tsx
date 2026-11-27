@@ -37,7 +37,7 @@ import {
 } from "./addBenchmarkState";
 
 /** How often a draft is read again while its readiness checks or publish run. */
-export const DRAFT_POLL_MS = 3000;
+export const DRAFT_POLL_MS = 5000;
 
 /** What a new source clears: the recognised chips, the found result and the draft (wave 4, p10-4). */
 export function sourceReset(): { matches: OnboardMatch[]; inv: null; setId: null; error: string } {
@@ -190,7 +190,7 @@ export default function AddBenchmarkView() {
 export function DraftSteps({ id }: { id: string }) {
 	const { t } = useTranslation("onboard");
 	const [poll, setPoll] = useState(0);
-	const q = useGetOnboardDraftQuery(id, { pollingInterval: poll });
+	const q = useGetOnboardDraftQuery(id, { pollingInterval: poll, skipPollingIfUnfocused: true });
 	const set = q.data;
 	const active =
 		!!set && (set.readiness?.status === "queued" || set.readiness?.status === "running" || (!!set.published && !set.published.job_id));

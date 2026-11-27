@@ -14,6 +14,23 @@ import { ImportedFrom } from "./suiteScenario";
 import { leaderboardSuite } from "./suites.utils";
 import { DeclaredArtifacts } from "./taskArtifacts";
 
+/** M6-36: the plain words key for a suite's environment id; null when the id is unknown (shown as is). */
+export function environmentLabelKey(env: string | undefined | null): "workspace" | "node" | "host" | null {
+	switch ((env ?? "").trim().toLowerCase()) {
+		case "docker":
+		case "docker_workspace":
+		case "workspace":
+			return "workspace";
+		case "node":
+			return "node";
+		case "host":
+		case "local":
+			return "host";
+		default:
+			return null;
+	}
+}
+
 /**
  * The suite's settings as a definition list, with a link to its leaderboard: track, grading (a
  * judged suite says in plain words what that means), output and services, then the verifier and
@@ -33,6 +50,7 @@ export function SuiteFacts({
 }) {
 	const { t } = useTranslation("bench");
 	const { t: tf } = useTranslation("uf6a");
+	const { t: tu } = useTranslation("suitesUx");
 	const locale = getLocale();
 	// M6-36: an empty fact is a plain dash, not the word "none".
 	const none = <span className="text-muted-foreground">-</span>;
@@ -54,6 +72,12 @@ export function SuiteFacts({
 		},
 	];
 	// M6-36: ids and hashes are for experts: they sit behind "Technical details".
+	const envKey = environmentLabelKey(suite.environment);
+	facts.push({
+		label: t("suites.facts.environment"),
+		value: envKey ? tu(`environment.${envKey}`) : <code>{suite.environment || "-"}</code>,
+		testId: "environment-plain",
+	});
 	const technical: { label: string; value: React.ReactNode; testId: string }[] = [
 		{ label: t("suites.facts.environment"), value: <code>{suite.environment}</code>, testId: "environment" },
 		{ label: t("suites.facts.grader"), value: <code>{suite.grader}</code>, testId: "grader" },

@@ -539,7 +539,7 @@ export function RowsImportForm({ suiteId, exact, format, onImported, t }: RowsIm
 	const [run, state] = useImportSuiteRowsMutation();
 	const polled = useGetRowImportQuery(
 		{ suite: suiteId, id: started?.id ?? "" },
-		{ skip: started?.status !== "running", pollingInterval: 2000 },
+		{ skip: started?.status !== "running", pollingInterval: 5000, skipPollingIfUnfocused: true },
 	);
 	useEffect(() => {
 		if (polled.data && started && polled.data.id === started.id && polled.data !== started) setStarted(polled.data);

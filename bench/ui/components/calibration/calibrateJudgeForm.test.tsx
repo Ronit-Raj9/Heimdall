@@ -46,14 +46,14 @@ describe("CalibrateJudgeForm", () => {
 		expect(html).toContain("About 48 grader call(s)");
 		expect(html).toContain("Hosted cap: 400 calls");
 		expect(html).toContain('data-testid="job-run-calibrate.run"');
-		expect(html).not.toContain('data-testid="calibrate-judge-addkey"');
+		expect(html).not.toContain('data-testid="calibrate-judge-nokey"');
 	});
 
 	it("links to add a model key when the org has none for the judge provider", () => {
 		api.models = okQuery({ providers: [], keys: [] });
 		const html = render(<CalibrateJudgeForm status={status} />, hostedSession("member"));
-		expect(html).toContain('data-testid="calibrate-judge-addkey"');
-		expect(html).toContain("Add a model key");
+		expect(html).toContain('data-testid="key-missing-note"');
+		expect(html).toContain("Add a openai key");
 		expect(html).not.toContain('data-testid="job-run-calibrate.run"');
 	});
 
