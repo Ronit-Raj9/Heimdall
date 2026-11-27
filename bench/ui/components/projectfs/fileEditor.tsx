@@ -1,5 +1,7 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
-import { useUnsavedGuard } from "@/components/settings/useUnsavedGuard";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import i18n from "@/lib/i18n";
+import "@/components/settings/uf8aI18n";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -87,7 +89,7 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 	const loadError = file.error && !missing ? getBenchErrorMessage(file.error) : null;
 
 	const dirty = !binary && text !== loadedText;
-	useUnsavedGuard(dirty);
+	useLeaveGuard(dirty, { body: i18n.t("unsaved.body", { ns: "uf8a" }) });
 	const segments = path.split("/");
 
 	return (

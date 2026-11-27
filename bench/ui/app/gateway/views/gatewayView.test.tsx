@@ -11,10 +11,8 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 	useNavigate: () => () => undefined,
 }));
-vi.mock("@/components/gateway/gatewayEffectQuery", () => ({
-	useGetGatewayEffectOptionalQuery: () => ({ data: undefined }),
-}));
 vi.mock("@/lib/store/apis/gatewayApi", () => ({
+	useGetGatewayEffectOptionalQuery: () => ({ data: undefined }),
 	useGetGatewayReportCardQuery: () => state.card,
 	useSetGatewaySourceMutation: () => mutation(),
 	useRemoveGatewaySourceMutation: () => mutation(),

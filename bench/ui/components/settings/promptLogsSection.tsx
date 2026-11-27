@@ -18,7 +18,9 @@ import { Check, FileText, FileX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "./settingsBits";
-import { useUnsavedGuard } from "./useUnsavedGuard";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import i18n from "@/lib/i18n";
+import "@/components/settings/uf8aI18n";
 
 /** Prompt logging of the organization: keep text or not, retention, delete all (admin). */
 export function PromptLogsSection() {
@@ -57,7 +59,7 @@ function PromptLogsForm({ policy }: { policy: PromptLogging }) {
 	const rows = useListPromptLogsQuery({ limit: 1 }, { skip: !policy.gateway_logs });
 	const [purge, purgeState] = useDeletePromptLogsMutation();
 	const dirty = keep !== policy.keep_content || days !== policy.retention_days;
-	useUnsavedGuard(isAdmin && dirty && !saved);
+	useLeaveGuard(isAdmin && dirty && !saved, { body: i18n.t("unsaved.body", { ns: "uf8a" }) });
 
 	const onSave = async () => {
 		try {

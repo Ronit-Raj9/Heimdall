@@ -6,7 +6,9 @@ import { Check } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "./settingsBits";
-import { useUnsavedGuard } from "./useUnsavedGuard";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import i18n from "@/lib/i18n";
+import "@/components/settings/uf8aI18n";
 
 /** Passwords shorter than this are refused here before the server refuses them (as on sign-up). */
 const MIN_PASSWORD = 12;
@@ -26,7 +28,7 @@ export function PasswordTab() {
 
 	const tooShort = touched && next.length < MIN_PASSWORD;
 	const mismatch = touched && repeat !== next;
-	useUnsavedGuard(Boolean(current || next || repeat) && !state.isLoading);
+	useLeaveGuard(Boolean(current || next || repeat) && !state.isLoading, { body: i18n.t("unsaved.body", { ns: "uf8a" }) });
 
 	const onSubmit = async (event: FormEvent) => {
 		event.preventDefault();

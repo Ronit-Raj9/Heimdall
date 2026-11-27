@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useDeleteOrgMutation, useGetRetentionQuery, useSetRetentionMutation } from "@/lib/store/apis/dataOpsApi";
-import { useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
+import { useLazyGetRetentionPreviewQuery, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
+import type { RetentionPreview, RetentionWithPreview } from "@/lib/types/serverFields";
 import type { RetentionPolicy } from "@/lib/types/dataops";
 import type { OrgInfo } from "@/lib/types/bench";
 import { Check, TriangleAlert } from "lucide-react";
@@ -16,10 +17,22 @@ import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
 import "@/components/calibration/hw04I18n";
 import "./uf8aI18n";
-import { useUnsavedGuard } from "./useUnsavedGuard";
-import { previewOf, useLazyGetRetentionPreviewQuery } from "./retentionPreviewApi";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
+import i18n from "@/lib/i18n";
 import { formatCount } from "@/lib/numbers";
 import { Dialog } from "@/components/ui/dialog";
+
+/**
+ * The retention dry run (G1, M8-55): GET /data/retention?preview_days=N answers the policy plus how
+ * many comparisons and runs a shorter retention would delete. Servers without the field leave
+ * `preview` out; the plain confirm stays then. The preview of the answer when it is well formed and
+ * for the asked days, else null.
+ */
+export function previewOf(answer: RetentionWithPreview | undefined, days: number): RetentionPreview | null {
+	const p = answer?.preview;
+	if (!p || p.days !== days || typeof p.runs !== "number" || typeof p.experiments !== "number") return null;
+	return p;
+}
 
 /**
  * True when a new retention deletes runs that the old one keeps: any limit after "forever" (0),
@@ -101,7 +114,7 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	}, [policy.run_days]);
 	const days = retentionDays(choice, custom, policy);
 	const changed = days !== null && days !== policy.run_days;
-	useUnsavedGuard(canEdit && changed && !saved);
+	useLeaveGuard(canEdit && changed && !saved, { body: i18n.t("unsaved.body", { ns: "uf8a" }) });
 
 	const onSave = async (event: FormEvent) => {
 		event.preventDefault();

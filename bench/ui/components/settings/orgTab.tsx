@@ -25,7 +25,7 @@ import { PromptLogsSection } from "./promptLogsSection";
 import { SettingsSection, When } from "./settingsBits";
 import "./w4m8I18n";
 import "./uf8aI18n";
-import { useUnsavedGuard } from "./useUnsavedGuard";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 
 /** Turns public read on after a confirmation, or off without one. */
 export async function togglePublic(
@@ -83,7 +83,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 	const isOwner = canUse(session, "owner");
 	const [name, setName] = useState(info.name);
 	useEffect(() => setName(info.name), [info.name]);
-	useUnsavedGuard(isAdmin && name.trim() !== "" && name.trim() !== info.name);
+	useLeaveGuard(isAdmin && name.trim() !== "" && name.trim() !== info.name, { body: i18n.t("unsaved.body", { ns: "uf8a" }) });
 	const [rename, renameState] = useRenameOrgMutation();
 	const [setPublic, publicState] = useSetPublicReadMutation();
 	const confirm = useConfirm();

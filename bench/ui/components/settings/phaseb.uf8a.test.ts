@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { auditParams } from "./auditTab";
-import { previewOf } from "./retentionPreviewApi";
+import { previewOf } from "./dataControls";
 
 const policy = { run_days: 90, min_days: 1, max_days: 3650 };
 
