@@ -2,7 +2,7 @@
 
 A live monitor runs a few real tasks (default 3, at most 5) of a ready benchmark against a deployed
 agent's remote endpoint on a schedule (default hourly, minimum 15 minutes). Open it from
-Scheduled checks, tab Live monitors, or from an agent page: More, Monitor this agent.
+[Checks](/scheduled-checks), tab Live monitors, or from an agent page: More, Monitor this agent.
 
 - Every running monitor is a schedule, so the daily budget, overlap lock and hosted guardrails
   of scheduled checks apply. Each monitor also has its own budget per day.

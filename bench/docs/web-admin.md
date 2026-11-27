@@ -1,6 +1,6 @@
 # Server admin on the website
 
-**Operate > Admin** (page title **Server admin**) is shown only to server admins: emails listed in
+[Settings > Server admin](/settings?tab=admin) (page title **Server admin**) is shown only to server admins: emails listed in
 `HEIMDALL_SERVER_ADMINS` on the server. Tabs:
 
 - **Overview**: users, organizations, runs in progress, and the **Kill
@@ -30,7 +30,7 @@
 
 ## Health and evidence
 
-**Operate > Operations**:
+[Settings > Operations](/settings?tab=operations):
 
 - **Health**: **Run doctor** (Docker, images, gateway, fault proxy, suite lock),
   **Kubernetes status**, **GPU check** (local only).

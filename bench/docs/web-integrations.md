@@ -1,11 +1,11 @@
 # Integrations on the website
 
-**Operate > Integrations** has three tabs: CI, Exports, Webhooks. Live
-scoring and the inbox live under **Production**.
+[Settings > Integrations](/settings?tab=integrations) has three tabs: CI, Exports, Webhooks. Live
+scoring and Production failures live under **Production** in the sidebar.
 
 ## CI gate
 
-Connect GitHub first (**Settings > GitHub**, connect and pick repositories).
+Connect GitHub first ([Settings > GitHub](/settings?tab=github), connect and pick repositories).
 Then **Integrations > CI**:
 
 1. **Repository**, **Mode**:
@@ -46,7 +46,7 @@ deliver only to public https URLs.
 
 ## Inbox ingest
 
-**Production > Failure inbox**: flagged production sessions become task drafts.
+[Production failures](/inbox): flagged production sessions become task drafts.
 
 - **Push failures in**: add the shown snippet to `inbox/sources.yaml` and
   point your tracing tool's webhook at the ingest URL. Works hosted.

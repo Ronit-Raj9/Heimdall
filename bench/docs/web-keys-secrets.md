@@ -5,7 +5,7 @@ never shown again after saving.
 
 ## Model keys
 
-**Build > Models & keys**, **Add a model key**:
+[Settings > Model keys](/settings?tab=keys), then **Add key** on your provider's card:
 
 - Provider, label, API key. Optional base URL (needed for some providers).
 - **Allowed models**: comma separated; empty allows any model.
@@ -17,7 +17,7 @@ Runs reach models only through the Bifrost gateway, which holds the key. The
 agent container gets a per-run key, never your provider key. **Edit** with an
 empty key field keeps the stored key. **Delete** makes runs using it fail.
 
-Spend per key: **Operate > Usage**, Provider keys section.
+Spend per key: [Settings > Usage](/settings?tab=usage), Provider keys section.
 
 ## Budgets
 
@@ -30,7 +30,7 @@ Three layers, smallest wins:
 
 ## Org secrets
 
-**Settings > Secrets** (admins add, rotate and delete; members see names only):
+[Settings > Secrets](/settings?tab=secrets) (admins add, rotate and delete; members see names only):
 
 - Name: upper case letters, digits and underscores, starting with a letter,
   max 64 (for example `TAVILY_API_KEY`). Some prefixes are reserved for the server.

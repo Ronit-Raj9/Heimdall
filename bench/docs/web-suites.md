@@ -1,7 +1,7 @@
 # Suites on the website
 
 A suite is a benchmark pack: `benchmarks/<id>/` with `suite.yaml`, tasks,
-hidden verifiers and a lock. Pages: **Build > Catalog** and **Build > Suites**.
+hidden verifiers and a lock. Pages: [Benchmarks](/suites) in the sidebar, with its **Catalog** tab.
 
 ## Catalog
 

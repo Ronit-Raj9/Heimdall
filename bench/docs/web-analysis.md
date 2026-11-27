@@ -61,7 +61,7 @@ runs; see past certifications.
 
 ## Inbox, clusters, leaderboard
 
-- **Production > Failure inbox**: production failures become task drafts; accept,
+- [Production failures](/inbox): production failures become task drafts; accept,
   reject or snooze. Failure clusters and triage live here too.
-- **Benchmark > Leaderboard**: agent configs ranked by verified success,
+- [Results > Leaderboard](/leaderboard): agent configs ranked by verified success,
   with tiers and trends.

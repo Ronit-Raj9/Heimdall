@@ -1,7 +1,7 @@
 # Agents on the website
 
 An agent is `agents/<name>.yaml` in your project: adapter, image, model,
-limits, env, command. Everything below is under **Build > Agents**.
+limits, env, command. Everything below is under [Agents](/agents) in the sidebar.
 
 ## Create from a template
 

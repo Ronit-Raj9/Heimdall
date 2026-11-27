@@ -63,7 +63,7 @@ Tip: anywhere in the app, a word with a dotted underline has an explanation. Hov
 ## Production and release
 
 - **Drift monitor** (technical: `canary`). A small test re-run on a schedule to catch an agent or model silently getting worse.
-- **Failure inbox** (technical: `inbox`). Failures collected from real use, waiting to be turned into new tasks.
+- **Production failures** (technical: `inbox`). Failures collected from real use, waiting to be turned into new tasks.
 - **Where failures come from** (technical: `trace source`). A system that sends failed agent sessions into the failure inbox.
 - **Live quality scoring** (technical: `livescore`). Scores real agent sessions as they happen, so you see quality in production.
 - **Release rule** (technical: `policy`). A rule a new agent version must pass before it can be released.

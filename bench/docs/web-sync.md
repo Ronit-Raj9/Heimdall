@@ -5,16 +5,16 @@ The website and the CLI work on the same project files: `agents/`,
 
 ## On the website
 
-- **Build > Files** (page title **Project files**): browse, edit, create and delete files; every
+- [Settings > Files](/settings?tab=files) (page title **Project files**): browse, edit, create and delete files; every
   save is versioned (**Versions**, **Load into editor** to restore).
   **Download project (.zip)** takes everything.
-- **Operate > Upload**: bring sealed runs, a project folder or an agent
+- **Upload** ([open](/upload), reached from Benchmarks): bring sealed runs, a project folder or an agent
   folder from your machine as a zip. Sealed runs are checked against their
   seal: imported, skipped or refused.
 
 ## From the CLI
 
-Create an API token: **Settings > API tokens**, **Create token**, pick a
+Create an access token: [Settings > Access tokens](/settings?tab=tokens), **Create token**, pick a
 role (never more than your own). It shows once.
 
 ```sh

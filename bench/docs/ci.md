@@ -21,7 +21,7 @@ The fastest way to set it up is the agent page: open your agent, tab **Pull requ
 
 ## Setup
 
-1. **An org API token.** In Heimdall, Settings > API tokens, create a token with the member role (or use "Create a CI token" on the agent page). It is shown once.
+1. **An org API token.** In Heimdall, [Settings > Access tokens](/settings?tab=tokens), create a token with the member role (or use "Create a CI token" on the agent page). It is shown once.
 2. **Secrets and variables.**
    - GitHub: repository Settings > Secrets and variables > Actions. Secret `HEIMDALL_TOKEN`; variable `HEIMDALL_URL` (your Heimdall's address) unless the workflow names it.
    - GitLab: project Settings > CI/CD > Variables. `HEIMDALL_TOKEN` (masked), `HEIMDALL_URL`, and `GITLAB_TOKEN`: a project access token with the `api` scope. GitLab's CI job token cannot write merge request notes or commit statuses.

@@ -18,7 +18,7 @@ controls (section 6).
 
 What the server holds, and what it does not:
 
-- **Provider keys.** Each organization adds its own keys in Models & keys.
+- **Provider keys.** Each organization adds its own keys in [Settings > Model keys](/settings?tab=keys).
   They are stored encrypted in the keystore under `HEIMDALL_MASTER_KEY` and
   are never shown again, not even to owners. A worker receives an
   organization's keys only while it holds a run of that organization, over
@@ -27,7 +27,7 @@ What the server holds, and what it does not:
 - **Own key required.** Runs never fall back to a key of the server or of
   the worker. An evaluation or experiment on a provider the organization has
   no working key for is refused before anything runs, with a pointer to
-  Models & keys.
+  [Settings > Model keys](/settings?tab=keys).
 - **No public demo.** A fresh install has no demo organization, no
   anonymous access and no sample data. Every visitor signs in and sees only
   their own organization's work.
@@ -153,7 +153,7 @@ An organization left without an admin is repaired with
 you@example.com -role owner`.
 
 Open `https://heimdall.example.com/`, sign in (your organization was created
-with the account), invite your team (Settings > Members).
+with the account), invite your team ([Settings > Members](/settings?tab=members)).
 
 Each organization has a project folder in the data volume,
 `/var/lib/heimdall/runs/projects/<org id>/` (agent configs and their saved
@@ -205,7 +205,7 @@ are not used for hosted organizations. Details, flags, upgrades and
 troubleshooting: [runners.md](runners.md) and `deploy/runner/README.md`.
 
 Model keys: every organization's runs use only that organization's own keys
-from Models & keys, which the server hands to the runner per lease. There is
+from [Settings > Model keys](/settings?tab=keys), which the server hands to the runner per lease. There is
 no fallback to the server's or a runner's own provider keys, and no silent
 fallback to the scripted practice model. Evaluations, QuickRun, experiments
 and schedules are refused before launch (HTTP 409, with a link to `/models`)
