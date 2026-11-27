@@ -26,7 +26,9 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetExperimentQuery: () => ({ data: undefined }),
 }));
 
-const { mutation } = vi.hoisted(() => ({ mutation: () => [() => Promise.resolve({}), { isLoading: false }] }));
+const { mutation } = vi.hoisted(() => ({
+	mutation: () => [() => Promise.resolve({}), { isLoading: false }],
+}));
 
 vi.mock("@/lib/store/apis/findingsApi", () => ({
 	useGetFindingsQuery: () => state.list,
@@ -38,7 +40,9 @@ vi.mock("@/lib/store/apis/findingsApi", () => ({
 	useGetInvestigationQuery: () => ({ data: undefined }),
 }));
 
-vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: mutation }));
+vi.mock("@/lib/store/apis/jobRunApi", () => ({
+	useCreateJobMutation: mutation,
+}));
 
 const base: Finding = {
 	id: "fnd-000000000001",
@@ -51,14 +55,25 @@ const base: Finding = {
 	runs: ["r_t01_A"],
 	hypothesis: "It never ran the tests",
 	quotes: [{ run_id: "r_t01_A", seq: 4, text: "skip tests" }],
-	history: [{ at: "2026-11-01T10:00:00Z", by: "Ann", from: "", to: "open", reason: "Tracked as a finding." }],
+	history: [
+		{
+			at: "2026-11-01T10:00:00Z",
+			by: "Ann",
+			from: "",
+			to: "open",
+			reason: "Tracked as a finding.",
+		},
+	],
 	created_at: "2026-11-01T10:00:00Z",
 	updated_at: "2026-11-01T10:00:00Z",
 };
 
 describe("Findings tab", () => {
 	beforeEach(() => {
-		state.list = { isLoading: false, data: { mode: "live", findings: [], counts: {} } };
+		state.list = {
+			isLoading: false,
+			data: { mode: "live", findings: [], counts: {} },
+		};
 	});
 
 	it("shows model text only as a hypothesis, with quotes that open the run at the step", () => {
@@ -113,8 +128,11 @@ describe("Findings tab", () => {
 	});
 
 	it("lists findings with their state badge, and says so when there are none", () => {
-		expect(renderToStaticMarkup(<FindingsTab />)).toContain("No findings yet.");
-		state.list = { isLoading: false, data: { mode: "live", findings: [base], counts: { open: 1 } } };
+		expect(renderToStaticMarkup(<FindingsTab />)).toContain("No tracked failures yet.");
+		state.list = {
+			isLoading: false,
+			data: { mode: "live", findings: [base], counts: { open: 1 } },
+		};
 		const html = renderToStaticMarkup(<FindingsTab />);
 		expect(html).toContain("Skips the tests");
 		expect(html).toContain("finding-state-open");
@@ -122,7 +140,14 @@ describe("Findings tab", () => {
 	});
 
 	it("reads the investigation list in either answer shape", () => {
-		const row = { id: "j", exp_id: "e", created_at: "", runs: 1, items: 1, spent_usd: 0 };
+		const row = {
+			id: "j",
+			exp_id: "e",
+			created_at: "",
+			runs: 1,
+			items: 1,
+			spent_usd: 0,
+		};
 		expect(investigationRows([row])).toHaveLength(1);
 		expect(investigationRows({ mode: "live", investigations: [row] })).toHaveLength(1);
 		expect(investigationRows(undefined)).toHaveLength(0);

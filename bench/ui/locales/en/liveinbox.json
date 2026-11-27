@@ -40,21 +40,21 @@
 			"label": "Pull now",
 			"since": "How far back",
 			"sinceCursor": "Since last pull",
-			"hosted": "Pulling needs a key to read your tools, so it only works on a Heimdall running on your own machine. Here, have your tools send failures in with an access token (Send failures in, below).",
+			"hosted": "Pulling needs a key to read your tools, so it only works on a Heimdall running on your own machine. Here, have your tools send failures in with an ingest token (Send failures in, below).",
 			"needsSetup": "Set up pulling"
 		},
 		"webhook": {
 			"title": "Send failures in",
-			"description": "Any tool can send a failed session to this address using the access token.",
+			"description": "Any tool can send a failed session to this address with an ingest token. Heimdall keeps the failed conversation: the request, the answer and the tool calls, with keys, tokens, email addresses, phone numbers, long numbers and home folder names removed. Names and street addresses are not removed.",
 			"url": "Address to send to",
 			"on": "Accepting failures",
 			"off": "Not accepting failures",
-			"tokenEnv": "Token variable name",
+			"tokenEnv": "Ingest token variable",
 			"tokenSet": "set on the server",
 			"tokenMissing": "not set on the server",
 			"next": "Next step",
 			"example": "Example",
-			"snippet": "Add to inbox/sources.yaml",
+			"snippet": "Source settings to add",
 			"generate": "Generate token",
 			"generated": "Set this on the server, then restart it. It is shown only here in your browser and never sent to Heimdall.",
 			"copy": "Copy",
@@ -62,14 +62,14 @@
 			"loadError": "Could not read the setup for sending failures in"
 		},
 		"tokens": {
-			"title": "Access tokens",
+			"title": "Ingest tokens",
 			"label": "Label (optional)",
 			"labelPlaceholder": "e.g. production gateway",
 			"full": "This organization already has {{max}} tokens. Remove one to make another.",
-			"viewer": "Only organization admins can create or remove access tokens. Ask an admin (Settings, Members).",
+			"viewer": "Only organization admins can create or remove ingest tokens. Ask an admin (Settings, Members).",
 			"createdOnce": "Copy this token now: it is shown only once. Heimdall keeps only a fingerprint of it. Save it where your tool runs, then send failures with the curl line below.",
-			"empty": "No access tokens yet. An organization admin can create one here.",
-			"emptyAdmin": "No access tokens yet. Create one to start sending failures in.",
+			"empty": "No ingest tokens yet. An organization admin can create one here.",
+			"emptyAdmin": "No ingest tokens yet. Create one to start sending failures in.",
 			"colLabel": "Label",
 			"colToken": "Token",
 			"colCreated": "Created",
@@ -78,11 +78,11 @@
 			"revoke": "Remove",
 			"revokeQuestion": "Remove this token? Tools using it can no longer send failures.",
 			"cancel": "Cancel",
-			"loadError": "Could not read the access tokens"
+			"loadError": "Could not read the ingest tokens"
 		},
 		"source": {
 			"title": "Pull failures from your tools",
-			"description": "Add Bifrost, Langfuse or LangSmith. Heimdall saves it in inbox/sources.yaml and starts by collecting errors.",
+			"description": "Add Bifrost, Langfuse or LangSmith. Heimdall checks it for errors first.",
 			"kind": "Tool",
 			"name": "Name",
 			"url": "Gateway URL",
@@ -95,8 +95,7 @@
 			"apiKeyEnv": "API key secret name",
 			"secretHint": "Enter the names of server environment variables, never the values.",
 			"secretHintHosted": "Enter the names of organization secrets, never the values. Store the values in Settings > Secrets.",
-			"submit": "Connect",
-			"incomplete": "Fill the required fields to continue.",
+			"submit": "Add source",
 			"another": "Connect another tool"
 		}
 	},

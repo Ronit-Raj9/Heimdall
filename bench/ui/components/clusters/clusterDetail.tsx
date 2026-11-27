@@ -49,7 +49,7 @@ export function ClusterDetailPanel({ detail, onClose, onOpen, renderRunLink }: C
 						<span>{t("clusters.detail.seen", { first, last })}</span>
 					</div>
 					<p className="text-muted-foreground text-xs">
-						{t("clusters.detail.signature")} <code className="font-mono text-[11px]">{cluster.signature}</code>
+						{t("clusters.detail.signature")} <code className="font-mono text-xs">{cluster.signature}</code>
 					</p>
 				</div>
 				<Button variant="ghost" size="sm" onClick={onClose} dataTestId="cluster-detail-close" aria-label={t("clusters.detail.close")}>
@@ -107,17 +107,17 @@ export function ClusterLayers({ layers }: { layers: readonly ClusterLayer[] }) {
 										<ul className="flex flex-wrap gap-1">
 											{items.map((item) => (
 												<li key={item}>
-													<code className="bg-muted text-foreground rounded-sm px-1 py-0.5 font-mono text-[11px] break-all">{item}</code>
+													<code className="bg-muted text-foreground rounded-sm px-1 py-0.5 font-mono text-xs break-all">{item}</code>
 												</li>
 											))}
 										</ul>
 									) : (
-										<span className="text-foreground font-mono text-[11px] break-all whitespace-pre-wrap">{layer.label}</span>
+										<span className="text-foreground font-mono text-xs break-all whitespace-pre-wrap">{layer.label}</span>
 									)}
 								</>
 							)}
 							{layer.source && (
-								<span className="text-muted-foreground text-[11px]">{t("clusters.detail.source", { source: layer.source })}</span>
+								<span className="text-muted-foreground text-xs">{t("clusters.detail.source", { source: layer.source })}</span>
 							)}
 						</li>
 					);
@@ -160,7 +160,7 @@ export function ErrorText({ text, testId }: { text: string; testId: string }) {
 				<p className="text-muted-foreground text-xs">{t("clusters.detail.errorTextHint")}</p>
 			</div>
 			<pre
-				className="bg-muted/40 max-h-64 overflow-auto rounded-sm border px-3 py-2 text-[11px] leading-relaxed break-all whitespace-pre-wrap"
+				className="bg-muted/40 max-h-64 overflow-auto rounded-sm border px-3 py-2 text-xs leading-relaxed break-all whitespace-pre-wrap"
 				data-testid={testId}
 			>
 				<code className="font-mono">{text}</code>
@@ -254,7 +254,7 @@ function ClusterRunsTable({ runs, renderRunLink }: { runs: readonly ClusterRun[]
 								<span className="flex flex-col">
 									<span className="font-mono">{run.agent}</span>
 									{run.config_hash && (
-										<span className="text-muted-foreground font-mono text-[11px]" title={run.config_hash}>
+										<span className="text-muted-foreground font-mono text-xs" title={run.config_hash}>
 											{shortHash(run.config_hash)}
 										</span>
 									)}
@@ -270,9 +270,7 @@ function ClusterRunsTable({ runs, renderRunLink }: { runs: readonly ClusterRun[]
 								{run.last_tool ? (
 									<span className="flex flex-col">
 										<span className="font-mono">{run.last_tool}</span>
-										{run.last_tool_errored && (
-											<span className="text-chart-error-ink text-[11px]">{t("clusters.detail.lastToolErrored")}</span>
-										)}
+										{run.last_tool_errored && <span className="text-chart-error-ink text-xs">{t("clusters.detail.lastToolErrored")}</span>}
 									</span>
 								) : (
 									<span className="text-muted-foreground">-</span>
@@ -281,7 +279,7 @@ function ClusterRunsTable({ runs, renderRunLink }: { runs: readonly ClusterRun[]
 							<TableCell className="max-w-sm align-top whitespace-normal">
 								{run.error_text ? (
 									<code
-										className="text-foreground line-clamp-3 font-mono text-[11px] break-all whitespace-pre-wrap"
+										className="text-foreground line-clamp-3 font-mono text-xs break-all whitespace-pre-wrap"
 										title={run.error_text}
 										data-testid={`cluster-run-error-${run.run_id}`}
 									>
@@ -325,7 +323,7 @@ export function ClusterRunLink({ runId, pairId }: ClusterRunLinkProps) {
 			<span className="font-mono text-xs" data-testid={`cluster-run-id-${runId}`}>
 				{runId}
 			</span>
-			{pairId === null && <span className="text-muted-foreground text-[11px]">{t("clusters.detail.noPair")}</span>}
+			{pairId === null && <span className="text-muted-foreground text-xs">{t("clusters.detail.noPair")}</span>}
 		</span>
 	);
 }

@@ -27,6 +27,20 @@ export function FindingStateBadge({ state }: { state: Finding["state"] }) {
 	);
 }
 
+/** The URL of one finding on the Tracked tab. */
+export function findingHref(id: string): string {
+	return `?tab=findings&finding=${encodeURIComponent(id)}`;
+}
+
+/** Findings whose title, id, task or hypothesis holds the search text (M7-13). */
+export function filterFindings(findings: readonly Finding[], q: string): Finding[] {
+	const needle = q.trim().toLowerCase();
+	if (!needle) return [...findings];
+	return findings.filter((f) =>
+		[f.title, f.id, f.hypothesis ?? "", ...f.tasks.map((x) => `${x.suite}/${x.task}`)].some((s) => s.toLowerCase().includes(needle)),
+	);
+}
+
 /** The findings table: title, state, source, tasks count, last change. */
 export function FindingList({
 	findings,
@@ -57,9 +71,19 @@ export function FindingList({
 						data-testid={`finding-row-${f.id}`}
 					>
 						<td className="py-2 pr-3">
-							<button type="button" className="text-primary text-left hover:underline" onClick={() => onSelect(f.id)}>
+							{/* A real link, so a finding can be opened in a new tab or shared (M7-32). */}
+							<a
+								href={findingHref(f.id)}
+								className="text-primary text-left hover:underline"
+								onClick={(e) => {
+									if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+									e.preventDefault();
+									onSelect(f.id);
+								}}
+								data-testid={`finding-link-${f.id}`}
+							>
 								{f.title}
-							</button>
+							</a>
 						</td>
 						<td className="py-2 pr-3">
 							<FindingStateBadge state={f.state} />

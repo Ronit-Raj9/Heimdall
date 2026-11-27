@@ -13,6 +13,8 @@ import { FlaskConical, SearchCheck } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { firstWithFinishedRuns } from "./patternDefaults";
+import "./uf7aI18n";
 
 /** The experiment id a triage URL names: the first of a comma list (a Clusters filter carried over). */
 export function triageExpId(raw: string | null): string | null {
@@ -27,6 +29,7 @@ export function triageExpId(raw: string | null): string | null {
  */
 export default function TriageTab() {
 	const { t } = useTranslation("bench");
+	const { t: f } = useTranslation("uf7a");
 	const [expParam, setExp] = useQueryState("exp", parseAsString);
 	const [, setPattern] = useQueryState("pattern", parseAsString);
 	const [all, setAll] = useQueryState("all", parseAsString);
@@ -34,13 +37,15 @@ export default function TriageTab() {
 	const experiments = useMemo(() => list.data?.experiments ?? [], [list.data]);
 	// Checks, practice runs and debug runs are listed only with all=1, so the tab opens on a real comparison.
 	const picker = useExperimentPicker(experiments, all === "1", useEvaluationNames());
-	const expId = defaultPickerExperiment(picker.options, triageExpId(expParam)) ?? null;
+	// With no ?exp= the tab opens on the newest listed comparison that has finished runs, so it does not open empty (M7-41).
+	const expId =
+		defaultPickerExperiment(picker.options, triageExpId(expParam) ?? firstWithFinishedRuns(picker.options, experiments)) ?? null;
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="triage-screen">
 			<p className="text-muted-foreground max-w-3xl text-sm">{t("triage.subtitle")}</p>
 			<TriageBanner />
-			<div className="flex flex-wrap items-end gap-3">
+			<div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
 				<ExperimentSelect
 					picker={picker}
 					value={expId}
@@ -53,7 +58,11 @@ export default function TriageTab() {
 					disabled={list.isLoading || experiments.length === 0}
 					testId="triage-experiment-picker"
 				/>
-				{expId && <EntityLink kind="experiment" id={expId} className="mb-2 text-xs" testId="triage-experiment-link" />}
+				{expId && (
+					<EntityLink kind="experiment" id={expId} className="self-start text-sm" testId="triage-experiment-link">
+						{f("patterns.openComparison")}
+					</EntityLink>
+				)}
 			</div>
 			{list.isError && (
 				<LoadError title={t("triage.listError")} error={list.error} onRetry={() => void list.refetch()} testId="triage-list-error" />

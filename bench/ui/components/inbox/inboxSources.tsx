@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { formatInboxTime } from "./inboxBadges";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { SessionImport } from "./sessionImport";
+import "@/app/inbox/views/uf7aI18n";
 
 /**
  * Each trace source and how its last pull went: when, from where on, how many traces, the last error. With manage
@@ -17,13 +18,17 @@ export function InboxSourcesTable({
 	sources,
 	manage,
 	onChanged,
+	blocked,
 }: {
 	sources: readonly InboxSourceStatus[];
 	manage?: boolean;
 	onChanged?: () => void;
+	/** Sources whose key the pull check lists as not stored: their last error reads "Blocked: key not stored" (M7-7). */
+	blocked?: ReadonlySet<string>;
 }) {
 	const { t } = useTranslation("bench");
 	const { t: w } = useTranslation("w4m7");
+	const { t: f } = useTranslation("uf7a");
 	if (sources.length === 0) return <EmptyNote testId="inbox-sources-none">{w("sources.none")}</EmptyNote>;
 	return (
 		<div className="min-w-0 overflow-x-auto rounded-sm border">
@@ -47,10 +52,14 @@ export function InboxSourcesTable({
 							<TableCell className="text-xs whitespace-nowrap">
 								{source.last_pull ? formatInboxTime(source.last_pull) : t("inbox.sources.never")}
 							</TableCell>
-							<TableCell className="text-xs whitespace-nowrap">{source.since ? formatInboxTime(source.since) : ""}</TableCell>
-							<TableCell className="text-right text-xs tabular-nums">{source.pulled ?? ""}</TableCell>
+							<TableCell className="text-xs whitespace-nowrap">{source.since ? formatInboxTime(source.since) : "-"}</TableCell>
+							<TableCell className="text-right text-xs tabular-nums">{source.pulled ?? "-"}</TableCell>
 							<TableCell className="max-w-96 text-xs">
-								{source.last_error ? (
+								{blocked?.has(source.name) && !source.last_error ? (
+									<span className="text-chart-warning-ink font-medium" data-testid={`inbox-source-blocked-${source.name}`}>
+										{f("sources.blocked")}
+									</span>
+								) : source.last_error ? (
 									<span className="text-chart-error-ink break-words" data-testid={`inbox-source-error-${source.name}`}>
 										{source.last_error}
 									</span>
@@ -60,6 +69,15 @@ export function InboxSourcesTable({
 							</TableCell>
 							{manage && (
 								<TableCell className="text-right" data-testid={`inbox-source-remove-${source.name}`}>
+									{blocked?.has(source.name) && (
+										<a
+											href="/settings?tab=secrets"
+											className="text-primary mr-2 text-sm font-medium underline-offset-2 hover:underline"
+											data-testid={`inbox-source-add-key-${source.name}`}
+										>
+											{f("sources.addKey")}
+										</a>
+									)}
 									<JobRunButton
 										kind="inbox.source"
 										params={{ name: source.name, remove: true }}
@@ -114,11 +132,12 @@ export function InboxIngestOffNote() {
 /** The empty inbox: one sentence, a "Connect a trace source" action that opens the setup, and the command inside a "From a terminal" block (wave 4, N78). */
 export function InboxEmpty() {
 	const { t: u } = useTranslation("ux13");
+	const { t: f } = useTranslation("uf7a");
 	return (
 		<FeatureHero
 			icon={Radar}
 			title={u("inbox.heroTitle")}
-			message={u("inbox.heroMessage")}
+			message={f("inbox.emptyFirst")}
 			testId="inbox-empty"
 			action={
 				<Button asChild>
@@ -130,7 +149,7 @@ export function InboxEmpty() {
 						}}
 						data-testid="inbox-hero-connect"
 					>
-						{u("inbox.heroAction")}
+						{f("inbox.emptyFirstAction")}
 					</a>
 				</Button>
 			}

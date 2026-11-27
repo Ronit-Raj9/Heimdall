@@ -53,11 +53,17 @@ export interface Finding {
 	fix?: FindingFixProof;
 	reruns?: string[];
 	history: FindingEvent[];
+	/** The comparison and setup the failure came from, once the server sends them (M7-27); until then the history names the comparison. */
+	experiment?: string;
+	arm?: string;
 	created_at: string;
 	updated_at: string;
 }
 
-export type FindingsListResponse = WithMode<{ findings: Finding[]; counts: Partial<Record<FindingState, number>> }>;
+export type FindingsListResponse = WithMode<{
+	findings: Finding[];
+	counts: Partial<Record<FindingState, number>>;
+}>;
 
 export interface FindingRerunRequest {
 	exp_id: string;
@@ -67,7 +73,14 @@ export interface FindingRerunRequest {
 }
 
 export type FindingRerunResponse = WithMode<{
-	rerun: { parent_id: string; experiment_id: string; tasks: number; slots: number; started: boolean; start_error?: string };
+	rerun: {
+		parent_id: string;
+		experiment_id: string;
+		tasks: number;
+		slots: number;
+		started: boolean;
+		start_error?: string;
+	};
 	finding: Finding;
 	note?: string;
 }>;
@@ -119,14 +132,22 @@ export const findingsApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchFindi
 			invalidatesTags: [{ type: "BenchFindings", id: "LIST" }],
 		}),
 		findingReason: builder.mutation<WithMode<Finding>, { id: string; action: "expected" | "reopen"; reason: string }>({
-			query: ({ id, action, reason }) => ({ url: `/findings/${encodeURIComponent(id)}/${action}`, method: "POST", body: { reason } }),
+			query: ({ id, action, reason }) => ({
+				url: `/findings/${encodeURIComponent(id)}/${action}`,
+				method: "POST",
+				body: { reason },
+			}),
 			invalidatesTags: (_r, _e, { id }) => [
 				{ type: "BenchFindings", id: "LIST" },
 				{ type: "BenchFindings", id },
 			],
 		}),
 		rerunFinding: builder.mutation<FindingRerunResponse, { id: string; body: FindingRerunRequest }>({
-			query: ({ id, body }) => ({ url: `/findings/${encodeURIComponent(id)}/rerun`, method: "POST", body }),
+			query: ({ id, body }) => ({
+				url: `/findings/${encodeURIComponent(id)}/rerun`,
+				method: "POST",
+				body,
+			}),
 			invalidatesTags: (_r, _e, { id }) => [
 				{ type: "BenchFindings", id: "LIST" },
 				{ type: "BenchFindings", id },
@@ -134,7 +155,11 @@ export const findingsApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchFindi
 			],
 		}),
 		checkFinding: builder.mutation<WithMode<Finding>, string>({
-			query: (id) => ({ url: `/findings/${encodeURIComponent(id)}/check`, method: "POST", body: {} }),
+			query: (id) => ({
+				url: `/findings/${encodeURIComponent(id)}/check`,
+				method: "POST",
+				body: {},
+			}),
 			invalidatesTags: (_r, _e, id) => [
 				{ type: "BenchFindings", id: "LIST" },
 				{ type: "BenchFindings", id },

@@ -121,7 +121,7 @@ describe("sources and empty state", () => {
 	it("explains how items get in", () => {
 		const html = renderToStaticMarkup(<InboxEmpty />);
 		expect(html).toContain("From a terminal");
-		expect(html).toContain("Connect a tool");
+		expect(html).toContain("Connect a source"); // M7-2 first-use empty state
 	});
 
 	it("notes when push ingest is off", () => {

@@ -4,7 +4,9 @@ import { ClusterDetailPanel, ClusterRunLink } from "@/components/clusters/cluste
 import { ClustersBanner } from "@/components/clusters/clustersBanner";
 import { ClustersFilters, type ClusterTextFilter } from "@/components/clusters/clustersFilters";
 import { ClustersSummary } from "@/components/clusters/clustersSummary";
-import { ClustersTable } from "@/components/clusters/clustersTable";
+import { ClustersTable, filterClusters } from "@/components/clusters/clustersTable";
+import { ToolbarSearch } from "@/components/ui/toolbar";
+import "./uf7aI18n";
 import {
 	clusterParams,
 	excludesSynthetic,
@@ -60,6 +62,9 @@ export default function ClustersTab() {
 	const [min, setMin] = useQueryState("min", parseAsInteger);
 	const [synthetic, setSynthetic] = useQueryState("synthetic", parseAsStringLiteral(CLUSTER_SYNTHETIC));
 	const [sig, setSig] = useQueryState("sig", parseAsString);
+	// The search is kept in the URL, so a narrowed list can be shared (M7-13, M5-24).
+	const [q, setQ] = useQueryState("q", parseAsString);
+	const { t: f } = useTranslation("uf7a");
 
 	const query = useMemo<ClusterQuery>(() => ({ suite, agent, exp, since, min, synthetic }), [suite, agent, exp, since, min, synthetic]);
 	const params = useMemo(() => clusterParams(query), [query]);
@@ -89,7 +94,6 @@ export default function ClustersTab() {
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("clusters.subtitle")}</p>
 			</div>
-			<ClustersBanner />
 
 			<ClustersFilters
 				suite={suite ?? data?.filters?.suite ?? ""}
@@ -106,12 +110,12 @@ export default function ClustersTab() {
 				disabled={list.isLoading}
 			/>
 			{experimentChoices.hiddenCount > 0 && (
-				<label className="text-muted-foreground inline-flex items-center gap-2 text-xs" title={tx("picker.showHiddenHint")}>
+				<label className="text-muted-foreground inline-flex min-h-6 items-center gap-2 text-sm" title={tx("picker.showHiddenHint")}>
 					<input
 						type="checkbox"
 						checked={showHidden}
 						onChange={(ev) => setShowHidden(ev.target.checked)}
-						className="accent-primary size-3.5"
+						className="accent-primary size-4"
 						data-testid="clusters-show-hidden"
 					/>
 					{tx("picker.showHidden", { count: experimentChoices.hiddenCount })}
@@ -131,13 +135,33 @@ export default function ClustersTab() {
 				</div>
 			) : (
 				<div className={cn("flex min-w-0 flex-col gap-6 transition-opacity", list.isFetching && "opacity-60")} aria-busy={list.isFetching}>
-					<ClustersSummary data={data} />
+					<div className="flex flex-col gap-2">
+						<ClustersSummary data={data} />
+						<ClustersBanner />
+					</div>
 					<Section title={t("clusters.table.title")} description={t("clusters.table.description")} testId="clusters-table-section">
 						{(data.clusters ?? []).length === 0 ? (
 							<EmptyClusters data={data} onShowSynthetic={() => void setSynthetic("include")} />
 						) : (
-							<div className="min-w-0 rounded-sm border">
-								<ClustersTable clusters={data.clusters} selected={sig} onSelect={(next) => void setSig(next)} />
+							<div className="flex min-w-0 flex-col gap-3">
+								<ToolbarSearch
+									value={q ?? ""}
+									onChange={(next) => void setQ(next || null)}
+									label={f("clusters.search")}
+									placeholder={f("clusters.searchPlaceholder")}
+									testId="clusters-search"
+								/>
+								{filterClusters(data.clusters, q ?? "").length === 0 ? (
+									<EmptyNote testId="clusters-no-match">{f("clusters.noMatch")}</EmptyNote>
+								) : (
+									<div className="min-w-0 rounded-sm sm:border">
+										<ClustersTable
+											clusters={filterClusters(data.clusters, q ?? "")}
+											selected={sig}
+											onSelect={(next) => void setSig(next)}
+										/>
+									</div>
+								)}
 							</div>
 						)}
 					</Section>

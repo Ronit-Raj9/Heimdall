@@ -5,6 +5,7 @@ import type { InboxBulkAcceptRequest, InboxItem, InboxSuite } from "@/lib/types/
 import { cn } from "@/lib/utils";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/inbox/views/uf7aI18n";
 import { isActionable } from "./inbox.utils";
 
 const FIELD =
@@ -54,6 +55,7 @@ export function InboxBulkAccept({
 }) {
 	const { t } = useTranslation("inboxGuide");
 	const { t: w } = useTranslation("w4m7");
+	const { t: f } = useTranslation("uf7a");
 	const ids = useId();
 	const open = useMemo(() => items.filter(isActionable), [items]);
 	const [values, setValues] = useState<BulkAcceptValues>({ ids: [], suite: "", recorded: false, rubric: "", switchGrader: false });
@@ -193,6 +195,11 @@ export function InboxBulkAccept({
 				<span>{t("bulk.switchGrader")}</span>
 			</label>
 			{!values.recorded && values.rubric.trim() === "" && <p className="text-muted-foreground text-xs">{t("bulk.asDrafts")}</p>}
+			{values.ids.length > 0 && values.suite && (
+				<p className="text-sm font-medium" data-testid="inbox-bulk-summary">
+					{f("bulk.summary", { count: values.ids.length, suite: values.suite })}
+				</p>
+			)}
 			<div>
 				<Button type="submit" disabled={off} isLoading={result.isLoading} dataTestId="inbox-bulk-submit">
 					{t("bulk.submit", { count: values.ids.length })}

@@ -21,13 +21,16 @@ export default function MonitorsView() {
 	const { t: tu } = useTranslation("u14");
 	const [cert] = useQueryState("cert", parseAsString);
 	const [certifying, setCertifying] = useState(false);
+	// While the list is empty its empty state carries the one "certify" action, so the header does not repeat it (M7-68).
+	const list = useListMonitorCertificationsQuery();
+	const listEmpty = !list.isLoading && !list.isError && (list.data?.certifications ?? []).length === 0;
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="monitors-screen">
 			<PageHeader
 				title={tu("monitors.title")}
 				subtitle={tu("monitors.subtitle")}
 				actions={
-					cert ? undefined : (
+					cert || listEmpty ? undefined : (
 						<Button onClick={() => setCertifying(true)} data-testid="monitors-certify-open">
 							<Plus className="size-4" aria-hidden="true" />
 							{tu("monitors.certifyNew")}
@@ -37,7 +40,11 @@ export default function MonitorsView() {
 				breadcrumbs={cert ? [{ label: tu("monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
 			/>
 			{cert ? <CertificationScreen certId={cert} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} />}
-			<p className="text-muted-foreground line-clamp-2 max-w-3xl text-xs" data-testid="monitors-disclaimer" title={tu("monitors.disclaimer")}>
+			<p
+				className="text-muted-foreground line-clamp-2 max-w-3xl text-xs"
+				data-testid="monitors-disclaimer"
+				title={tu("monitors.disclaimer")}
+			>
 				{tu("monitors.disclaimer")}
 			</p>
 		</section>
@@ -77,7 +84,7 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 				className="max-w-2xl"
 				testId="monitors-certify-dialog"
 			>
-				<div className="[&>[data-testid=monitor-certify]]:border-0 [&>[data-testid=monitor-certify]]:py-0 [&>[data-testid=monitor-certify]]:shadow-none [&_[data-slot=card-content]]:px-0 [&_h2]:hidden">
+				<div className="[&_[data-slot=card-content]]:px-0 [&_h2]:hidden [&>[data-testid=monitor-certify]]:border-0 [&>[data-testid=monitor-certify]]:py-0 [&>[data-testid=monitor-certify]]:shadow-none">
 					<MonitorCertifyForm
 						onDone={() => {
 							void q.refetch();
