@@ -58,7 +58,7 @@ describe("JudgedNotice", () => {
 	it("explains a judged suite in plain words as a note", () => {
 		const html = renderToStaticMarkup(<JudgedNotice testId="n" />);
 		expect(html).toContain('role="note"');
-		expect(html).toContain("Judged");
+		expect(html).toContain("Judged, not verified");
 		expect(html).toContain("Model, prompt and votes are pinned");
 		expect(html).toContain("Never compared with verified benchmarks");
 	});

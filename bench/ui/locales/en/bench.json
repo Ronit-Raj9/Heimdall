@@ -3104,7 +3104,7 @@
 			"judged": "Judged",
 			"verifiedHint": "A deterministic check decides every outcome. No model grades.",
 			"judgedHint": "A pinned judge model decides. Never compared with verified.",
-			"judgedTitle": "Judged",
+			"judgedTitle": "Judged, not verified",
 			"judgedBody": "A judge model decides each answer. Model, prompt and votes are pinned. Judge cost is reported apart. Never compared with verified benchmarks."
 		},
 		"output": {
