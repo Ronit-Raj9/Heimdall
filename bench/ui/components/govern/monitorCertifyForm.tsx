@@ -1,4 +1,5 @@
 import { isCheckPracticeOrDebug } from "@/components/experiments/experiments.utils";
+import { NativeSelect } from "@/components/ui/select";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -82,8 +83,7 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 				<label className="flex flex-col gap-1 text-xs">
 					{t("monitors.monitorFile")}
 					{monitors.length > 0 ? (
-						<select
-							className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+						<NativeSelect
 							value={monitor}
 							onChange={(e) => setMonitor(e.target.value)}
 							data-testid="monitor-certify-file"
@@ -94,7 +94,7 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 									{m}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					) : (
 						<span className="text-muted-foreground" data-testid="monitor-certify-no-file">
 							{files.isLoading ? t("monitors.loading") : t("monitors.monitorFilesEmpty")}
@@ -155,15 +155,14 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 					<label className="flex flex-col gap-1 text-xs">
 						{t("monitors.gradeSource")}
 						{/* M7-69: the scores come from the original grading unless a regrade id was set before. */}
-						<select
-							className="border-input bg-background h-9 w-full min-w-0 rounded-md border px-2 text-sm"
+						<NativeSelect wrapperClassName="w-full min-w-0"
 							value={gradeSource}
 							onChange={(e) => setGradeSource(e.target.value)}
 							data-testid="monitor-certify-grade-source"
 						>
 							<option value="original">{m("monitors.gradeOriginal")}</option>
 							{gradeSource !== "original" && <option value={gradeSource}>{gradeSource}</option>}
-						</select>
+						</NativeSelect>
 					</label>
 				</div>
 				{ready ? (

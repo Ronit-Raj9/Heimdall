@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { browserZone, cronProblem, formatRun, nextRuns } from "@/lib/utils/cron";
 import { useTranslation } from "react-i18next";
 import "./uf7bI18n";
@@ -85,7 +86,6 @@ export function zoneOptions(current: string): string[] {
 	return [...set];
 }
 
-const selectClass = "border-input bg-background h-9 w-full min-w-0 rounded-md border px-2 text-sm";
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 /**
@@ -116,8 +116,7 @@ export function HowOften({
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className="flex min-w-0 flex-col gap-1">
 					<span className={label}>{t("howOften.label")}</span>
-					<select
-						className={selectClass}
+					<NativeSelect wrapperClassName="w-full min-w-0"
 						value={value.when}
 						onChange={(e) => patch({ when: e.target.value as HowOftenWhen })}
 						data-testid={`${testIdPrefix}-when`}
@@ -127,13 +126,12 @@ export function HowOften({
 								{t(`howOften.option.${w}`)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</label>
 				{value.when !== "manual" && (
 					<label className="flex min-w-0 flex-col gap-1">
 						<span className={label}>{t("howOften.zone")}</span>
-						<select
-							className={selectClass}
+						<NativeSelect wrapperClassName="w-full min-w-0"
 							value={value.timezone}
 							onChange={(e) => patch({ timezone: e.target.value })}
 							data-testid={`${testIdPrefix}-zone`}
@@ -143,14 +141,13 @@ export function HowOften({
 									{z === browserZone() ? t("howOften.yourZone", { zone: z }) : z}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 				)}
 				{value.when === "weekly" && (
 					<label className="flex min-w-0 flex-col gap-1">
 						<span className={label}>{t("howOften.weekday")}</span>
-						<select
-							className={selectClass}
+						<NativeSelect wrapperClassName="w-full min-w-0"
 							value={String(value.weekday)}
 							onChange={(e) => patch({ weekday: Number(e.target.value) })}
 							data-testid={`${testIdPrefix}-weekday`}
@@ -160,7 +157,7 @@ export function HowOften({
 									{t(`howOften.day.${k}`)}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 				)}
 				{(value.when === "daily" || value.when === "weekly") && (

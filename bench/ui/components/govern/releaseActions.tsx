@@ -1,4 +1,5 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { NativeSelect } from "@/components/ui/select";
 import { useListCompliancePacksQuery } from "@/lib/store/apis/governApi";
 import type { ReleaseRecord } from "@/lib/types/bench";
 import { useState } from "react";
@@ -44,8 +45,7 @@ export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]
 				<div className="flex flex-col gap-2">
 					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
 						{t("releases.pickRelease")}
-						<select
-							className="border-input bg-background text-foreground h-9 rounded-md border px-2 text-xs"
+						<NativeSelect
 							value={releaseId}
 							onChange={(e) => setPicked(e.target.value)}
 							data-testid="release-actions-pick"
@@ -55,7 +55,7 @@ export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]
 									{releaseOptionLabel(r)}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 					<JobRunButton
 						kind="release.compliance"

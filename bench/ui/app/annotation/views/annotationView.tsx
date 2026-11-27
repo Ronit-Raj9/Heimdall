@@ -1,4 +1,5 @@
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { NativeSelect } from "@/components/ui/select";
 import { pageWidthClass } from "@/components/shell/pageWidth";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ declare module "@/lib/i18n/resources" {
 	}
 }
 
-export const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
 	return (
@@ -407,8 +407,7 @@ function CreateQueueSettings({ onCancel, onCreated }: { onCancel: () => void; on
 					/>
 				</Field>
 				<Field label={t("create.benchmark")} hint={t("create.benchmarkHint")}>
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={form.benchmark}
 						onChange={(e) => set("benchmark", e.target.value)}
 						data-testid="annotation-create-benchmark"
@@ -419,18 +418,17 @@ function CreateQueueSettings({ onCancel, onCreated }: { onCancel: () => void; on
 								{id}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</Field>
 				<Field label={t("create.kind")}>
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={form.kind}
 						onChange={(e) => set("kind", e.target.value as AnnotationKind)}
 						data-testid="annotation-create-kind"
 					>
 						<option value="runs">{t("create.kindRuns")}</option>
 						<option value="judge">{t("create.kindJudge")}</option>
-					</select>
+					</NativeSelect>
 				</Field>
 				<Field label={t("create.reviewers")} hint={perItemProblem(form.reviewers) ? t("create.reviewersRange") : t("create.reviewersHint")}>
 					<Input

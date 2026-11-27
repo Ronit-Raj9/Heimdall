@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shell";
+import { NativeSelect } from "@/components/ui/select";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Collapsible, FeatureHero, Pill, SetupCard, Step, type PillTone } from "@/components/inbox/featureHero";
 import { CalendarClock, Code2, MoreHorizontal, Plus } from "lucide-react";
@@ -8,6 +9,7 @@ import "./ufrjI18n";
 import "@/components/canaries/uf7bI18n";
 import { cronProblem, runsPerDay } from "@/lib/utils/cron";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { PaidButton } from "@/components/ui/paidButton";
 import { Input } from "@/components/ui/input";
 import {
@@ -169,28 +171,31 @@ export default function SchedulesView() {
 				subtitle={t("subtitle")}
 				actions={
 					// M7-62: the YAML editor is a rare tool, so it sits in a small "More" fold, not as the header action.
-					<details className="relative" data-testid="schedules-more">
-						<summary className="hover:bg-muted text-muted-foreground flex h-8 cursor-pointer list-none items-center gap-1 rounded-md px-2 text-sm [&::-webkit-details-marker]:hidden">
-							<MoreHorizontal className="size-4" aria-hidden="true" />
-							{m("schedules.more")}
-						</summary>
-						<div className="bg-card absolute right-0 z-10 mt-1 w-48 rounded-md border p-1 shadow-sm">
-							<Button
-								size="sm"
-								variant="ghost"
-								className="w-full justify-start"
-								onClick={() => {
+					<DropdownMenu
+						label={m("schedules.more")}
+						testId="schedules-more"
+						items={[
+							{
+								label: yamlMode ? t("yaml.hide") : t("yaml.show"),
+								icon: Code2,
+								testId: "schedules-yaml-toggle",
+								onSelect: () => {
 									setMsg(null);
 									setFormError(null);
 									setYamlMode((v) => !v);
-								}}
-								data-testid="schedules-yaml-toggle"
+								},
+							},
+						]}
+						trigger={(props) => (
+							<button
+								{...props}
+								className="hover:bg-muted text-muted-foreground flex h-(--control-h) cursor-pointer items-center gap-1 rounded-md px-2 text-sm focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none"
 							>
-								<Code2 className="size-4" aria-hidden="true" />
-								{yamlMode ? t("yaml.hide") : t("yaml.show")}
-							</Button>
-						</div>
-					</details>
+								<MoreHorizontal className="size-4" aria-hidden="true" />
+								{m("schedules.more")}
+							</button>
+						)}
+					/>
 				}
 			/>
 			{msg && (
@@ -653,8 +658,7 @@ function AddScheduleForm({
 					</Field>
 					{what === "evaluation" ? (
 						<Field label={t("add.evaluation")}>
-							<select
-								className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+							<NativeSelect
 								value={s.evaluation}
 								onChange={set("evaluation")}
 								data-testid="schedule-add-evaluation"
@@ -670,7 +674,7 @@ function AddScheduleForm({
 										))}
 									</optgroup>
 								))}
-							</select>
+							</NativeSelect>
 						</Field>
 					) : (
 						<Field label={t("add.experiment")}>
@@ -806,8 +810,7 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 			<div className="grid gap-3 md:grid-cols-3">
 				<Field label={t("alerts.urlEnv")}>
 					{secrets.length > 0 ? (
-						<select
-							className="bg-card h-9 w-full min-w-0 rounded-md border px-2 text-sm"
+						<NativeSelect wrapperClassName="w-full min-w-0"
 							value={draft.url_env}
 							onChange={(e) => setDraft({ ...draft, url_env: e.target.value })}
 							data-testid="alert-url-env"
@@ -819,7 +822,7 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 									{x}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					) : (
 						<Input
 							value={draft.url_env}
@@ -837,14 +840,13 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 					/>
 				</Field>
 				<Field label={t("alerts.format")}>
-					<select
-						className="bg-card h-9 rounded-md border px-2 text-sm"
+					<NativeSelect
 						value={draft.format ?? ""}
 						onChange={(e) => setDraft({ ...draft, format: e.target.value as AlertConfig["format"] })}
 					>
 						<option value="">{m("alerts.formatHook")}</option>
 						<option value="slack">{m("alerts.formatSlack")}</option>
-					</select>
+					</NativeSelect>
 				</Field>
 				<datalist id="schedule-secret-names">
 					{secrets.map((s) => (
