@@ -11,6 +11,24 @@ export interface InboxTableProps {
 	items: readonly InboxItem[];
 	selectedId?: string | null;
 	onSelect: (item: InboxItem) => void;
+	/** An item panel sits beside the table (2xl): keep only the columns that pick a row, so the table fits its narrower box. */
+	compact?: boolean;
+}
+
+/**
+ * Where each optional column shows (Failures table: the request text must stay in its own cell and the table
+ * must fit at 1440 and 1920 without sideways scroll). Columns that only add detail appear from lg or 2xl, and
+ * hide while the item panel sits beside the table. Pure, exported for tests.
+ */
+export function inboxColumnClass(column: "flagged" | "firstSeen" | "suggested" | "trace" | "task", compact: boolean): string {
+	// The panel goes beside the table only from 2xl; below that it sits under the table, which keeps its columns.
+	switch (column) {
+		case "flagged":
+		case "task":
+			return compact ? "hidden lg:table-cell 2xl:hidden" : "hidden lg:table-cell";
+		default:
+			return compact ? "hidden" : "hidden 2xl:table-cell";
+	}
 }
 
 /**
@@ -18,7 +36,8 @@ export interface InboxTableProps {
  * seen, its state, what it would become, a link to the original trace when the source has one,
  * and for an accepted item the regression task it became and how that task is doing.
  */
-export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
+export function InboxTable({ items, selectedId, onSelect, compact = false }: InboxTableProps) {
+	const col = (c: Parameters<typeof inboxColumnClass>[0]) => inboxColumnClass(c, compact);
 	const { t } = useTranslation("bench");
 	const kindLabel = useKindLabel();
 	return (
@@ -48,19 +67,19 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 				))}
 			</ul>
 			<div className="hidden min-w-0 sm:block">
-				<Table stickyColumns={1} aria-label={t("inbox.table.label")} data-testid="inbox-table">
+				<Table aria-label={t("inbox.table.label")} data-testid="inbox-table">
 					<TableHeader>
 						<TableRow>
-							<TableHead>{t("inbox.table.columns.title")}</TableHead>
+							<TableHead className="w-full">{t("inbox.table.columns.title")}</TableHead>
 							<TableHead>{t("inbox.table.columns.source")}</TableHead>
-							<TableHead>{t("inbox.table.columns.flagged")}</TableHead>
+							<TableHead className={col("flagged")}>{t("inbox.table.columns.flagged")}</TableHead>
 							<TableHead className="text-right">{t("inbox.table.columns.occurrences")}</TableHead>
-							<TableHead>{t("inbox.table.columns.firstSeen")}</TableHead>
+							<TableHead className={col("firstSeen")}>{t("inbox.table.columns.firstSeen")}</TableHead>
 							<TableHead>{t("inbox.table.columns.lastSeen")}</TableHead>
 							<TableHead>{t("inbox.table.columns.state")}</TableHead>
-							<TableHead>{t("inbox.table.columns.suggested")}</TableHead>
-							<TableHead>{t("inbox.table.columns.trace")}</TableHead>
-							<TableHead>{t("inbox.table.columns.task")}</TableHead>
+							<TableHead className={col("suggested")}>{t("inbox.table.columns.suggested")}</TableHead>
+							<TableHead className={col("trace")}>{t("inbox.table.columns.trace")}</TableHead>
+							<TableHead className={col("task")}>{t("inbox.table.columns.task")}</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -76,7 +95,7 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 									onClick={() => onSelect(item)}
 									data-testid={`inbox-row-${item.id}`}
 								>
-									<TableCell className="max-w-80 min-w-48 overflow-hidden whitespace-normal">
+									<TableCell className="w-full min-w-48 overflow-hidden whitespace-normal" data-testid={`inbox-title-cell-${item.id}`}>
 										<button
 											type="button"
 											className="focus-visible:ring-ring/50 line-clamp-2 block w-full min-w-0 rounded-sm text-left text-sm font-medium [overflow-wrap:anywhere] underline-offset-2 hover:underline focus-visible:ring-[3px] focus-visible:outline-none"
@@ -90,13 +109,13 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 										>
 											{item.title}
 										</button>
-										<span className="text-muted-foreground block truncate font-mono text-xs" title={item.id}>
-										{item.id}
-									</span>
+										<span className="text-muted-foreground line-clamp-1 block font-mono text-xs [overflow-wrap:anywhere]" title={item.id}>
+											{item.id}
+										</span>
 									</TableCell>
 									<TableCell>
 										<div className="flex flex-col">
-											<span className="font-mono text-xs">{item.source}</span>
+											<span className="font-mono text-xs [overflow-wrap:anywhere]">{item.source}</span>
 											{/* The kind only when it says more than the name ("webhook webhook", M7-12); then the model the session used. */}
 											{item.source_kind && item.source_kind !== item.source && (
 												<span className="text-muted-foreground text-xs">{item.source_kind}</span>
@@ -108,7 +127,7 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 											)}
 										</div>
 									</TableCell>
-									<TableCell className="max-w-72" data-testid={`inbox-flagged-${item.id}`}>
+									<TableCell className={cn("max-w-64 whitespace-normal", col("flagged"))} data-testid={`inbox-flagged-${item.id}`}>
 										<ul className="flex flex-col gap-0.5 text-xs">
 											{flagged.slice(0, FLAGGED_SHOWN).map((reason, i) => (
 												<li key={`${i}-${reason}`} className="line-clamp-2 break-words" title={reason}>
@@ -121,18 +140,18 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 									<TableCell className="text-right tabular-nums" data-testid={`inbox-occurrences-${item.id}`}>
 										{item.occurrences}
 									</TableCell>
-									<TableCell className="text-xs whitespace-nowrap">{formatInboxTime(item.first_seen)}</TableCell>
+									<TableCell className={cn("text-xs whitespace-nowrap", col("firstSeen"))}>{formatInboxTime(item.first_seen)}</TableCell>
 									<TableCell className="text-xs whitespace-nowrap">{formatInboxTime(item.last_seen)}</TableCell>
 									<TableCell>
 										<InboxStateBadge state={item.state} testId={`inbox-state-badge-${item.id}`} />
 									</TableCell>
-									<TableCell className="text-xs" data-testid={`inbox-suggested-${item.id}`}>
+									<TableCell className={cn("text-xs", col("suggested"))} data-testid={`inbox-suggested-${item.id}`}>
 										<div className="flex flex-col">
 											<span>{kindLabel(item.suggested_kind)}</span>
 											<span className="text-muted-foreground font-mono">{item.suggested_suite ?? t("inbox.table.noSuite")}</span>
 										</div>
 									</TableCell>
-									<TableCell onClick={(e) => e.stopPropagation()}>
+									<TableCell className={col("trace")} onClick={(e) => e.stopPropagation()}>
 										{item.link ? (
 											<TraceSourceLink
 												link={item.link}
@@ -145,7 +164,7 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 											<span className="text-muted-foreground text-xs">{t("inbox.table.noLink")}</span>
 										)}
 									</TableCell>
-									<TableCell className="text-xs" data-testid={`inbox-task-${item.id}`}>
+									<TableCell className={cn("text-xs", col("task"))} data-testid={`inbox-task-${item.id}`}>
 										{item.task ? (
 											<div className="flex flex-col items-start gap-1">
 												<span className="font-mono">

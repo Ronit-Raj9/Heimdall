@@ -20,6 +20,7 @@ import { ListChecks, Plug } from "lucide-react";
 import { UnknownLinkNote } from "@/components/shell/unknownLinkNote";
 import { ToolbarSearch } from "@/components/ui/toolbar";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { INBOX_SINCE, narrowInboxItems, openingInboxFilter, type InboxSince } from "./inboxDefaults";
 import "./uf7aI18n";
 
@@ -228,7 +229,7 @@ export function InboxBody({
 					<InboxEmpty />
 				</>
 			) : (
-				<div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+				<div className={cn("grid min-w-0 grid-cols-1 items-start gap-6", panel && "2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")} data-testid="inbox-layout">
 					<Section
 						title={t("inbox.table.title")}
 						description={t("inbox.table.description")}
@@ -292,7 +293,7 @@ export function InboxBody({
 								</EmptyNote>
 							) : (
 								<div className="min-w-0 overflow-x-auto rounded-sm border">
-									<InboxTable items={items} selectedId={itemId} onSelect={(item) => onItem(item.id)} />
+									<InboxTable items={items} selectedId={itemId} onSelect={(item) => onItem(item.id)} compact={Boolean(panel)} />
 								</div>
 							)}
 						</div>

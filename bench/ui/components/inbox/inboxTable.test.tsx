@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { INBOX_LIST_FIXTURE } from "./inbox.fixtures";
 import { InboxStateFilter } from "./inboxStateFilter";
-import { InboxTable } from "./inboxTable";
+import { InboxTable, inboxColumnClass } from "./inboxTable";
 
 const noop = () => {};
 
@@ -93,5 +93,23 @@ describe("InboxTable", () => {
 		const out = renderToStaticMarkup(<InboxTable items={[item]} onSelect={noop} />);
 		expect(out).toContain("+2 more");
 		expect(out).not.toContain(">c<");
+	});
+});
+describe("InboxTable fits its box (Failures table, owner bug)", () => {
+	const item = INBOX_LIST_FIXTURE.items[0];
+	const html = renderToStaticMarkup(<InboxTable items={INBOX_LIST_FIXTURE.items} onSelect={noop} />);
+
+	it("gives the request text the free width, clamps it inside its own cell and pins no column over the others", () => {
+		expect(html).toMatch(new RegExp(`class="[^"]*w-full[^"]*overflow-hidden[^"]*"[^>]*data-testid="inbox-title-cell-${item.id}"`));
+		expect(html).not.toContain("data-sticky");
+		expect(html).toContain("line-clamp-2");
+	});
+
+	it("shows detail columns from lg or 2xl and drops them at 2xl while the panel sits beside the table", () => {
+		expect(inboxColumnClass("firstSeen", false)).toBe("hidden 2xl:table-cell");
+		expect(inboxColumnClass("trace", false)).toBe("hidden 2xl:table-cell");
+		expect(inboxColumnClass("flagged", false)).toBe("hidden lg:table-cell");
+		expect(inboxColumnClass("flagged", true)).toBe("hidden lg:table-cell 2xl:hidden");
+		expect(inboxColumnClass("suggested", true)).toBe("hidden");
 	});
 });
