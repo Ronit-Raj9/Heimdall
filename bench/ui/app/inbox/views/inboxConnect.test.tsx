@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { InboxWebhookInfo } from "@/lib/types/liveinbox";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { InboxTokensView, InboxWebhookCard, generateInboxToken } from "./inboxConnect";
+import { InboxTokensView, InboxWebhookCard, generateInboxToken, secretNameOptions } from "./inboxConnect";
 
 const base: InboxWebhookInfo = {
 	url: "http://localhost:8090/api/bench/inbox/ingest",
@@ -99,5 +99,12 @@ describe("generateInboxToken", () => {
 	it("gives 64 hex characters", () => {
 		expect(generateInboxToken((a) => a.fill(171))).toBe("ab".repeat(32));
 		expect(generateInboxToken()).toMatch(/^[0-9a-f]{64}$/);
+	});
+});
+
+describe("secret name suggestions (M7-6)", () => {
+	it("lists each stored secret name once, sorted", () => {
+		expect(secretNameOptions([{ name: "B_KEY" }, { name: "A_KEY" }, { name: "B_KEY" }, { name: " " }])).toEqual(["A_KEY", "B_KEY"]);
+		expect(secretNameOptions(undefined)).toEqual([]);
 	});
 });

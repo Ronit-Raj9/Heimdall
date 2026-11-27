@@ -12,6 +12,7 @@ import type { EmailEventType, EmailSettings } from "@/lib/types/integrations";
 import { Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { canRetry } from "@/lib/requestErrors";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { useTranslation } from "react-i18next";
 
 /** The caller's own email notifications: weekly digest and per-event email (handlers/notifications.go). */
@@ -30,6 +31,8 @@ export function EmailPanel() {
 		setEvents(data.prefs.events);
 		setDigest(data.prefs.digest);
 	}, [data]);
+	// Leaving with an unsaved choice asks first (M8-44).
+	useLeaveGuard(data ? !sameChoice(data, events, digest) : false);
 
 	if (isLoading) return <Skeleton className="h-40 w-full" />;
 	if (error || !data) {

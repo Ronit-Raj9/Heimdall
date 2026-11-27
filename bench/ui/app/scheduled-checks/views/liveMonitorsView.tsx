@@ -38,7 +38,7 @@ export default function LiveMonitorsView() {
 	const [monitor, setMonitor] = useQueryState("monitor", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
 	const [formOpen, setFormOpen] = useState(false);
-	const list = useGetLiveMonitorsQuery(undefined, { pollingInterval: 60_000 });
+	const list = useGetLiveMonitorsQuery(undefined, { pollingInterval: 60_000, skipPollingIfUnfocused: true });
 	const data = list.data;
 	const open = monitor ?? data?.monitors[0]?.id ?? null;
 	const showForm = formOpen || Boolean(agent);
@@ -356,7 +356,7 @@ function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose:
 
 function MonitorPanel({ id }: { id: string }) {
 	const { t } = useTranslation("liveMonitors");
-	const detail = useGetLiveMonitorQuery(id, { pollingInterval: 60_000 });
+	const detail = useGetLiveMonitorQuery(id, { pollingInterval: 60_000, skipPollingIfUnfocused: true });
 	if (detail.isLoading) return <BlockSkeleton rows={6} testId="live-monitor-loading" />;
 	if (detail.error || !detail.data) {
 		return <LoadError title={t("detailError")} error={detail.error} onRetry={() => void detail.refetch()} testId="live-monitor-error" />;

@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CANARY_DRIFTED_FIXTURE } from "@/components/canaries/canary.fixtures";
 import {
 	buildCanaryEdit,
+	dropShare,
 	buildCanaryRequest,
 	canaryFormFields,
 	canaryFormProblems,
@@ -197,5 +198,18 @@ describe("server problems (N81)", () => {
 		expect(errorMessage(err, "x")).toBe("Pick an agent.\nPick a benchmark.");
 		expect(errorProblems({ status: 409, data: { error: { message: "exists" } } })).toEqual([]);
 		expect(errorProblems(undefined)).toEqual([]);
+	});
+
+	it("sends a drop of N points as the success noise floor (M7-49)", () => {
+		expect(dropShare("5")).toBe(0.05);
+		expect(dropShare("")).toBeNull();
+		expect(dropShare("0")).toBeNull();
+		expect(dropShare("abc")).toBeNull();
+		expect(buildCanaryRequest({ ...newCanaryFields(), dropPoints: "5" }).noise_floor).toEqual({ success: 0.05 });
+		expect(buildCanaryRequest(newCanaryFields()).noise_floor).toBeUndefined();
+		const def = { ...CANARY_DRIFTED_FIXTURE.definition, noise_floor: { success: 0.03, cost_usd: 0.5 } };
+		expect(canaryFormFields(def).dropPoints).toBe("3");
+		expect(buildCanaryEdit(def, { ...canaryFormFields(def), dropPoints: "" }).noise_floor).toEqual({ cost_usd: 0.5 });
+		expect(buildCanaryEdit(def, { ...canaryFormFields(def), dropPoints: "10" }).noise_floor).toEqual({ success: 0.1, cost_usd: 0.5 });
 	});
 });

@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
 import { getBenchErrorMessage, useCreateReleaseMutation, useGetVerdictQuery, useListExperimentsQuery } from "@/lib/store";
 import { useSession } from "@/lib/session/sessionContext";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReleaseForm } from "./releaseForm";
@@ -32,10 +33,10 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 	const verdict = useGetVerdictQuery(expId ?? "", { skip: !expId });
 	const [createRelease, created] = useCreateReleaseMutation();
 	const data = verdict.data;
-	// The approver defaults to the signed-in person and survives switching the comparison (M7-81).
+	// The approver defaults to the signed-in person and survives switching the comparison and leaving the page (M7-81).
 	const session = useSession();
-	const [approver, setApprover] = useState<string | undefined>(undefined);
-	const defaultApprover = approver ?? session.user?.name ?? session.user?.email ?? "";
+	const [kept, keep] = useFormDraft<{ approver?: string }>("releaseApprover", {});
+	const defaultApprover = kept.approver ?? session.user?.name ?? session.user?.email ?? "";
 
 	return (
 		<Card className="gap-4 py-4 shadow-none" data-testid="release-panel">
@@ -83,7 +84,7 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 					created={created.data}
 					initialValues={defaultApprover ? { approver: defaultApprover } : undefined}
 					onSubmit={(request) => {
-						setApprover(request.approver);
+						keep({ approver: request.approver });
 						void createRelease(request);
 					}}
 				/>

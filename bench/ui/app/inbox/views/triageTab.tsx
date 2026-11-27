@@ -76,7 +76,7 @@ export default function TriageTab() {
 					<EmptyState
 						icon={FlaskConical}
 						message={t("triage.noExperiments")}
-						action={{ label: t("triage.newExperiment"), to: "/experiments/new" }}
+						action={{ label: t("triage.newExperiment"), to: "/evaluate" }}
 						testId="triage-no-experiments"
 					/>
 				)

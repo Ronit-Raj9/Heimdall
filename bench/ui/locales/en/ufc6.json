@@ -1,0 +1,7 @@
+{
+	"canary": {
+		"dropLabel": "Alert when success drops by more than (points)",
+		"dropPlaceholder": "Default",
+		"dropHelp": "For example 5 means 80% to below 75%. Leave blank to use the drop size above."
+	}
+}

@@ -649,7 +649,7 @@ function DeliveryLogPanel() {
 	const { t } = useTranslation("integrations");
 	const session = useSession();
 	const [polling, setPolling] = useState(false);
-	const { data, error, isLoading, refetch } = useListDeliveriesQuery(100, { pollingInterval: polling ? DELIVERY_POLL_MS : 0 });
+	const { data, error, isLoading, refetch } = useListDeliveriesQuery(100, { pollingInterval: polling ? DELIVERY_POLL_MS : 0, skipPollingIfUnfocused: true });
 	const { t: tm } = useTranslation("w4m8");
 	const hooks = useListWebhooksQuery();
 	const [retry] = useRetryDeliveryMutation();
