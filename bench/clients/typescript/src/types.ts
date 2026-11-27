@@ -1223,6 +1223,16 @@ export interface VerdictPayload {
 	review_changed_runs?: number;
 	/** W8 judge calibration: the judge_calibration instrument of a judged experiment; absent otherwise. */
 	judge_calibration?: JudgeCalibrationVerdict;
+	/**
+	 * M8-68: the experiment status a shared verdict shows (cost, date, sample size, who ran it). Sent
+	 * by the share link (KindVerdict) once the server adds them; absent from an older server.
+	 */
+	spent_usd?: number;
+	finished_at?: string;
+	created_by?: string;
+	runs_total?: number;
+	runs_counted?: number;
+	tasks?: number;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1742,6 +1752,17 @@ export interface RunListRow {
 	sealed_at?: string;
 	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
 	error?: string;
+	/**
+	 * M2-42: why a non-pass run failed in plain words (the grader's verdict reason, or "cheating
+	 * detected"); absent until the server sends it, then the list falls back to error. Inert text.
+	 */
+	fail_reason?: string;
+	/** The task's display title when the server sends it (lane 5b reads it); absent means show task_id. */
+	task_title?: string;
+	/** The benchmark's display title when the server sends it; absent means show suite_id. */
+	suite_title?: string;
+	/** The name of the experiment the run belongs to, when the server sends it. */
+	exp_name?: string;
 	paired?: boolean;
 	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
 	excluded?: string;

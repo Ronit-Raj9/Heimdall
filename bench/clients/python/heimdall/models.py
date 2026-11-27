@@ -740,6 +740,13 @@ class AgentImportRequest(_AgentImportRequestRequired, total=False):
 AgentImportResponse = TypedDict('AgentImportResponse', {'dry_run': "bool", 'files': "List[str]", 'id': "str", 'import': "Optional[Result_agentplatform]", 'path': "str", 'validation_error': "str", 'yaml': "str"}, total=False)
 
 
+class AgentLastScore(TypedDict):
+    at: str
+    exp_id: str
+    runs: int
+    score: float
+
+
 class AgentLeaderboard(TypedDict):
     capabilities: List[str]
     capability: str
@@ -1001,9 +1008,11 @@ class AgentSummary(_AgentSummaryRequired, total=False):
     capabilities: List[str]
     error: str
     last_run_at: Optional[str]
+    last_score: Optional[AgentLastScore]
     owns_model: bool
     reports_events: str
     runs_total: Optional[int]
+    versions: Optional[int]
 
 
 class _AgentTemplateRequired(TypedDict):
@@ -2808,6 +2817,11 @@ class CatchRate(TypedDict):
 
 
 class Category(TypedDict):
+    id: str
+    label: str
+
+
+class Category_redteam(TypedDict):
     channels: List[str]
     description: str
     id: str
@@ -2935,6 +2949,7 @@ class _ClusterRequired(TypedDict):
 class Cluster(_ClusterRequired, total=False):
     after_config_change: Optional[ConfigChange_clusters]
     error_text: str
+    example_runs: List[ExampleRun]
     related: List[Related]
 
 
@@ -3498,6 +3513,7 @@ class ConnectionView(_ConnectionViewRequired, total=False):
     docs_url: str
     endpoint: str
     endpoint_label: str
+    endpoint_placeholder: str
     endpoint_required: bool
     last_tested_at: Optional[str]
     registry: Optional[RegistryView]
@@ -4105,8 +4121,12 @@ class DocBody(TypedDict):
     title: str
 
 
-class DocList(TypedDict):
+class _DocListRequired(TypedDict):
     docs: List[DocSummary]
+
+
+class DocList(_DocListRequired, total=False):
+    categories: List[Category]
 
 
 class _DocSummaryRequired(TypedDict):
@@ -4115,7 +4135,9 @@ class _DocSummaryRequired(TypedDict):
 
 
 class DocSummary(_DocSummaryRequired, total=False):
+    category: str
     snippet: str
+    start_rank: Optional[int]
 
 
 class Doctor(TypedDict):
@@ -4579,6 +4601,7 @@ class _ErrorFieldRequired(TypedDict):
 
 
 class ErrorField(_ErrorFieldRequired, total=False):
+    code: str
     link: str
 
 
@@ -4788,11 +4811,13 @@ class _EvalPresetEstimateRequired(TypedDict):
     mde_pp: Optional[float]
     runs: int
     summary: str
+    tasks: int
     tasks_per_benchmark: int
     trials: int
 
 
 class EvalPresetEstimate(_EvalPresetEstimateRequired, total=False):
+    all_ready: bool
     from_library: bool
 
 
@@ -4876,6 +4901,15 @@ class EvaluationCacheChild(TypedDict):
     report: CacheABReport
 
 
+class _EvaluationCardRequired(TypedDict):
+    evaluation: Any
+
+
+class EvaluationCard(_EvaluationCardRequired, total=False):
+    failure_patterns: Any
+    report: Any
+
+
 class _EvaluationChildRequired(TypedDict):
     benchmark: str
     experiment_id: str
@@ -4934,6 +4968,15 @@ class EvaluationLaunch(_EvaluationLaunchRequired, total=False):
 
 class EvaluationList(TypedDict):
     evaluations: List[Optional[Evaluation]]
+
+
+class _EvaluationQueueRequired(TypedDict):
+    ahead: int
+
+
+class EvaluationQueue(_EvaluationQueueRequired, total=False):
+    worker_last_seen: Optional[str]
+    worker_online: Optional[bool]
 
 
 class EvaluationReleaseChild(TypedDict):
@@ -5121,6 +5164,18 @@ class _ExampleRequired(TypedDict):
 
 class Example(_ExampleRequired, total=False):
     reason: str
+
+
+class _ExampleRunRequired(TypedDict):
+    at: str
+    exp_id: str
+    run_id: str
+    suite: str
+    task: str
+
+
+class ExampleRun(_ExampleRunRequired, total=False):
+    pair_id: str
 
 
 class Exclusion(TypedDict):
@@ -6383,6 +6438,19 @@ class HoldStatus(_HoldStatusRequired, total=False):
     stopped: bool
 
 
+class _HomeSummaryRequired(TypedDict):
+    counts: Dict[str, int]
+
+
+class HomeSummary(_HomeSummaryRequired, total=False):
+    latest_comparisons: Any
+    latest_evaluations: Any
+    running: Optional[int]
+    spend_month_from: str
+    spend_month_unknown_cost_runs: Optional[int]
+    spend_month_usd: Optional[float]
+
+
 class _HumanActionRequired(TypedDict):
     action: str
     at: str
@@ -6581,6 +6649,7 @@ class _InboxItemRequired(TypedDict):
 
 
 class InboxItem(_InboxItemRequired, total=False):
+    agent: str
     duplicate_of: str
     golden: bool
     last_recurrence: Optional[str]
@@ -6894,8 +6963,19 @@ class Inventory(_InventoryRequired, total=False):
     warnings: List[str]
 
 
-class InvestigationList(TypedDict):
+class _InvestigationListRequired(TypedDict):
     investigations: List[InvestigationSummary]
+
+
+class InvestigationList(_InvestigationListRequired, total=False):
+    running: List[InvestigationRunning]
+
+
+class InvestigationRunning(TypedDict):
+    created_at: str
+    exp_id: str
+    id: str
+    status: str
 
 
 class _InvestigationSummaryRequired(TypedDict):
@@ -7573,6 +7653,17 @@ class MCPEndpoint(TypedDict, total=False):
     transport: str
 
 
+class MCPOptions(TypedDict):
+    poison_probes: List[MCPPoisonProbe]
+    services: List[str]
+    suite: str
+
+
+class MCPPoisonProbe(TypedDict):
+    id: str
+    mode: str
+
+
 class _MCPServerDraftRequestRequired(TypedDict):
     id: str
     server_id: str
@@ -7892,6 +7983,25 @@ class MeOrg(TypedDict):
     name: str
     role: str
     slug: str
+
+
+class _MeResponseRequired(TypedDict):
+    auth_mode: str
+    kind: str
+    orgs: List[MeOrg]
+
+
+class MeResponse(_MeResponseRequired, total=False):
+    csrf: str
+    current_org: str
+    default_org: str
+    email_verified: Optional[bool]
+    has_password: Optional[bool]
+    org_reset: bool
+    role: str
+    server_admin: bool
+    token_id: str
+    user: Optional[User]
 
 
 class MemberManifest(TypedDict, total=False):
@@ -10106,7 +10216,7 @@ class RedTeamBenchmarkResult(TypedDict):
 
 
 class RedTeamCatalog(TypedDict):
-    categories: List[Category]
+    categories: List[Category_redteam]
     channels: List[Channel]
     max_attempts: int
     regressions: str
@@ -10314,6 +10424,7 @@ class _ReleaseSideRequired(TypedDict):
 
 
 class ReleaseSide(_ReleaseSideRequired, total=False):
+    at: Optional[str]
     cost_per_solved_usd: Optional[float]
     evaluation_id: str
     false_completion: Optional[float]
@@ -13999,6 +14110,8 @@ class _TotalsRequired(TypedDict):
 class Totals(_TotalsRequired, total=False):
     cost_per_solved_usd: Optional[float]
     false_completion: Optional[float]
+    fault_cost_runs: int
+    fault_cost_usd: Optional[float]
     fault_runs: int
     fault_survival: Optional[float]
 
@@ -15014,6 +15127,30 @@ class Written(_WrittenRequired, total=False):
     reviewed_by: str
 
 
+class _evaluationWithQueueRequired(TypedDict):
+    children: List[EvaluationChild]
+    created_at: str
+    id: str
+    spec: EvaluationSpec
+    status: str
+
+
+class evaluationWithQueue(_evaluationWithQueueRequired, total=False):
+    cheat_check_of: str
+    created_by: str
+    failed_runs: int
+    gate_result: Optional[EvaluationGateResult]
+    launch: Optional[EvaluationLaunch]
+    notified_at: Optional[str]
+    org: str
+    paused: bool
+    problem: str
+    queue: Optional[EvaluationQueue]
+    rerun_of: str
+    result: Optional[EvaluationResult]
+    schedule: str
+
+
 class gatewayAgentImportDoc(TypedDict):
     agent_id: str
     yaml: str
@@ -15463,6 +15600,10 @@ class EvaluationCacheABResponse(EvaluationCacheAB):
     mode: Mode
 
 
+class EvaluationCardResponse(EvaluationCard):
+    mode: Mode
+
+
 class EvaluationListResponse(EvaluationList):
     mode: Mode
 
@@ -15585,6 +15726,10 @@ class HoldStatusResponse(HoldStatus):
     mode: Mode
 
 
+class HomeSummaryResponse(HomeSummary):
+    mode: Mode
+
+
 class HumanActionResponse(HumanAction):
     mode: Mode
 
@@ -15689,6 +15834,10 @@ class LogPageResponse(LogPage):
     mode: Mode
 
 
+class MCPOptionsResponse(MCPOptions):
+    mode: Mode
+
+
 class MCPServerDraftResponseResponse(MCPServerDraftResponse):
     mode: Mode
 
@@ -15730,6 +15879,10 @@ class MeResponse(Me):
 
 
 class MeOrgResponse(MeOrg):
+    mode: Mode
+
+
+class MeResponseResponse(MeResponse):
     mode: Mode
 
 
@@ -16453,6 +16606,10 @@ class WorkersListResponse(WorkersList):
     mode: Mode
 
 
+class evaluationWithQueueResponse(evaluationWithQueue):
+    mode: Mode
+
+
 class gatewayAgentImportDocResponse(gatewayAgentImportDoc):
     mode: Mode
 
@@ -16551,6 +16708,7 @@ __all__ = [
     'AgentHandoff',
     'AgentImportRequest',
     'AgentImportResponse',
+    'AgentLastScore',
     'AgentLeaderboard',
     'AgentLeaderboardCapability',
     'AgentLeaderboardRow',
@@ -16729,6 +16887,7 @@ __all__ = [
     'CatalogView',
     'CatchRate',
     'Category',
+    'Category_redteam',
     'Cell',
     'Change',
     'Changes',
@@ -16918,11 +17077,13 @@ __all__ = [
     'EvaluationBifrostUse',
     'EvaluationCacheAB',
     'EvaluationCacheChild',
+    'EvaluationCard',
     'EvaluationChild',
     'EvaluationGate',
     'EvaluationGateResult',
     'EvaluationLaunch',
     'EvaluationList',
+    'EvaluationQueue',
     'EvaluationReleaseChild',
     'EvaluationReleasePreview',
     'EvaluationReleaseRequest',
@@ -16938,6 +17099,7 @@ __all__ = [
     'Evidence',
     'EvidenceStatus',
     'Example',
+    'ExampleRun',
     'Exclusion',
     'Exclusion_agentdiff',
     'Experiment',
@@ -17056,6 +17218,7 @@ __all__ = [
     'Hold',
     'HoldRelease',
     'HoldStatus',
+    'HomeSummary',
     'HumanAction',
     'ImageSpec',
     'ImportList',
@@ -17104,6 +17267,7 @@ __all__ = [
     'Interval',
     'Inventory',
     'InvestigationList',
+    'InvestigationRunning',
     'InvestigationSummary',
     'InvitationInfo',
     'Issue',
@@ -17166,6 +17330,8 @@ __all__ = [
     'LogicalRequest',
     'LoginRequest',
     'MCPEndpoint',
+    'MCPOptions',
+    'MCPPoisonProbe',
     'MCPServerDraftRequest',
     'MCPServerDraftResponse',
     'MCPServerInspectRequest',
@@ -17191,6 +17357,7 @@ __all__ = [
     'MaximTestResult',
     'Me',
     'MeOrg',
+    'MeResponse',
     'MemberManifest',
     'Message',
     'Meter',
@@ -17822,6 +17989,7 @@ __all__ = [
     'WorkerUploadState',
     'WorkersList',
     'Written',
+    'evaluationWithQueue',
     'gatewayAgentImportDoc',
     'gatewayAgentImportRequest',
     'gatewayAgentsDoc',
@@ -17928,6 +18096,7 @@ __all__ = [
     'EvaluationResponse',
     'EvaluationBifrostUseResponse',
     'EvaluationCacheABResponse',
+    'EvaluationCardResponse',
     'EvaluationListResponse',
     'EvaluationReleasePreviewResponse',
     'EvaluationRerunResultResponse',
@@ -17959,6 +18128,7 @@ __all__ = [
     'HealthResponse',
     'HeldOutSplitResultResponse',
     'HoldStatusResponse',
+    'HomeSummaryResponse',
     'HumanActionResponse',
     'ImportListResponse',
     'InboxAcceptResultResponse',
@@ -17985,6 +18155,7 @@ __all__ = [
     'LiveFrameReplyResponse',
     'LiveVersionResponse',
     'LogPageResponse',
+    'MCPOptionsResponse',
     'MCPServerDraftResponseResponse',
     'MCPServerReportResponse',
     'ManifestResponse',
@@ -17996,6 +18167,7 @@ __all__ = [
     'MaximTestResultResponse',
     'MeResponse',
     'MeOrgResponse',
+    'MeResponseResponse',
     'ModelKeyResponseResponse',
     'ModelKeyTestResponseResponse',
     'ModelKeysResponseResponse',
@@ -18177,6 +18349,7 @@ __all__ = [
     'WorkerTargetViewResponse',
     'WorkerUploadStateResponse',
     'WorkersListResponse',
+    'evaluationWithQueueResponse',
     'gatewayAgentImportDocResponse',
     'gatewayAgentsDocResponse',
     'gatewayDraftDocResponse',
