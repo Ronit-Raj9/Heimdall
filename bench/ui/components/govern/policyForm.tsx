@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { idProblem } from "@/lib/inputChecks";
 import "@/lib/w4m0I18n";
@@ -97,7 +98,6 @@ export function policyNameProblem(name: string): string | null {
 	return idProblem(name, "rule set name");
 }
 
-const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 export interface PolicyFormProps {
 	value: ReleasePolicy;
@@ -153,15 +153,14 @@ export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 				</label>
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("policies.onUnknown")}
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={value.on_unknown ?? ""}
 						onChange={(e) => onChange({ ...value, on_unknown: e.target.value as ReleasePolicy["on_unknown"] })}
 					>
 						<option value="">{t("policies.onUnknownDefault")}</option>
 						<option value="block">{t("policies.onUnknownBlock")}</option>
 						<option value="warn">{t("policies.onUnknownWarn")}</option>
-					</select>
+					</NativeSelect>
 				</label>
 				<label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">
 					{t("policies.description")}

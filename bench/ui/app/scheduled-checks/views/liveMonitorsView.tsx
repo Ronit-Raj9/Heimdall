@@ -1,4 +1,5 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
+import { NativeSelect } from "@/components/ui/select";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, InlineError, LoadError, Section } from "@/components/runs/screenStates";
 import { PaidButton } from "@/components/ui/paidButton";
@@ -215,8 +216,7 @@ export function MonitorAgentPicker({ value, agents, onChange }: { value: string;
 	return (
 		<label className="flex flex-col gap-1 text-xs">
 			{t("form.agent")}
-			<select
-				className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+			<NativeSelect
 				value={notEndpoint ? "" : value}
 				onChange={(e) => onChange(e.target.value)}
 				data-testid="live-monitor-form-agent"
@@ -227,7 +227,7 @@ export function MonitorAgentPicker({ value, agents, onChange }: { value: string;
 						{id}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 			{notEndpointNote}
 		</label>
 	);

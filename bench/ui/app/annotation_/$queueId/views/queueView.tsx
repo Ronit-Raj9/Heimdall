@@ -1,9 +1,10 @@
 import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { NativeSelect } from "@/components/ui/select";
 import { pageWidthClass } from "@/components/shell/pageWidth";
 import { notify } from "@/lib/notify";
 import "@/components/suites/uf6bI18n";
 import { queueSourceLine } from "./queueSource";
-import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
+import { Field, LabellerPicker, perItemProblem } from "@/app/annotation/views/annotationView";
 import { humanExperimentName, isCheckPracticeOrDebug, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
@@ -75,7 +76,8 @@ export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 				subtitle={[sourceText, queue.description].filter(Boolean).join(" ")}
 				breadcrumbs={[{ label: t("queue.back"), to: "/annotation" }, { label: queue.name }]}
 			/>
-			<StatGrid>
+			{/* Round 3: five numbers in one row on a wide screen, not four and one alone. */}
+			<StatGrid className={cn("grid-cols-2", queue.can_label && "lg:grid-cols-5")}>
 				<StatCard label={t("queue.stats.total")} value={queue.counts.total} testId="annotation-stat-total" />
 				<StatCard label={t("queue.stats.done")} value={queue.counts.done} testId="annotation-stat-done" />
 				<StatCard label={t("queue.stats.disputed")} value={queue.counts.disputed} testId="annotation-stat-disputed" />
@@ -416,8 +418,7 @@ export function ItemsTab({ queue }: { queue: AnnotationQueue }) {
 				title={t("items.title")}
 				testId="annotation-items"
 				actions={
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={state}
 						onChange={(e) => setState(e.target.value as AnnotationState | "")}
 						data-testid="annotation-items-filter"
@@ -428,7 +429,7 @@ export function ItemsTab({ queue }: { queue: AnnotationQueue }) {
 								{t(`items.state.${s}`)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				}
 			>
 				{items.isLoading ? (
@@ -605,8 +606,7 @@ export function AddItems({ queue }: { queue: AnnotationQueue }) {
 				{options.length > 0 && (
 					<>
 						<Field label={t("add.experimentPick")}>
-							<select
-								className={cn(selectClass, "w-80 max-w-full")}
+							<NativeSelect wrapperClassName="w-80 max-w-full"
 								value={experiment}
 								onChange={(e) => setPicked(e.target.value)}
 								data-testid="annotation-add-experiment"
@@ -620,7 +620,7 @@ export function AddItems({ queue }: { queue: AnnotationQueue }) {
 										</option>
 									);
 								})}
-							</select>
+							</NativeSelect>
 						</Field>
 						<Field label={t("add.sample")}>
 							<Input

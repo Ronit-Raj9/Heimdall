@@ -215,7 +215,7 @@ function ReasonFilter({
 			aria-checked={active}
 			onClick={onClick}
 			className={cn(
-				"inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+				"inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
 				active
 					? "border-primary bg-primary text-primary-foreground"
 					: "bg-background text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -228,6 +228,10 @@ function ReasonFilter({
 			)}
 		</button>
 	);
+	// Round 3: a reason no run in this queue has is not shown (a row of "0" chips repeats one fact);
+	// with an empty queue the filter is gone. A reason picked from the URL stays visible.
+	if (total === 0 && value === null) return null;
+	const shown = reasons.filter((r) => (counts[r] ?? 0) > 0 || value === r);
 	return (
 		<div
 			role="radiogroup"
@@ -237,7 +241,7 @@ function ReasonFilter({
 		>
 			<Filter className="text-muted-foreground mr-1 size-3.5" aria-hidden="true" />
 			{chip(ALL_REASONS, tu("review.all"), total, value === null, () => onChange(null))}
-			{reasons.map((r) =>
+			{shown.map((r) =>
 				chip(
 					r,
 					r === "invalidated"

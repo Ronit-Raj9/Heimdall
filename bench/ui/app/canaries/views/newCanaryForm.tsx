@@ -1,4 +1,5 @@
 import "./ufc6I18n";
+import { NativeSelect } from "@/components/ui/select";
 import { SetupCard, Step } from "@/components/inbox/featureHero";
 import { Bird, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -290,7 +291,6 @@ export function canaryFormProblems(
 	return out;
 }
 
-const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 /** The largest number of task checkboxes shown at once; the filter narrows a bigger benchmark. */
 const TASKS_SHOWN = 200;
@@ -444,7 +444,7 @@ export function NewCanaryForm({
 	const agentField = (
 		<label className="flex flex-col gap-1 text-xs">
 			<span className="text-foreground text-sm font-medium">{t("canary.agent")}</span>
-			<select className={selectClass} value={f.agent} onChange={set("agent")} data-testid="canary-new-agent">
+			<NativeSelect value={f.agent} onChange={set("agent")} data-testid="canary-new-agent">
 				<option value="">{agents.isLoading ? t("canary.agentsLoading") : t("canary.agentPick")}</option>
 				{f.agent && !agentPaths.includes(f.agent) && <option value={f.agent}>{f.agent}</option>}
 				{agentList.map((a) => (
@@ -452,7 +452,7 @@ export function NewCanaryForm({
 						{a.id}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 			{agents.isSuccess && agentList.length === 0 && (
 				<Link to="/agents/new" className="text-xs underline" data-testid="canary-new-no-agents">
 					{t("canary.agentsEmpty")}
@@ -464,8 +464,7 @@ export function NewCanaryForm({
 	const suiteField = (
 		<label className="flex flex-col gap-1 text-xs">
 			<span className="text-foreground text-sm font-medium">{t("canary.suite")}</span>
-			<select
-				className={selectClass}
+			<NativeSelect
 				value={f.suite}
 				onChange={(e) => patch({ suite: e.target.value, taskIds: [] })}
 				data-testid="canary-new-suite"
@@ -476,7 +475,7 @@ export function NewCanaryForm({
 						{r}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 			{!suites.isLoading && refs.length === 0 && (
 				<Link to="/suites" search={{ tab: "catalog" } as never} className="text-xs underline" data-testid="canary-new-no-suites">
 					{t("canary.suitesEmpty")}
@@ -488,15 +487,14 @@ export function NewCanaryForm({
 	const tasksField = (
 		<div className="flex flex-col gap-1 text-xs" role="group" aria-label={t("canary.tasks")}>
 			<span className="text-foreground text-sm font-medium">{t("canary.tasks")}</span>
-			<select
-				className={selectClass}
+			<NativeSelect
 				value={f.tasksAll ? "all" : "some"}
 				onChange={(e) => patch({ tasksAll: e.target.value === "all" })}
 				data-testid="canary-new-tasks"
 			>
 				<option value="all">{t("canary.tasksAll")}</option>
 				<option value="some">{t("canary.tasksSome")}</option>
-			</select>
+			</NativeSelect>
 			{!f.tasksAll &&
 				(!f.suite ? (
 					<span className="text-muted-foreground">{t("canary.tasksPickSuite")}</span>
@@ -608,11 +606,11 @@ export function NewCanaryForm({
 		<div className="flex min-w-0 flex-col gap-2 text-xs" data-testid="canary-new-tell">
 			<label className="flex max-w-sm min-w-0 flex-col gap-1">
 				<span className="text-foreground text-sm font-medium">{c("canary.threshold")}</span>
-				<select className={selectClass} value={f.sensitivity} onChange={(e) => patch({ sensitivity: e.target.value })} data-testid="canary-new-sensitivity">
+				<NativeSelect value={f.sensitivity} onChange={(e) => patch({ sensitivity: e.target.value })} data-testid="canary-new-sensitivity">
 					<option value="">{c("canary.sensitivity.normal")}</option>
 					<option value="high">{c("canary.sensitivity.high")}</option>
 					<option value="low">{c("canary.sensitivity.low")}</option>
-				</select>
+				</NativeSelect>
 			</label>
 			<label className="flex max-w-sm min-w-0 flex-col gap-1">
 				<span className="text-foreground text-sm font-medium">{d("canary.dropLabel")}</span>

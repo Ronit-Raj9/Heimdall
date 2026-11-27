@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import type { EvaluationGate, EvaluationGateSlice } from "@/lib/store/apis/evaluationsApi";
 import { Plus, Trash2 } from "lucide-react";
@@ -103,8 +104,7 @@ export function GateSettings({
 						<span className="text-muted-foreground text-xs">Lowest score needed per capability</span>
 						{mins.map(([cap, v], i) => (
 							<div key={`${cap}-${i}`} className="flex items-center gap-2" data-testid={`gate-min-${i}`}>
-								<select
-									className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+								<NativeSelect
 									aria-label="Capability"
 									value={cap}
 									onChange={(e) => setMins(mins.map(([c, x], j) => (j === i ? [e.target.value, x] : [c, x])))}
@@ -114,7 +114,7 @@ export function GateSettings({
 											{c === "all" ? "all benchmarks" : c}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 								<Input
 									type="number"
 									min={0}

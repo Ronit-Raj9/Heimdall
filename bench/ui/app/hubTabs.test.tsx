@@ -55,7 +55,7 @@ describe("hub tabs", () => {
 
 	it("Releases: history, review and rules", () => {
 		const html = at(null, ReleasesPage);
-		for (const label of ["Releases", "Waiting for approval", "Rules"]) expect(html).toContain(label);
+		for (const label of ["Releases", "Needs review", "Rules"]) expect(html).toContain(label);
 		expect(html).toContain("inner-history");
 		expect(at("review", ReleasesPage)).toContain("inner-review");
 		expect(at("rules", ReleasesPage)).toContain("inner-rules");
