@@ -14,6 +14,8 @@ export const PATH_ALIASES: Readonly<Record<string, string>> = {
 	"/labelling": "/annotation",
 	"/labeling": "/annotation",
 	"/drift": "/scheduled-checks?tab=drift",
+	"/get-started": "/quickstart",
+	"/safety-monitors": "/monitors",
 };
 
 /** The page an alias address stands for (exact match after dropping one trailing "/"), or undefined. */

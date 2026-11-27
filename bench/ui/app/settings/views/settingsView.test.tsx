@@ -347,7 +347,9 @@ describe("AuditTab", () => {
 	it("shows who did what to which target, when and from where, with paging", () => {
 		const html = render(<AuditTab org={org} />, hostedSession("admin"));
 		expect(html).toContain('data-testid="audit-row-aud_3"');
-		expect(html).toContain("ada@acme.dev"); // actor ids read as member emails
+		// Wave 4 N33: actor ids read as member names, never addresses.
+		expect(html).toContain("Ada Lovelace");
+		expect(html).not.toContain("ada@acme.dev");
 		expect(html).toContain("member.role");
 		expect(html).toContain("user:usr_grace");
 		expect(html).toContain("10.0.0.7");
