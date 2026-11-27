@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultExperimentTab, hiddenExperimentTabs, redirectExperimentTab, type ExperimentFacts } from "./experimentTabs";
+import { behindMore, defaultExperimentTab, hiddenExperimentTabs, redirectExperimentTab, type ExperimentFacts } from "./experimentTabs";
 
 const base: ExperimentFacts = {
 	arms: 2,
@@ -51,5 +51,11 @@ describe("redirectExperimentTab (M4-15)", () => {
 		expect(redirectExperimentTab("export")).toBe("verdict");
 		expect(redirectExperimentTab("cost")).toBeNull();
 		expect(redirectExperimentTab(null)).toBeNull();
+	});
+});
+describe("behindMore (lane 4a phase B, M4-15)", () => {
+	it("puts Switch decision, Actions, Analysis, Scores and Problems found behind More", () => {
+		for (const id of ["migration", "actions", "analysis", "scorecards", "receipts"]) expect(behindMore(id)).toBe(true);
+		for (const id of ["verdict", "runs", "cost", "integrity", "matrix"]) expect(behindMore(id)).toBe(false);
 	});
 });

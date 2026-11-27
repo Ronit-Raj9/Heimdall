@@ -1,3 +1,4 @@
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import "@/components/verdict/uf4aI18n";
 import { MigrationReportView } from "@/components/migration/migrationReport";
@@ -8,7 +9,7 @@ import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useListPoliciesQuery } from "@/lib/store/apis/governApi";
-import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
+import { useGetCostExplainQuery, useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
 import { useGetModelSwitchConfigQuery } from "@/lib/store/apis/modelSwitchApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
@@ -52,6 +53,11 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
 	const [policy, setPolicy] = useQueryState("policy", parseAsString);
 	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource, policy }));
+	// M4-2: the average cost per run of the pair, the same query as the Cost tab (shared cache).
+	const costExplain = useGetCostExplainQuery(arms.length === 2 ? { expId } : skipToken);
+	const meanCost = costExplain.data
+		? { [costExplain.data.a.arm]: costExplain.data.a.cost_per_run, [costExplain.data.b.arm]: costExplain.data.b.cost_per_run }
+		: undefined;
 	// Only the response to the current selection is shown: RTK keeps the previous one in data while a
 	// changed bookmark loads, and its settings would sit beside the new controls (QC2-27-07).
 	const current = report.currentData;
@@ -111,7 +117,7 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 			) : report.error || !current ? (
 				<LoadError title={t("migration.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="migration-error" />
 			) : (
-				<MigrationReportView report={current} />
+				<MigrationReportView report={current} meanCost={meanCost} />
 			)}
 			{evaluationId ? arms.length >= 2 && <MigrationApply evaluationId={evaluationId} /> : <RoutingNote expId={expId} />}
 		</div>

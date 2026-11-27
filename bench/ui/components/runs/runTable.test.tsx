@@ -30,9 +30,12 @@ const row = (arm: string, extra: Partial<RunListRow> = {}): RunListRow => ({
 	...extra,
 });
 
+// Lane 4a phase B (M4-21): the Score column shows only with a score other than 0 or 1, so the fixtures carry one.
 describe("RunTable", () => {
 	it("lists every arm, links every id, and opens the pair in the comparison", () => {
-		const html = renderToStaticMarkup(<RunTable rows={[row("A"), row("B"), row("C", { outcome: "fail", sealed: true })]} />);
+		const html = renderToStaticMarkup(
+			<RunTable rows={[row("A"), row("B", { y: { state: "observed", v: 0.5 } }), row("C", { outcome: "fail", sealed: true })]} />,
+		);
 		for (const arm of ["A", "B", "C"]) expect(html).toContain(`data-arm="${arm}"`);
 		expect(html).toContain('href="/runs/r_c1"');
 		expect(html).toContain('href="/experiments/e_x"');
@@ -47,7 +50,10 @@ describe("RunTable", () => {
 	});
 	it("marks a judged score and a run still in flight", () => {
 		const html = renderToStaticMarkup(
-			<RunTable rows={[row("A", { grading: "judged" }), row("B", { sealed: false })]} showExperiment={false} />,
+			<RunTable
+				rows={[row("A", { grading: "judged", y: { state: "observed", v: 0.5 } }), row("B", { sealed: false })]}
+				showExperiment={false}
+			/>,
 		);
 		expect(html).toContain('data-testid="run-row-r_a1-judged"');
 		expect(html).toContain("Running");

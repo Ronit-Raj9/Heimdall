@@ -4,16 +4,24 @@ import { getLocale } from "@/lib/i18n";
 import { useGetExperimentParetoQuery, useGetLeaderboardParetoQuery } from "@/lib/store/apis/migrationApi";
 import type { LeaderboardParetoParams, MigrationPair, MigrationReport, MigrationVerdict, Value } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
+import { Alert, type AlertTone } from "@/components/ui/alert";
 import { useTranslation } from "react-i18next";
+import { FadeScroll } from "./fadeScroll";
 import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed } from "./pareto.utils";
 import { ParetoChart } from "./paretoChart";
 
-const ACTION_CLASS: Record<string, string> = {
-	migrate: "border-[var(--color-chart-info)]",
-	do_not_migrate: "border-[var(--color-chart-error)]",
-	not_enough_evidence: "border-border",
+/** The shared callout's tone per recommendation (X-98, M4-32): no side stripe. */
+const ACTION_TONE: Record<string, AlertTone> = {
+	migrate: "info",
+	do_not_migrate: "danger",
+	not_enough_evidence: "warning",
 };
+
+/** True when some model has a known pass^k, so the column is worth showing (M4-29). Pure. */
+export function anyKnown(values: readonly (Value | undefined)[]): boolean {
+	return values.some((v) => observed(v) !== null);
+}
 
 /**
  * The model migration report (docs/model-migration.md): the recommendation per pair first, the
@@ -21,10 +29,32 @@ const ACTION_CLASS: Record<string, string> = {
  * overall verdict, every stratum (Holm across the strata), behaviour, flipped tasks with links to
  * their run pairs, and why the cost moved. The recommendation is never stronger than the tests.
  */
-export function MigrationReportView({ report }: { report: MigrationReport }) {
+export function MigrationReportView({
+	report,
+	meanCost,
+}: {
+	report: MigrationReport;
+	/** The average (mean) cost per run per arm from the cost explanation (M4-2); the server column is a median. */
+	meanCost?: Record<string, Value | undefined>;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4a");
 	const locale = getLocale();
 	const unknown = t("migration.unknown");
+	const showPassK = anyKnown(report.models.map((m) => m.reliability));
+	const cols = [
+		"arm",
+		"model",
+		"success",
+		...(showPassK ? ["passk"] : []),
+		"costPerSuccess",
+		"costPerRun",
+		"tokens",
+		"wall",
+		"steps",
+		"latency",
+		"pareto",
+	];
 	return (
 		<div className="flex flex-col gap-6" data-testid="migration-report">
 			{report.synthetic && (
@@ -44,28 +74,23 @@ export function MigrationReportView({ report }: { report: MigrationReport }) {
 			</p>
 			<ul className="flex flex-col gap-2" data-testid="migration-recommendations">
 				{report.pairs.map((p) => (
-					<li
-						key={p.to.arm}
-						className={`rounded-md border-y border-r border-l-4 p-3 text-sm ${ACTION_CLASS[p.recommendation.action] ?? ""}`}
-						data-testid={`migration-recommendation-${p.to.arm}`}
-						data-action={p.recommendation.action}
-					>
-						<strong>{t(`migration.action.${p.recommendation.action}`)}</strong>{" "}
-						{t("migration.pairName", { from: p.from.model, to: p.to.model, arm: p.to.arm })}: {p.recommendation.reason}
+					<li key={p.to.arm} data-testid={`migration-recommendation-${p.to.arm}`} data-action={p.recommendation.action}>
+						<Alert tone={ACTION_TONE[p.recommendation.action] ?? "info"}>
+							<strong>{t(`migration.action.${p.recommendation.action}`)}</strong>{" "}
+							{t("migration.pairName", { from: p.from.model, to: p.to.model, arm: p.to.arm })}: {p.recommendation.reason}
+						</Alert>
 					</li>
 				))}
 			</ul>
-			<div className="overflow-x-auto">
+			<FadeScroll>
 				<table className="w-full min-w-[640px] text-sm" data-testid="migration-models">
 					<thead>
 						<tr className="text-muted-foreground text-left text-xs">
-							{["arm", "model", "success", "passk", "costPerSuccess", "costPerRun", "tokens", "wall", "steps", "latency", "pareto"].map(
-								(c) => (
-									<th key={c} className="py-1 pr-3 font-medium" scope="col">
-										{t(`migration.models.${c}` as "migration.models.arm")}
-									</th>
-								),
-							)}
+							{cols.map((c) => (
+								<th key={c} className="py-1 pr-3 font-medium" scope="col">
+									{c === "costPerRun" ? tu("cost.perRun") : t(`migration.models.${c}` as "migration.models.arm")}
+								</th>
+							))}
 						</tr>
 					</thead>
 					<tbody>
@@ -74,11 +99,19 @@ export function MigrationReportView({ report }: { report: MigrationReport }) {
 								<td className="py-1 pr-3 font-mono">{m.arm}</td>
 								<td className="py-1 pr-3">{m.model}</td>
 								<td className="py-1 pr-3 tabular-nums">{successText(m.success, locale, unknown)}</td>
-								<td className="py-1 pr-3 tabular-nums">{formatShare(observed(m.reliability), locale) ?? unknown}</td>
+								{showPassK && <td className="py-1 pr-3 tabular-nums">{formatShare(observed(m.reliability), locale) ?? unknown}</td>}
 								<td className="py-1 pr-3 font-mono tabular-nums">
 									{costText(m.cost_per_success, locale) ?? naText(m.cost_per_success, unknown)}
 								</td>
-								<td className="py-1 pr-3 font-mono tabular-nums">{costText(m.cost_per_run, locale) ?? unknown}</td>
+								{/* M4-2: the average per run, the median of the server only as a labelled second value. */}
+								<td className="py-1 pr-3 tabular-nums" data-testid={`migration-cost-run-${m.arm}`}>
+									<span className="font-mono">{costText(meanCost?.[m.arm], locale) ?? unknown}</span>
+									{costText(m.cost_per_run, locale) && (
+										<span className="text-muted-foreground block text-xs">
+											{tu("cost.median", { cost: costText(m.cost_per_run, locale) })}
+										</span>
+									)}
+								</td>
 								<td className="py-1 pr-3 tabular-nums">{numText(m.tokens, unknown)}</td>
 								<td className="py-1 pr-3 tabular-nums">{numText(m.wall_time_s, unknown)}</td>
 								<td className="py-1 pr-3 tabular-nums">{numText(m.steps, unknown)}</td>
@@ -90,7 +123,7 @@ export function MigrationReportView({ report }: { report: MigrationReport }) {
 						))}
 					</tbody>
 				</table>
-			</div>
+			</FadeScroll>
 			{report.pareto && <ParetoChart pareto={report.pareto} testId="migration-pareto" />}
 			{report.pairs.map((p) => (
 				<PairSection key={p.to.arm} pair={p} expId={report.exp_id} />
@@ -134,7 +167,7 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 					<li key={c}>{c}</li>
 				))}
 			</ul>
-			<div className="overflow-x-auto">
+			<FadeScroll>
 				<table className="w-full min-w-[560px] text-sm" data-testid="migration-strata">
 					<caption className="text-muted-foreground pb-1 text-left text-xs">
 						{t("migration.strata.caption", { count: pair.strata[0]?.family ?? 0, family: pair.strata[0]?.family ?? 0 })}
@@ -166,7 +199,7 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 						))}
 					</tbody>
 				</table>
-			</div>
+			</FadeScroll>
 			<div className="flex flex-col gap-1 text-sm" data-testid="migration-behaviour">
 				<h3 className="text-foreground font-medium">{t("migration.behaviour.title")}</h3>
 				<ul className="text-muted-foreground list-disc pl-5">
@@ -191,7 +224,7 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 						</li>
 					))}
 				</ul>
-				<div className="overflow-x-auto">
+				<FadeScroll>
 					<table className="w-full min-w-[480px] text-sm" data-testid="migration-conditions">
 						<thead>
 							<tr className="text-muted-foreground text-left text-xs">
@@ -226,7 +259,7 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 							))}
 						</tbody>
 					</table>
-				</div>
+				</FadeScroll>
 			</div>
 			{pair.flipped.length > 0 && (
 				<div className="flex flex-col gap-1 text-sm" data-testid="migration-flipped">

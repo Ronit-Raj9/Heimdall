@@ -58,16 +58,16 @@ export function GateChecklist({ gates, className }: GateChecklistProps) {
 										<CircleCheck className="text-chart-success-ink size-4 shrink-0" aria-label={t("verdict.gates.statusClear")} />
 									)}
 									<span className="font-mono text-xs">{gate.gate}</span>
-									<span className="text-muted-foreground font-mono text-[10px]">{gate.version}</span>
+									<span className="text-muted-foreground font-mono text-xs">{gate.version}</span>
 									{gate.baseline && (
-										<Badge variant="secondary" className="text-[10px]">
+										<Badge variant="secondary" className="text-xs">
 											{t("verdict.gates.baseline")}
 										</Badge>
 									)}
 								</div>
 							</TableCell>
 							<TableCell>
-								<Badge variant="outline" className="font-mono text-[10px]">
+								<Badge variant="outline" className="font-mono text-xs">
 									{t(`verdict.gates.effectName.${gate.effect}`)}
 								</Badge>
 							</TableCell>

@@ -6,6 +6,8 @@ import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
 import type { CostArm, CostExplanation, CostWaterfall as Waterfall, Value } from "@/lib/types/bench";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { FadeScroll } from "./fadeScroll";
+import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed, signedUsd, waterfallBars } from "./pareto.utils";
 import { formatUsd2, observedNumber } from "@/components/verdict/armCost";
 
@@ -20,6 +22,7 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 	const locale = getLocale();
 	const { a, b } = explanation;
 	const { t: tw } = useTranslation("w4b06");
+	const { t: tu } = useTranslation("uf4a");
 	const unknown = t("migration.unknown");
 	// N200: the configured model, then the provider's own name for it on a second line only when it differs.
 	const modelCell = (arm: CostArm): ReactNode => {
@@ -39,15 +42,15 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 		[t("migration.cost.row.runs"), (arm) => t("migration.cost.runsValue", { runs: arm.runs, successes: arm.successes })],
 		// The mean, the one cost per run of every tab, with two significant digits (M4-2).
 		[
-			t("migration.cost.row.perRun"),
+			tu("cost.perRun"),
 			(arm) => {
 				const mean = observedNumber(arm.cost_per_run);
 				return mean !== null ? formatUsd2(mean, locale) : valueReason(arm.cost_per_run, unknown);
 			},
 		],
-		[t("migration.cost.row.perSuccess"), (arm) => costText(arm.cost_per_success, locale) ?? valueReason(arm.cost_per_success, unknown)],
+		[tu("cost.perSuccess"), (arm) => costText(arm.cost_per_success, locale) ?? valueReason(arm.cost_per_success, unknown)],
 		[
-			t("migration.cost.row.cacheNeutral"),
+			tu("cost.cacheNeutral"),
 			(arm) => costText(arm.cache_neutral_per_success, locale) ?? valueReason(arm.cache_neutral_per_success, unknown),
 		],
 		[t("migration.cost.row.cacheRead"), (arm) => formatShare(observed(arm.cache_read_share), locale) ?? unknown],
@@ -60,7 +63,15 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 			t("migration.cost.row.attempts"),
 			(arm) => `${arm.retries_per_run.toFixed(2)} / ${arm.fallbacks_per_run.toFixed(2)} / ${arm.rejected_per_run.toFixed(2)}`,
 		],
-		[t("migration.cost.row.unpriced"), (arm) => `${arm.unpriced_rows} / ${arm.unattributed_rows}`],
+		// M4-24: a row that is 0 for both setups says nothing and is left out.
+		...(a.unpriced_rows + a.unattributed_rows + b.unpriced_rows + b.unattributed_rows > 0
+			? [
+					[t("migration.cost.row.unpriced"), (arm: CostArm) => `${arm.unpriced_rows} / ${arm.unattributed_rows}`] as [
+						string,
+						(arm: CostArm) => ReactNode,
+					],
+				]
+			: []),
 	];
 	return (
 		<section className="flex flex-col gap-4" data-testid="cost-explanation" aria-label={t("migration.cost.title")}>
@@ -69,7 +80,7 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 					{t("migration.synthetic")}
 				</p>
 			)}
-			<div className="overflow-x-auto">
+			<FadeScroll pinStart>
 				<table className="w-full min-w-[420px] text-sm" data-testid="cost-arms">
 					<thead>
 						<tr className="text-muted-foreground text-left text-xs">
@@ -100,7 +111,7 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 						))}
 					</tbody>
 				</table>
-			</div>
+			</FadeScroll>
 			<WaterfallView title={t("migration.cost.perRun")} waterfall={explanation.per_run} testId="cost-waterfall-run" />
 			<WaterfallView title={t("migration.cost.perSuccess")} waterfall={explanation.per_success} testId="cost-waterfall-success" />
 			<div className="flex flex-col gap-1 text-sm" data-testid="cost-apart">

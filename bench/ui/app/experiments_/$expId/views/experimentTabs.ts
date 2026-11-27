@@ -60,3 +60,13 @@ export function redirectExperimentTab(tab: string | null | undefined): Experimen
 	if (tab === "export") return "verdict";
 	return null;
 }
+/**
+ * M4-15 (owner decision default: Analysis behind More for everyone): the views that sit behind the
+ * strip's More menu. They open from the menu (addressable), and the strip shows the open one at its end.
+ */
+export const MORE_TABS: ReadonlySet<string> = new Set(["migration", "actions", "analysis", "scorecards", "receipts"]);
+
+/** True when a tab that applies goes behind More instead of the strip. Pure. */
+export function behindMore(id: string): boolean {
+	return MORE_TABS.has(id);
+}

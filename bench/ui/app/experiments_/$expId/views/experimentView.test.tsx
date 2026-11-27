@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import ExperimentView from "./experimentView";
+import ExperimentView, { deleteBlocked } from "./experimentView";
 
 // QC2-28-04: while a new experiment route loads, RTK hands back the previous experiment's status as
 // data. The screen must not render that status, or its Start action, under the new id.
@@ -20,6 +20,11 @@ vi.mock("nuqs", async (importOriginal) => ({
 	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/lib/store", () => ({ useAppDispatch: () => () => undefined }));
+// Lane 4a phase B: the header downloads are More menu items read lazily; no store in these renders.
+vi.mock("@/components/export/exportMenu", () => ({
+	useExperimentExportItems: () => ({ items: [], error: null }),
+	ExperimentExportMenu: () => null,
+}));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetExperimentQuery: (id: unknown) => (id === "e_parent" ? api.parent : api.status),
@@ -75,24 +80,15 @@ describe("ExperimentView identity (QC2-28-04)", () => {
 	});
 });
 
+// Lane 4a phase B: Delete is an item of the shared More menu (closed in a static render), so its rule is tested on the pure helper.
 describe("ExperimentView delete (X16)", () => {
-	it("offers Delete to an admin, disabled with the reason while the comparison runs", async () => {
-		const { hostedSession } = await import("@/lib/testing/platformFixtures");
-		const { tagOf } = await import("@/lib/testing/render");
-		api.status = okQuery(created("e_done"));
-		const idle = render(<ExperimentView expId="e_done" />, hostedSession("admin"));
-		expect(tagOf(idle, "experiment-delete")).not.toContain('disabled=""');
-		api.status = okQuery({ ...created("e_run"), state: "running" });
-		const running = render(<ExperimentView expId="e_run" />, hostedSession("admin"));
-		expect(tagOf(running, "experiment-delete")).toContain('disabled=""');
-		expect(running).toContain("Stop the comparison or wait for it to finish before deleting it.");
+	const texts = { adminOnly: "admins", busy: "Stop the comparison or wait for it to finish before deleting it." };
+	it("offers Delete to an admin, disabled with the reason while the comparison runs", () => {
+		expect(deleteBlocked(true, false, texts)).toEqual({ disabled: false });
+		expect(deleteBlocked(true, true, texts)).toEqual({ disabled: true, disabledReason: texts.busy });
 	});
-	it("hides Delete below admin", async () => {
-		const { hostedSession } = await import("@/lib/testing/platformFixtures");
-		api.status = okQuery(created("e_done"));
-		const html = render(<ExperimentView expId="e_done" />, hostedSession("member"));
-		expect(html).not.toContain('data-testid="experiment-delete"');
-		expect(html).toContain("experiment-delete-admin-only");
+	it("disables Delete below admin with the reason", () => {
+		expect(deleteBlocked(false, false, texts)).toEqual({ disabled: true, disabledReason: "admins" });
 	});
 });
 
@@ -103,7 +99,7 @@ describe("ExperimentView one benchmark of an evaluation (J7.tabs)", () => {
 		const html = render(<ExperimentView expId="e_child" />);
 		expect(html).toContain('data-testid="experiment-evaluation-note"');
 		expect(html).toContain(
-			"This is one benchmark of an evaluation. Result, Model switch and Extra trials appear when two setups run on the same tasks.",
+			"This is one benchmark of an evaluation. A comparison of two setups on the same tasks adds Switch decision, and Actions can add more tasks.",
 		);
 		expect(html).toContain("Open the evaluation");
 		expect(html).toContain('href="/evaluations/ev_1"');

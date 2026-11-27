@@ -8,14 +8,19 @@ import {
 	type ExperimentKind,
 } from "@/components/experiments/experiments.utils";
 import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
-import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
+import { ExperimentExportMenu, useExperimentExportItems } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunControlsPanel } from "@/components/experiments/runControls"; // run control
 import { RunList } from "@/components/runs/runList";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
-import { CopyId } from "@/components/ui/copyId";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
+import type { OverflowMenuItem } from "@/components/agents/overflowMenu";
+import { useConfirm, type DestructiveConfirmOptions } from "@/components/platform/confirmDialog";
+import { notify } from "@/lib/notify";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import "@/components/verdict/uf4aI18n";
 import { activeNavItem } from "@/lib/constants/navigation";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { ShareButton } from "@/components/share/shareDialog";
@@ -42,16 +47,22 @@ import { errorStatus } from "@/lib/store/apis/session";
 import { useGetExperimentSupportQuery } from "@/lib/store/apis/supportApi";
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
-import { Bot, CornerUpLeft, Download, GitCompareArrows, Hourglass, Layers, ListChecks, MoreHorizontal, SearchX } from "lucide-react";
+import { Bot, ChevronDown, CornerUpLeft, Hourglass, Layers, ListChecks, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionsTab } from "./actionsTab";
 import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
-import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, redirectExperimentTab, type ExperimentTabId } from "./experimentTabs";
+import {
+	EXPERIMENT_TABS,
+	behindMore,
+	defaultExperimentTab,
+	hiddenExperimentTabs,
+	redirectExperimentTab,
+	type ExperimentTabId,
+} from "./experimentTabs";
 import { RegradeNotice, gradeQuery, useGradeChoice } from "./gradeChoice";
 import { IntegrityTab } from "./integrityTab";
 import { LiveProgress } from "./liveProgress";
@@ -61,7 +72,7 @@ import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
 import { ScorecardsTab } from "./scorecardsTab";
 import { VerdictTab } from "./verdictTab";
-import { GatewayEffectCard } from "@/components/gateway/gatewayEffectCard";
+import { GatewayEffectSlot } from "./gatewayEffectSlot";
 import "./fw11I18n";
 import "./hw12I18n";
 import { FlipBanner } from "@/components/validity/flipBanner";
@@ -118,8 +129,13 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	// M4-15: an old ?tab=adaptive or ?tab=export link lands where that content lives now.
 	const redirect = redirectExperimentTab(tabParam);
-	// The export menu asks for the run list, so it mounts only once More is opened.
-	const [moreOpen, setMoreOpen] = useState(false);
+	const { t: tu } = useTranslation("uf4a");
+	const session = useSession();
+	const canMember = canUse(session, "member");
+	const [regradeOpen, setRegradeOpen] = useState(false);
+	const [deleteError, setDeleteError] = useState<unknown>(null);
+	const [copyError, setCopyError] = useState<unknown>(null);
+	const exportItems = useExperimentExportItems(expId);
 	useEffect(() => {
 		if (redirect) void setTab(redirect === "verdict" ? null : redirect);
 	}, [redirect, setTab]);
@@ -171,6 +187,17 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		((current?.evaluation_id ? "shell.nav.evaluations" : activeNavItem("/experiments")?.labelKey) ?? "shell.nav.experiments") as never,
 	);
 	usePageTitle(titleForTab ? `${titleForTab} · ${String(section)} · Heimdall` : undefined);
+	const deleteItem = useDeleteExperimentItem(expId, titleForTab ?? expId, live, setDeleteError);
+	const copyId = async () => {
+		setCopyError(null);
+		try {
+			await navigator.clipboard.writeText(expId);
+			notify({ text: tu("copied", { ns: "toast" }) });
+		} catch (e) {
+			setCopyError(e);
+		}
+	};
+	const headerError = exportItems.error ?? deleteError ?? copyError;
 
 	// RTK keeps the last result in data while a new argument loads; only a response for this id may
 	// drive the header and its write actions (QC2-28-04).
@@ -206,14 +233,17 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	});
 	// A two-arm matrix repeats the verdict, so it is hidden, but an old /matrix?exp= link that asks for it still gets it.
 	const shownOnRequest = (id: ExperimentTabId) => id === "matrix" && tabParam === "matrix" && arms.length >= 2;
-	const tabs: RouteTab[] = EXPERIMENT_TABS.map((id) => ({
+	const allTabs: RouteTab[] = EXPERIMENT_TABS.map((id) => ({
 		id,
 		// One setup is scored on its own, so its result tab reads "Score", not a comparison.
 		label: id === "actions" ? tActions("tab") : id === "verdict" && arms.length === 1 ? tPage("tabs.verdictScore") : tPage(`tabs.${id}`),
 		hidden: hidden.has(id) && !shownOnRequest(id),
 		testId: `experiment-tab-${id}`,
 	}));
-	tabs.push({ id: ANALYSIS_TAB_ID, label: <AnalysisTabLabel />, testId: `experiment-tab-${ANALYSIS_TAB_ID}` });
+	allTabs.push({ id: ANALYSIS_TAB_ID, label: <AnalysisTabLabel />, testId: `experiment-tab-${ANALYSIS_TAB_ID}` });
+	// M4-15: Result, Runs, Cost and Checks in the strip; the views that apply beside them sit behind More.
+	const moreTabs = allTabs.filter((tab) => !tab.hidden && behindMore(tab.id));
+	const tabs: RouteTab[] = allTabs.map((tab) => (!tab.hidden && behindMore(tab.id) ? { ...tab, hidden: true, addressable: true } : tab));
 	const decision = verdict.data?.verdict.decision;
 	// A verdict worked out while runs are still going is not final (N197): no decision until the end.
 	const partial = live || Boolean((verdict.data as VerdictFacts | undefined)?.partial);
@@ -318,46 +348,26 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					<div className="flex flex-wrap items-center gap-1.5" data-testid="experiment-actions">
 						<ExperimentRunActions status={st} />
 						<ShareButton kind="verdict" target={expId} />
-						{/* M4-14: Re-score, Compare runs, Export, the id and, after a line, Delete in one More menu. */}
-						<details
-							className="group relative"
-							data-testid="experiment-more"
-							onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
-						>
-							<summary
-								className="border-input bg-background hover:bg-muted inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border px-3 text-sm font-medium select-none [&::-webkit-details-marker]:hidden"
-								data-testid="experiment-more-trigger"
-							>
-								<MoreHorizontal className="size-4" aria-hidden="true" />
-								{tPage("header.more")}
-							</summary>
-							<div className="bg-popover text-popover-foreground absolute right-0 z-30 mt-1 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-1 rounded-lg border p-2 shadow-md">
-								<RegradeAction expId={expId} />
-								<Button variant="ghost" size="sm" className="justify-start" asChild>
-									<Link to="/compare" search={compareSearch(undefined, expId) as never} data-testid="experiment-compare">
-										<GitCompareArrows aria-hidden="true" />
-										{t("experiments.page.compare")}
-									</Link>
-								</Button>
-								<div className="flex flex-col gap-1 px-2 py-1" data-testid="experiment-export">
-									<span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium">
-										<Download className="size-3.5" aria-hidden="true" />
-										{tPage("header.export")}
-									</span>
-									{moreOpen && <ExperimentExportMenu expId={expId} />}
-								</div>
-								<div className="flex items-center gap-2 px-2 py-1 text-xs">
-									<span className="text-muted-foreground shrink-0">{tPage("header.copyId")}</span>
-									<CopyId value={expId} className="min-w-0" testId="experiment-copy-id" />
-								</div>
-								<div className="border-t pt-1">
-									<DeleteExperimentAction expId={expId} running={live} />
-								</div>
-							</div>
-						</details>
 					</div>
 				}
+				// M4-14: Re-score, Compare runs, the three downloads, Copy id and, after a line, Delete in the shared More menu.
+				moreLabel={tPage("header.more")}
+				more={[
+					...(canMember ? [{ label: tu("header.rescore"), onSelect: () => setRegradeOpen(true), testId: "experiment-regrade" }] : []),
+					{
+						label: tu("header.compare"),
+						to: "/compare",
+						search: compareSearch(undefined, expId) as Record<string, unknown>,
+						testId: "experiment-compare",
+					},
+					...exportItems.items,
+					{ label: tu("header.copyId", { id: expId }), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
+					deleteItem,
+				]}
 			/>
+
+			<InlineError error={headerError} testId="experiment-header-error" />
+			{canMember && <RegradeAction expId={expId} open={regradeOpen} onOpenChange={setRegradeOpen} hideButton />}
 
 			{system && (
 				<p
@@ -395,55 +405,110 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 			{!notStarted && <RunControlsPanel expId={expId} state={st.state} />}
 
-			<RouteTabs
-				tabs={tabs}
-				defaultTab={defaultExperimentTab(arms.length)}
-				label={t("experiments.page.tabsLabel")}
-				testId="experiment-tabs"
-			>
-				{(active) =>
-					active === ANALYSIS_TAB_ID ? (
-						<AnalysisTab expId={expId} gradeSource={gradeQuery(expId, grade).gradeSource} />
-					) : notStarted && active === "verdict" ? (
-						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
-					) : (
-						<ExperimentTab
-							tab={active as ExperimentTabId}
-							expId={expId}
-							arms={arms}
-							suite={st.suite}
-							suiteVersion={st.suite_version}
-							evaluationId={evaluationId}
-							live={live}
-							gradeSource={gradeQuery(expId, grade).gradeSource}
+			<div className="relative min-w-0">
+				{moreTabs.length > 0 && (
+					// The strip's More menu (M4-15) sits at the strip's right end; the strip keeps room for it.
+					<div className="bg-background absolute top-0 right-0 z-10 flex h-9 items-center pl-1" data-testid="experiment-more-views">
+						<DropdownMenu
+							label={tu("header.moreViewsLabel")}
+							align="end"
+							testId="experiment-more-views-menu"
+							items={moreTabs.map((tab) => ({
+								id: tab.id,
+								label: tab.label,
+								to: "/experiments/$expId",
+								params: { expId },
+								search: { tab: tab.id },
+								testId: `experiment-more-${tab.id}`,
+							}))}
+							trigger={(p) => (
+								<Button {...p} variant="ghost" size="sm" className="gap-1" dataTestId="experiment-more-views-button">
+									{tu("header.moreViews")}
+									<ChevronDown aria-hidden="true" />
+								</Button>
+							)}
 						/>
-					)
-				}
-			</RouteTabs>
+					</div>
+				)}
+				<RouteTabs
+					className={moreTabs.length > 0 ? "[&_[role=tablist]]:pr-24" : undefined}
+					tabs={tabs}
+					defaultTab={defaultExperimentTab(arms.length)}
+					label={t("experiments.page.tabsLabel")}
+					testId="experiment-tabs"
+				>
+					{(active) =>
+						active === ANALYSIS_TAB_ID ? (
+							<AnalysisTab expId={expId} gradeSource={gradeQuery(expId, grade).gradeSource} />
+						) : notStarted && active === "verdict" ? (
+							<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
+						) : (
+							<ExperimentTab
+								tab={active as ExperimentTabId}
+								expId={expId}
+								arms={arms}
+								suite={st.suite}
+								suiteVersion={st.suite_version}
+								evaluationId={evaluationId}
+								live={live}
+								gradeSource={gradeQuery(expId, grade).gradeSource}
+							/>
+						)
+					}
+				</RouteTabs>
+			</div>
 		</div>
 	);
 }
 
-/** Delete (admin): confirm, delete, back to the list. Disabled while the comparison runs. */
-function DeleteExperimentAction({ expId, running }: { expId: string; running: boolean }) {
+/** Whether the More menu's Delete is off and why: admins only, and never while the comparison runs. Pure. */
+export function deleteBlocked(
+	admin: boolean,
+	running: boolean,
+	texts: { adminOnly: string; busy: string },
+): { disabled: boolean; disabledReason?: string } {
+	if (!admin) return { disabled: true, disabledReason: texts.adminOnly };
+	if (running) return { disabled: true, disabledReason: texts.busy };
+	return { disabled: false };
+}
+
+/**
+ * Delete (admin) as an item of the More menu: the shared confirm names what goes, then delete, a
+ * notice and back to the list. Disabled with the reason while the comparison runs or below admin.
+ */
+function useDeleteExperimentItem(expId: string, name: string, running: boolean, onError: (e: unknown) => void): OverflowMenuItem {
 	const { t } = useTranslation("experimentPage");
+	const { t: tu } = useTranslation("uf4a");
+	const session = useSession();
 	const navigate = useNavigate();
+	const confirm = useConfirm();
 	const [remove] = useDeleteExperimentMutation();
-	return (
-		<DeleteAction
-			label={t("header.delete")}
-			confirmTitle={t("header.deleteConfirmTitle")}
-			confirmBody={t("header.deleteConfirm")}
-			confirmLabel={t("header.deleteConfirmOk")}
-			cancelLabel={t("header.deleteKeep")}
-			busyReason={running ? t("header.deleteBusy") : undefined}
-			adminOnly={t("header.deleteAdminOnly")}
-			errorText={(error) => t("header.deleteError", { error })}
-			onDelete={() => remove(expId).unwrap()}
-			onDeleted={() => void navigate({ to: "/experiments" })}
-			testId="experiment-delete"
-		/>
-	);
+	const admin = canUse(session, "admin");
+	const opts: DestructiveConfirmOptions = {
+		destructive: true,
+		title: tu("header.deleteTitle"),
+		confirmLabel: tu("header.deleteOk"),
+		cancelLabel: t("header.deleteKeep"),
+	};
+	return {
+		label: tu("header.delete"),
+		destructive: true,
+		separatorBefore: true,
+		...deleteBlocked(admin, running, { adminOnly: t("header.deleteAdminOnly"), busy: t("header.deleteBusy") }),
+		testId: "experiment-delete",
+		onSelect: () =>
+			void (async () => {
+				if (!(await confirm(t("header.deleteConfirm"), opts))) return;
+				onError(null);
+				try {
+					await remove(expId).unwrap();
+					notify({ text: t("deleted", { ns: "toast", name }) });
+					void navigate({ to: "/experiments" });
+				} catch (e) {
+					onError(e);
+				}
+			})(),
+	};
 }
 
 function SuiteGlyph({ suite }: { suite?: string }) {
@@ -479,7 +544,7 @@ function ExperimentTab({
 		case "verdict":
 			return (
 				<>
-					<GatewayEffectCard expId={expId} />
+					<GatewayEffectSlot expId={expId} />
 					<VerdictTab expId={expId} evaluationId={evaluationId} />
 				</>
 			);

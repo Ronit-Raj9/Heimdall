@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { cheaperArm, formatUsd2, observedNumber } from "./armCost";
 import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, Hourglass, Trophy, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
+import "./uf4aI18n";
 import {
 	DECISION_TONE,
 	formatPp,
@@ -61,6 +63,8 @@ export interface VerdictSummaryProps {
 	 * the tile shows the median under its own label.
 	 */
 	armCost?: Record<string, Value>;
+	/** Runs thrown out for cheating per arm, from the grid (M4-11); a note under the pass count when above 0. */
+	thrown?: Record<string, number>;
 	/** Where the diagnostics query is when armMetrics is absent: still loading, or failed. */
 	metricsStatus?: "loading" | "error";
 	/** The one next step; the page decides where the button goes. */
@@ -78,6 +82,7 @@ export function VerdictSummary({
 	armMetrics,
 	metricsStatus,
 	armCost,
+	thrown,
 	onNext,
 	className,
 }: VerdictSummaryProps) {
@@ -135,6 +140,7 @@ export function VerdictSummary({
 						first={index === 0}
 						cheaper={cheaper?.arm === arm}
 						mean={armCost?.[arm]}
+						thrown={thrown?.[arm] ?? 0}
 						colour={BAR[index % BAR.length]}
 						ratio={naive[arm]}
 						metrics={armMetrics?.[arm]}
@@ -162,6 +168,7 @@ function ArmPanel({
 	first,
 	cheaper,
 	mean,
+	thrown = 0,
 	colour,
 	ratio,
 	metrics,
@@ -173,12 +180,14 @@ function ArmPanel({
 	first: boolean;
 	cheaper: boolean;
 	mean?: Value;
+	thrown?: number;
 	colour: string;
 	ratio?: Ratio;
 	metrics?: Record<string, Value>;
 	status?: "loading" | "error";
 }) {
 	const { t } = useTranslation("experimentPage");
+	const { t: tu } = useTranslation("uf4a");
 	const locale = getLocale();
 	const rate = ratio && ratio.den > 0 ? ratio.num / ratio.den : null;
 	const value = (name: string, kind: "usd" | "tokens") => {
@@ -196,14 +205,16 @@ function ArmPanel({
 	const meanCost = observedNumber(mean);
 	const medianCost = observedNumber(metrics?.cost_usd);
 	// Without the mean (three or more setups, or the cost explanation is missing) the median shows under its own label.
-	const costLabel = meanCost === null && medianCost !== null ? t("summary.costMedian") : t("summary.cost");
+	// M4-2: one label, "Average cost per run" (the mean), on every tab; the median is only a labelled second value.
+	const costLabel = t("summary.cost");
+	// No mean: a known median is not the average, so the average reads not known (median under it); else the load state or the reason.
 	const costText =
 		meanCost !== null
 			? formatUsd2(meanCost, locale)
-			: medianCost !== null
-				? formatUsd2(medianCost, locale)
-				: mean
-					? notKnown(mean.reason, t)
+			: mean
+				? notKnown(mean.reason, t)
+				: medianCost !== null
+					? t("summary.unknown")
 					: value("cost_usd", "usd");
 	return (
 		<div
@@ -234,6 +245,16 @@ function ArmPanel({
 			<span className="text-muted-foreground text-xs">
 				{ratio ? t("summary.passCount", { num: ratio.num, den: ratio.den }) : t("summary.passRate")}
 			</span>
+			{thrown > 0 && (
+				<Link
+					to="."
+					search={((prev: Record<string, unknown>) => ({ ...prev, tab: "runs", outcome: "integrity_violation" })) as never}
+					className="text-warning-ink w-fit text-xs font-medium underline-offset-2 hover:underline"
+					data-testid={`verdict-summary-thrown-${arm}`}
+				>
+					{tu("summary.thrown", { count: thrown })}
+				</Link>
+			)}
 			<dl className="grid grid-cols-2 gap-2 text-xs">
 				<div>
 					<dt className="text-muted-foreground">{costLabel}</dt>
@@ -250,7 +271,7 @@ function ArmPanel({
 							</span>
 						)}
 					</dd>
-					{meanCost !== null && medianCost !== null && (
+					{medianCost !== null && (
 						<dd className="text-muted-foreground mt-0.5 text-xs tabular-nums" data-testid={`verdict-summary-median-${arm}`}>
 							{t("summary.medianSecond", {
 								cost: formatUsd2(medianCost, locale),
@@ -438,4 +459,13 @@ function nextLine(verdict: Verdict, arms: readonly string[], opts: HeadlineOptio
 			return t("summary.next.fix_harness");
 	}
 	return "";
+}
+/** Runs thrown out for cheating per arm, counted from the grid cells (M4-11). Pure. */
+export function thrownByArm(
+	rows: readonly { cells: readonly { arm: string; outcome: string | null }[] }[] | undefined,
+): Record<string, number> {
+	const out: Record<string, number> = {};
+	for (const row of rows ?? [])
+		for (const cell of row.cells) if (cell.outcome === "integrity_violation") out[cell.arm] = (out[cell.arm] ?? 0) + 1;
+	return out;
 }

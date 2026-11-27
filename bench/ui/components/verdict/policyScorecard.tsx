@@ -136,13 +136,13 @@ function CheckRow({
 				<div className="flex items-center gap-1.5">
 					<Badge
 						variant="outline"
-						className={cn("font-mono text-[10px]", TONE_CLASS[tone], check.status === "unknown" && "bench-hatched border-dashed")}
+						className={cn("font-mono text-xs", TONE_CLASS[tone], check.status === "unknown" && "bench-hatched border-dashed")}
 						data-testid={`policy-check-status-${check.id}`}
 					>
 						{t(`policy.status.${check.status}`)}
 					</Badge>
 					{check.blocking && (
-						<Badge variant="outline" className={cn("text-[10px]", TONE_CLASS.bad)} data-testid={`policy-check-blocking-${check.id}`}>
+						<Badge variant="outline" className={cn("text-xs", TONE_CLASS.bad)} data-testid={`policy-check-blocking-${check.id}`}>
 							{t("policy.blocking")}
 						</Badge>
 					)}
@@ -151,7 +151,7 @@ function CheckRow({
 			<TableCell>
 				<div className="flex flex-col">
 					<span className="font-mono text-xs">{check.id}</span>
-					<span className="text-muted-foreground font-mono text-[10px]">{check.metric}</span>
+					<span className="text-muted-foreground font-mono text-xs">{check.metric}</span>
 				</div>
 			</TableCell>
 			<TableCell className="text-xs">{t("policy.target", { condition, arm: check.arm })}</TableCell>
@@ -204,7 +204,7 @@ function Evidence({
 			{shown.map((run) => {
 				const pair = runPairs?.[run];
 				if (!pair) {
-					return <EntityLink key={run} kind="run" id={run} className="text-[10px]" />;
+					return <EntityLink key={run} kind="run" id={run} className="text-xs" />;
 				}
 				const href = compareHref(pair, expId);
 				const open = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -217,7 +217,7 @@ function Evidence({
 						key={run}
 						href={href}
 						onClick={open}
-						className="text-primary font-mono text-[10px] underline-offset-2 hover:underline"
+						className="text-primary font-mono text-xs underline-offset-2 hover:underline"
 						aria-label={t("policy.openRun", { run })}
 						data-testid={`policy-evidence-link-${run}`}
 					>
@@ -226,7 +226,7 @@ function Evidence({
 				);
 			})}
 			{ids.length > shown.length && (
-				<span className="text-muted-foreground text-[10px]">{t("policy.evidenceMore", { count: ids.length - shown.length })}</span>
+				<span className="text-muted-foreground text-xs">{t("policy.evidenceMore", { count: ids.length - shown.length })}</span>
 			)}
 		</div>
 	);

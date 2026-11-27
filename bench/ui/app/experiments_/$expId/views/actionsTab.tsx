@@ -1,5 +1,4 @@
 import { CompareRefsForm } from "@/components/experiments/compareRefsForm";
-import { FollowUpJob } from "@/components/experiments/followUpJob";
 import { MigrateForm } from "@/components/experiments/migrateForm";
 import { ActionCard } from "@/components/experiments/compareActionCard";
 import { groupFaults } from "@/app/evaluate/views/step4Setup";
@@ -21,6 +20,7 @@ import "@/components/verdict/hw09I18n";
 import "@/app/compare/views/w4m3I18n";
 import { wholeNumberProblem } from "@/lib/inputChecks";
 import { usePartialSuiteRefetch } from "@/app/experiments_/new/views/partialRefetch";
+import { PaidFollowUpJob } from "./paidFollowUpJob";
 
 export interface ActionsTabProps {
 	expId: string;
@@ -162,6 +162,7 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 	const problem = wholeNumberProblem(count, 1, max);
 	const params: ExtendJobParams | null = parent ? null : extendParams(count, max, mode, expId, force);
 	const estimate = extendEstimate(mode, Number(count), more, arms);
+	const startParams = params && !broken && (open || force || !decision) ? params : null;
 	const what = tw(mode === "trials" ? "extend.whatTrials" : "extend.whatTasks");
 	const estimateText =
 		estimate.runs == null
@@ -230,6 +231,7 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 							<label className="flex items-center gap-2">
 								<input
 									type="radio"
+									className="size-4"
 									name={`${uid}-mode`}
 									checked={mode === "trials"}
 									onChange={() => setMode("trials")}
@@ -240,6 +242,7 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 							<label className="flex items-center gap-2">
 								<input
 									type="radio"
+									className="size-4"
 									name={`${uid}-mode`}
 									checked={mode === "tasks"}
 									onChange={() => {
@@ -266,22 +269,31 @@ function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?:
 						</label>
 						{decision && !open && !broken && (
 							<label className="flex items-center gap-2 text-sm">
-								<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="actions-extend-force" />
+								<input
+									type="checkbox"
+									className="size-4"
+									checked={force}
+									onChange={(e) => setForce(e.target.checked)}
+									data-testid="actions-extend-force"
+								/>
 								{t("extend.force")}
 							</label>
 						)}
 					</>
 				)}
-				<FollowUpJob
+				<PaidFollowUpJob
 					kind="experiment.extend"
-					params={params && !broken && (open || force || !decision) ? params : null}
+					params={startParams}
 					label={t("extend.run")}
-					// Phase B of the fix wave swaps this plain confirm for the shared PaidButton.
+					// M4-33: the shared PaidButton asks with the runs and the price before anything starts.
 					confirm={confirmText}
+					estimateRuns={estimate.runs}
+					estimateUsd={estimate.cost}
 					missing={parent || broken ? undefined : (problem ?? t("extend.notInconclusive"))}
 					testId="actions-extend-job"
 				/>
-				{!parent && !broken && (
+				{/* The PaidButton prints a known estimate under itself; this line covers the rest. */}
+				{!parent && !broken && (!startParams || estimate.runs == null) && (
 					<p className="text-muted-foreground text-sm tabular-nums" data-testid="actions-extend-estimate">
 						{estimateText}
 					</p>
@@ -345,6 +357,7 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 												<label key={f.id} className={chip} title={f.help}>
 													<input
 														type="checkbox"
+														className="size-4"
 														checked={faults.includes(f.id)}
 														onChange={() => setFaults((cur) => flip(cur, f.id))}
 														data-testid={`actions-fault-${f.id}`}
@@ -369,6 +382,7 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 									<label key={p.id} className={chip}>
 										<input
 											type="checkbox"
+											className="size-4"
 											checked={picked.includes(p.id)}
 											onChange={() => setPicked((cur) => flip(cur, p.id))}
 											data-testid={`actions-probe-${p.id}`}
@@ -391,7 +405,7 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 						</label>
 					</>
 				)}
-				<FollowUpJob
+				<PaidFollowUpJob
 					kind="probe.run"
 					params={params}
 					label={t("probe.run")}

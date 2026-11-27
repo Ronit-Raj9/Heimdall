@@ -14,7 +14,7 @@ vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: (key: string) => [api.search[key] ?? null, () => undefined],
 }));
-vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query }));
+vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query, useGetCostExplainQuery: () => ({}) }));
 const gov = vi.hoisted(() => ({ policies: {} as unknown }));
 vi.mock("@/lib/store/apis/governApi", () => ({ useListPoliciesQuery: () => gov.policies }));
 vi.mock("@/components/migration/migrationReport", () => ({ MigrationReportView: () => <div data-testid="migration-report" /> }));

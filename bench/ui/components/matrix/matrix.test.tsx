@@ -160,12 +160,14 @@ describe("MatrixReport", () => {
 		expect(html).toContain('data-separable="false"');
 		expect(html).toContain('data-testid="matrix-not-separable"');
 		expect(html).toContain(">Cannot separate<");
+		// Lane 4a phase B (M4-46): a plain sentence first; the server's note sits under For statisticians.
+		expect(html).toContain("Only 4 shared tasks, too few to tell these setups apart.");
 		expect(html).toContain(fixture.note.replace("<", "&lt;"));
 		expect(html.indexOf("matrix-not-separable")).toBeLessThan(html.indexOf('data-testid="matrix-table"'));
 		expect(html).toContain('data-testid="matrix-synthetic"');
 		expect(html).toContain('data-testid="matrix-grid"');
-		expect(textOf(html, "matrix-facts")).toBe("coding-core@1.0.0, 4 shared tasks, a difference counts below a luck chance of 0.05");
-		expect(textOf(html, "matrix-grade-source")).toBe("Grades: original");
+		// M4-52: a plain facts line.
+		expect(textOf(html, "matrix-facts")).toBe("4 shared tasks, original grades");
 		expect(html).toContain('data-testid="matrix-condition"');
 		expect(html).toContain("Left out: infra_error (1 runs)");
 	});

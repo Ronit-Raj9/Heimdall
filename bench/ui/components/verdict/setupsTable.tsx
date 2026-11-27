@@ -30,6 +30,8 @@ export function SetupsTable({
 		return pair?.p_adjusted ?? null;
 	};
 	const order = [...arms].sort((x, y) => Number(y === setups.leader) - Number(x === setups.leader));
+	// M4-48: when every setup is tied with the leader the group says nothing: it is left out.
+	const allTied = setups.behind.length === 0;
 	const groupOf = (arm: string) =>
 		arm === setups.leader ? t("setups.leader") : setups.behind.includes(arm) ? t("setups.behind") : t("setups.top");
 	return (
@@ -48,7 +50,7 @@ export function SetupsTable({
 								</span>
 								<span className="shrink-0 tabular-nums">{ratio ? `${ratio.num} / ${ratio.den}` : "-"}</span>
 							</div>
-							<span className="text-muted-foreground text-xs">{groupOf(arm)}</span>
+							{!allTied && <span className="text-muted-foreground text-xs">{groupOf(arm)}</span>}
 							{broken.length > 0 && (
 								<span className="text-chart-error-ink text-xs font-medium">{t("setups.safetyBroken", { tasks: broken.join(", ") })}</span>
 							)}
@@ -64,7 +66,7 @@ export function SetupsTable({
 						<TableHead className="text-right" title={t("setups.pHint")}>
 							{t("setups.pVsLeader")}
 						</TableHead>
-						<TableHead>{t("setups.group")}</TableHead>
+						{!allTied && <TableHead>{t("setups.group")}</TableHead>}
 						<TableHead>{t("setups.safety")}</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -83,7 +85,7 @@ export function SetupsTable({
 								</TableCell>
 								<TableCell className="text-right tabular-nums">{ratio ? `${ratio.num} / ${ratio.den}` : "-"}</TableCell>
 								<TableCell className="text-right tabular-nums">{p === null ? "-" : formatPValue(p, locale)}</TableCell>
-								<TableCell>{group}</TableCell>
+								{!allTied && <TableCell>{group}</TableCell>}
 								<TableCell className={cn(broken.length > 0 ? "text-chart-error-ink font-medium" : "text-muted-foreground")}>
 									{broken.length > 0 ? t("setups.safetyBroken", { tasks: broken.join(", ") }) : t("setups.safetyOk")}
 								</TableCell>

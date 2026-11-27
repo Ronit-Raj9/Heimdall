@@ -24,7 +24,9 @@ import "@/components/verdict/hw09I18n";
 import { SetupsTable } from "@/components/verdict/setupsTable";
 import { armOrder, isScoreVerdict, isSetupsVerdict } from "@/components/verdict/verdict.utils";
 import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
-import { VerdictSummary, costNumbers } from "@/components/verdict/verdictSummary";
+import { LoadError } from "@/components/runs/screenStates";
+import { VerdictSummary, costNumbers, thrownByArm } from "@/components/verdict/verdictSummary";
+import { NoiseFloorLine } from "@/components/integrity/varianceCard";
 import { cheaperArm } from "@/components/verdict/armCost";
 import "@/components/verdict/uf4aI18n";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
@@ -233,10 +235,10 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 		(action: Action) => {
 			// Export lives in the header's More menu now (M4-15, M4-25): open it.
 			if (action === "ship") {
-				const more = document.querySelector<HTMLDetailsElement>('[data-testid="experiment-more"]');
+				const more = document.querySelector<HTMLButtonElement>('[data-testid="page-header-more-button"]');
 				if (more) {
-					more.open = true;
 					more.scrollIntoView({ block: "nearest" });
+					more.click();
 				}
 			} else if (action === "fix_harness") void setTab("runs");
 			else void navigate({ to: "/compare", search: compareSearch(undefined, expId) as never });
@@ -248,11 +250,8 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	if (verdict.isLoading) return <VerdictSkeleton tasks={status.data?.slots.total} onRetry={verdict.refetch} />;
 	if (verdict.isError || !verdict.data) {
 		return (
-			<ErrorState
-				message={t("verdict.loadError", { id: expId, error: getBenchErrorMessage(verdict.error) })}
-				onRetry={verdict.refetch}
-				testId="verdict-error"
-			/>
+			// M4-5: the shared load error (why, Retry when it helps, the server's text under Details).
+			<LoadError title={tf("verdict.loadErrorTitle")} error={verdict.error} onRetry={() => void verdict.refetch()} testId="verdict-error" />
 		);
 	}
 

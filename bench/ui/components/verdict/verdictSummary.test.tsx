@@ -60,9 +60,11 @@ describe("VerdictSummary cost and tokens (D8.cost)", () => {
 
 	it("renders the live payload shape", () => {
 		const html = show({ armMetrics: live });
-		expect(at(html, "verdict-summary-cost-A")).toBe("$0.0035");
+		// Lane 4a phase B (M4-2): the diagnostics cost is a median, so the average reads not known and the median is the second value.
+		expect(at(html, "verdict-summary-cost-A")).toBe("Not known");
+		expect(at(html, "verdict-summary-median-A")).toBe("Median $0.0035");
 		expect(at(html, "verdict-summary-tokens-A")).toBe("23,128");
-		expect(at(html, "verdict-summary-cost-B")).toBe("$0.0017");
+		expect(at(html, "verdict-summary-median-B")).toBe("Median $0.0017");
 	});
 
 	it("says loading and load failure instead of a missing price", () => {

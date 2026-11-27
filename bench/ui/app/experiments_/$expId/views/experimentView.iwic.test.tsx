@@ -20,6 +20,11 @@ vi.mock("nuqs", async (importOriginal) => ({
 	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/lib/store", () => ({ useAppDispatch: () => () => undefined }));
+// Lane 4a phase B: the header downloads are More menu items read lazily; no store in these renders.
+vi.mock("@/components/export/exportMenu", () => ({
+	useExperimentExportItems: () => ({ items: [], error: null }),
+	ExperimentExportMenu: () => null,
+}));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetExperimentQuery: (id: unknown) => (id === "e_parent" ? api.parent : api.status),

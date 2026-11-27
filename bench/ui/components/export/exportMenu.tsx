@@ -1,7 +1,9 @@
 import { IS_FIXTURE_MODE, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { experimentExportUrl, suiteHarborUrl, useGetExperimentRunTableQuery } from "@/lib/store/apis/exportApi";
+import { experimentExportUrl, exportApi, suiteHarborUrl, useGetExperimentRunTableQuery } from "@/lib/store/apis/exportApi";
+import type { OverflowMenuItem } from "@/components/agents/overflowMenu";
+import "@/components/verdict/uf4aI18n";
 import { Download } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 import { downloadChecked } from "@/lib/downloadChecked";
 import "@/app/suites_/$suiteId/views/w4m6I18n";
 import { useTranslation } from "react-i18next";
@@ -218,4 +220,60 @@ export function SuiteExportMenu({
 			{list}
 		</details>
 	);
+}
+/** The three experiment downloads with their file names (M4-25). Pure, so the labels are tested without a page. */
+export function experimentExportFiles(expId: string): { format: "csv" | "jsonl" | "eee"; file: string }[] {
+	return [
+		{ format: "csv", file: `${expId}.runs.csv` },
+		{ format: "jsonl", file: `${expId}.runs.jsonl` },
+		{ format: "eee", file: `${expId}.eee.jsonl` },
+	];
+}
+
+/** Starts a browser download of href under the file name. */
+function startDownload(href: string, file: string) {
+	const a = document.createElement("a");
+	a.href = href;
+	a.download = file;
+	a.rel = "noopener noreferrer";
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+}
+
+/**
+ * The experiment downloads as items of the page header's More menu (M4-25): plain labels, each with
+ * its file name; the run count once the run table was read. The Every Eval Ever item reads the run
+ * table first, so synthetic results are asked for labelled (an unlabelled request is refused). A
+ * failure to classify is returned as error for the page to show.
+ */
+export function useExperimentExportItems(expId: string, fixtureMode = IS_FIXTURE_MODE): { items: OverflowMenuItem[]; error: unknown } {
+	const { t } = useTranslation("uf4a");
+	const [readTable, table] = exportApi.endpoints.getExperimentRunTable.useLazyQuery();
+	const [error, setError] = useState<unknown>(null);
+	const eee = useCallback(async () => {
+		setError(null);
+		try {
+			const rows = await readTable(expId, true).unwrap();
+			startDownload(
+				experimentExportUrl(
+					expId,
+					"eee",
+					rows.some((row) => row.synthetic),
+				),
+				`${expId}.eee.jsonl`,
+			);
+		} catch (e) {
+			setError(e);
+		}
+	}, [expId, readTable]);
+	if (fixtureMode) return { items: [], error: null };
+	const runs = table.data && table.originalArgs === expId ? table.data.length : null;
+	const items = experimentExportFiles(expId).map(({ format, file }, i) => ({
+		label: runs === null ? t(`export.${format}`, { file }) : t(`export.${format}Runs`, { file, count: runs }),
+		onSelect: format === "eee" ? () => void eee() : () => startDownload(experimentExportUrl(expId, format), file),
+		separatorBefore: i === 0,
+		testId: `export-${format}`,
+	}));
+	return { items, error };
 }

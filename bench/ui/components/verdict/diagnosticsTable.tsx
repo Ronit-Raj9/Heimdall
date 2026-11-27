@@ -5,7 +5,15 @@ import type { DiagnosticsPayload, DiagnosticsRow, MetricDescriptor, Ratio, Value
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { MethodHint } from "./methodHint";
-import { EFFICIENCY_ARM_METRICS, METER_GROUP_ORDER, armMetricGroup, formatCount, formatSignedPp, meterGroup, type MeterGroup } from "./verdict.utils";
+import {
+	EFFICIENCY_ARM_METRICS,
+	METER_GROUP_ORDER,
+	armMetricGroup,
+	formatCount,
+	formatSignedPp,
+	meterGroup,
+	type MeterGroup,
+} from "./verdict.utils";
 
 export interface DiagnosticsTableProps {
 	diagnostics: Pick<DiagnosticsPayload, "diagnostics" | "meters" | "arm_metrics">;
@@ -83,7 +91,7 @@ function RatioText({ ratio }: { ratio: Ratio | undefined }) {
 		<span className="inline-flex items-center gap-1.5 tabular-nums">
 			{t("verdict.naive.ratio", { num: formatCount(ratio.num, locale), den: formatCount(ratio.den, locale) })}
 			{ratio.unknown > 0 && (
-				<span className="bench-hatched text-muted-foreground rounded-sm border border-dashed px-1 text-[10px]">
+				<span className="bench-hatched text-muted-foreground rounded-sm border border-dashed px-1 text-xs">
 					{t("verdict.naive.unknown", { count: ratio.unknown })}
 				</span>
 			)}
@@ -99,7 +107,7 @@ function EffectCell({ row }: { row: DiagnosticsRow }) {
 		return (
 			<span className="inline-flex items-center justify-end gap-2" data-testid={`verdict-diagnostics-effect-${row.condition}`}>
 				{value && <span className="text-muted-foreground text-xs tabular-nums">{value}</span>}
-				<span className="text-muted-foreground rounded-sm border border-dashed px-1 text-[10px] uppercase">
+				<span className="text-muted-foreground rounded-sm border border-dashed px-1 text-xs uppercase">
 					{t("verdict.diagnostics.descriptive")}
 				</span>
 			</span>
@@ -108,9 +116,7 @@ function EffectCell({ row }: { row: DiagnosticsRow }) {
 	return (
 		<span className="inline-flex items-center justify-end gap-2" data-testid={`verdict-diagnostics-effect-${row.condition}`}>
 			<span className="font-semibold tabular-nums">{value ?? t("verdict.card.noEffect")}</span>
-			<span className="border-primary/50 text-primary rounded-sm border px-1 text-[10px] uppercase">
-				{t("verdict.diagnostics.primary")}
-			</span>
+			<span className="border-primary/50 text-primary rounded-sm border px-1 text-xs uppercase">{t("verdict.diagnostics.primary")}</span>
 		</span>
 	);
 }

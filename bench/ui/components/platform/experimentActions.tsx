@@ -5,13 +5,21 @@ import { ConfirmButton } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { RegradeDialog } from "@/components/platform/regradeDialog";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { useSession } from "@/lib/session/sessionContext";
 import { useAppDispatch } from "@/lib/store";
-import { benchApi, getBenchErrorMessage, useGetHealthQuery, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
+import {
+	benchApi,
+	getBenchErrorMessage,
+	useGetHealthQuery,
+	useRegradeMutation,
+	useStartExperimentMutation,
+} from "@/lib/store/apis/benchApi";
 import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
 import { launchAvailable, type ExperimentStatus, type Job, type Role } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Play, RotateCcw } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,7 +28,7 @@ function ActionError({ error, title, testId, min = "member" }: { error: unknown;
 	const session = useSession();
 	if (isRoleRefusal(session, error)) return <ForbiddenNote min={min} error={error} testId={testId} className="w-full" />;
 	return (
-		<p role="alert" className="text-chart-error-ink w-full text-xs" data-testid={testId}>
+		<p role="alert" className="text-danger-ink w-full text-xs" data-testid={testId}>
 			{title}: {getBenchErrorMessage(error)}
 		</p>
 	);
@@ -59,24 +67,35 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 						testId="experiment-cancel"
 					/>
 				)}
+				{/* M4-41: Resume and Start spend money on model calls: the shared PaidButton asks first. */}
 				{resumable && (
-					<Button
+					<PaidButton
 						variant="outline"
 						size="sm"
-						className="gap-1.5"
+						verb={t("experimentActions.resume")}
+						capUsd={null}
+						confirm="always"
 						isLoading={resumeState.isLoading}
-						onClick={() => void resume(status.exp_id)}
-						dataTestId="experiment-resume"
-					>
-						<Play className="size-3.5" aria-hidden="true" />
-						{t("experimentActions.resume")}
-					</Button>
+						onConfirm={async () => {
+							const res = await resume(status.exp_id);
+							if ("data" in res) notify({ text: t("started", { ns: "toast", name: t("experimentActions.resume") }) });
+						}}
+						testId="experiment-resume"
+					/>
 				)}
 				{startable && (
-					<Button size="sm" className="gap-1.5" isLoading={startState.isLoading} onClick={() => void start(status.exp_id)} dataTestId="experiment-start">
-						<Play className="size-3.5" aria-hidden="true" />
-						{t("experimentActions.start")}
-					</Button>
+					<PaidButton
+						size="sm"
+						verb={t("experimentActions.start")}
+						capUsd={null}
+						confirm="always"
+						isLoading={startState.isLoading}
+						onConfirm={async () => {
+							const res = await start(status.exp_id);
+							if ("data" in res) notify({ text: t("started", { ns: "toast", name: t("experimentActions.start") }) });
+						}}
+						testId="experiment-start"
+					/>
 				)}
 				{startState.error && (
 					<ActionError error={startState.error} title={t("experimentActions.startError")} testId="experiment-start-error" />
@@ -97,12 +116,34 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
  * dialog with the regate options (suite lock, note, regrade id); once queued, the job's live log
  * shows here with a link to read the verdict at the new grade source. The original grades stay.
  */
-export function RegradeAction({ expId, defaultOpen = false }: { expId: string; defaultOpen?: boolean }) {
+export function RegradeAction({
+	expId,
+	defaultOpen = false,
+	open: openProp,
+	onOpenChange,
+	hideButton = false,
+}: {
+	expId: string;
+	defaultOpen?: boolean;
+	/** Controlled dialog (M4-14: the header More menu opens it); leave out for the button's own state. */
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	/** The More menu holds the trigger: show only the started job, its log and the dialog. */
+	hideButton?: boolean;
+}) {
 	const { t } = useTranslation("platform");
 	const [regrade, state] = useRegradeMutation();
-	const [open, setOpen] = useState(defaultOpen);
+	const [ownOpen, setOwnOpen] = useState(defaultOpen);
+	const open = openProp ?? ownOpen;
+	const setOpen = useCallback(
+		(next: boolean) => {
+			setOwnOpen(next);
+			onOpenChange?.(next);
+		},
+		[onOpenChange],
+	);
 	const [showLog, setShowLog] = useState(true);
-	const close = useCallback(() => setOpen(false), []);
+	const close = useCallback(() => setOpen(false), [setOpen]);
 	const job = state.data && state.originalArgs?.exp_id === expId ? state.data : null;
 	const regradeId = job ? regradeIdOf(job) : null;
 	// The mutation's job is the queued row; the log panel reports the finished one. A finished re-score
@@ -135,18 +176,20 @@ export function RegradeAction({ expId, defaultOpen = false }: { expId: string; d
 							</Link>
 						</span>
 					)}
-					<Button
-						variant="outline"
-						size="sm"
-						className="gap-1.5"
-						title={t("experimentActions.regradeHint")}
-						isLoading={state.isLoading}
-						onClick={() => setOpen(true)}
-						dataTestId="regrade-button"
-					>
-						<RotateCcw className="size-3.5" aria-hidden="true" />
-						{job ? t("experimentActions.regradeDialog.again") : t("experimentActions.regrade")}
-					</Button>
+					{!hideButton && (
+						<Button
+							variant="outline"
+							size="sm"
+							className="gap-1.5"
+							title={t("experimentActions.regradeHint")}
+							isLoading={state.isLoading}
+							onClick={() => setOpen(true)}
+							dataTestId="regrade-button"
+						>
+							<RotateCcw className="size-3.5" aria-hidden="true" />
+							{job ? t("experimentActions.regradeDialog.again") : t("experimentActions.regrade")}
+						</Button>
+					)}
 				</div>
 				{state.error && <ActionError error={state.error} title={t("experimentActions.regradeError")} testId="regrade-error" />}
 				{job && showLog && (
