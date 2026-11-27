@@ -53,7 +53,7 @@ export function LandingView() {
 			<section className="relative flex flex-col gap-8 pt-4 md:pt-10" data-testid="landing-hero">
 				<div
 					aria-hidden="true"
-					className="pointer-events-none absolute -top-24 left-1/2 -z-10 size-[36rem] -translate-x-1/2 rounded-full bg-[oklch(0.55_0.18_272)] opacity-[0.08] blur-3xl"
+					className="pointer-events-none absolute -top-24 left-1/2 -z-10 size-[36rem] -translate-x-1/2 rounded-full bg-brand-glow opacity-[0.08] blur-3xl"
 				/>
 				<p className="text-primary font-mono text-xs font-medium tracking-[0.12em] uppercase">{t("landing.eyebrow")}</p>
 				<h1 className="max-w-4xl text-[2.6rem] leading-[1.05] font-semibold tracking-[-0.035em] text-balance md:text-6xl">{t("landing.title")}</h1>
@@ -125,20 +125,20 @@ export function LandingView() {
 			</section>
 
 			<section
-				className="grid gap-8 overflow-hidden rounded-2xl bg-[oklch(0.2_0.035_272)] p-8 text-[oklch(0.96_0.01_272)] md:grid-cols-2 md:p-12 dark:bg-[oklch(0.17_0.03_272)]"
+				className="grid gap-8 overflow-hidden rounded-2xl bg-brand-panel p-8 text-brand-ink md:grid-cols-2 md:p-12"
 				data-testid="landing-bifrost"
 			>
 				<div className="flex flex-col gap-3">
-					<span className="flex size-10 items-center justify-center rounded-xl bg-[oklch(1_0_0/0.08)] ring-1 ring-[oklch(1_0_0/0.12)]">
+					<span className="flex size-10 items-center justify-center rounded-xl bg-white/8 ring-1 ring-white/12">
 						<Network className="size-5" aria-hidden="true" />
 					</span>
 					<h2 className="text-2xl font-semibold tracking-[-0.02em]">{t("landing.bifrost.title")}</h2>
-					<p className="leading-relaxed text-[oklch(0.82_0.03_272)]">{t("landing.bifrost.body")}</p>
+					<p className="leading-relaxed text-brand-muted">{t("landing.bifrost.body")}</p>
 				</div>
 				<ul className="flex flex-col justify-center gap-4">
 					{(["point1", "point2", "point3"] as const).map((p) => (
 						<li key={p} className="flex items-start gap-3 text-sm">
-							<Check className="mt-0.5 size-4 shrink-0 text-[oklch(0.8_0.12_160)]" aria-hidden="true" />
+							<Check className="mt-0.5 size-4 shrink-0 text-brand-tick" aria-hidden="true" />
 							{t(`landing.bifrost.${p}`)}
 						</li>
 					))}

@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { EmptyNote, Section } from "@/components/runs/screenStates";
 import { Link } from "@tanstack/react-router";
 import { EntityLink } from "@/components/shell";
@@ -127,8 +128,9 @@ function WhatChanged({ look }: { look: CanaryRecord }) {
 			{ch.moved.length > 0 ? (
 				<ul className="flex flex-col gap-1 text-sm" data-testid="canary-moved">
 					{ch.moved.map((m) => (
-						<li key={m} className="border-chart-warning/60 border-l-2 pl-2">
-							{m}
+						<li key={m} className="flex items-start gap-2">
+							<TriangleAlert className="text-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+							<span>{m}</span>
 						</li>
 					))}
 				</ul>

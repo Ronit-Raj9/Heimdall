@@ -3,14 +3,14 @@ import { ModeBadge } from "@/components/modeBadge";
 import { HelpMenu } from "@/components/platform/helpMenu";
 import { JobsIndicator } from "@/components/platform/jobsDrawer";
 import { UserMenu } from "@/components/platform/userMenu";
-import { ThemeToggle } from "@/components/themeToggle";
 import { Button } from "@/components/ui/button";
 import { BENCH_NAV_GROUPS, activeNavItem, ownPageTitle } from "@/lib/constants/navigation";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
 import { launchAvailable } from "@/lib/types/bench";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronRight, Menu, Plus } from "lucide-react";
+import { ChevronRight, Menu, Moon, Plus, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 
 export interface BenchHeaderProps {
@@ -35,7 +35,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 	const canStart = canUse(session, "member") && pathname !== "/evaluate" && launchAvailable(data);
 
 	return (
-		<header className="flex h-13 shrink-0 items-center gap-2 px-3 md:gap-2 md:px-4" data-testid="bench-header">
+		<header className="flex h-(--header-h) shrink-0 items-center gap-2 px-3 md:gap-2 md:px-4" data-testid="bench-header">
 			{onOpenNav && (
 				<button
 					type="button"
@@ -43,7 +43,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 					aria-label={t("shell.openMenu")}
 					aria-expanded={navOpen}
 					aria-haspopup="dialog"
-					className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 -ml-1 flex size-8 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none md:hidden"
+					className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-(--focus) -ml-1 flex size-8 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none md:hidden"
 					data-testid="nav-menu-button"
 				>
 					<Menu className="size-4.5" aria-hidden="true" />
@@ -52,7 +52,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			<Link
 				to="/"
 				aria-label={t("shell.nav.home")}
-				className="bg-foreground text-background focus-visible:ring-ring/60 flex size-7 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none md:hidden"
+				className="bg-foreground text-background focus-visible:ring-(--focus) flex size-7 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none md:hidden"
 				data-testid="header-home"
 			>
 				<HeimdallMark className="size-4.5" />
@@ -77,7 +77,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			<JobsIndicator />
 			<HelpMenu />
 			<span aria-hidden="true" className="bg-border mx-0.5 hidden h-5 w-px sm:block" />
-			<ThemeToggle />
+			<HeaderThemeToggle />
 			<UserMenu />
 		</header>
 	);
@@ -105,7 +105,7 @@ export function HeaderCrumbs({ pathname }: { pathname: string }) {
 				{showGroup && (
 					<>
 						<li className="text-muted-foreground hidden shrink-0 sm:block">{groupLabel}</li>
-						<li aria-hidden="true" className="text-muted-foreground/60 hidden sm:block">
+						<li aria-hidden="true" className="text-muted-foreground hidden sm:block">
 							<ChevronRight className="size-3.5" />
 						</li>
 					</>
@@ -119,7 +119,7 @@ export function HeaderCrumbs({ pathname }: { pathname: string }) {
 					) : (
 						<Link
 							to={item.to as never}
-							className="text-foreground/90 hover:text-foreground flex min-w-0 items-center gap-1.5 rounded-sm font-medium transition-colors"
+							className="text-foreground hover:text-primary flex min-w-0 items-center gap-1.5 rounded-sm font-medium transition-colors"
 						>
 							<Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
 							<span className="truncate">{t(item.labelKey)}</span>
@@ -128,7 +128,7 @@ export function HeaderCrumbs({ pathname }: { pathname: string }) {
 				</li>
 				{own && (
 					<>
-						<li aria-hidden="true" className="text-muted-foreground/60">
+						<li aria-hidden="true" className="text-muted-foreground">
 							<ChevronRight className="size-3.5" />
 						</li>
 						<li className="min-w-0">
@@ -140,5 +140,26 @@ export function HeaderCrumbs({ pathname }: { pathname: string }) {
 				)}
 			</ol>
 		</nav>
+	);
+}
+/** The theme switch as a toggle button: its name is "Dark theme" and it reports whether dark is on. */
+function HeaderThemeToggle() {
+	const { t } = useTranslation("bench");
+	const { resolvedTheme, setTheme } = useTheme();
+	const dark = resolvedTheme === "dark";
+	return (
+		<Button
+			variant="ghost"
+			size="icon"
+			className="text-muted-foreground hover:bg-accent hover:text-accent-foreground relative size-8"
+			onClick={() => setTheme(dark ? "light" : "dark")}
+			aria-label={t("theme.dark")}
+			aria-pressed={dark}
+			title={t("theme.toggle")}
+			data-testid="theme-toggle-btn"
+		>
+			<Sun className="size-4 scale-100 rotate-0 transition-transform duration-200 dark:scale-0 dark:-rotate-90" strokeWidth={2} aria-hidden="true" />
+			<Moon className="absolute size-4 scale-0 rotate-90 transition-transform duration-200 dark:scale-100 dark:rotate-0" strokeWidth={2} aria-hidden="true" />
+		</Button>
 	);
 }
