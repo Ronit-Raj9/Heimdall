@@ -20,6 +20,8 @@ import { Boxes, Cloud, Plus, Server, Ship } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
 import { useConfirm } from "@/components/platform/confirmDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import "@/components/home/uf2aI18n";
 import { useConfirmTarget } from "./whereRunsGo";
 import { useTranslation } from "react-i18next";
 
@@ -279,6 +281,16 @@ function Field({ label, hint, children, htmlFor }: { label: string; hint?: strin
 	);
 }
 
+/** Number fields of the connect form that size a machine: each must be 1 or more. */
+const SIZE_FIELDS = new Set(["hours", "cpus", "memory_mb", "gpu_count", "disk_gb"]);
+
+/** A filled size field below 1 or not a number (M8-34); empty means "use the default". */
+export function badSize(v: string | undefined): boolean {
+	if (v === undefined || v.trim() === "") return false;
+	const n = Number(v);
+	return !Number.isFinite(n) || n < 1;
+}
+
 const inputClass = "border-input bg-background h-8 w-full min-w-0 rounded-md border px-2 text-sm";
 const areaClass = "border-input bg-background min-h-28 w-full min-w-0 rounded-md border px-2 py-1.5 font-mono text-xs";
 
@@ -327,6 +339,7 @@ export function draftToCreate(d: ConnectDraft) {
 
 export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPlatform[]; onClose(): void }) {
 	const { t } = useTranslation("byoworker");
+	const { t: tf } = useTranslation("uf2a");
 	const [draft, setDraft] = useState<ConnectDraft>({
 		platform: platforms[0]?.id ?? "vm",
 		name: "",
@@ -338,19 +351,48 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 	const [created, setCreated] = useState<WorkerConnectionCreated | null>(null);
 	const base = useId();
 	const set = (key: string, value: string) => setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }));
-	const text = (key: string, label: string, hint?: string, type = "text") => (
-		<Field label={label} hint={hint} htmlFor={`${base}-${key}`}>
-			<input
-				id={`${base}-${key}`}
-				type={type}
-				autoComplete="off"
-				className={inputClass}
-				value={draft.fields[key] ?? ""}
-				onChange={(e) => set(key, e.target.value)}
-				data-testid={`byo-form-${key}`}
-			/>
+	// M8-34: sizes (CPUs, memory, GPUs, disk, hours) start at 1; a 0 or negative value is named inline.
+	const text = (key: string, label: string, hint?: string, type = "text") => {
+		const bad = type === "number" && badSize(draft.fields[key]);
+		return (
+			<Field label={label} hint={hint} htmlFor={`${base}-${key}`}>
+				<input
+					id={`${base}-${key}`}
+					type={type}
+					min={type === "number" ? 1 : undefined}
+					autoComplete="off"
+					className={inputClass}
+					value={draft.fields[key] ?? ""}
+					onChange={(e) => set(key, e.target.value)}
+					aria-invalid={bad || undefined}
+					data-testid={`byo-form-${key}`}
+				/>
+				{bad && (
+					<span className="text-chart-error-ink text-xs" role="alert" data-testid={`byo-form-${key}-error`}>
+						{tf("workers.sizeMin")}
+					</span>
+				)}
+			</Field>
+		);
+	};
+	// X-54: the styled Select, the same list as everywhere else on Settings.
+	const choice = (key: string, label: string, options: string[], fallback: string, testId?: string) => (
+		<Field label={label} htmlFor={`${base}-${key}`}>
+			<Select value={draft.fields[key] ?? fallback} onValueChange={(v) => set(key, v)}>
+				<SelectTrigger id={`${base}-${key}`} className="h-8 w-full" data-testid={testId}>
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((o) => (
+						<SelectItem key={o} value={o}>
+							{o}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 		</Field>
 	);
+	const sizesBad = Object.entries(draft.fields).some(([k, v]) => SIZE_FIELDS.has(k) && badSize(v));
 	const area = (key: string, label: string, hint?: string) => (
 		<Field label={label} hint={hint} htmlFor={`${base}-${key}`}>
 			<textarea
@@ -452,19 +494,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 				{p === "runloop" && (
 					<>
 						{text("secret", t("runloop.secret"), t("form.secretHint"), "password")}
-						<Field label={t("runloop.size")} htmlFor={`${base}-size`}>
-							<select
-								id={`${base}-size`}
-								className={inputClass}
-								value={draft.fields.size ?? "X_LARGE"}
-								onChange={(e) => set("size", e.target.value)}
-								data-testid="byo-form-size"
-							>
-								{["MEDIUM", "LARGE", "X_LARGE", "XX_LARGE"].map((s) => (
-									<option key={s}>{s}</option>
-								))}
-							</select>
-						</Field>
+						{choice("size", t("runloop.size"), ["MEDIUM", "LARGE", "X_LARGE", "XX_LARGE"], "X_LARGE", "byo-form-size")}
 						{text("blueprint", t("runloop.blueprint"), t("runloop.blueprintHint"))}
 						{text("hours", t("runloop.hours"), undefined, "number")}
 					</>
@@ -476,17 +506,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 						{text("region", t("fly.region"))}
 						{text("cpus", t("fly.cpus"), undefined, "number")}
 						{text("memory_mb", t("fly.memory"), undefined, "number")}
-						<Field label={t("fly.cpuKind")} htmlFor={`${base}-cpu_kind`}>
-							<select
-								id={`${base}-cpu_kind`}
-								className={inputClass}
-								value={draft.fields.cpu_kind ?? "performance"}
-								onChange={(e) => set("cpu_kind", e.target.value)}
-							>
-								<option>performance</option>
-								<option>shared</option>
-							</select>
-						</Field>
+						{choice("cpu_kind", t("fly.cpuKind"), ["performance", "shared"], "performance")}
 						{text("image", t("fly.image"))}
 					</>
 				)}
@@ -495,18 +515,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 						{text("secret", t("runpod.secret"), t("form.secretHint"), "password")}
 						{text("gpu_type", t("runpod.gpuType"), t("runpod.gpuTypeHint"))}
 						{text("gpu_count", t("runpod.gpuCount"), undefined, "number")}
-						<Field label={t("runpod.cloudType")} htmlFor={`${base}-cloud_type`}>
-							<select
-								id={`${base}-cloud_type`}
-								className={inputClass}
-								value={draft.fields.cloud_type ?? "SECURE"}
-								onChange={(e) => set("cloud_type", e.target.value)}
-								data-testid="byo-form-cloud-type"
-							>
-								<option>SECURE</option>
-								<option>COMMUNITY</option>
-							</select>
-						</Field>
+						{choice("cloud_type", t("runpod.cloudType"), ["SECURE", "COMMUNITY"], "SECURE", "byo-form-cloud-type")}
 						{text("image", t("runpod.image"), t("runpod.imageHint"))}
 						{text("disk_gb", t("runpod.disk"), undefined, "number")}
 					</>
@@ -567,7 +576,7 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 				</p>
 			)}
 			<div className="flex gap-2">
-				<Button type="submit" size="sm" disabled={state.isLoading || draft.name.trim() === ""} data-testid="byo-form-submit">
+				<Button type="submit" size="sm" disabled={state.isLoading || draft.name.trim() === "" || sizesBad} data-testid="byo-form-submit">
 					{state.isLoading ? t("form.submitting") : t("form.submit")}
 				</Button>
 				<Button type="button" size="sm" variant="outline" onClick={onClose}>

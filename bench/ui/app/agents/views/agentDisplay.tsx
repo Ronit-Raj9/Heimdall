@@ -43,7 +43,7 @@ export function isBaselineAgent(agent: Pick<AgentSummary, "id">): boolean {
 
 export function isTestAgent(agent: TestAgentFields): boolean {
 	if (agent.scripted_kind || agent.adapter === "scripted") return true;
-	if (TEST_IDS.has(agent.id) || agent.id.startsWith("live-")) return true;
+	if (TEST_IDS.has(agent.id) || agent.id.startsWith("live-") || agent.id.startsWith("zz-test-")) return true;
 	return TEST_DOUBLE_TEXT.test(`${agent.description ?? ""} ${agent.notes ?? ""}`);
 }
 
@@ -129,20 +129,8 @@ export function initials(name: string): string {
 	return (name.slice(0, 2) || "?").toUpperCase();
 }
 
-const TONES = [
-	"bg-sky-500/15 text-sky-700 dark:text-sky-300",
-	"bg-violet-500/15 text-violet-700 dark:text-violet-300",
-	"bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-	"bg-amber-500/15 text-amber-700 dark:text-amber-300",
-	"bg-rose-500/15 text-rose-700 dark:text-rose-300",
-	"bg-teal-500/15 text-teal-700 dark:text-teal-300",
-];
-
-function toneFor(name: string): string {
-	let h = 0;
-	for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-	return TONES[h % TONES.length];
-}
+// M2-29: one neutral tile for every agent; the initials tell agents apart, so no tint reads as a status.
+const AVATAR_TONE = "bg-muted text-foreground";
 
 /** A rounded tile with the agent's initials (or a bot icon when there is no name). */
 export function AgentAvatar({ name, size = "md", className }: { name: string; size?: "md" | "lg"; className?: string }) {
@@ -152,7 +140,7 @@ export function AgentAvatar({ name, size = "md", className }: { name: string; si
 			className={cn(
 				"inline-flex shrink-0 items-center justify-center rounded-xl font-semibold tracking-tight",
 				size === "lg" ? "size-12 text-base" : "size-10 text-sm",
-				toneFor(name),
+				AVATAR_TONE,
 				className,
 			)}
 		>
@@ -175,16 +163,22 @@ export function jobState(job: Job | undefined): CheckState {
 	return "failed";
 }
 
+// M2-112f: the shared status tokens of globals.css (lane S1).
 const PILL: Record<CheckState, { dot: string; cls: string }> = {
-	passed: { dot: "bg-emerald-500", cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-	failed: { dot: "bg-red-500", cls: "bg-red-500/10 text-red-700 dark:text-red-300" },
-	running: { dot: "bg-sky-500 animate-pulse", cls: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
-	never: { dot: "bg-muted-foreground/50", cls: "bg-muted text-muted-foreground" },
-	broken: { dot: "bg-red-500", cls: "bg-red-500/10 text-red-700 dark:text-red-300" },
+	passed: { dot: "bg-success", cls: "bg-success-soft text-success-ink" },
+	failed: { dot: "bg-danger", cls: "bg-danger-soft text-danger-ink" },
+	running: { dot: "bg-info animate-pulse", cls: "bg-info-soft text-info-ink" },
+	never: { dot: "bg-unmeasured", cls: "bg-muted text-muted-foreground" },
+	broken: { dot: "bg-danger", cls: "bg-danger-soft text-danger-ink" },
 };
 
-export function CheckPill({ state, testId }: { state: CheckState; testId?: string }) {
+/**
+ * The setup check state. "Setup not checked" is left out for an agent that already has runs
+ * (pass `runs`), since the runs show it works (M2-22).
+ */
+export function CheckPill({ state, testId, runs }: { state: CheckState; testId?: string; runs?: number }) {
 	const { t } = useTranslation("agentsUx");
+	if (state === "never" && (runs ?? 0) > 0) return null;
 	const p = PILL[state];
 	return (
 		<span

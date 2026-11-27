@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { AgentSummary } from "@/lib/types/bench";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { YourAgents, agentCardStats } from "./yourAgents";
+import { YourAgents, agentCardStats, agentsWithResults, ownAgents } from "./yourAgents";
 
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
@@ -49,19 +49,22 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
+const evaluation = (id: string, agentId: string, created_at = "2026-11-10T00:00:00Z") =>
+	({ id, status: "done", created_at, spec: { arms: [{ agent: agentId }] } }) as never;
+
 const agent = (id: string) => ({ id, adapter: "command", scripted_kind: "", path: `agents/${id}.yaml` }) as AgentSummary;
 
 describe("Home: your agents", () => {
 	it("shows version, score per capability, cost per solved task, drop under faults and last evaluation", () => {
 		const html = renderToStaticMarkup(
-			<YourAgents agents={[agent("codex"), agent("support-bot"), agent("draft-bot")]} evaluations={[]} mayRun />,
+			<YourAgents agents={[agent("codex"), agent("support-bot"), agent("draft-bot")]} evaluations={[evaluation("ev_9", "support-bot")]} mayRun />,
 		);
 		expect(html).not.toContain("home-agent-codex");
 		expect(html).toContain('data-testid="home-agent-support-bot-version">v4');
 		expect(html).toContain("62%");
 		expect(html).toContain('data-testid="home-agent-support-bot-cost">$0.20');
 		expect(html).toContain("-32 pts (Broken tool)");
-		expect(html).toContain("Last evaluation ev_9");
+		expect(html).toContain("Last evaluation ");
 		expect(html).toContain('data-testid="home-agent-draft-bot-none"');
 	});
 
@@ -69,6 +72,27 @@ describe("Home: your agents", () => {
 		const html = renderToStaticMarkup(<YourAgents agents={[agent("codex")]} evaluations={[]} mayRun />);
 		expect(html).toContain('data-testid="home-agents-empty"');
 		expect(html).toContain('data-testid="home-agents-add"');
+	});
+});
+
+describe("Home: which agents show (M2-11, M2-12, M1-19, X-13)", () => {
+	it("adds built-in agents that were evaluated, newest evaluation first", () => {
+		const list = [agent("support-bot"), agent("codex"), agent("draft-bot"), agent("zz-test-a")];
+		const evs = [evaluation("ev_1", "support-bot", "2026-11-01T00:00:00Z"), evaluation("ev_2", "codex", "2026-11-20T00:00:00Z")];
+		expect(ownAgents(list, 6, evs).map((a) => a.id)).toEqual(["codex", "support-bot", "draft-bot"]);
+		expect(ownAgents(list).map((a) => a.id)).toEqual(["support-bot", "draft-bot"]);
+		expect(agentsWithResults(list, evs)).toBe(2);
+	});
+
+	it("lists agents with no report card as short rows with a ghost Evaluate, and points to built-in agents", () => {
+		const html = renderToStaticMarkup(
+			<YourAgents agents={[agent("codex"), agent("draft-bot"), agent("other-bot")]} evaluations={[]} mayRun />,
+		);
+		expect(html).toContain('data-testid="home-agents-unevaluated"');
+		expect(html).toContain("None of your 2 agents has a report card yet");
+		expect(html).toContain('data-testid="home-agents-builtin-codex"');
+		expect(html).toContain('data-testid="home-agents-scheduled"');
+		expect(html).not.toContain('data-testid="home-agents-list"');
 	});
 });
 

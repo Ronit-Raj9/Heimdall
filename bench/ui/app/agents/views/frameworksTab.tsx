@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Bot, Check, Minus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/home/uf2aI18n";
 import { splitAgents, type AgentsQuery } from "./agentConfigsTab";
 
 /**
@@ -17,6 +18,7 @@ import { splitAgents, type AgentsQuery } from "./agentConfigsTab";
 export function FrameworksTab({ query }: { query: AgentsQuery }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("agentsUx");
+	const { t: tf } = useTranslation("uf2a");
 	const [showTests, setShowTests] = useState(false);
 	// The same test agents the Configs tab hides are hidden here too, until "Show them".
 	const tests = useMemo(() => splitAgents(query.data?.agents ?? []).tests, [query.data]);
@@ -45,7 +47,17 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 				</Button>
 			</span>
 		) : null;
-	if (rows.length === 0 && !testsToggle) return <EmptyState icon={Bot} message={t("agents.empty")} testId="frameworks-empty" />;
+	if (rows.length === 0 && !testsToggle)
+		return (
+			<EmptyState
+				icon={Bot}
+				title={tf("agents.emptyTitle")}
+				body={tf("agents.emptyBody")}
+				action={{ label: tf("agents.fromTemplate"), to: "/agents/new" }}
+				secondary={{ label: tf("agents.connect"), to: "/connect" }}
+				testId="frameworks-empty"
+			/>
+		);
 	const native = rows.filter((row) => row.nativeTrace).length;
 	const scripted = rows.filter((row) => row.scripted).length;
 	return (

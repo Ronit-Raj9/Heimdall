@@ -4,13 +4,14 @@ import type { AgentSummary } from "@/lib/types/bench";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgentConfigsTab, configsCount, splitAgents } from "./agentConfigsTab";
+import { AgentConfigsTab, configsCount, splitAgents, visibleAgents } from "./agentConfigsTab";
 import { filterAgents, initials, isTestAgent, sortAgents } from "./agentDisplay";
 import { FrameworksTab } from "./frameworksTab";
 
 vi.mock("./agentRowDelete", () => ({ AgentRowDelete: () => null })); // row Delete has its own test (agentRowDelete.iwid.test.tsx)
 vi.mock("./agentJobs", () => ({
 	useAgentJobs: () => [{ id: "j1", kind: "agent.check", status: "succeeded", params: { agent: "agents/codex.yaml" } }],
+	useAgentJobsError: () => false,
 }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...(rest as object)}>{children}</a>,
@@ -82,7 +83,7 @@ const more = [
 
 /** The data-testid of every agent card in render order. */
 const cardIds = (html: string) =>
-	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last)$/.test(id));
+	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last|menu|delete|delete-error)$/.test(id));
 
 describe("AgentConfigsTab", () => {
 	it("shows agents as cards with a friendly adapter, model chip, check status and Evaluate", () => {
@@ -147,6 +148,18 @@ describe("AgentConfigsTab", () => {
 		expect(filterAgents(more, "codex").map((a) => a.id)).toEqual(["codex", "live-l10-codex-task"]);
 	});
 
+	it("filters by type chips, hides Setup not checked on agents with runs, and keeps Delete in the row menu (M2-21..M2-26)", () => {
+		const html = render(more);
+		expect(html).toContain('data-testid="agents-types"');
+		expect(html).toContain('data-testid="agents-type-remote_http"');
+		expect(cardIds(render(more, { type: "remote_http" }))).toEqual(["support-bot"]);
+		expect(html).toContain("Sort by");
+		expect(html).not.toContain('data-testid="agents-row-claude-code-status"');
+		expect(html).toContain('data-testid="agents-row-my-plain-loop-menu"');
+		expect(html).not.toContain('data-testid="agents-row-codex-menu"');
+		expect(isTestAgent({ id: "zz-test-p1", scripted_kind: "", adapter: "command" })).toBe(true);
+	});
+
 	it("sorts by name, last run or runs", () => {
 		expect(sortAgents(more, "name").map((a) => a.id)).toEqual([
 			"claude-code",
@@ -196,5 +209,21 @@ describe("AgentConfigsTab", () => {
 		expect(html).toContain('data-testid="frameworks-tests-hidden"');
 		expect(html).toContain("2 test agents hidden");
 		expect(html).toContain("Show them");
+	});
+});
+describe("visibleAgents (M1-18)", () => {
+	const withTest = [...agents, { ...agents[1], id: "zz-test-bot", path: "agents/zz-test-bot.yaml" }] as AgentSummary[];
+	it("hides test objects unless asked and counts them", () => {
+		const off = visibleAgents(withTest, false);
+		expect(off.hidden).toBe(2); // zz-test-bot and the scripted oracle
+		expect(off.yours.map((a) => a.id)).not.toContain("zz-test-bot");
+		const on = visibleAgents(withTest, true);
+		expect(on.hidden).toBe(2); // still counted, so the chip can turn it off
+		expect(on.yours.map((a) => a.id)).toContain("zz-test-bot");
+	});
+	it("shows the show-tests chip on the list", () => {
+		const html = render(withTest);
+		expect(html).not.toContain("zz-test-bot");
+		expect(html).toMatch(/test items/i);
 	});
 });

@@ -50,7 +50,7 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 					<Award className="size-4" />
 				</span>
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground truncate text-sm font-medium">{ev.spec?.name?.trim() || t("evaluations.untitled")}</span>
+					<span className="text-foreground line-clamp-2 text-sm font-medium break-words">{ev.spec?.name?.trim() || t("evaluations.untitled")}</span>
 					<span className="text-muted-foreground truncate text-xs">
 						{evaluationWho(ev) || "-"}
 						{" · "}
@@ -72,7 +72,7 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 					) : null}
 				</span>
 				<ChevronRight
-					className="text-muted-foreground/60 size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+					className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
 					aria-hidden="true"
 				/>
 			</Link>

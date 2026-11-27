@@ -226,22 +226,54 @@ export function newestEvaluations<T extends Pick<Evaluation, "created_at">>(eval
 	return [...evaluations].sort((a, b) => (at(b.created_at) || 0) - (at(a.created_at) || 0)).slice(0, limit);
 }
 
-/** Set once Home has sent a first-time visitor to /evaluate, so Home shows itself from then on. */
-export const FIRST_RUN_KEY = "heimdall.first-run.evaluate";
-
-/** Whether this browser was already sent to /evaluate on a fresh org. Blocked storage counts as seen. */
-export function firstRunSeen(): boolean {
-	try {
-		return window.localStorage.getItem(FIRST_RUN_KEY) === "1";
-	} catch {
-		return true;
-	}
+/** First day of the month `now` falls in, in UTC: the month key budgets and Usage count (M8-19). */
+export function monthStartUTC(now: Date): Date {
+	return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
-export function markFirstRunSeen(): void {
-	try {
-		window.localStorage.setItem(FIRST_RUN_KEY, "1");
-	} catch {
-		// Private window or blocked storage: Home stays where it is next time, nothing breaks.
-	}
+/** A date as YYYY-MM-DD in UTC, the shape GET /usage takes. */
+export function isoDayUTC(d: Date): string {
+	return d.toISOString().slice(0, 10);
+}
+
+/** The Usage range Home reads for "Spent": this calendar month in UTC, up to today. */
+export function homeUsageRange(now: Date = new Date()): { from: string; to: string } {
+	return { from: isoDayUTC(monthStartUTC(now)), to: isoDayUTC(now) };
+}
+
+/** One step of the set-up card on a new organization (M2-10). */
+export interface SetupStep {
+	id: "keys" | "agent" | "evaluate" | "report";
+	done: boolean;
+	to: string;
+	search?: Record<string, string>;
+}
+
+/**
+ * The four set-up steps and whether each is done: a model key exists, an agent of the org exists,
+ * an evaluation was started, and one has finished with a report card. The card shows until then.
+ */
+export function setupSteps(have: { keys: boolean; agent: boolean; evaluation: boolean; finished: boolean }): SetupStep[] {
+	return [
+		{ id: "keys", done: have.keys, to: "/settings", search: { tab: "keys" } },
+		{ id: "agent", done: have.agent, to: "/agents/new" },
+		{ id: "evaluate", done: have.evaluation, to: "/evaluate" },
+		{ id: "report", done: have.finished, to: "/evaluations" },
+	];
+}
+
+/** Whether an evaluation has finished with a report card: the set-up card hides from then on. */
+export function hasFinishedEvaluation(evaluations: readonly Pick<Evaluation, "status">[]): boolean {
+	return evaluations.some((ev) => ev.status === "done");
+}
+
+/**
+ * Where one Home query stands (M2-8): "error" on a failed load, "loading" while it loads or has no
+ * answer yet, else "ready". A failed or missing answer must never read as an empty org (for
+ * example "No scored runs yet").
+ */
+export function queryState(q: { isLoading?: boolean; isError?: boolean; data?: unknown }): "loading" | "error" | "ready" {
+	if (q.isError) return "error";
+	if (q.isLoading || q.data === undefined || q.data === null) return "loading";
+	return "ready";
 }

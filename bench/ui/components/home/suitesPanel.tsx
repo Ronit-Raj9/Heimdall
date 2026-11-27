@@ -8,7 +8,8 @@ import { suiteHomeState } from "./home.utils";
 
 const DOT: Record<"ready" | "attention" | "failed", string> = {
 	ready: "bg-chart-success",
-	attention: "bg-chart-warning",
+	// X-66: partly ready is not a warning, so it gets a neutral dot plus a ready-of-total bar.
+	attention: "bg-muted-foreground",
 	failed: "bg-chart-error",
 };
 
@@ -85,6 +86,14 @@ function SuiteRow({ suite }: { suite: SuiteSummary }) {
 					data-readiness={readiness}
 				>
 					<span className={cn("size-1.5 rounded-full", DOT[state])} aria-hidden="true" />
+					{state === "attention" && suite.task_count > 0 && (
+						<span className="bg-muted h-1 w-10 overflow-hidden rounded-full" aria-hidden="true" data-testid={`home-suite-bar-${suite.id}`}>
+							<span
+								className="bg-foreground/60 block h-full rounded-full"
+								style={{ width: `${Math.min(100, Math.round((suite.admitted_count / suite.task_count) * 100))}%` }}
+							/>
+						</span>
+					)}
 					{label}
 				</span>
 			</Link>

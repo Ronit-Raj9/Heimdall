@@ -21,9 +21,9 @@ export default function AgentsView() {
 	const query = useGetAgentsQuery();
 	const data = query.data;
 	const tabs: RouteTab[] = [
-		{ id: "configs", label: t("agents.tabs.configs"), badge: data ? configsCount(data.agents) : undefined },
-		{ id: "diff", label: t("agents.tabs.diff") },
-		{ id: "frameworks", label: t("agents.tabs.frameworks") },
+		{ id: "configs", label: tu("tabs.configs"), badge: data ? configsCount(data.agents) : undefined },
+		{ id: "diff", label: tu("tabs.diff") },
+		{ id: "frameworks", label: tu("tabs.frameworks") },
 	];
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="agents-screen">
@@ -32,7 +32,7 @@ export default function AgentsView() {
 				subtitle={tu("subtitle")}
 				actions={
 					<div className="flex items-center gap-2">
-						<Button asChild size="sm" variant="outline" data-testid="agents-connect">
+						<Button asChild size="sm" variant="link" data-testid="agents-connect">
 							<Link to="/connect">
 								<Plug aria-hidden="true" />
 								{tc("title")}

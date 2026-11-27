@@ -42,7 +42,7 @@ export function TrackBadge({ track, className }: { track: string | undefined; cl
 	const Icon = trackIcon(track);
 	return (
 		<span
-			className={cn("bg-muted text-foreground/80 flex size-8 shrink-0 items-center justify-center rounded-lg", className)}
+			className={cn("bg-muted text-foreground flex size-8 shrink-0 items-center justify-center rounded-lg", className)}
 			data-track={track ?? "unknown"}
 		>
 			<Icon className="size-4" aria-hidden="true" />
@@ -53,19 +53,19 @@ export function TrackBadge({ track, className }: { track: string | undefined; cl
 export type PillTone = "good" | "warn" | "bad" | "info" | "neutral";
 
 const PILL_CLASS: Record<PillTone, string> = {
-	good: "bg-chart-success/12 text-chart-success-ink",
-	warn: "bg-chart-warning/15 text-chart-warning-ink",
-	bad: "bg-chart-error/12 text-chart-error-ink",
-	info: "bg-chart-info/12 text-chart-info-ink",
+	good: "bg-success-soft text-success-ink",
+	warn: "bg-warning-soft text-warning-ink",
+	bad: "bg-danger-soft text-danger-ink",
+	info: "bg-info-soft text-info-ink",
 	neutral: "bg-muted text-muted-foreground",
 };
 
 const DOT_CLASS: Record<PillTone, string> = {
-	good: "bg-chart-success",
-	warn: "bg-chart-warning",
-	bad: "bg-chart-error",
-	info: "bg-chart-info",
-	neutral: "bg-muted-foreground/60",
+	good: "bg-success",
+	warn: "bg-warning",
+	bad: "bg-danger",
+	info: "bg-info",
+	neutral: "bg-unmeasured",
 };
 
 /** A small rounded status pill: a coloured dot and a word. */
@@ -90,13 +90,13 @@ export function Pill({ tone, children, testId, className }: { tone: PillTone; ch
 export function LiveDot({ className }: { className?: string }) {
 	return (
 		<span aria-hidden="true" className={cn("relative flex size-2", className)}>
-			<span className="bg-chart-info absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:animate-none" />
-			<span className="bg-chart-info relative inline-flex size-2 rounded-full" />
+			<span className="bg-info absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:animate-none" />
+			<span className="bg-info relative inline-flex size-2 rounded-full" />
 		</span>
 	);
 }
 
-/** One KPI: an icon, a label, a large number and one muted line under it. */
+/** One KPI: an icon, a label, a large number and up to two muted lines under it (M2-15); the hint may be a node, such as an error with Retry. */
 export function StatCard({
 	icon: Icon,
 	label,
@@ -118,7 +118,7 @@ export function StatCard({
 			data-testid={testId}
 		>
 			<div className="text-muted-foreground flex items-center justify-between gap-2 text-sm">
-				<span className="truncate">{label}</span>
+				<span className="line-clamp-2">{label}</span>
 				<span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-lg">
 					<Icon className="size-3.5" aria-hidden="true" />
 				</span>
@@ -133,7 +133,7 @@ export function StatCard({
 					<span className="text-foreground truncate text-2xl font-semibold tracking-tight tabular-nums" data-testid={`${testId}-value`}>
 						{value}
 					</span>
-					{hint && <span className="text-muted-foreground truncate text-xs">{hint}</span>}
+					{hint && <span className="text-muted-foreground line-clamp-2 text-xs">{hint}</span>}
 				</div>
 			)}
 		</div>

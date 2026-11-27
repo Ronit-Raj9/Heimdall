@@ -12,7 +12,7 @@ describe("QuickstartBody", () => {
 		for (const key of ["init", "mine", "compare", "ci"]) {
 			expect(html).toContain(`data-testid="quickstart-step-${key}"`);
 		}
-		expect(html).toContain("heimdall tasks mine -limit 10");
+		expect(html).toContain("heimdall tasks mine --limit 10");
 		expect(html).toContain("$0, Docker only");
 		expect(html).toContain('data-testid="quickstart-no-mined"');
 	});
