@@ -36,6 +36,7 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
+import { ArchiveButton } from "@/components/ui/archiveAction";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -242,6 +243,7 @@ export default function RunView({ runId }: { runId: string }) {
 							<RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
 							<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
 							<RunCompareButton detail={d} />
+							<ArchiveButton kind="run" id={runId} name={taskName} archivedAt={(d as { archived_at?: string | null }).archived_at} testId="run" />
 						</div>
 					</div>
 				}

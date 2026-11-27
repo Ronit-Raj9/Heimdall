@@ -47,6 +47,9 @@ import { useEffect, useMemo, useState } from "react";
 import "@/app/leaderboard/views/uf4bI18n";
 import { cheaperArm } from "@/components/verdict/armCost";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import { archivedCountOf, archivedParam, isArchived } from "@/lib/store/apis/archiveApi";
+import { ArchiveRowMenu } from "@/components/ui/archiveAction";
+import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip, withoutArchived } from "@/components/ui/showArchivedChip";
 import type { ArmStat, ExperimentRow } from "@/lib/types/serverFields";
 import { useTranslation } from "react-i18next";
 
@@ -251,6 +254,9 @@ function RunsProgress({ e }: { e: ExperimentStatus }) {
 }
 
 /** /experiments body: one toolbar (search, status, benchmark), and one row per experiment with a readable name. */
+/** A list row with the optional archive field (phase D decision 6). */
+type ArchivedRow = { archived_at?: string | null };
+
 export function ExperimentBoard() {
 	const { t } = useTranslation("experimentsUx");
 	const { t: tb } = useTranslation("bench");
@@ -259,9 +265,6 @@ export function ExperimentBoard() {
 	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
 	// M4-79, M1-62: refresh every 15 s while a row runs, never when nothing does.
 	const [anyRunning, setAnyRunning] = useState(false);
-	const list = useListExperimentsQuery(ARM_STATS, { pollingInterval: anyRunning ? 15_000 : 0, skipPollingIfUnfocused: true });
-	const runningNow = listHasRunning(list.data?.experiments);
-	useEffect(() => setAnyRunning(runningNow), [runningNow]);
 	const [filters, setFilters] = useQueryStates(
 		{
 			q: parseAsString,
@@ -273,15 +276,29 @@ export function ExperimentBoard() {
 			result: parseAsString,
 			tests: parseAsString,
 			page: parseAsString,
+			archived: parseAsString,
 		},
 		{ history: "replace", throttleMs: 200 },
 	);
+	// Phase D decision 6: archived comparisons are hidden unless ?archived=1.
+	const showArchived = filters.archived === "1";
+	const listArgs = useMemo(() => ({ ...ARM_STATS, ...archivedParam(showArchived) }), [showArchived]);
+	const list = useListExperimentsQuery(listArgs, { pollingInterval: anyRunning ? 15_000 : 0, skipPollingIfUnfocused: true });
+	const runningNow = listHasRunning(list.data?.experiments);
+	useEffect(() => setAnyRunning(runningNow), [runningNow]);
 	// M1-18: comparisons the project's own checks made ("zz-test-...") hide behind "Show test items (n)".
 	const showTests = filters.tests === "1";
 	const { shown: everything, hidden: hiddenTests } = useMemo(
-		() => withoutTests(list.data?.experiments ?? [], (e) => isTestObject(e.exp_id) || isTestObject(e.name), showTests),
-		[list.data, showTests],
+		() =>
+			withoutTests(
+				withoutArchived(list.data?.experiments ?? [], (e) => isArchived(e as ArchivedRow), showArchived).shown,
+				(e) => isTestObject(e.exp_id) || isTestObject(e.name),
+				showTests,
+			),
+		[list.data, showTests, showArchived],
 	);
+	const archivedSeen = useMemo(() => (list.data?.experiments ?? []).filter((e) => isArchived(e as ArchivedRow)).length, [list.data]);
+	const archivedCount = archivedCountOf(list.data) ?? (showArchived ? archivedSeen : undefined);
 	// Automatic checks, practice runs and the single-setup benchmarks of an evaluation are not
 	// comparisons: hidden unless asked for (URL all=1), so the list matches its subtitle.
 	const showSystem = filters.all === "1";
@@ -333,7 +350,7 @@ export function ExperimentBoard() {
 	const clear = () => void setFilters({ q: null, state: null, suite: null, agent: null, model: null, result: null, page: null });
 	// M1-59: 50 rows per page; any filter change goes back to page 1.
 	const slice = pageSlice(shown, Number(filters.page) || 1);
-	const setFilter = (patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests", string | null>>) =>
+	const setFilter = (patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests" | "archived", string | null>>) =>
 		void setFilters({ ...patch, page: null });
 	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
 	const tokens = (
@@ -459,6 +476,7 @@ export function ExperimentBoard() {
 					)}
 				</div>
 				<ShowTestsChip count={hiddenTests} on={showTests} onChange={(on) => setFilter({ tests: on ? "1" : null })} testId="experiment-show-tests" />
+				<ShowArchivedChip count={archivedCount} on={showArchived} onChange={(on) => setFilter({ archived: on ? "1" : null })} className="self-start" testId="experiment-show-archived" />
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
@@ -490,7 +508,7 @@ export function ExperimentBoard() {
 			) : (
 				<div className="bg-card overflow-hidden rounded-xl border">
 					<div
-						className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
+						className="text-muted-foreground bg-muted/40 hidden grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] items-center gap-4 border-b px-5 py-2.5 text-xs font-medium md:grid"
 						aria-hidden="true"
 					>
 						<span>{t("col.experiment")}</span>
@@ -499,16 +517,18 @@ export function ExperimentBoard() {
 						<span className="text-right">{t("col.runs")}</span>
 						<span className="text-right">{t("col.cost")}</span>
 						<span className="text-right">{t("col.when")}</span>
+						<span />
 					</div>
 					<ul className="divide-y" data-testid="experiment-table" aria-label={tb("experiments.list.tableLabel")}>
 						{slice.rows.map((e) => {
 							const when = e.started_at ?? e.frozen_at;
 							const title = named.get(e.exp_id) ?? e.exp_id;
 							const kind = experimentKind(e);
+							const archivedAt = (e as ArchivedRow).archived_at;
 							return (
 								<li
 									key={e.exp_id}
-									className="hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-4 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem] md:items-center md:gap-4"
+									className={`${isArchived(e as ArchivedRow) ? ARCHIVED_ROW_CLASS : ""} hover:bg-muted/40 relative flex flex-col gap-3 px-5 py-4 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_8rem_10rem_7rem_6rem_7rem_2.5rem] md:items-center md:gap-4`}
 									data-testid={`experiment-row-${e.exp_id}`}
 								>
 									<span className="flex min-w-0 items-center gap-3">
@@ -521,6 +541,11 @@ export function ExperimentBoard() {
 											>
 												<span title={title}>{title}</span>
 											</EntityLink>
+											{isArchived(e as ArchivedRow) && (
+												<span className="mt-1">
+													<ArchivedPill at={archivedAt} testId={`experiment-row-${e.exp_id}-archived`} />
+												</span>
+											)}
 											<span className="text-muted-foreground truncate text-xs">
 												{suiteName(e.suite)}
 												{systemExperiment(e) ? (
@@ -576,6 +601,9 @@ export function ExperimentBoard() {
 											title={formatWhen(when, locale) ?? undefined}
 										>
 											{formatRelative(when, locale) ?? ""}
+										</span>
+										<span className="md:flex md:justify-end">
+											<ArchiveRowMenu kind="experiment" id={e.exp_id} name={title} archivedAt={archivedAt} testId={`experiment-row-${e.exp_id}`} />
 										</span>
 									</span>
 								</li>

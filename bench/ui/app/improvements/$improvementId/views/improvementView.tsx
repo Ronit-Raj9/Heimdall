@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shell";
+import { useArchiveItems } from "@/components/ui/archiveAction";
 import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ export default function ImprovementView({ id }: { id: string }) {
 	const admin = canUse(useSession(), "admin");
 	const [continuing, setContinuing] = useState(false);
 	const d = q.data;
+	// Phase D decision 6: Archive in the More menu.
+	const archive = useArchiveItems({ kind: "improvement", id, name: d?.name ?? id, archivedAt: (d as { archived_at?: string | null } | undefined)?.archived_at, testId: "improvement" });
 	// Stop, resume and approve can fail after the click; show why below the header (M1-44).
 	const [actionError, setActionError] = useState<unknown>(null);
 	const name = d?.name ?? id;
@@ -81,6 +84,7 @@ export default function ImprovementView({ id }: { id: string }) {
 						</StatusPill>
 					)
 				}
+				more={d ? archive.items : undefined}
 				actions={
 					d?.can_resume && admin ? (
 						<PaidButton
@@ -108,6 +112,7 @@ export default function ImprovementView({ id }: { id: string }) {
 				}
 			/>
 			<InlineError error={actionError} testId="improvement-action-error" />
+			{archive.alert}
 			{q.isLoading ? (
 				<BlockSkeleton rows={6} testId="improvement-loading" />
 			) : q.error || !d ? (

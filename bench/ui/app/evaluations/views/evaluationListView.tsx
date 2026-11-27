@@ -4,6 +4,9 @@ import { LoadError, TableSkeleton } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Pager, pageSlice } from "@/components/ui/pager";
 import { ShowTestsChip } from "@/components/ui/toolbar";
+import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip, useShowArchived, withoutArchived } from "@/components/ui/showArchivedChip";
+import { ArchiveRowMenu } from "@/components/ui/archiveAction";
+import { archivedParam, isArchived } from "@/lib/store/apis/archiveApi";
 import { useShowTests, withoutTests } from "@/lib/testObjects";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
@@ -43,18 +46,22 @@ import { usd } from "@/components/reportcard/reportCard.utils";
 /** /evaluations: every evaluation with search, filters and sort kept in the URL; each row opens its progress and report card. */
 export default function EvaluationListView() {
 	const { t } = useTranslation("evaluations");
-	const list = useListEvaluationsQuery();
+	// Archived evaluations are hidden unless ?archived=1 (phase D decision 6).
+	const [showArchived, setShowArchived] = useShowArchived();
+	const listArgs = showArchived ? archivedParam(true) : undefined;
+	const list = useListEvaluationsQuery(listArgs);
 	const search = useSearch({ strict: false }) as Record<string, unknown>;
 	const navigate = useNavigate();
 	const filters = parseEvaluationFilters(search);
 	const anyActive = (list.data ?? []).some((e) => isActiveStatus(e.status));
 	// A second subscription with polling only while something is still running.
-	useListEvaluationsQuery(undefined, { pollingInterval: anyActive ? 5000 : 0, skipPollingIfUnfocused: true, skip: !anyActive });
+	useListEvaluationsQuery(listArgs, { pollingInterval: anyActive ? 5000 : 0, skipPollingIfUnfocused: true, skip: !anyActive });
 	// The project's own test evaluations are hidden unless ?tests=1 (M1-18).
 	const [showTests, setShowTests] = useShowTests();
-	const { shown, hidden } = withoutTests(list.data ?? [], isTestEvaluation, showTests);
+	const live = withoutArchived(list.data ?? [], (e) => isArchived(e as { archived_at?: string | null }), showArchived);
+	const { shown, hidden } = withoutTests(live.shown, isTestEvaluation, showTests);
 	const setFilters = (next: EvaluationFilters) =>
-		void navigate({ to: "/evaluations", search: { ...evaluationFiltersSearch(next), ...(showTests ? { tests: "1" } : {}) } as never, replace: true });
+		void navigate({ to: "/evaluations", search: { ...evaluationFiltersSearch(next), ...(showTests ? { tests: "1" } : {}), ...(showArchived ? { archived: "1" } : {}) } as never, replace: true });
 
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluations-screen">
@@ -71,7 +78,12 @@ export default function EvaluationListView() {
 					evaluations={shown}
 					filters={filters}
 					onFiltersChange={setFilters}
-					toolbarExtra={<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="evaluations-show-tests" />}
+					toolbarExtra={
+						<>
+							<ShowTestsChip count={hidden} on={showTests} onChange={setShowTests} testId="evaluations-show-tests" />
+							<ShowArchivedChip count={showArchived ? live.archived : undefined} on={showArchived} onChange={setShowArchived} testId="evaluations-show-archived" />
+						</>
+					}
 				/>
 			)}
 		</div>
@@ -208,6 +220,7 @@ export function EvaluationTable({
 }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
+	const { t: ta } = useTranslation("ufd5");
 	const [picked, setPicked] = useState<Set<string>>(() => new Set());
 	const [deleting, setDeleting] = useState(false);
 	const [bulkError, setBulkError] = useState<string | null>(null);
@@ -294,6 +307,9 @@ export function EvaluationTable({
 							<TableHead priority="secondary" className="hidden xl:table-cell">
 								{t("list.col.mode")}
 							</TableHead>
+							<TableHead className="w-10">
+								<span className="sr-only">{ta("archive.actions")}</span>
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -301,9 +317,10 @@ export function EvaluationTable({
 							const benches = evaluationBenchmarks(ev);
 							const status = evaluationStatusWord(ev);
 							const started = formatCreated(ev.created_at, i18n.language);
+							const archivedAt = (ev as { archived_at?: string | null }).archived_at;
 							return (
 								// The whole row opens the evaluation: the name link covers it (M3-51).
-								<TableRow key={ev.id} className="hover:bg-muted/50 relative" data-testid={`evaluation-row-${ev.id}`}>
+								<TableRow key={ev.id} className={`hover:bg-muted/50 relative ${isArchived(ev as { archived_at?: string | null }) ? ARCHIVED_ROW_CLASS : ""}`} data-testid={`evaluation-row-${ev.id}`}>
 									<TableCell>
 										{!isActiveStatus(ev.status) && (
 											<input
@@ -325,6 +342,11 @@ export function EvaluationTable({
 										>
 											{ev.spec.name || ev.id}
 										</Link>
+										{isArchived({ archived_at: archivedAt }) && (
+											<span className="ml-2 align-middle">
+												<ArchivedPill at={archivedAt} testId={`evaluation-archived-${ev.id}`} />
+											</span>
+										)}
 										<span
 											className="text-muted-foreground block max-w-80 truncate text-xs font-normal"
 											title={benches.join(", ")}
@@ -370,6 +392,9 @@ export function EvaluationTable({
 									</TableCell>
 									<TableCell priority="secondary" className="hidden xl:table-cell">
 										<EvaluationKindLabel evaluation={ev} />
+									</TableCell>
+									<TableCell className="text-right">
+										<ArchiveRowMenu kind="evaluation" id={ev.id} name={ev.spec.name || ev.id} archivedAt={archivedAt} testId={`evaluation-row-${ev.id}`} />
 									</TableCell>
 								</TableRow>
 							);

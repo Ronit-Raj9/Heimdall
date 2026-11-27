@@ -29,6 +29,7 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { EvaluationBifrostSection } from "@/components/bifrost/bifrostUse";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
+import { ArchiveButton } from "@/components/ui/archiveAction";
 import { Button } from "@/components/ui/button";
 import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
 import {
@@ -252,6 +253,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							</summary>
 							<div className="bg-popover absolute right-0 z-20 mt-1 flex min-w-56 flex-col items-stretch gap-2 rounded-lg border p-2 shadow-md">
 								{done && <RepeatEvaluation evaluationId={evaluation.id} />}
+								<ArchiveButton kind="evaluation" id={evaluation.id} name={name} archivedAt={(evaluation as { archived_at?: string | null }).archived_at} testId="evaluation-more" />
 								<DeleteEvaluationAction id={evaluation.id} active={active} />
 							</div>
 						</details>

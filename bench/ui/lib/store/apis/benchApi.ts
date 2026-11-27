@@ -291,6 +291,8 @@ export interface ListExperimentsParams {
 	limit?: number;
 	offset?: number;
 	q?: string;
+	/** Phase D decision 6: "include" also lists archived comparisons, "only" lists just them. */
+	archived?: "include" | "only";
 }
 
 /** The search parameters of a listExperiments call: only set ones; arm_stats as "1". Pure. */
@@ -301,6 +303,7 @@ export function listExperimentsSearch(params: ListExperimentsParams | void): Rec
 	if (typeof params.limit === "number") out.limit = params.limit;
 	if (typeof params.offset === "number") out.offset = params.offset;
 	if (params.q && params.q.trim()) out.q = params.q.trim();
+	if (params.archived) out.archived = params.archived;
 	return out;
 }
 

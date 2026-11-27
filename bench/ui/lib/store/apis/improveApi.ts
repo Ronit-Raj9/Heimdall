@@ -44,8 +44,9 @@ const runAndList = (id: string) => [
  */
 export const improveApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchImprovement"] }).injectEndpoints({
 	endpoints: (builder) => ({
-		getImprovements: builder.query<ImprovementList, void>({
-			query: () => "/improvements",
+		// archived (phase D decision 6): "include" also lists archived runs; left out, the server hides them.
+		getImprovements: builder.query<ImprovementList, { archived?: "include" | "only" } | void>({
+			query: (params) => (params?.archived ? { url: "/improvements", params: { archived: params.archived } } : "/improvements"),
 			providesTags: [{ type: "BenchImprovement", id: "LIST" }],
 		}),
 		getImprovement: builder.query<ImprovementDetail, string>({

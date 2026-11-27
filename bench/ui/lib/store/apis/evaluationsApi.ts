@@ -934,6 +934,8 @@ export interface ListEvaluationsParams {
 	q?: string;
 	status?: string | readonly string[];
 	fields?: "light";
+	/** Phase D decision 6: "include" also lists archived evaluations, "only" lists just them. */
+	archived?: "include" | "only";
 }
 
 /** The search parameters of an evaluations list call: only set ones. Pure. */
@@ -946,6 +948,7 @@ export function listEvaluationsSearch(params: ListEvaluationsParams | void): Rec
 	const status = typeof params.status === "string" ? params.status : params.status?.join(",");
 	if (status) out.status = status;
 	if (params.fields) out.fields = params.fields;
+	if (params.archived) out.archived = params.archived;
 	return out;
 }
 
