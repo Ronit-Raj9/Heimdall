@@ -68,6 +68,7 @@ func newCluster(sig string, runs []scored, failures int) Cluster {
 	c.Title = TitleIn(first.layers, oneSuite(runs), topTool(runs))
 	for i := len(runs) - 1; i >= 0 && len(c.Examples) < maxExamples; i-- {
 		c.Examples = append(c.Examples, runs[i].ref.RunID)
+		c.ExampleRuns = append(c.ExampleRuns, exampleOf(runs[i].ref))
 	}
 	c.Scope = scopeOf(c)
 	return c
