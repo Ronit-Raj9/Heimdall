@@ -44,7 +44,7 @@ describe("PairTable", () => {
 		const rows = [{ task: "t01", condition: "clean", discordant: false, cells: [] }] as unknown as GridRow[];
 		const html = render(<PairTable rows={rows} arms={["A", "B"]} suite="coding-core@1.0.0" onPick={() => undefined} />);
 		// QC2-27-09: the frozen version stays in the link, so the suite page can flag a newer revision.
-		expect(tagOf(html, "pair-picker-task-t01")).toContain("/suites/coding-core%401.0.0");
+		expect(tagOf(html, "pair-picker-task-t01")).toContain("/suites/coding-core?tab=tasks&amp;task=t01&amp;rev=1.0.0");
 	});
 });
 

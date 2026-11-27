@@ -14,8 +14,8 @@ describe("HeaderCrumbs", () => {
 		expect(html).toContain("Connect an agent");
 		expect(html).toContain('aria-current="page"');
 	});
-	it("ends a job page with Job", () => {
-		expect(render(<HeaderCrumbs pathname="/jobs/job_x" />)).toContain(">Job<");
+	it("ends a job page with Background job", () => {
+		expect(render(<HeaderCrumbs pathname="/jobs/job_x" />)).toContain(">Background job<");
 	});
 	it("adds nothing on the entry's own page", () => {
 		const html = render(<HeaderCrumbs pathname="/agents" />);

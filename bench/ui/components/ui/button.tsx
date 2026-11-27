@@ -6,22 +6,22 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 const buttonVariants = cva(
-	"inline-flex items-center ring-none justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,color,border-color,box-shadow,transform] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:border-destructive active:scale-[0.97] duration-150 ease-(--ease-out)",
+	"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,color,border-color,box-shadow,transform] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:border-destructive active:scale-[0.97] duration-150 ease-(--ease-out)",
 	{
 		variants: {
 			variant: {
-				default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 focus-visible:ring-primary/50",
+				default: "bg-primary text-primary-foreground shadow-xs hover:bg-(--primary-hover) active:bg-(--primary-active) focus-visible:ring-(--focus)",
 				destructive:
-					"bg-destructive text-white font-normal hover:bg-destructive/90 focus-visible:ring-destructive/50 dark:bg-destructive/60",
+					"bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-(--focus) dark:bg-destructive/80",
 				outline:
-					"border border-border/80 bg-card shadow-xs hover:bg-accent hover:border-border hover:text-accent-foreground focus-visible:ring-ring/50 dark:bg-input/20 dark:border-input dark:hover:bg-input/40",
-				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus-visible:ring-secondary-foreground/30",
-				ghost: "hover:bg-accent hover:text-accent-foreground focus-visible:ring-accent-foreground/30 dark:hover:bg-accent/50",
-				link: "text-primary underline-offset-4 hover:underline focus-visible:ring-primary/50",
+					"border border-border bg-card shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-(--focus) dark:bg-card dark:border-input dark:hover:bg-accent",
+				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus-visible:ring-(--focus)",
+				ghost: "hover:bg-accent hover:text-accent-foreground focus-visible:ring-(--focus) dark:hover:bg-accent/50",
+				link: "text-primary underline-offset-4 hover:underline focus-visible:ring-(--focus)",
 			},
 			size: {
-				default: "h-8 px-3 py-1 has-[>svg]:px-2.5",
-				sm: "h-8 gap-1.5 px-3 has-[>svg]:px-2.5",
+				default: "h-(--control-h) px-3 py-1 has-[>svg]:px-2.5",
+				sm: "h-7 gap-1.5 px-2.5 text-[13px] has-[>svg]:px-2",
 				lg: "h-10 px-6 has-[>svg]:px-4",
 				icon: "size-9",
 			},
@@ -48,9 +48,27 @@ function Button({
 		isLoading?: boolean;
 		dataTestId?: string;
 	}) {
+	// A busy button keeps its label, so it does not change width, and cannot be pressed twice.
+	// With asChild the child is the only node Slot accepts, so the spinner is left out there.
 	return (
-		<BaseButton className={className} variant={variant} size={size} asChild={asChild} dataTestId={dataTestId} {...props}>
-			{isLoading ? <Loader2 className="size-4 animate-spin" /> : children}
+		<BaseButton
+			className={className}
+			variant={variant}
+			size={size}
+			asChild={asChild}
+			dataTestId={dataTestId}
+			{...props}
+			disabled={props.disabled || isLoading}
+			aria-busy={isLoading || undefined}
+		>
+			{isLoading && !asChild ? (
+				<>
+					<Loader2 className="size-4 animate-spin" aria-hidden="true" />
+					{children}
+				</>
+			) : (
+				children
+			)}
 		</BaseButton>
 	);
 }
