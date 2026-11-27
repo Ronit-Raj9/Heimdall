@@ -836,6 +836,18 @@ func (g *schemaGen) schema(t reflect.Type) map[string]any {
 	case reflect.Map:
 		return map[string]any{"type": "object", "additionalProperties": g.schema(t.Elem())}
 	case reflect.Struct:
+		if t.Name() == "" {
+			// An anonymous struct has no name to key a component by (a client
+			// generator would write a nameless type): inline its object.
+			props, required := map[string]any{}, []string{}
+			g.fields(t, props, &required)
+			s := map[string]any{"type": "object", "properties": props}
+			if len(required) > 0 {
+				slices.Sort(required)
+				s["required"] = required
+			}
+			return s
+		}
 		return map[string]any{"$ref": "#/components/schemas/" + g.component(t)}
 	default:
 		return map[string]any{}
