@@ -35,7 +35,7 @@
 		"stale": "Still nothing. Check the token, the endpoint and that the exporter uses protocol http/protobuf.",
 		"staleLink": "See your sources in Failures",
 		"fileTitle": "No exporter? Upload a file",
-		"envNoToken": "No token was made on this page. Set it first:",
+		"envNoToken": "No token was made on this page.",
 		"libraries": "Your tracing library",
 		"worksWith": "Works with: {{list}}",
 		"missingName": "Agent name: use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
@@ -61,7 +61,7 @@
 		"steps": "1. Fill in. 2. Test (optional, sends one real request). 3. Create.",
 		"tested": "Test passed",
 		"haveKey": "You have a key for {{provider}}.",
-		"addKey": "Add a {{provider}} key",
+		"addKey": "Add a key for {{provider}}",
 		"secretSuffix": " (stored as a secret)",
 		"secretPick": "Pick a secret",
 		"looksLikeKey": "This looks like a key. Save it as a secret instead."

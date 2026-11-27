@@ -5,9 +5,13 @@ import { connectProblem, envBlock, setupChip } from "./fromTracesView";
 describe("from traces helpers (fix wave 2b)", () => {
 	it("adds an export line when no token was made on the page", () => {
 		const env = "A=Bearer%20$HEIMDALL_INGEST_TOKEN";
-		expect(envBlock(env, null)).toEqual({ text: `export HEIMDALL_INGEST_TOKEN=<your hmi_ token>\n${env}`, needsExport: true });
-		expect(envBlock(env, "hmi_x")).toEqual({ text: "A=Bearer%20hmi_x", needsExport: false });
-		expect(envBlock("B=1", null)).toEqual({ text: "B=1", needsExport: false });
+		expect(envBlock(env, null)).toEqual({ text: `export HEIMDALL_INGEST_TOKEN=<your hmi_ token>\nexport ${env}`, needsExport: true });
+		expect(envBlock(env, "hmi_x")).toEqual({ text: "export A=Bearer%20hmi_x", needsExport: false });
+		expect(envBlock("B=1", null)).toEqual({ text: "export B=1", needsExport: false });
+	});
+
+	it("makes every setting line an export line, keeping blanks, comments and existing exports (Q-35)", () => {
+		expect(envBlock("A=1\n\n# note\nexport C=3\nB=2", "hmi_x").text).toBe("export A=1\n\n# note\nexport C=3\nexport B=2");
 	});
 
 	it("shortens a setup chip and keeps what it covers", () => {

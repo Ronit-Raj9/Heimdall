@@ -4,11 +4,11 @@ import type { AgentSummary } from "@/lib/types/bench";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgentConfigsTab, configsCount, splitAgents, visibleAgents } from "./agentConfigsTab";
+import { AgentConfigsTab, baselinesOpen, configsCount, pickedInList, splitAgents, visibleAgents } from "./agentConfigsTab";
 import { filterAgents, initials, isTestAgent, sortAgents } from "./agentDisplay";
 import { FrameworksTab } from "./frameworksTab";
 
-vi.mock("./agentRowDelete", () => ({ AgentRowDelete: () => null })); // row Delete has its own test (agentRowDelete.iwid.test.tsx)
+vi.mock("./agentRowDelete", () => ({ AgentRowDelete: () => null, agentRowDeletable: () => false })); // row Delete has its own test (agentRowDelete.iwid.test.tsx)
 vi.mock("./agentJobs", () => ({
 	useAgentJobs: () => [{ id: "j1", kind: "agent.check", status: "succeeded", params: { agent: "agents/codex.yaml" } }],
 	useAgentJobsError: () => false,
@@ -83,7 +83,7 @@ const more = [
 
 /** The data-testid of every agent card in render order. */
 const cardIds = (html: string) =>
-	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last|menu|delete|delete-error)$/.test(id));
+	[...html.matchAll(/data-testid="agents-row-([A-Za-z0-9_-]+?)"/g)].map((m) => m[1]).filter((id) => !/-(status|run|runs|last|menu|delete|delete-error|versions|score|select)$/.test(id));
 
 describe("AgentConfigsTab", () => {
 	it("shows agents as cards with a friendly adapter, model chip, check status and Evaluate", () => {
@@ -225,5 +225,36 @@ describe("visibleAgents (M1-18)", () => {
 		const html = render(withTest);
 		expect(html).not.toContain("zz-test-bot");
 		expect(html).toMatch(/test items/i);
+	});
+});
+
+describe("agents list round 2 (Q-2, Q-114, Q-123, Q-124, Q-122)", () => {
+	const scored = [
+		{ ...base, id: "a-low", path: "agents/a-low.yaml", adapter: "command", model: "m", scripted_kind: "", sealed_runs: 5, versions: 2, last_score: { score: 0.4, runs: 5, exp_id: "e1", at: "2026-11-01T00:00:00Z" } },
+		{ ...base, id: "b-none", path: "agents/b-none.yaml", adapter: "command", model: "m", scripted_kind: "", sealed_runs: 0 },
+		{ ...base, id: "c-high", path: "agents/c-high.yaml", adapter: "command", model: "m", scripted_kind: "", sealed_runs: 5, last_score: { score: 1, runs: 5, exp_id: "e2", at: "2026-11-02T00:00:00Z" } },
+	] as unknown as AgentSummary[];
+
+	it("never collapses the name cell on phones (no max-w-0 below md)", () => {
+		const html = render();
+		expect(html).not.toMatch(/class="max-w-0 px-4 py-2 md:h-10/);
+		expect(html).toContain("md:max-w-0");
+		expect(html).toContain("table-fixed");
+	});
+
+	it("shows versions and last score, and sorts by last score with unscored last", () => {
+		const html = render(scored);
+		expect(html).toContain("2 versions");
+		expect(html).toContain(">40%<");
+		expect(sortAgents(scored, "score").map((a) => a.id)).toEqual(["c-high", "a-low", "b-none"]);
+	});
+
+	it("opens the baseline group when a baseline has results", () => {
+		expect(baselinesOpen(agents.slice(0, 1), false, 2)).toBe(true);
+		expect(baselinesOpen([{ ...agents[0], sealed_runs: 0 }] as AgentSummary[], false, 2)).toBe(false);
+	});
+
+	it("deletes only picked rows still in the list", () => {
+		expect(pickedInList(new Set(["a-low", "gone"]), scored)).toEqual(["a-low"]);
 	});
 });

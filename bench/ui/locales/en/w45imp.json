@@ -28,8 +28,8 @@
 		"detectable": "Smallest gain this run can confirm: about {{held_out_points}} points.",
 		"notEnough": "Smallest gain this run can confirm: not enough tasks to estimate.",
 		"cost": "Estimated cost: ${{low}} to ${{high}}, about {{minutes_low}} to {{minutes_high}} minutes. Hard stop at ${{limit}}.",
-		"improver": "Improver: Heimdall reflect-edit 1.1.0, on {{model}}.",
-		"improverTeacher": "Improver: Heimdall reflect-edit 1.1.0, on {{teacher}}, teacher-assisted.",
+		"improver": "Improver: Heimdall on {{model}}.",
+		"improverTeacher": "Improver: Heimdall on {{teacher}}, teacher-assisted.",
 		"unavailable": "The estimate is not available: {{error}}",
 		"waiting": "The estimate appears when the form is complete."
 	},
@@ -61,7 +61,7 @@
 		"stage": {
 			"improve": "writing ideas",
 			"screen": "trying ideas on practice tasks",
-			"audit": "testing the best idea on gate tasks",
+			"audit": "testing the best idea on held-back check tasks",
 			"final": "scoring the final version on hidden tasks",
 			"retries": "retrying version 0 for the comparison",
 			"other": "working"
@@ -73,8 +73,8 @@
 	},
 	"timeline": {
 		"title": "Timeline",
-		"row": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the gate, {{decision}}.",
-		"rowP": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the gate, {{decision}} (p {{p}}).",
+		"row": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the check tasks, {{decision}}.",
+		"rowP": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the check tasks, {{decision}} (p {{p}}).",
 		"kept": "kept",
 		"notKept": "not kept",
 		"inProgress": "in progress",
@@ -86,7 +86,7 @@
 		},
 		"practice": "practice difference {{v}}",
 		"stopped": "stopped: {{why}}",
-		"winner": "went to the gate"
+		"winner": "went to the check tasks"
 	},
 	"explain": {
 		"title": "What changed and why",
@@ -106,7 +106,7 @@
 	},
 	"cost": {
 		"practice": "Practice",
-		"gate": "Gate",
+		"gate": "Final check",
 		"hidden": "Hidden scoring",
 		"improver": "Improver",
 		"controls": "Comparisons",

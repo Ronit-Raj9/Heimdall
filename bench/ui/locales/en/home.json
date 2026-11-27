@@ -84,7 +84,7 @@
 	"onboarding": {
 		"title": "Set up Heimdall",
 		"body": "Four steps to your agent's first report card. This card stays until one evaluation has finished.",
-		"viewer": "Nothing has been tested yet. Ask a team member to run the first test.",
+		"viewer": "Nothing has been tested yet. See who can run tests in Members.",
 		"done": "Done",
 		"steps": {
 			"keys": "Add a model key",

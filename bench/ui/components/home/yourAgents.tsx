@@ -4,7 +4,10 @@ import { capabilityName, faultChange, faultName, pct, usd } from "@/components/r
 import "@/app/evaluations/views/gw08I18n";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
-import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type Evaluation, type Report } from "@/lib/store/apis/evaluationsApi";
+import { useGetAgentVersionsQuery, type Evaluation, type Report } from "@/lib/store/apis/evaluationsApi";
+import { useGetAgentCardQuery } from "@/lib/store/apis/agentCardApi";
+import { isTestObject } from "@/lib/testObjects";
+import { preferredAgentEvaluation } from "./agentEvaluation";
 import type { AgentSummary } from "@/lib/types/bench";
 import "@/lib/types/agentFirstI18n";
 import "./uf2aI18n";
@@ -15,10 +18,20 @@ import { useTranslation } from "react-i18next";
 /** Agent cards shown on Home. */
 export const HOME_AGENTS_SHOWN = 6;
 
-/** When each agent was last in an evaluation (newest created_at over the evaluations' arms), as ms. */
-export function lastEvaluated(evaluations: readonly Pick<Evaluation, "spec" | "created_at">[]): Map<string, number> {
+type EvaluationFacts = Pick<Evaluation, "spec" | "created_at"> & Partial<Pick<Evaluation, "id" | "status">>;
+
+/**
+ * The evaluations that give an agent a report card (Q-18): finished ones that are not test objects
+ * ("zz-test-..." names). The tile and the cards both count agents by these, so they agree.
+ */
+export function scoredEvaluations<T extends EvaluationFacts>(evaluations: readonly T[]): T[] {
+	return evaluations.filter((ev) => (ev.status === undefined || ev.status === "done") && !isTestObject(ev.spec?.name ?? ev.id));
+}
+
+/** When each agent was last in a finished, non-test evaluation (newest created_at over the evaluations' arms), as ms. */
+export function lastEvaluated(evaluations: readonly EvaluationFacts[]): Map<string, number> {
 	const last = new Map<string, number>();
-	for (const ev of evaluations) {
+	for (const ev of scoredEvaluations(evaluations)) {
 		const at = Date.parse(ev.created_at ?? "");
 		const t = Number.isFinite(at) ? at : 0;
 		for (const arm of ev.spec?.arms ?? []) if (arm.agent && t >= (last.get(arm.agent) ?? -1)) last.set(arm.agent, t);
@@ -34,7 +47,7 @@ export function lastEvaluated(evaluations: readonly Pick<Evaluation, "spec" | "c
 export function ownAgents(
 	agents: readonly AgentSummary[],
 	n = HOME_AGENTS_SHOWN,
-	evaluations: readonly Pick<Evaluation, "spec" | "created_at">[] = [],
+	evaluations: readonly EvaluationFacts[] = [],
 ): AgentSummary[] {
 	const last = lastEvaluated(evaluations);
 	return agents
@@ -50,8 +63,8 @@ export function ownAgents(
 		.map((x) => x.a);
 }
 
-/** How many of the shown agents have an evaluation: the "Agents with results" tile counts the same set (M1-19). */
-export function agentsWithResults(agents: readonly AgentSummary[], evaluations: readonly Pick<Evaluation, "spec" | "created_at">[]): number {
+/** How many agents get a report card on Home: the "Agents with results" tile counts the same set as the cards (M1-19, Q-18). */
+export function agentsWithResults(agents: readonly AgentSummary[], evaluations: readonly EvaluationFacts[]): number {
 	const last = lastEvaluated(evaluations);
 	return ownAgents(agents, Number.POSITIVE_INFINITY, evaluations).filter((a) => last.has(a.id)).length;
 }
@@ -221,7 +234,11 @@ function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evalua
 	const { t: tg } = useTranslation("gw08");
 	const { t: tf } = useTranslation("uf2a");
 	const locale = getLocale();
-	const report = useGetAgentReportCardQuery({ agent: agent.id });
+	// Q-17: the same evaluation the agent page's Report card tab opens on (never a test object).
+	const first = useGetAgentCardQuery({ agent: agent.id });
+	const pick = first.data ? preferredAgentEvaluation(first.data) : undefined;
+	const picked = useGetAgentCardQuery({ agent: agent.id, evaluation: pick ?? "" }, { skip: !pick });
+	const report = pick ? picked : first;
 	const versions = useGetAgentVersionsQuery(agent.id);
 	const list = versions.data?.versions ?? [];
 	const version = list.length > 0 ? Math.max(...list.map((v) => v.version)) : null;

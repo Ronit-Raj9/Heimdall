@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import { FileArchive } from "lucide-react";
 import "./uf2cI18n";
+import "@/app/agents/views/ufreI18n";
 import { type AgentOpsTabProps, Field, OpsSection, useAgentId } from "./agentOps.shared";
 
 const MAX_ZIP_MB = 50;
@@ -317,6 +318,7 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 function MCPSection({ id }: { id: string }) {
 	const { t } = useTranslation("agentops");
 	const { t: tu } = useTranslation("uf2c");
+	const { t: tr } = useTranslation("ufre");
 	const { data, error, isLoading } = useGetAgentMCPQuery(id);
 	const [save, { isLoading: saving }] = usePutAgentMCPMutation();
 	const [form, setForm] = useState(() => ({
@@ -373,7 +375,7 @@ function MCPSection({ id }: { id: string }) {
 							>
 								{MCP_FORMATS.map((f) => (
 									<option key={f} value={f}>
-										{f || t("tools.mcp.adapterDefault")}
+										{mcpFormatLabel(f, t("tools.mcp.adapterDefault"), (k) => tr(`tools.mcpFormat.${k}`))}
 									</option>
 								))}
 							</select>
@@ -470,3 +472,9 @@ function ServerList({ data }: { data?: AgentMCPResponse }) {
 }
 
 export default ToolsTab;
+
+/** The label of an MCP config format (Q-291): what is written where, never the raw id; "" is the adapter's default. */
+export function mcpFormatLabel(format: string, adapterDefault: string, label: (key: Exclude<(typeof MCP_FORMATS)[number], "">) => string): string {
+	if (!format) return adapterDefault;
+	return (MCP_FORMATS as readonly string[]).includes(format) ? label(format as Exclude<(typeof MCP_FORMATS)[number], "">) : format;
+}

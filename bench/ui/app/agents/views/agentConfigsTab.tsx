@@ -9,17 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { AgentSummary, AgentsResponse, Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Bot, Gauge, Info, MoreHorizontal, Search } from "lucide-react";
+import { AlertTriangle, Bot, ChevronRight, Gauge, Info, MoreHorizontal, Search, Trash2 } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import "@/lib/types/agentFirstI18n";
 import "@/components/home/uf2aI18n";
+import "./ufreI18n";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { useSession } from "@/lib/session/sessionContext";
+import { useDeleteAgentMutation } from "@/lib/store/apis/agentDeleteApi";
+import { useState } from "react";
 import {
 	AGENT_SORTS,
 	AgentAvatar,
 	CheckPill,
 	adapterKey,
+	agentLastScore,
 	agentRunsTotal,
+	agentVersions,
+	formatLastScore,
 	filterAgents,
 	isBaselineAgent,
 	isTestAgent,
@@ -30,7 +38,7 @@ import {
 	type AgentSort,
 } from "./agentDisplay";
 import { useAgentJobs, useAgentJobsError } from "./agentJobs";
-import { AgentRowDelete } from "./agentRowDelete";
+import { AgentRowDelete, agentRowDeletable } from "./agentRowDelete";
 /** What the agents tabs read of GET /agents. */
 export interface AgentsQuery {
 	data?: AgentsResponse;
@@ -81,6 +89,16 @@ export function agentTypes(agents: readonly Pick<AgentSummary, "adapter">[]): st
 	return [...new Set(agents.map((a) => adapterKey(a.adapter)))].sort();
 }
 
+/** Whether the baseline group opens by itself: on a search or type filter, with no own agents, or when a baseline has results (Q-124). */
+export function baselinesOpen(baselines: readonly AgentSummary[], filtered: boolean, yoursCount: number): boolean {
+	return filtered || yoursCount === 0 || baselines.some((a) => agentLastScore(a) !== null || (a.sealed_runs ?? 0) > 0);
+}
+
+/** The ids of the picked rows still in the list (a filter can hide a picked row; it is never deleted unseen). */
+export function pickedInList(picked: ReadonlySet<string>, agents: readonly AgentSummary[]): string[] {
+	return agents.filter((a) => a.id && picked.has(a.id)).map((a) => a.id);
+}
+
 /** Configs tab: "Your agents" first, then "Baseline agents" for comparison. Test agents are hidden. */
 export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const { t } = useTranslation("bench");
@@ -91,7 +109,10 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const [sort, setSort] = useQueryState("sort", parseAsStringLiteral(AGENT_SORTS).withDefault("name"));
 	const [type, setType] = useQueryState("type", parseAsString.withDefault(""));
 	const { t: tf } = useTranslation("uf2a");
+	const { t: tr } = useTranslation("ufre");
 	const [showTests, setShowTests] = useShowTests();
+	const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+	const session = useSession();
 	const jobs = useAgentJobs();
 	const jobsError = useAgentJobsError();
 	const data = query.data;
@@ -117,6 +138,23 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const yours = sortAgents(ofType(filterAgents(all.yours, q)), sort);
 	const baselines = sortAgents(ofType(filterAgents(all.baselines, q)), sort);
 	const noMatch = (q.trim() !== "" || type !== "") && yours.length === 0 && baselines.length === 0;
+	const deletable = yours.filter((a) => !a.error && agentRowDeletable(session, a));
+	const selection: Selection | undefined =
+		deletable.length > 0
+			? {
+					picked,
+					deletable: new Set(deletable.map((a) => a.id)),
+					toggle: (id, on) =>
+						setPicked((prev) => {
+							const next = new Set(prev);
+							if (on) next.add(id);
+							else next.delete(id);
+							return next;
+						}),
+					setAll: (on) => setPicked(on ? new Set(deletable.map((a) => a.id)) : new Set()),
+				}
+			: undefined;
+	const pickedIds = pickedInList(picked, deletable);
 	return (
 		<div className={cn("flex min-w-0 flex-col gap-6", query.isFetching && "opacity-60")}>
 			{missing && (
@@ -168,9 +206,11 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 						<SelectItem value="name">{tu("list.sortName")}</SelectItem>
 						<SelectItem value="last">{tu("list.sortLast")}</SelectItem>
 						<SelectItem value="runs">{tu("list.sortRuns")}</SelectItem>
+						<SelectItem value="score">{tr("agents.sortScore")}</SelectItem>
 					</SelectContent>
 				</Select>
 				<ShowTestsChip count={all.hidden} on={showTests} onChange={setShowTests} />
+				{pickedIds.length > 0 && <BulkDelete ids={pickedIds} onDone={(left) => setPicked(new Set(left))} />}
 			</div>
 			{types.length > 1 && (
 				<div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label={tf("agents.typeLabel")} data-testid="agents-types">
@@ -228,18 +268,22 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 								</Button>
 							</div>
 						) : (
-							<AgentTable label={t("agents.label")} agents={yours} jobs={jobs} wanted={wanted} testId="agents-list" />
+							<AgentTable label={t("agents.label")} agents={yours} jobs={jobs} wanted={wanted} testId="agents-list" selection={selection} />
 						)}
 					</section>
 					{baselines.length > 0 && (
 						<section className="flex min-w-0 flex-col gap-3" data-testid="agents-baselines" aria-labelledby="agents-baselines-title">
-							<details className="group min-w-0" open={q.trim() !== "" || type !== "" || yours.length === 0}>
-								<summary className="flex min-h-8 cursor-pointer list-none flex-col gap-0.5">
-									<h2 id="agents-baselines-title" className="text-lg font-semibold tracking-tight">
+							<details className="group min-w-0" open={baselinesOpen(baselines, q.trim() !== "" || type !== "", yours.length)}>
+								<summary className="flex min-h-8 cursor-pointer list-none flex-col gap-0.5" data-testid="agents-baselines-summary">
+									<h2 id="agents-baselines-title" className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
+										<ChevronRight
+											className="text-muted-foreground size-4 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+											aria-hidden="true"
+										/>
 										{ta("list.baselines")}{" "}
 										<span className="text-muted-foreground font-normal tabular-nums">({baselines.length})</span>
 									</h2>
-									<p className="text-muted-foreground text-sm">{ta("list.baselinesHint")}</p>
+									<p className="text-muted-foreground pl-5.5 text-sm">{ta("list.baselinesHint")}</p>
 								</summary>
 								<div className="mt-3">
 									<AgentTable label={ta("list.baselines")} agents={baselines} jobs={jobs} wanted={wanted} testId="agents-baseline-list" />
@@ -258,29 +302,59 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
  * actions. The name link covers the row, so the whole row opens the agent. Phones get two-line
  * rows: name and state, then model and last run.
  */
+interface Selection {
+	picked: ReadonlySet<string>;
+	/** Ids of the rows that may be deleted (own agents, the caller's role allows it). */
+	deletable: ReadonlySet<string>;
+	toggle(id: string, on: boolean): void;
+	setAll(on: boolean): void;
+}
+
 function AgentTable({
 	label,
 	agents,
 	jobs,
 	wanted,
 	testId,
+	selection,
 }: {
 	label: string;
 	agents: readonly AgentSummary[];
 	jobs?: readonly Job[];
 	wanted: string | null;
 	testId: string;
+	selection?: Selection;
 }) {
 	const { t: tf } = useTranslation("uf2a");
+	const { t: tr } = useTranslation("ufre");
+	const pickedCount = selection ? [...selection.deletable].filter((id) => selection.picked.has(id)).length : 0;
 	return (
 		<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
-			<table className="w-full text-sm" aria-label={label}>
+			{/* Phones: a fixed layout, so the name takes the width the dot and actions leave (Q-2). */}
+			<table className="w-full table-fixed text-sm md:table-auto" aria-label={label}>
 				<thead className="bg-muted/40 text-muted-foreground hidden text-left text-xs md:table-header-group">
 					<tr className="border-b">
+						{selection && (
+							<th className="w-10 py-2 pl-4 font-medium">
+								<input
+									type="checkbox"
+									className="accent-primary size-4 cursor-pointer"
+									checked={pickedCount > 0 && pickedCount === selection.deletable.size}
+									ref={(el) => {
+										if (el) el.indeterminate = pickedCount > 0 && pickedCount < selection.deletable.size;
+									}}
+									onChange={(e) => selection.setAll(e.target.checked)}
+									aria-label={tr("agents.selectAll")}
+									data-testid={`${testId}-select-all`}
+								/>
+							</th>
+						)}
 						<th className="px-4 py-2 font-medium">{tf("agents.columns.name")}</th>
 						<th className="px-4 py-2 font-medium">{tf("agents.columns.runsAs")}</th>
 						<th className="px-4 py-2 font-medium">{tf("agents.columns.model")}</th>
+						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tr("agents.columns.versions")}</th>
 						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tf("agents.columns.runs")}</th>
+						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tr("agents.columns.lastScore")}</th>
 						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tf("agents.columns.lastRun")}</th>
 						<th className="px-4 py-2 font-medium">{tf("agents.columns.check")}</th>
 						<th className="px-4 py-2 text-right font-medium">
@@ -290,7 +364,7 @@ function AgentTable({
 				</thead>
 				<tbody data-testid={testId}>
 					{agents.map((agent) => (
-						<AgentRow key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} />
+						<AgentRow key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} selection={selection} />
 					))}
 				</tbody>
 			</table>
@@ -302,11 +376,14 @@ function AgentRow({
 	agent,
 	jobs,
 	selected,
+	selection,
 }: {
 	agent: AgentSummary;
 	jobs?: readonly Job[];
 	selected: boolean;
+	selection?: Selection;
 }) {
+	const { t: tr } = useTranslation("ufre");
 	const { t } = useTranslation("agentsUx");
 	const { t: ta } = useTranslation("agentFirst");
 	const { t: tf } = useTranslation("uf2a");
@@ -325,6 +402,8 @@ function AgentRow({
 					: t("list.scoredRuns", { count: agent.sealed_runs })}
 			</span>
 		) : null;
+	const versions = agent.error ? null : agentVersions(agent);
+	const score = agent.error ? null : agentLastScore(agent);
 	const model = agent.model ? (
 		<span className="truncate font-mono text-xs" title={agent.model}>
 			{agent.model}
@@ -339,7 +418,21 @@ function AgentRow({
 			data-state={selected ? "selected" : undefined}
 			data-testid={testId}
 		>
-			<td className="max-w-0 px-4 py-2 md:h-10 md:w-[22%]">
+			{selection && (
+				<td className="hidden py-2 pl-4 md:table-cell">
+					{selection.deletable.has(agent.id) && (
+						<input
+							type="checkbox"
+							className="accent-primary relative z-10 size-4 cursor-pointer"
+							checked={selection.picked.has(agent.id)}
+							onChange={(e) => selection.toggle(agent.id, e.target.checked)}
+							aria-label={tr("agents.selectAgent", { name })}
+							data-testid={`${testId}-select`}
+						/>
+					)}
+				</td>
+			)}
+			<td className="px-4 py-2 md:h-10 md:w-[22%] md:max-w-0">
 				<div className="flex min-w-0 items-center gap-2.5">
 					<AgentAvatar name={name} className="size-7 rounded-lg text-xs" />
 					<div className="flex min-w-0 flex-col">
@@ -361,19 +454,33 @@ function AgentRow({
 				</div>
 			</td>
 			<td className="text-muted-foreground hidden px-4 py-2 text-xs md:table-cell">{tf(`agents.type.${adapterKey(agent.adapter) as "command"}`)}</td>
-			<td className="hidden max-w-0 px-4 py-2 md:table-cell">
+			<td className="hidden max-w-0 min-w-32 px-4 py-2 md:table-cell">
 				<span className="flex min-w-0" title={adapterLabel(agent.adapter)}>
 					{model}
 				</span>
 			</td>
+			<td className="text-muted-foreground hidden px-4 py-2 text-xs tabular-nums lg:table-cell" data-testid={`${testId}-versions`}>
+				{versions !== null && tr("agents.versions", { count: versions })}
+			</td>
 			<td className="text-muted-foreground hidden px-4 py-2 text-xs tabular-nums lg:table-cell">{runs}</td>
+			<td className="hidden px-4 py-2 text-xs tabular-nums lg:table-cell" data-testid={`${testId}-score`}>
+				{score && (
+					<span title={tr("agents.lastScoreTitle", { passed: Math.round(score.score * score.runs), runs: score.runs })}>
+						{formatLastScore(score)}
+					</span>
+				)}
+			</td>
 			<td className="text-muted-foreground hidden px-4 py-2 text-xs whitespace-nowrap lg:table-cell">
-				{lastRun && <span data-testid={`${testId}-last`}>{t("list.lastRun", { when: lastRun })}</span>}
+				{lastRun ? (
+					<span data-testid={`${testId}-last`}>{t("list.lastRun", { when: lastRun })}</span>
+				) : (
+					!agent.error && <span data-testid={`${testId}-last`}>{tr("agents.neverRun")}</span>
+				)}
 			</td>
-			<td className="px-2 py-2 md:px-4">
-				<CheckPill state={state} runs={agentRunsTotal(agent)} testId={`${testId}-status`} />
+			<td className="w-10 px-1 py-2 text-center md:w-auto md:px-4 md:text-left">
+				<CheckPill state={state} runs={agentRunsTotal(agent)} testId={`${testId}-status`} compact />
 			</td>
-			<td className="px-2 py-2 text-right md:px-4">
+			<td className="w-22 px-2 py-2 text-right md:w-auto md:px-4">
 				<div className="relative z-10 flex items-center justify-end gap-1">
 					{!agent.error && (
 						<Button asChild size="sm" variant="ghost" className="h-8">
@@ -407,5 +514,47 @@ function RowMenu({ agent, name, testId }: { agent: AgentSummary; name: string; t
 				<AgentRowDelete agent={agent} name={name} testId={testId} />
 			</div>
 		</details>
+	);
+}
+
+/** "Delete selected" (Q-122): one confirm (it opens on Cancel), then each picked agent's settings file is deleted. */
+function BulkDelete({ ids, onDone }: { ids: readonly string[]; onDone(left: string[]): void }) {
+	const { t } = useTranslation("ufre");
+	const confirm = useConfirm();
+	const [remove] = useDeleteAgentMutation();
+	const [busy, setBusy] = useState(false);
+	const [failed, setFailed] = useState<string[]>([]);
+	const run = async () => {
+		const ok = await confirm(t("agents.deleteSelectedBody", { names: ids.join(", ") }), {
+			title: t("agents.deleteSelectedTitle", { count: ids.length }),
+			confirmLabel: t("agents.deleteSelectedConfirm"),
+			cancelLabel: t("agents.deleteSelectedCancel"),
+			destructive: true,
+		});
+		if (!ok) return;
+		setBusy(true);
+		const bad: string[] = [];
+		for (const id of ids) {
+			await remove(id)
+				.unwrap()
+				.catch(() => bad.push(id));
+		}
+		setBusy(false);
+		setFailed(bad);
+		// The ones the server refused stay picked, so the error below stays in view.
+		onDone(bad);
+	};
+	return (
+		<div className="flex items-center gap-2">
+			<Button size="sm" variant="outline" isLoading={busy} dataTestId="agents-delete-selected" onClick={() => void run()}>
+				<Trash2 aria-hidden="true" />
+				{t("agents.deleteSelected", { count: ids.length })}
+			</Button>
+			{failed.length > 0 && (
+				<p role="alert" className="text-destructive text-xs" data-testid="agents-delete-selected-error">
+					{t("agents.deleteSelectedFailed", { names: failed.join(", ") })}
+				</p>
+			)}
+		</div>
 	);
 }

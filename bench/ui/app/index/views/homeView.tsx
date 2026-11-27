@@ -147,7 +147,7 @@ export default function HomeView() {
 					<StatCard
 						icon={Bot}
 						label={t("kpi.agents")}
-						value={evalsState === "error" || agentsState === "error" ? "-" : agents.data ? agentsWithResults(agentList, evaluations) : evStats.agents}
+						value={evalsState === "error" || agentsState === "error" || !agents.data ? "-" : agentsWithResults(agentList, evaluations)}
 						hint={
 							evalsState === "error"
 								? kpiError(() => void evals.refetch())
@@ -155,7 +155,7 @@ export default function HomeView() {
 									? kpiError(() => void agents.refetch())
 									: t("kpi.agentsHint")
 						}
-						loading={evalsState === "loading"}
+						loading={evalsState === "loading" || agentsState === "loading"}
 						testId="home-kpi-agents"
 					/>
 				</KpiLink>

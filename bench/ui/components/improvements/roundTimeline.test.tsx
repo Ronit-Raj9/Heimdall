@@ -22,7 +22,7 @@ const round: RoundView = {
 describe("RoundTimeline", () => {
 	it("writes one row per round and each idea with its source, practice difference and why it stopped", () => {
 		const html = render(<RoundTimeline rounds={[round]} />);
-		expect(html).toContain("Round 2: 4 ideas tried, 1 tested on the gate, kept (p 0.02).");
+		expect(html).toContain("Round 2: 4 ideas tried, 1 tested on the check tasks, kept (p 0.02).");
 		expect(html).toContain("edit of v3");
 		expect(html).toContain("merge");
 		expect(html).toContain("restart from version 0");
@@ -32,6 +32,6 @@ describe("RoundTimeline", () => {
 
 	it("reads an older round with no ideas list as one idea", () => {
 		const html = render(<RoundTimeline rounds={[IMPROVEMENT_FIXTURE.round_views[1]]} />);
-		expect(html).toContain("Round 2: 1 ideas tried, 1 tested on the gate, not kept.");
+		expect(html).toContain("Round 2: 1 ideas tried, 1 tested on the check tasks, not kept.");
 	});
 });

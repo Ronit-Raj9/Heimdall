@@ -63,34 +63,37 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 				title={exp.exp_id}
 			>
 				<TrackBadge track={trackOf?.(suite)} />
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
-					<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
-						{/* The same name as the comparison page header: the saved title, never a title-cased id (M4-115). */}
-						{experimentName(exp, (k, o) => String(tx(k as never, (o ?? {}) as never)))}
-					</span>
-					<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1" data-testid={`home-recent-suite-${exp.exp_id}`}>
-						{suite ? suiteIdOf(suite) : "-"}
-						<span className="sm:hidden">
-							{" · "}
-							{when ? formatRelative(when, locale) : t("recent.notStarted")}
+				{/* Phones: the verdict sits under the name, so the name gets the row's width (Q-120). */}
+				<span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+						{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
+						<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
+							{/* The same name as the comparison page header: the saved title, never a title-cased id (M4-115). */}
+							{experimentName(exp, (k, o) => String(tx(k as never, (o ?? {}) as never)))}
+						</span>
+						<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1" data-testid={`home-recent-suite-${exp.exp_id}`}>
+							{suite ? suiteIdOf(suite) : "-"}
+							<span className="sm:hidden">
+								{" · "}
+								{when ? formatRelative(when, locale) : t("recent.notStarted")}
+							</span>
 						</span>
 					</span>
-				</span>
-				<span className="shrink-0" data-testid={`home-recent-verdict-${exp.exp_id}`}>
-					{decision ? (
-						<StatusBadge decision={decision} className="rounded-full border-0 px-2" />
-					) : exp.state !== "done" ? (
-						<StatusBadge state={exp.state} testId={`home-recent-state-${exp.exp_id}`} className="rounded-full border-0 px-2" />
-					) : verdict.isLoading ? (
-						<span className="bg-muted inline-block h-5 w-20 animate-pulse rounded-full" aria-hidden="true" />
-					) : verdict.error ? (
-						<span className="text-muted-foreground text-xs" title={getBenchErrorMessage(verdict.error)}>
-							{t("recent.unavailable")}
-						</span>
-					) : (
-						<span className="text-muted-foreground text-xs">{t("recent.pending")}</span>
-					)}
+					<span className="shrink-0 self-start sm:self-auto" data-testid={`home-recent-verdict-${exp.exp_id}`}>
+						{decision ? (
+							<StatusBadge decision={decision} className="rounded-full border-0 px-2" />
+						) : exp.state !== "done" ? (
+							<StatusBadge state={exp.state} testId={`home-recent-state-${exp.exp_id}`} className="rounded-full border-0 px-2" />
+						) : verdict.isLoading ? (
+							<span className="bg-muted inline-block h-5 w-20 animate-pulse rounded-full" aria-hidden="true" />
+						) : verdict.error ? (
+							<span className="text-muted-foreground text-xs" title={getBenchErrorMessage(verdict.error)}>
+								{t("recent.unavailable")}
+							</span>
+						) : (
+							<span className="text-muted-foreground text-xs">{t("recent.pending")}</span>
+						)}
+					</span>
 				</span>
 				<span className="text-muted-foreground hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block">
 					{when ? (

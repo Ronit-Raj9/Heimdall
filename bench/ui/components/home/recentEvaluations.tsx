@@ -46,19 +46,22 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 				<span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
 					<Award className="size-4" />
 				</span>
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
-					<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
-						{ev.spec?.name?.trim() || t("evaluations.untitled")}
+				{/* Phones: the status sits under the name, so the name gets the row's width (Q-120). */}
+				<span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+						{/* Phones: names and captions wrap to two lines instead of being cut (M2-15). */}
+						<span className="text-foreground line-clamp-2 text-sm font-medium break-words sm:line-clamp-1">
+							{ev.spec?.name?.trim() || t("evaluations.untitled")}
+						</span>
+						<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1">
+							{evaluationWho(ev) || "-"}
+							{" · "}
+							{t("evaluations.benchmarks", { count })}
+						</span>
 					</span>
-					<span className="text-muted-foreground line-clamp-2 text-xs break-words sm:line-clamp-1">
-						{evaluationWho(ev) || "-"}
-						{" · "}
-						{t("evaluations.benchmarks", { count })}
-					</span>
+					{/* The shared status pill: icon plus the one status word (Spec 4). */}
+					<StatusPill raw={status} className="shrink-0 self-start sm:self-auto" data-status={status} testId={`home-evaluation-status-${ev.id}`} />
 				</span>
-				{/* The shared status pill: icon plus the one status word (Spec 4). */}
-				<StatusPill raw={status} className="shrink-0" data-status={status} testId={`home-evaluation-status-${ev.id}`} />
 				<span className="text-muted-foreground hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block">
 					{ev.created_at ? (
 						<time dateTime={ev.created_at} title={formatWhen(ev.created_at, locale) ?? undefined}>

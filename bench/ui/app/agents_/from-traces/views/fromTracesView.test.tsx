@@ -53,7 +53,7 @@ describe("FromTracesView", () => {
 
 	it("shows the endpoint and setup while waiting for the first trace", () => {
 		const html = renderToStaticMarkup(<FromTracesView />);
-		expect(html).toContain("Connect from traces");
+		expect(html).toContain("Agent from traces");
 		expect(html).toContain("https://h.example/api/bench/orgs/org_a/otlp/v1/traces");
 		expect(html).toContain("Create an ingest token");
 		expect(html).toContain('data-testid="from-traces-waiting"');

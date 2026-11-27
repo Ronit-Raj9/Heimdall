@@ -34,9 +34,9 @@ vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 describe("NewImprovementDialog benchmark picker", () => {
 	it("fills from the light benchmark list, sorted, with versions", () => {
 		const html = render(<NewImprovementDialog onClose={() => undefined} />);
-		const bfcl = html.indexOf("hd-harbor-bfcl@1.0.0");
-		const tb2 = html.indexOf("hd-harbor-tb2@2.0.0");
-		expect(bfcl).toBeGreaterThan(-1);
-		expect(tb2).toBeGreaterThan(bfcl);
+		// Q-109: the shared Select renders its options only when opened; the sorted choices are pinned in
+		// newImprovementDialog.uf2b.test.ts. Here the styled trigger with its placeholder must show.
+		expect(html).toMatch(/<button[^>]*data-testid="new-improvement-suite"/);
+		expect(html).toContain("data-slot=\"select-value\"");
 	});
 });

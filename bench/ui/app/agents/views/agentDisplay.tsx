@@ -48,8 +48,37 @@ export function isTestAgent(agent: TestAgentFields): boolean {
 }
 
 /** How the agents list can be ordered (URL state `sort`). */
-export const AGENT_SORTS = ["name", "last", "runs"] as const;
+export const AGENT_SORTS = ["name", "last", "runs", "score"] as const;
 export type AgentSort = (typeof AGENT_SORTS)[number];
+
+/** The newest scored evaluation of an agent as GET /agents serves it (optional: older servers omit it). */
+export interface AgentLastScore {
+	/** Share of passing runs, 0..1. */
+	score: number;
+	runs: number;
+	exp_id: string;
+	at: string;
+}
+
+/** The fields GET /agents adds per agent (round 2, Q-123); read as optional so an older server still works. */
+export type AgentScoreFields = { versions?: number | null; last_score?: AgentLastScore | null };
+
+/** The last score of an agent, or null when the server sent none. */
+export function agentLastScore(agent: object): AgentLastScore | null {
+	const s = (agent as AgentScoreFields).last_score;
+	return s && typeof s.score === "number" && Number.isFinite(s.score) ? s : null;
+}
+
+/** How many config versions the agent ran with, or null when the server sent none. */
+export function agentVersions(agent: object): number | null {
+	const v = (agent as AgentScoreFields).versions;
+	return typeof v === "number" && v > 0 ? v : null;
+}
+
+/** A last score as a whole percent ("40%"). */
+export function formatLastScore(s: AgentLastScore): string {
+	return `${Math.round(s.score * 100)}%`;
+}
 
 /** The agents whose id, file, model or adapter contains q (case-insensitive). An empty q keeps every agent. */
 export function filterAgents<T extends Pick<AgentSummary, "id" | "path" | "model" | "adapter">>(
@@ -79,7 +108,7 @@ function nameOf(agent: Pick<AgentSummary, "id" | "path">): string {
 
 /**
  * The agents in the chosen order: by name (A to Z), by last run (newest first, never-run last) or
- * by runs (most first). Ties fall back to the name, so the order is stable.
+ * by runs (most first) or by last score (highest first, unscored last). Ties fall back to the name, so the order is stable.
  */
 export function sortAgents<T extends Pick<AgentSummary, "id" | "path" | "sealed_runs" | "runs_total" | "last_run_at">>(
 	agents: readonly T[],
@@ -88,6 +117,10 @@ export function sortAgents<T extends Pick<AgentSummary, "id" | "path" | "sealed_
 	const byName = (a: T, b: T) => nameOf(a).localeCompare(nameOf(b));
 	const out = [...agents];
 	if (sort === "last") return out.sort((a, b) => lastRunMs(b) - lastRunMs(a) || byName(a, b));
+	if (sort === "score") {
+		const score = (a: T) => agentLastScore(a)?.score ?? Number.NEGATIVE_INFINITY;
+		return out.sort((a, b) => score(b) - score(a) || byName(a, b));
+	}
 	if (sort === "runs")
 		return out.sort((a, b) => agentRunsTotal(b) - agentRunsTotal(a) || (b.sealed_runs ?? 0) - (a.sealed_runs ?? 0) || byName(a, b));
 	return out.sort(byName);
@@ -176,18 +209,19 @@ const PILL: Record<CheckState, { dot: string; cls: string }> = {
  * The setup check state. "Setup not checked" is left out for an agent that already has runs
  * (pass `runs`), since the runs show it works (M2-22).
  */
-export function CheckPill({ state, testId, runs }: { state: CheckState; testId?: string; runs?: number }) {
+export function CheckPill({ state, testId, runs, compact }: { state: CheckState; testId?: string; runs?: number; compact?: boolean }) {
 	const { t } = useTranslation("agentsUx");
 	if (state === "never" && (runs ?? 0) > 0) return null;
 	const p = PILL[state];
 	return (
 		<span
-			className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", p.cls)}
+			className={cn("inline-flex items-center gap-1.5 rounded-full py-0.5 text-xs font-medium whitespace-nowrap", compact ? "px-1.5 md:px-2" : "px-2", p.cls)}
 			data-state={state}
 			data-testid={testId}
 		>
 			<span className={cn("size-1.5 rounded-full", p.dot)} aria-hidden="true" />
-			{t(`status.${state}`)}
+			{/* compact: phones show the dot only, so the name keeps the row width (Q-2); the text stays for screen readers. */}
+			<span className={compact ? "sr-only md:not-sr-only" : undefined}>{t(`status.${state}`)}</span>
 		</span>
 	);
 }

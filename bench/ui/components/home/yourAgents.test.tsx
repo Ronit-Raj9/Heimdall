@@ -5,29 +5,36 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { YourAgents, agentCardStats, agentsWithResults, ownAgents } from "./yourAgents";
 
+const cardFor = ({ agent }: { agent: string; evaluation?: string }) =>
+	agent === "support-bot"
+		? {
+				isLoading: false,
+				data: {
+					evaluation: "ev_9",
+					evaluation_id: "ev_9",
+					arms: [{ label: "A", agent, model: "gpt-x" }],
+					capabilities: [{ capability: "support", benchmarks: ["b"], arms: { A: { score: 0.62, ci_low: 0.5, ci_high: 0.7, runs: 10 } } }],
+					benchmarks: [
+						{
+							benchmark: "b",
+							capability: "support",
+							experiment_id: "e",
+							arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.1 } },
+						},
+					],
+					reliability: [{ fault: "broken-tool", arms: { A: { score: 0.3, drop: -0.32 } } }],
+				},
+			}
+		: { isLoading: false, data: { evaluation: "", arms: [], capabilities: [], benchmarks: [], reliability: [] } };
+
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useGetAgentVersionsQuery: () => ({ data: { agent: "support-bot", versions: [{ version: 1 }, { version: 4 }] } }),
-	useGetAgentReportCardQuery: ({ agent }: { agent: string }) =>
-		agent === "support-bot"
-			? {
-					isLoading: false,
-					data: {
-						evaluation: "ev_9",
-						arms: [{ label: "A", agent, model: "gpt-x" }],
-						capabilities: [{ capability: "support", benchmarks: ["b"], arms: { A: { score: 0.62, ci_low: 0.5, ci_high: 0.7, runs: 10 } } }],
-						benchmarks: [
-							{
-								benchmark: "b",
-								capability: "support",
-								experiment_id: "e",
-								arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.1 } },
-							},
-						],
-						reliability: [{ fault: "broken-tool", arms: { A: { score: 0.3, drop: -0.32 } } }],
-					},
-				}
-			: { isLoading: false, data: { evaluation: "", arms: [], capabilities: [], benchmarks: [], reliability: [] } },
+}));
+
+vi.mock("@/lib/store/apis/agentCardApi", () => ({
+	useGetAgentCardQuery: (args: { agent: string; evaluation?: string }, opts?: { skip?: boolean }) =>
+		opts?.skip ? { isLoading: false, data: undefined } : cardFor(args),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -117,5 +124,20 @@ describe("agentCardStats worst drop (N126)", () => {
 		expect(s.worstDrop).toBeNull();
 		expect(s.faultsTested).toBe(true);
 		expect(agentCardStats(report([])).faultsTested).toBe(false);
+	});
+});
+
+describe("Home: agents with results agree with the cards (Q-18)", () => {
+	it("counts neither unfinished nor test evaluations", () => {
+		const list = [agent("support-bot"), agent("codex"), agent("draft-bot")];
+		const evs = [
+			evaluation("ev_1", "support-bot"),
+			{ id: "ev_2", status: "running", created_at: "2026-11-10T00:00:00Z", spec: { arms: [{ agent: "draft-bot" }] } } as never,
+			{ id: "ev_3", status: "done", created_at: "2026-11-10T00:00:00Z", spec: { name: "zz-test-c2-budget", arms: [{ agent: "codex" }] } } as never,
+		];
+		expect(agentsWithResults(list, evs)).toBe(1);
+		const html = renderToStaticMarkup(<YourAgents agents={list} evaluations={evs} mayRun />);
+		expect(html.match(/data-testid="home-agent-[a-z-]+-scores"/g)?.length).toBe(1);
+		expect(html).not.toContain('data-testid="home-agent-codex"');
 	});
 });
