@@ -7,7 +7,7 @@ import { suiteGrading } from "@/components/scenario/scenario.utils";
 import { EmptyState, PageHeader, RouteTabs, suiteIdOf, type RouteTab } from "@/components/shell";
 import { suiteVersionOf } from "@/components/shell/entityLink";
 import { isBuiltinSuite, suiteDisplayDescription } from "@/components/suites/suiteDisplay";
-import { SuiteStatusPill, suiteDisplayName } from "@/components/suites/suiteIdentity";
+import { SuiteStatusPill, suiteDisplayName, suitePillState } from "@/components/suites/suiteIdentity";
 import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
 import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
@@ -113,9 +113,17 @@ export function aliasSection(tab: string | null): string | null {
 	}
 }
 
+/**
+ * Q-186: the status pill already says "24 of 89 ready" (or "Ready"), so the facts line drops the
+ * ready count, and drops the task count too when the pill names it.
+ */
+export function factsCounts(pill: string): { tasks: boolean; ready: boolean } {
+	return { tasks: pill !== "needsAdmission", ready: false };
+}
+
 /** M6-10: the one facts line under the title, "3641 tasks, 36 ready, 103 runs so far". */
 export function headerFacts(
-	parts: { tasks: string; ready: string; probes?: string | null; runs?: string | null },
+	parts: { tasks?: string | null; ready?: string | null; probes?: string | null; runs?: string | null },
 ): string {
 	return [parts.tasks, parts.ready, parts.probes, parts.runs].filter(Boolean).join(", ");
 }
@@ -180,9 +188,10 @@ function SuiteBody({
 		: runList.isError
 			? null
 			: tg("suite.counting");
+	const shown = factsCounts(suitePillState(suite));
 	const facts = headerFacts({
-		tasks: tf("header.tasks", { count: suite.task_count }),
-		ready: tf("header.ready", { count: suite.admitted_count }),
+		tasks: shown.tasks ? tf("header.tasks", { count: suite.task_count }) : null,
+		ready: shown.ready ? tf("header.ready", { count: suite.admitted_count }) : null,
 		probes: (suite.probes ?? []).length > 0 ? tf("header.probes", { count: (suite.probes ?? []).length }) : null,
 		runs: runsText,
 	});
@@ -190,7 +199,7 @@ function SuiteBody({
 	const noneReady = !builtin && !suite.error && suite.task_count > 0 && suite.admitted_count === 0;
 
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suite-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-4 sm:gap-8" data-testid="suite-screen">
 			<PageHeader
 				title={
 					// M6-16: the h1 holds the name only; the id and version line sits under it in the subtitle.
@@ -202,20 +211,18 @@ function SuiteBody({
 				subtitle={
 					<span className="flex flex-col gap-0.5" data-testid="suite-plain-subtitle">
 						{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version) && (
-							<span className="text-muted-foreground truncate font-mono text-xs font-normal" data-testid="suite-header-line">
+							<span className="text-muted-foreground hidden truncate font-mono text-xs font-normal sm:block" data-testid="suite-header-line">
 								{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version)}
 							</span>
 						)}
-						<span>
-							{noneReady
-								? tf("header.notReady", { count: suite.task_count })
-								: describedByOwnWords(suite) && suiteDisplayDescription(suite)
-									? suiteDisplayDescription(suite)
-									: tu("pageSubtitle", {
-											count: suite.task_count,
-											skill: suiteSkill(suite) ?? tu("skillFallback"),
-										})}
-						</span>
+						{/* Q-186: the task count lives in the pill and the tab badge; the description shows from sm up only. */}
+						{noneReady ? (
+							<span>{tf("header.notReady", { count: suite.task_count })}</span>
+						) : describedByOwnWords(suite) && suiteDisplayDescription(suite) ? (
+							<span className="hidden sm:inline">{suiteDisplayDescription(suite)}</span>
+						) : suiteSkill(suite) ? (
+							<span className="hidden sm:inline">{tu("pageSkill", { skill: suiteSkill(suite) })}</span>
+						) : null}
 						{/* M6-15: the benchmark's own words only from sm up; on a phone one sentence is enough. */}
 						{!noneReady && !describedByOwnWords(suite) && suiteDisplayDescription(suite) && (
 							<span className="text-muted-foreground hidden text-xs sm:line-clamp-2">{suiteDisplayDescription(suite)}</span>

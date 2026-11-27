@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import SuiteView, { aliasSection, headerFacts, TAB_ALIASES } from "./suiteView";
+import SuiteView, { aliasSection, factsCounts, headerFacts, TAB_ALIASES } from "./suiteView";
 
 // QC2-27-09: a task link from frozen evidence names its suite version; when the catalog holds a
 // newer revision the page says it shows the current one.
@@ -101,14 +101,17 @@ describe("SuiteView built-in note (C2.tabs)", () => {
 	it("tells how to get an editable benchmark, with a link to Add a benchmark", () => {
 		fixture.suites = [healthy({ builtin: true, source: "library" })];
 		const html = render(<SuiteView suiteId="hd-swe-verified" />);
-		expect(html).toContain("To build, edit or review tasks, make your own benchmark.");
+		// Q-55: one sentence, said once.
+		expect(html).toContain("To change tasks, add your own benchmark.");
+		expect(html).not.toContain("Read-only built-in benchmark");
+		expect(html.split("add your own benchmark").length).toBe(2);
 		expect(html).toMatch(/href="\/suites\/add"[^>]*>Add a benchmark</);
 	});
 	it("shows a team benchmark by its id as typed", () => {
 		fixture.suites = [healthy({ id: "zz-test-own" })];
 		const html = render(<SuiteView suiteId="zz-test-own" />);
 		expect(html).not.toContain("Zz Test Own");
-		expect(html).not.toContain("make your own benchmark");
+		expect(html).not.toContain("add your own benchmark");
 	});
 });
 describe("SuiteView stat tiles (N164)", () => {
@@ -162,5 +165,15 @@ describe("SuiteView facts line (M6-10)", () => {
 		expect(headerFacts({ tasks: "3641 tasks", ready: "36 ready", probes: null, runs: "103 runs so far" })).toBe(
 			"3641 tasks, 36 ready, 103 runs so far",
 		);
+	});
+});
+
+describe("header counts shown once (Q-186)", () => {
+	it("drops the task and ready counts when the pill says N of M ready", () => {
+		expect(factsCounts("needsAdmission")).toEqual({ tasks: false, ready: false });
+	});
+	it("keeps the task count when the pill says only Ready", () => {
+		expect(factsCounts("ready")).toEqual({ tasks: true, ready: false });
+		expect(headerFacts({ tasks: "11 tasks", ready: null, runs: "3 runs so far" })).toBe("11 tasks, 3 runs so far");
 	});
 });

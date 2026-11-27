@@ -72,7 +72,7 @@ describe("health column", () => {
 		expect(p02).toContain("Runs out of time (19%)");
 		// Variance is a muted line, never a toned badge.
 		expect(p02).toMatch(
-			/<span class="text-muted-foreground text-\[11px\]"[^>]*data-testid="suites-task-health-p02-variance">Agents mixed on it: 1 of 2/,
+			/<span class="text-muted-foreground text-xs"[^>]*data-testid="suites-task-health-p02-variance">Agents mixed on it: 1 of 2/,
 		);
 	});
 

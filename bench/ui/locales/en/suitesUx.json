@@ -61,6 +61,7 @@
 	"subtitle": "Each benchmark is a set of tasks. Open one to see its tasks and run it.",
 	"pageSubtitle_one": "A set of {{count}} task that tests {{skill}}.",
 	"pageSubtitle_other": "A set of {{count}} tasks that test {{skill}}.",
+	"pageSkill": "Tests {{skill}}.",
 	"skillFallback": "an agent's skills",
 	"moreColumns": "More columns",
 	"fewerColumns": "Fewer columns",
@@ -72,7 +73,7 @@
 	},
 	"builtIn": "Built in",
 	"builtinReadOnly": "Built-in benchmark, read-only",
-	"builtinReadOnlyHint": "Read-only built-in benchmark. To change tasks, add your own benchmark.",
+	"builtinReadOnlyHint": "To change tasks, add your own benchmark.",
 	"filter": {
 		"search": "Search benchmarks",
 		"category": "Category",
