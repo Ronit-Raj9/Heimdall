@@ -11,7 +11,8 @@ describe("PolicyScorecard without a release rule set (p05-1)", () => {
 	it("speaks to web users, with no terminal flag", () => {
 		const html = renderToStaticMarkup(<PolicyScorecard policy={null} expId="e_x" />);
 		expect(html).not.toContain("-policy");
-		expect(html).toContain("Releases page");
+		// The Releases page hint moved into a link that lane RC adds (Q-60).
+		expect(html).toContain("No release rule set applies to this comparison.");
 	});
 });
 

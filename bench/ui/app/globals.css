@@ -630,6 +630,28 @@
 	--page-px: 40px;
 }
 
+/* Page widths (Q-317): one system by page type, relative with a cap. Pages wrap their content in
+   PageWidth (components/shell/pageWidth.tsx). wide: tables and lists; dash: dashboards and result
+   pages; read: forms and reading (prose itself keeps about 72 characters). */
+:root {
+	--page-max-wide: 1680px;
+	--page-max-dash: 1440px;
+	--page-max-read: 1000px;
+}
+/* Side padding grows on very wide screens. */
+@media (min-width: 1920px) {
+	:root,
+	[data-density="default"] {
+		--page-px: 48px;
+	}
+	[data-density="compact"] {
+		--page-px: 32px;
+	}
+	[data-density="comfortable"] {
+		--page-px: 56px;
+	}
+}
+
 /* Tab strips and wide tables that scroll sideways fade at the edge that has more content
    (useScrollEdges sets the data attributes). */
 [data-overflow-start="true"]:not([data-overflow-end="true"]) {
@@ -649,10 +671,15 @@
 	[data-shell-sidebar],
 	header[data-shell],
 	[role="tablist"],
+	[role="menu"],
+	[data-slot="select-trigger"],
+	[data-slot="dropdown-menu-content"],
 	button {
 		display: none !important;
 	}
-	[data-bench-content] {
+	[data-bench-content],
+	[data-bench-main] {
+		max-height: none !important;
 		overflow: visible !important;
 		height: auto !important;
 	}
@@ -668,6 +695,11 @@
 	body {
 		background: white;
 		color: black;
+	}
+	/* Links keep their text; only links in running text get their address, never inside tables. */
+	td a::after,
+	th a::after {
+		content: none !important;
 	}
 	[data-bench-content] p a[href^="http"]::after {
 		content: " (" attr(href) ")";

@@ -132,7 +132,7 @@ describe("CodeScanPanel", () => {
 		expect(html).toContain("No findings");
 		expect(html).toContain('data-testid="codescan-A-empty"');
 		expect(html).toContain("Computed now from the run&#x27;s saved diff");
-		expect(html).toContain("Experiment veto level high: not reached.");
+		expect(html).toContain("Comparison veto level high: not reached.");
 		const unscanned: CodeScanReport = { ...clean, scan: { ...clean.scan, scanned: false, reason: "no exported diff" } };
 		html = renderToStaticMarkup(<CodeScanPanel report={unscanned} arm="A" />);
 		expect(html).toContain("Not scanned: no exported diff.");

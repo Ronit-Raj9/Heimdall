@@ -1,5 +1,6 @@
 import { OverflowMenu, type OverflowMenuItem } from "@/components/agents/overflowMenu";
 import { activeNavItem, BENCH_NAV } from "@/lib/constants/navigation";
+import { pageWidthClass, type PageWidthKind } from "@/components/shell/pageWidth";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
@@ -41,6 +42,8 @@ export interface PageHeaderProps {
 	icon?: ComponentType<{ className?: string }> | ReactNode;
 	className?: string;
 	testId?: string;
+	/** Aligns the header to its page's width when the header sits outside the page's PageWidth (Q-317). */
+	width?: PageWidthKind;
 }
 
 /** The path of the section the top bar shows for this page (its nav entry), or null without a router. */
@@ -65,7 +68,9 @@ export function pageCrumbs(crumbs: readonly Crumb[] | undefined, sectionPath: st
 	if (list[0].to === "/") list = list.slice(1);
 	if (list.length === 0) return [];
 	const [first, ...rest] = list;
-	if (sectionPath && first.to === sectionPath && rest.length > 0) return rest.length > 1 ? rest : [];
+	// A crumb that carries a search (a filtered list) is kept: it leads back to that view (RD Q-63).
+	const filtered = first.search !== undefined && Object.keys(first.search).length > 0;
+	if (sectionPath && first.to === sectionPath && rest.length > 0 && !filtered) return rest.length > 1 ? rest : [];
 	// Only the current page left: no trail.
 	if (list.length === 1 && !list[0].to) return [];
 	return list;
@@ -82,13 +87,13 @@ export function crumbNavLabelKey(crumb: Crumb): string | null {
  * subtitle and the page's actions. Pages use it instead of their own h1 block so every page
  * starts the same way.
  */
-export function PageHeader({ title, subtitle, actions, meta, more, moreLabel, tabs, breadcrumbs, className, testId }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, meta, more, moreLabel, tabs, breadcrumbs, className, testId, width }: PageHeaderProps) {
 	const { t } = useTranslation("bench");
 	// Inside another page's tab the title is a section heading, not the page's h1.
 	const Heading = useEmbedded() ? "h2" : "h1";
 	const trail = pageCrumbs(breadcrumbs, useSectionPath());
 	return (
-		<header className={cn("mb-2 flex min-w-0 flex-col gap-2", className)} data-testid={testId ?? "page-header"}>
+		<header className={cn("mb-2 flex min-w-0 flex-col gap-2", width && pageWidthClass(width), className)} data-testid={testId ?? "page-header"}>
 			{trail.length > 0 && (
 				<nav aria-label={t("shell.breadcrumbs")} className="min-w-0">
 					<ol className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1 text-xs">

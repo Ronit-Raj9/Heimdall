@@ -100,7 +100,7 @@ describe("OpsTab", () => {
 		} as unknown as SuiteSummary;
 		const html = render(<OpsTab suite={s} />);
 		expect(html).not.toContain("In use");
-		expect(html).toMatch(/data-testid="suite-ops-task-t1"[\s\S]*?Not frozen yet/);
+		expect(html).toMatch(/data-testid="suite-ops-task-t1"[\s\S]*?Draft version/);
 		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Not checked yet/);
 		expect(html).toContain("Paused: flaky");
 	});

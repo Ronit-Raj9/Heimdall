@@ -76,7 +76,7 @@ describe("SuiteExportMenu", () => {
 		const html = renderToStaticMarkup(<SuiteExportMenu suiteId="coding-core" fixtureMode={false} />);
 		expect(html).toContain('href="/api/bench/suites/coding-core/export?format=harbor"');
 		expect(html).toContain('download="coding-core.harbor.tar.gz"');
-		expect(html).toContain("withheld");
+		expect(html).toContain("left out");
 		expect(html).toContain("-include-hidden");
 	});
 });

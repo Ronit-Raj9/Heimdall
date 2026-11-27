@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { routerState } from "@/lib/testing/routerMock";
 import { render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import { PageHeader } from "./pageHeader";
+import { PageHeader, pageCrumbs } from "./pageHeader";
 
 // Fix wave 3, N203: the top bar already names the section, so the page trail does not repeat it, and
 // every item of the trail has text (the chevrons sit inside the items, between them only).
@@ -58,5 +58,13 @@ describe("PageHeader breadcrumbs on phones (Q-63)", () => {
 		expect(items.length).toBeGreaterThan(1);
 		expect(items.slice(0, -1).every((li) => li.includes("max-sm:hidden"))).toBe(true);
 		expect(items.at(-1)).not.toContain("max-sm:hidden");
+	});
+});
+
+describe("pageCrumbs keeps a filtered section crumb (RD Q-63)", () => {
+	it("keeps the first crumb when it carries a search, drops it otherwise", () => {
+		const page = { label: "r_1" };
+		expect(pageCrumbs([{ label: "Runs", to: "/runs", search: { status: "failed" } }, page], "/runs")).toHaveLength(2);
+		expect(pageCrumbs([{ label: "Runs", to: "/runs" }, page], "/runs")).toEqual([]);
 	});
 });

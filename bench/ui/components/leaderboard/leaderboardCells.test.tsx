@@ -91,6 +91,6 @@ describe("ExperimentLinks", () => {
 		expect(html).toContain('href="/experiments/e_b"');
 		expect(html).not.toContain('href="/experiments/e_a"');
 		expect(html).toContain(">+1 more<");
-		expect(html).toContain('title="Open experiment e_c"');
+		expect(html).toContain('title="Open comparison e_c"');
 	});
 });

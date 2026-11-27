@@ -53,7 +53,7 @@ describe("CalibrateJudgeForm", () => {
 		api.models = okQuery({ providers: [], keys: [] });
 		const html = render(<CalibrateJudgeForm status={status} />, hostedSession("member"));
 		expect(html).toContain('data-testid="key-missing-note"');
-		expect(html).toContain("Add a openai key");
+		expect(html).toContain("Add a key for openai");
 		expect(html).not.toContain('data-testid="job-run-calibrate.run"');
 	});
 

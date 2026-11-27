@@ -37,7 +37,7 @@ describe("VarianceCard", () => {
 	});
 	it("says no A/A arm ran when the SD is assumed", () => {
 		const html = render(verdictWith({ variance: variance({}) }));
-		expect(html).toContain("No A/A setup ran");
+		expect(html).toContain("No same-setup check ran");
 		expect(html).toContain("assumed");
 		expect(html).not.toContain('data-testid="variance-aa-tasks"');
 	});

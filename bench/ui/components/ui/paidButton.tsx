@@ -46,6 +46,8 @@ export interface PaidButtonProps extends Omit<ComponentProps<typeof Button>, "on
 	 * "Rerun (same budget as before)" instead of "(uses your model key)". The dialog keeps the cost line.
 	 */
 	capText?: string;
+	/** What limits the spend when there is no cap (the confirm says it instead of "no cap is set"). */
+	limitText?: string;
 	/** Where the estimate shows: a line under the button (default) or the button's tooltip (row actions). */
 	estimateAt?: "below" | "title";
 	testId: string;
@@ -95,6 +97,7 @@ export function PaidButton({
 	confirmText,
 	capText,
 	estimateAt = "below",
+	limitText,
 	testId,
 	disabled,
 	isLoading,
@@ -117,6 +120,9 @@ export function PaidButton({
 					title: tr("confirm.title", { verb }),
 					confirmLabel: capUsd === null ? tr("confirm.okUnknown", { verb }) : tr("confirm.ok", { verb, cap: formatUsd(capUsd) }),
 					costUsd: capUsd,
+					estimateUsd,
+					estimateRuns,
+					limitText,
 				});
 				if (!ok) return;
 			}

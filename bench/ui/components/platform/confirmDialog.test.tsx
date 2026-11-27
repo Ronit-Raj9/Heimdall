@@ -92,3 +92,4 @@ describe("initial focus (Q-1)", () => {
 		expect(confirmKind({})).toBe("plain");
 	});
 });
+
