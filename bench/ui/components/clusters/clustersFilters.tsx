@@ -1,3 +1,5 @@
+import { NativeSelect } from "@/components/ui/select";
+import { fieldStackClass } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { ClusterSynthetic } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -55,7 +57,7 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 		<div className="flex flex-col gap-1.5">
 			<button
 				type="button"
-				className="bg-card hover:bg-accent inline-flex h-9 w-fit items-center rounded-md border px-3 text-sm font-medium sm:hidden"
+				className="bg-card hover:bg-accent inline-flex h-10 w-fit items-center rounded-md border px-3 text-sm font-medium sm:hidden"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
 				data-testid="clusters-filters-toggle"
@@ -195,7 +197,7 @@ function TextField({ label, value, placeholder, type = "text", options, onCommit
 		if (next.trim() !== value) onCommit(next.trim());
 	};
 	return (
-		<div className="flex flex-col gap-1">
+		<div className={fieldStackClass}>
 			<label htmlFor={id} className="text-muted-foreground text-sm">
 				{label}
 			</label>
@@ -218,7 +220,7 @@ function TextField({ label, value, placeholder, type = "text", options, onCommit
 				onKeyDown={(e) => {
 					if (e.key === "Enter") commit(e.currentTarget.value);
 				}}
-				className={cn("w-full font-mono text-sm sm:w-44 md:text-sm", className)}
+				className={cn("w-full text-sm sm:w-44 md:text-sm", className)}
 				data-testid={testId}
 			/>
 			{options && options.length > 0 && (
@@ -267,7 +269,7 @@ function ExpPicker({
 	const picked = value.split(",").map((v) => v.trim()).filter(Boolean);
 	const list = [...options, ...picked.filter((p) => !options.includes(p))];
 	return (
-		<div className="flex flex-col gap-1">
+		<div className={fieldStackClass}>
 			<span id={id} className="text-muted-foreground text-sm">
 				{label}
 			</span>
@@ -275,7 +277,7 @@ function ExpPicker({
 				<summary
 					aria-labelledby={id}
 					aria-disabled={disabled || undefined}
-					className="border-input bg-card dark:bg-input/20 flex h-9 w-full cursor-pointer list-none items-center rounded-md border px-2 font-mono text-sm shadow-xs sm:w-56"
+					className="border-input bg-card dark:bg-input/20 flex h-(--control-h) w-full cursor-pointer list-none items-center rounded-md border px-2 text-sm shadow-xs sm:w-56"
 					data-testid={`${testId}-summary`}
 				>
 					{picked.length === 0 ? allLabel : pickedLabel(picked.length)}
@@ -329,16 +331,17 @@ function SelectField({
 	const id = useId();
 	const list = value && !options.includes(value) ? [...options, value] : options;
 	return (
-		<div className="flex flex-col gap-1">
+		<div className={fieldStackClass}>
 			<label htmlFor={id} className="text-muted-foreground text-sm">
 				{label}
 			</label>
-			<select
+			<NativeSelect
 				id={id}
 				value={value}
 				disabled={disabled}
 				onChange={(e) => onCommit(e.target.value)}
-				className="border-input bg-card dark:bg-input/20 h-9 w-full rounded-md border px-2 font-mono text-sm shadow-xs outline-none sm:w-44"
+				wrapperClassName="w-full sm:w-44"
+				className="w-full"
 				data-testid={testId}
 			>
 				<option value="">{allLabel}</option>
@@ -347,7 +350,7 @@ function SelectField({
 						{o}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 		</div>
 	);
 }
@@ -365,14 +368,14 @@ interface SegmentedProps<T extends string> {
 function Segmented<T extends string>({ label, value, options, onChange, disabled, testId }: SegmentedProps<T>) {
 	const id = useId();
 	return (
-		<div className="flex flex-col gap-1">
+		<div className={fieldStackClass}>
 			<span id={id} className="text-muted-foreground text-sm">
 				{label}
 			</span>
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
+				className="bg-muted inline-flex h-(--control-h) w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid={testId}
 			>
 				{options.map((option) => {

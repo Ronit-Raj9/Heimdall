@@ -115,7 +115,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 							<TableHead>{t("clusters.table.tasks")}</TableHead>
 							<TableHead>{t("clusters.table.agents")}</TableHead>
 							<TableHead>{t("clusters.table.conditions")}</TableHead>
-							<TableHead>{t("clusters.table.experiments")}</TableHead>
+							<TableHead className="hidden 2xl:table-cell">{t("clusters.table.experiments")}</TableHead>
 							<TableHead>{t("clusters.table.lastSeen")}</TableHead>
 							<TableHead />
 						</TableRow>
@@ -130,7 +130,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 									data-testid={`clusters-row-${cluster.signature}`}
 									data-state={open ? "selected" : undefined}
 								>
-									<TableCell className="max-w-md align-top whitespace-normal">
+									<TableCell className="max-w-sm min-w-64 align-top whitespace-normal">
 										<div className="flex flex-col gap-0.5">
 											<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 												<ClusterKindBadge cluster={cluster} />
@@ -193,7 +193,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 									<TableCell className="align-top">
 										<CompactList items={cluster.conditions} format={fault} />
 									</TableCell>
-									<TableCell className="align-top">
+									<TableCell className="hidden align-top 2xl:table-cell">
 										<CompactList items={cluster.experiments} />
 									</TableCell>
 									<TableCell className="text-muted-foreground align-top text-sm whitespace-nowrap">
@@ -321,7 +321,7 @@ function CompactList({
 	return (
 		<ul className="flex flex-col gap-0.5" title={more > 0 ? (items ?? []).join("\n") : undefined}>
 			{shown.map((item) => (
-				<li key={item} className="font-mono text-sm leading-6 break-all">
+				<li key={item} className="max-w-60 truncate font-mono text-sm leading-6" title={item}>
 					{format ? format(item) : <CompactItem item={item} kind={kind} />}
 				</li>
 			))}
@@ -333,11 +333,11 @@ function CompactList({
 /** One list item: a task "suite/task" or an agent id as a link, anything else as text. */
 function CompactItem({ item, kind }: { item: string; kind?: "task" | "agent" }) {
 	// Links are at least 24 px tall so they are easy to hit (M7-35).
-	if (kind === "agent") return <EntityLink kind="agent" id={item} className={LINK_TARGET} />;
+	if (kind === "agent") return <EntityLink kind="agent" id={item} className={cn(LINK_TARGET, "max-w-full overflow-hidden")} />;
 	const slash = item.indexOf("/");
 	if (kind === "task" && slash > 0) {
 		return (
-			<EntityLink kind="task" id={item.slice(slash + 1)} suite={item.slice(0, slash)} className={LINK_TARGET}>
+			<EntityLink kind="task" id={item.slice(slash + 1)} suite={item.slice(0, slash)} className={cn(LINK_TARGET, "max-w-full overflow-hidden")}>
 				{item}
 			</EntityLink>
 		);

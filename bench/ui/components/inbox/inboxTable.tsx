@@ -24,8 +24,9 @@ export function inboxColumnClass(column: "flagged" | "firstSeen" | "suggested" |
 	// The panel goes beside the table only from 2xl; below that it sits under the table, which keeps its columns.
 	switch (column) {
 		case "flagged":
-		case "task":
 			return compact ? "hidden lg:table-cell 2xl:hidden" : "hidden lg:table-cell";
+		case "task":
+			return compact ? "hidden" : "hidden 2xl:table-cell";
 		default:
 			return compact ? "hidden" : "hidden 2xl:table-cell";
 	}
@@ -127,7 +128,7 @@ export function InboxTable({ items, selectedId, onSelect, compact = false }: Inb
 											)}
 										</div>
 									</TableCell>
-									<TableCell className={cn("max-w-64 whitespace-normal", col("flagged"))} data-testid={`inbox-flagged-${item.id}`}>
+									<TableCell className={cn("max-w-64 min-w-56 whitespace-normal", col("flagged"))} data-testid={`inbox-flagged-${item.id}`}>
 										<ul className="flex flex-col gap-0.5 text-xs">
 											{flagged.slice(0, FLAGGED_SHOWN).map((reason, i) => (
 												<li key={`${i}-${reason}`} className="line-clamp-2 break-words" title={reason}>

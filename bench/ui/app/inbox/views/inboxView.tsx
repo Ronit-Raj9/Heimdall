@@ -10,6 +10,7 @@ import type { InboxItem, InboxListResponse, InboxSourceStatus } from "@/lib/type
 import { Link } from "@tanstack/react-router";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { NativeSelect } from "@/components/ui/select";
 import { useTranslation } from "react-i18next";
 import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
 import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
@@ -73,7 +74,7 @@ export function InboxTab() {
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
 				{data?.mode === "live" && <InboxPullButton check={ready?.inbox} />}
-				<Link to="/maxim" className="text-primary text-sm font-medium underline underline-offset-2" data-testid="inbox-maxim-link">
+				<Link to="/maxim" className="text-primary text-sm font-medium underline-offset-2 hover:underline" data-testid="inbox-maxim-link">
 					{m("showcaseLink")}
 				</Link>
 			</div>
@@ -248,9 +249,6 @@ export function InboxBody({
 					>
 						<div className="flex flex-col gap-4">
 							<div className="flex flex-wrap items-center gap-3" data-testid="inbox-filter-row">
-								<InboxStateFilter counts={data.counts} value={filter} onChange={onFilter} />
-								<SourceFilter names={sourceNames(sources, data.items)} value={source} onChange={onSource} />
-								<SinceFilter value={since} onChange={setSince} />
 								<ToolbarSearch
 									value={q}
 									onChange={(next) => onQ(next || null)}
@@ -258,6 +256,9 @@ export function InboxBody({
 									placeholder={f("inbox.searchPlaceholder")}
 									testId="inbox-search"
 								/>
+								<InboxStateFilter counts={data.counts} value={filter} onChange={onFilter} />
+								<SourceFilter names={sourceNames(sources, data.items)} value={source} onChange={onSource} />
+								<SinceFilter value={since} onChange={setSince} />
 							</div>
 							{openedOnAll && (
 								<p className="text-muted-foreground text-sm" role="note" data-testid="inbox-opened-on-all">
@@ -326,7 +327,7 @@ function RegressionTasksCount({ count, suite }: { count: number; suite: string |
 		<Link
 			to="/suites/$suiteId"
 			params={{ suiteId: suite }}
-			className="text-primary text-sm font-medium underline underline-offset-2"
+			className="text-primary text-sm font-medium underline-offset-2 hover:underline"
 			data-testid="inbox-regression-tasks"
 		>
 			{text}
@@ -343,9 +344,8 @@ function SinceFilter({ value, onChange }: { value: InboxSince; onChange: (next: 
 			<label htmlFor={id} className="text-muted-foreground text-sm">
 				{t("inbox.since")}
 			</label>
-			<select
+			<NativeSelect
 				id={id}
-				className="border-input bg-card dark:bg-input/20 h-8 rounded-md border px-2 text-sm shadow-xs outline-none"
 				value={value}
 				onChange={(e) => onChange(e.target.value as InboxSince)}
 				data-testid="inbox-since-filter"
@@ -355,7 +355,7 @@ function SinceFilter({ value, onChange }: { value: InboxSince; onChange: (next: 
 						{t(`inbox.sinceOptions.${s || "any"}`)}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 		</div>
 	);
 }
@@ -378,9 +378,9 @@ function SourceFilter({
 			<label htmlFor={id} className="text-muted-foreground text-sm">
 				{t("inbox.filters.source")}
 			</label>
-			<select
+			<NativeSelect
 				id={id}
-				className="border-input bg-card dark:bg-input/20 h-8 min-w-40 rounded-md border px-2 text-sm shadow-xs outline-none"
+				className="min-w-40"
 				value={value ?? ""}
 				onChange={(e) => onChange(e.target.value || null)}
 				data-testid="inbox-source-filter"
@@ -391,7 +391,7 @@ function SourceFilter({
 						{name}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 		</div>
 	);
 }

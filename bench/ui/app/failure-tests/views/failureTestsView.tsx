@@ -479,10 +479,11 @@ export default function FailureTestsView() {
 					<div className="flex min-w-0 flex-wrap items-start gap-4">
 						<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
 						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
-						<label className="flex flex-col gap-1.5 text-xs font-medium">
+						<label className="flex w-full flex-col gap-1.5 text-xs font-medium sm:w-auto">
 							{t("ft.version")}
 							<NativeSelect
 								className="min-w-40"
+								wrapperClassName="w-full sm:w-auto"
 								value={form.version}
 								onChange={(e) => setForm((f) => ({ ...f, version: Number(e.target.value) }))}
 								disabled={!form.agent}
@@ -705,7 +706,7 @@ export default function FailureTestsView() {
 					{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
 					<StickyFooter
 						phone="fixed"
-						className="bg-background min-w-0 justify-start gap-x-4 gap-y-2 shadow-sm sm:rounded-lg sm:border"
+						className="bg-background min-w-0 flex-col items-stretch justify-start gap-x-4 gap-y-2 shadow-sm sm:flex-row sm:items-center sm:rounded-lg sm:border"
 						testId="ft-launch-bar"
 					>
 						<FailureTestEstimate
