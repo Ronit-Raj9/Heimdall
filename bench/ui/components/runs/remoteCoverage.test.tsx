@@ -23,7 +23,8 @@ describe("RemoteCoverage", () => {
 		expect(html).toContain("tool ledger");
 		expect(html).toContain("agent&#x27;s word");
 		expect(html).toContain("120 tokens");
-		expect(html).toContain("$0.2500");
+		// Spec 12: one money format (formatUsd), 2 decimals from $0.01.
+		expect(html).toContain("$0.25");
 		expect(html).toContain("3 events");
 		expect(html).toContain('data-testid="remote-unknown-A"');
 	});

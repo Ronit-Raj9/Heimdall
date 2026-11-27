@@ -41,7 +41,8 @@ describe("ForbiddenNote and LoadError on 403", () => {
 		const html = render(<LoadError title="Could not save" error={error} onRetry={() => undefined} testId="save-error" />);
 		expect(html).toContain("reviews are refused in recorded mode");
 		expect(html).not.toContain("Your role cannot do this");
-		expect(html).toContain("save-error-retry");
+		// Spec 5: a retry cannot change a refusal, so no Retry.
+		expect(html).not.toContain("save-error-retry");
 	});
 });
 

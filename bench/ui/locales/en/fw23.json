@@ -17,15 +17,20 @@
 		"label": "Help",
 		"guides": "Guides",
 		"glossary": "Glossary",
-		"quickstart": "Quickstart",
+		"quickstart": "CLI quickstart",
 		"status": "System status"
 	},
 	"titles": {
-		"maxim": "Maxim failures",
 		"docs": "Guides",
-		"jobs": "Jobs",
-		"job": "Job",
-		"monitors": "Safety monitors"
+		"jobs": "Background jobs",
+		"job": "Background job",
+		"monitors": "Safety rule tests",
+		"gateway": "Gateway report card",
+		"validity": "Changed results",
+		"replays": "Replay on a new model",
+		"inbox": "Production failures",
+		"evaluate": "Evaluate an agent",
+		"quickstart": "CLI quickstart"
 	},
 	"webhooks": {
 		"httpsOnly": "Only https addresses are allowed on this server."

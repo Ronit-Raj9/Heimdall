@@ -36,7 +36,16 @@ export function entityTarget(kind: EntityKind, id: string, opts: { suite?: strin
 		case "suite":
 			return { to: "/suites/$suiteId", params: { suiteId: suiteIdOf(id) } };
 		case "task":
-			return opts.suite ? { to: "/suites/$suiteId", params: { suiteId: opts.suite }, search: { tab: "tasks", task: id } } : null;
+			if (!opts.suite) return null;
+			// A versioned ref ("coding-core@1.0.0") opens the suite by its id; the version rides along as rev.
+			{
+				const rev = suiteVersionOf(opts.suite);
+				return {
+					to: "/suites/$suiteId",
+					params: { suiteId: suiteIdOf(opts.suite) },
+					search: rev ? { tab: "tasks", task: id, rev } : { tab: "tasks", task: id },
+				};
+			}
 		case "agent":
 			return { to: "/agents", search: { agent: id } };
 	}
@@ -106,7 +115,7 @@ export function EntityLink({ kind, id, suite, children, short, className, testId
 			className={cn(
 				mono && "font-mono text-[0.92em]",
 				"text-foreground decoration-primary/40 hover:text-primary rounded-sm underline decoration-dotted underline-offset-[3px] transition-colors hover:decoration-solid",
-				"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
+				"focus-visible:ring-(--focus) focus-visible:ring-2 focus-visible:outline-none",
 				className,
 			)}
 			data-testid={testId}

@@ -29,7 +29,7 @@ describe("not-found page (N129, N73)", () => {
 		expect(html).toContain("Page not found");
 		expect(html).not.toContain('data-testid="navigate"');
 		expect(tagOf(html, "not-found-suggest-live")).toContain('href="/live"');
-		expect(html).toContain("Live sessions");
+		expect(html).toContain("Live scoring");
 	});
 
 	it("suggests nothing when no word matches", () => {

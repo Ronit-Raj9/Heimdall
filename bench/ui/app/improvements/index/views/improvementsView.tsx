@@ -26,7 +26,6 @@ export default function ImprovementsView() {
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
-				icon={TrendingUp}
 				actions={
 					admin ? (
 						<Button size="sm" onClick={() => setCreating(true)} data-testid="improvements-new">
@@ -65,6 +64,7 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 				message={admin ? t("empty.messageAdmin") : t("empty.message")}
 				testId="improvements-empty"
 			>
+				<ImprovementExample />
 				<ImprovementCli testId="improvements-cli" />
 			</FeatureHero>
 		);
@@ -127,5 +127,20 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 				</tbody>
 			</table>
 		</div>
+	);
+}
+/**
+ * A static, clearly labelled example of what an improvement run produces (X-23), so a new user
+ * sees the result before spending model calls. The numbers are made up and say so.
+ */
+export function ImprovementExample() {
+	const { t } = useTranslation("ufs1");
+	return (
+		<figure className="bg-muted/50 flex w-full max-w-md flex-col gap-1.5 rounded-lg border border-dashed p-3 text-left text-sm" data-testid="improvements-example">
+			<figcaption className="text-muted-foreground text-xs font-semibold">{t("improveExample.title")}</figcaption>
+			<p className="tabular-nums">{t("improveExample.rounds")}</p>
+			<p className="text-success-ink">{t("improveExample.kept")}</p>
+			<p className="text-muted-foreground">{t("improveExample.rejected")}</p>
+		</figure>
 	);
 }

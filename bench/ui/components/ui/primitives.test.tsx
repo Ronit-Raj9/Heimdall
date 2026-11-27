@@ -6,7 +6,7 @@ import { Badge } from "./badge";
 import { Card } from "./card";
 import { CategoryIcon, categoryStyle, normalizeCategory } from "./categoryIcon";
 import { DetailsDisclosure } from "./detailsDisclosure";
-import { EmptyState } from "./emptyState";
+import { EmptyState } from "@/components/shell/emptyState";
 import { KeyValueList } from "./keyValueList";
 import { PageHeader, Section } from "./section";
 import { StatCard } from "./statCard";
@@ -87,7 +87,7 @@ describe("layout primitives", () => {
 		expect(html).toContain("Details");
 	});
 	it("EmptyState and KeyValueList render content", () => {
-		expect(renderToStaticMarkup(<EmptyState title="No runs yet" description="Start one." />)).toContain("No runs yet");
+		expect(renderToStaticMarkup(<EmptyState title="No runs yet" body="Start one." />)).toContain("No runs yet");
 		const kv = renderToStaticMarkup(<KeyValueList items={[{ label: "Digest", value: "sha256:abc", mono: true }]} />);
 		expect(kv).toContain("<dt");
 		expect(kv).toContain("font-mono");

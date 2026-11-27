@@ -164,7 +164,7 @@ describe("MatrixReport", () => {
 		expect(html.indexOf("matrix-not-separable")).toBeLessThan(html.indexOf('data-testid="matrix-table"'));
 		expect(html).toContain('data-testid="matrix-synthetic"');
 		expect(html).toContain('data-testid="matrix-grid"');
-		expect(textOf(html, "matrix-facts")).toBe("coding-core@1.0.0, common tasks 4, alpha 0.05");
+		expect(textOf(html, "matrix-facts")).toBe("coding-core@1.0.0, 4 shared tasks, a difference counts below a luck chance of 0.05");
 		expect(textOf(html, "matrix-grade-source")).toBe("Grades: original");
 		expect(html).toContain('data-testid="matrix-condition"');
 		expect(html).toContain("Left out: infra_error (1 runs)");
