@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetAgentVersionsQuery, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/evaluateI18n";
@@ -123,8 +124,9 @@ export function Step2Learn() {
 			{draft.mode === "opponent" && (
 				<label className="flex flex-col gap-1.5 text-sm">
 					<span className="font-medium">{t("learn.opponent")}</span>
-					<select
-						className="border-input bg-background h-9 w-56 rounded-lg border px-2 text-sm"
+					<NativeSelect
+						wrapperClassName="w-56"
+				className="w-full"
 						value={draft.opponent ?? ""}
 						onChange={(e) => update({ opponent: e.target.value || null })}
 						data-testid="evaluate-opponent"
@@ -136,7 +138,7 @@ export function Step2Learn() {
 							</option>
 						))}
 						{draft.agent !== BARE_MODEL_AGENT && <option value={BARE_MODEL_AGENT}>{t("learn.bareModel")}</option>}
-					</select>
+					</NativeSelect>
 					{draft.opponent === BARE_MODEL_AGENT && (
 						<span className="text-muted-foreground max-w-xl text-xs" data-testid="evaluate-bare-model-help">
 							{t("learn.bareModelHelp")}

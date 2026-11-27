@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ShowTestsChip } from "@/components/ui/toolbar";
 import { OptionList, type OptionItem } from "@/components/ui/optionList";
@@ -58,8 +59,9 @@ export function VersionPicker({
 	return (
 		<label className="flex flex-col gap-1.5 text-sm">
 			<span className="font-medium">{label ?? t("agent.version")}</span>
-			<select
-				className="border-input bg-background h-9 w-56 rounded-lg border px-2 text-sm"
+			<NativeSelect
+				wrapperClassName="w-56"
+				className="w-full"
 				value={value == null ? "" : String(value)}
 				onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
 				data-testid={testId ?? "evaluate-version"}
@@ -72,7 +74,7 @@ export function VersionPicker({
 						{disabledVersion === v.version ? disabledSuffix : ""}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 			{!q.isLoading && versions.length === 0 && <span className="text-muted-foreground text-xs">{t("agent.noVersions")}</span>}
 			{countHint && versions.length >= 2 && latest !== undefined && (
 				<span className="text-muted-foreground text-xs" data-testid="evaluate-versions-hint">

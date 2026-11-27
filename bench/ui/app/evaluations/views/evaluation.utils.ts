@@ -195,9 +195,11 @@ function bestResult(evaluation: Evaluation): number | null {
 
 /** Spend: the stored result's cost, else the sum of the benchmarks' spend so far, else null. */
 export function evaluationSpend(evaluation: Evaluation): number | null {
+	// Same order as evaluationTotals on the evaluation page: what the benchmarks spent (every run, normal and
+	// with faults) first, then the stored result. The list and the page then show one cost (N3-1).
+	if ((evaluation.children ?? []).some((c) => typeof c.spent_usd === "number")) return spentOf(evaluation);
 	if (typeof evaluation.result?.cost_usd === "number") return evaluation.result.cost_usd;
-	const spent = spentOf(evaluation);
-	return spent > 0 ? spent : null;
+	return null;
 }
 
 type RunsKey = "detail.runs" | "detail.runsWithFailed" | "detail.runsRunning";
