@@ -73,7 +73,10 @@
 			"worker.offline": "A worker went offline",
 			"experiment.finished": "A comparison finished",
 			"job.failed": "A background job failed",
-			"monitor.incident": "A live monitor opened or resolved an incident"
+			"monitor.incident": "A live monitor opened or resolved an incident",
+			"improvement.finished": "An improvement run ended",
+			"improvement.paused": "An improvement run is waiting for approval",
+			"result.changed": "A result changed after a re-score"
 		},
 		"add": "Add web address",
 		"adding": "Adding...",

@@ -68,13 +68,24 @@ const EVENTS: WebhookEventType[] = [
 	"experiment.finished",
 	"job.failed",
 	"monitor.incident",
+	"improvement.finished",
+	"improvement.paused",
+	"result.changed",
 ];
 const HOOK_FORMATS: WebhookFormat[] = ["slack", "teams", "pagerduty", "json"];
 
 /** Events a hook of format f can take (webhooks/format.go EventsFor): PagerDuty pages only on problems. */
 export function eventsFor(f: WebhookFormat): WebhookEventType[] {
 	if (f === "pagerduty")
-		return ["evaluation.regressed", "release.blocked", "schedule.failed", "worker.offline", "job.failed", "monitor.incident"];
+		return [
+			"evaluation.regressed",
+			"release.blocked",
+			"schedule.failed",
+			"worker.offline",
+			"job.failed",
+			"monitor.incident",
+			"improvement.paused",
+		];
 	return EVENTS;
 }
 
