@@ -18,7 +18,7 @@ describe("ContinueDialogBody", () => {
 		const html = render(<ContinueDialogBody offer={offer} onConfirm={() => undefined} onCancel={() => undefined} />);
 		expect(html).toContain("To confirm a 5 point gain: about 30 more held-out tasks.");
 		expect(html).toContain(
-			"Continue this run? It spends up to $6.40 more on 96 runs. The result is tested again with a reserved part of the error budget.",
+			"Continue? Spends up to $6.40 more on 96 runs. Retested with reserved error budget.",
 		);
 		expect(html).toContain('data-testid="continue-confirm"');
 		expect(html).toContain('data-testid="continue-cancel"');
@@ -26,7 +26,7 @@ describe("ContinueDialogBody", () => {
 
 	it("disables Continue while the offer loads", () => {
 		const html = render(<ContinueDialogBody loading onConfirm={() => undefined} onCancel={() => undefined} />);
-		expect(html).toContain("Working out what a second look costs");
+		expect(html).toContain("Estimating cost...");
 		expect(html).toMatch(
 			/<button[^>]*disabled=""[^>]*data-testid="continue-confirm"|<button[^>]*data-testid="continue-confirm"[^>]*disabled=""/,
 		);

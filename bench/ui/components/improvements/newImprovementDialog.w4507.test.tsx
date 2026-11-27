@@ -28,7 +28,7 @@ const submitDisabled =
 describe("NewImprovementForm (wave 4)", () => {
 	it("offers standing instructions first and ticked, and never the old no-files dead end", () => {
 		const html = render(<NewImprovementForm {...props} form={filled} agentFiles={[]} estimate={ESTIMATE_FIXTURE} />);
-		expect(html).toContain("Standing instructions (added before every task)");
+		expect(html).toContain("Standing instructions");
 		expect(html).toMatch(/<input(?=[^>]*checked="")[^>]*data-testid="new-improvement-instructions"/);
 		expect(html).not.toContain("This agent has no files Heimdall can change");
 		expect(html).toContain("Kept fixed: model, tools, settings, budgets.");
@@ -46,7 +46,7 @@ describe("NewImprovementForm (wave 4)", () => {
 			/>,
 		);
 		expect(html.indexOf("Standing instructions")).toBeLessThan(html.indexOf("/home/agent/NOTES.md"));
-		expect(html).toContain("(folder: the improver may add skills here)");
+		expect(html).toContain("Improver may add skills here.");
 	});
 
 	it("disables Create with the estimate's refusal as its reason", () => {

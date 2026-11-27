@@ -132,7 +132,7 @@ describe("EmptyClusters", () => {
 	it("says why: no runs, no failures, or every cluster below the minimum", () => {
 		expect(render({ ...base, runs: 0, failures: 0, excluded: [] })).toContain("No checked runs match these filters.");
 		expect(render({ ...base, runs: 5, failures: 0, excluded: [] })).toContain("all 5 checked runs shown passed.");
-		expect(render({ ...base, hidden: 3, excluded: [] })).toContain("Every cluster is below the minimum count.");
+		expect(render({ ...base, hidden: 3, excluded: [] })).toContain("Every group is below the minimum.");
 	});
 
 	it("offers synthetic runs only when they were left out", () => {

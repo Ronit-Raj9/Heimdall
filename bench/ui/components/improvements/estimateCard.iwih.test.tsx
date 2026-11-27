@@ -21,7 +21,7 @@ const base: ImprovementEstimate = {
 describe("EstimateCard study limit", () => {
 	it("shows the study's total and each loop's share", () => {
 		const html = render(<EstimateCard estimate={{ ...base, loops: 3, usd: { ...base.usd, loop_limit: 10 } }} model="m" />);
-		expect(html).toContain("Total for 3 loops: at most $30.00 ($10.00 for each loop)");
+		expect(html).toContain("3 loops: up to $30.00 ($10.00 each)");
 	});
 
 	it("shows no study line for one run", () => {

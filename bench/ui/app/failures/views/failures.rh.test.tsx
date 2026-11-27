@@ -31,7 +31,7 @@ describe("Failures round 2 (lane RH)", () => {
 
 	it("Q-279: Find out why names the cap the dialog starts with", () => {
 		expect(i18n.t("investigations.findOutPaid", { ns: "w443", cap: formatUsd(INVESTIGATION_START_CAP_USD) })).toBe(
-			"Find out why (paid, up to $1.00 by default)",
+			"Find out why, up to $1.00",
 		);
 		// The dialog starts from the same constant the button names (findingPlans), so the two cannot drift.
 		expect(src("components/findings/investigateDialog.tsx")).toContain("useState(String(INVESTIGATION_START_CAP_USD))");

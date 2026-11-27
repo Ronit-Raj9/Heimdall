@@ -100,7 +100,7 @@ describe("review screen with a model draft (wave 4, trace to environment)", () =
 		expect(html).toContain("The refund call failed.");
 		// The rubric and the forbidden call have no reason left: the person checks them.
 		expect(html).toContain('data-testid="proposal-noquote-reply_rubric"');
-		expect(html).toContain("No quote found for this; check it yourself.");
+		expect(html).toContain("No quote found. Check it yourself.");
 		expect(html).toContain("2 suggestions had no quote found in the session and were left out.");
 	});
 
@@ -151,6 +151,6 @@ describe("review screen with a model draft (wave 4, trace to environment)", () =
 		expect(html).toContain("Import a session file");
 		expect(html).toContain("up to 32 MB");
 		expect(html).toContain('accept=".jsonl"');
-		expect(html).toContain("The file is cleaned of keys, emails and home folder names before it is kept.");
+		expect(html).toContain("Keys, emails and home folder names are removed");
 	});
 });

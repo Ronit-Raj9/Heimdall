@@ -90,7 +90,7 @@ describe("InboxDraftResult", () => {
 	it("says plainly that the draft still needs a person, with the files and next steps", () => {
 		const html = renderToStaticMarkup(<InboxDraftResult draft={INBOX_ACCEPT_FIXTURE.draft} />);
 		expect(html).toContain("Draft task support/refund-timeout created");
-		expect(html).toContain("This is a draft, not a finished test.");
+		expect(html).toContain("Draft only.");
 		expect(html).toContain("EDIT ME");
 		expect(html).toContain("instruction.md");
 		expect(html).toContain("verifier/tests/checks.py");
@@ -125,6 +125,6 @@ describe("sources and empty state", () => {
 	});
 
 	it("notes when push ingest is off", () => {
-		expect(renderToStaticMarkup(<InboxIngestOffNote />)).toContain("does not accept failures sent in");
+		expect(renderToStaticMarkup(<InboxIngestOffNote />)).toContain("does not accept pushed failures");
 	});
 });

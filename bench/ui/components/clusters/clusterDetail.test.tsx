@@ -77,7 +77,7 @@ describe("ClusterDetailPanel", () => {
 	it("shows the config change notice and related clusters that open in the panel", () => {
 		const out = render({ ...CLUSTER_DETAIL_FIXTURE, cluster: limiter });
 		expect(out).toContain('data-testid="cluster-after-change"');
-		expect(out).toContain("claude-code-sonnet changed settings from aaaaaaaa…1111 to cccccccc…3333");
+		expect(out).toContain("claude-code-sonnet changed from aaaaaaaa…1111 to cccccccc…3333");
 		expect(out).toMatch(/<button[^>]*data-testid="cluster-related-c_1122334455667788"/);
 		expect(out).toContain("3 runs");
 		expect(out).toContain("same task t03");

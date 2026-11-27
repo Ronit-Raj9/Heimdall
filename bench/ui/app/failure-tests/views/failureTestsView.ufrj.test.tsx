@@ -27,7 +27,7 @@ describe("failure test cap note (Q-295)", () => {
 		const html = render(
 			<FailureTestEstimate problem={null} estimate={{ data: est(0.12, 15) }} pending={false} budgetTyped={false} capUsd={5} />,
 		);
-		expect(html).toContain("The run stops at the $5.00 budget; the full run may need up to $15.");
+		expect(html).toContain("Stops at the $5.00 budget. The full run may need up to $15.");
 	});
 });
 

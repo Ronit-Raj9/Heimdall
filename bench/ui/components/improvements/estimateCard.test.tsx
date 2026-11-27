@@ -8,8 +8,8 @@ import { ESTIMATE_FIXTURE } from "./improve.fixtures";
 describe("EstimateCard", () => {
 	it("shows the splits, the smallest gain, the cost and the improver line, warnings in amber", () => {
 		const html = render(<EstimateCard estimate={ESTIMATE_FIXTURE} model="gpt-5-mini" />);
-		expect(html).toContain("60 tasks: 24 to practise on, 18 to decide, 18 kept hidden until the end.");
-		expect(html).toContain("Smallest gain this run can confirm: about 24 points.");
+		expect(html).toContain("60 tasks: 24 practice, 18 check, 18 hidden.");
+		expect(html).toContain("Smallest confirmable gain: about 24 points.");
 		expect(html).toContain("Estimated cost: $15.80 to $33.90, about 80 to 160 minutes. Hard stop at $45.00.");
 		expect(html).toContain("Improver: Heimdall on gpt-5-mini.");
 		expect(html).toContain('data-testid="estimate-warning"');
@@ -41,12 +41,12 @@ describe("EstimateCard", () => {
 			detectable: { gate_points: 0, held_out_points: 0 },
 		};
 		const html = render(<EstimateCard estimate={tiny} model="m" />);
-		expect(html).toContain("Smallest gain this run can confirm: not enough tasks to estimate.");
+		expect(html).toContain("Smallest confirmable gain: too few tasks.");
 		expect(html).not.toContain("about 0 points");
 	});
 
 	it("says when the estimate is loading or not available", () => {
-		expect(render(<EstimateCard loading model="m" />)).toContain("Estimating the cost");
+		expect(render(<EstimateCard loading model="m" />)).toContain("Estimating...");
 		expect(render(<EstimateCard error="This server cannot estimate." model="m" />)).toContain(
 			"The estimate is not available: This server cannot estimate.",
 		);
