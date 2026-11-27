@@ -142,15 +142,15 @@
 		}
 	},
 	"sectionHints": {
-		"guards": "Limits B must stay within, even when better.",
+		"guards": "",
 		"gates": "A check that fires fails the run.",
 		"diagnostics": "",
 		"meters": "",
 		"statistics": "",
 		"changes": "",
 		"policy": "",
-		"tasks": "Click a cell to compare the two runs.",
-		"guardsMany": "Limits each new setup must stay within.",
+		"tasks": "",
+		"guardsMany": "",
 		"diagnosticsMany": ""
 	},
 	"exportTab": {

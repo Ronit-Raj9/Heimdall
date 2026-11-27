@@ -24,7 +24,7 @@
 		"title": "Every setup",
 		"setup": "Setup",
 		"solved": "Solved",
-		"pVsLeader": "p vs leader",
+		"pVsLeader": "Chance vs leader",
 		"pHint": "Chance the gap to the leader is luck. Lower is stronger.",
 		"group": "Group",
 		"top": "Top group",

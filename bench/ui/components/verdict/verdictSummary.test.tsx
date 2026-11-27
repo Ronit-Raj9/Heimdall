@@ -50,7 +50,7 @@ describe("VerdictSummary", () => {
 		);
 		expect(few).toContain(`data-testid="verdict-summary-too-few-${arms[0]}"`);
 		expect(few).toContain("Too few runs to rate");
-		expect(few).toContain("9 runs; at least 10 are needed to rate");
+		expect(few).toContain('title="9 runs; at least 10 are needed to rate"');
 		const enough = renderToStaticMarkup(
 			<VerdictSummary
 				verdict={verdictWith({ decision: "inconclusive", action: "no_decision" })}

@@ -47,7 +47,7 @@
 			"score": "Score saved. One setup, no release decision.",
 			"improved": "B is better than A.",
 			"regressed": "B is worse than A.",
-			"inconclusive": "No clear difference between A and B yet.",
+			"inconclusive": "No clear difference between setups yet.",
 			"invalid": "Broken test, no verdict."
 		},
 		"action": {

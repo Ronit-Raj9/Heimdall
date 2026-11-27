@@ -593,7 +593,7 @@
 			},
 			"mde": {
 				"name": "minimal detectable effect",
-				"definition": "MDE in pp = (t(0.975, n-1) + t(0.8, n-1)) x SD_d / sqrt(n). 80% power, alpha 0.05.",
+				"definition": "MDE in pp = (t(0.975, n-1) + t(0.8, n-1)) x SD_d / sqrt(n). 80% power, 5% false alarm rate (alpha 0.05).",
 				"denominator": "Denominator: sqrt(n) over n tasks. SD_d assumed 0.30 until an A/A run."
 			},
 			"costPerSuccess": {
@@ -1637,7 +1637,7 @@
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
-		"facts": "{{suite}}, {{tasks}} shared tasks, alpha {{alpha}}",
+		"facts": "{{suite}}, {{tasks}} shared tasks, false alarm rate {{alpha}}",
 		"notSeparable": "Cannot separate",
 		"synthetic": "Synthetic data. These numbers are not findings.",
 		"openVerdict": "Open verdict",
@@ -1874,6 +1874,7 @@
 				"conditionProbe": "{{layer}} failure test",
 				"conditionProbeUnresolved": "failure test (layer unknown)",
 				"tasksAll": "All {{count}} tasks",
+				"tasksAll_zero": "All tasks",
 				"tasksChosen": "Chosen tasks",
 				"trials": "Trials",
 				"seed": "Random seed",
@@ -3707,7 +3708,7 @@
 		"loadError": "Could not load the migration report",
 		"unknown": "unknown",
 		"synthetic": "Synthetic comparison. The numbers are not findings.",
-		"facts": "Benchmark {{suite}}. Old model {{from}} (setup {{arm}}). Overall verdicts on {{condition}}, alpha {{alpha}}.",
+		"facts": "Benchmark {{suite}}. Old model {{from}} (setup {{arm}}). Overall verdicts on {{condition}}, false alarm rate {{alpha}}.",
 		"policy": "Release policy: {{name}}.",
 		"noPolicy": "No release policy evaluated.",
 		"action": {
@@ -3728,7 +3729,7 @@
 			"wall": "Median wall s",
 			"steps": "Median steps",
 			"latency": "Latency per turn",
-			"pareto": "Pareto position",
+			"pareto": "Cost vs score",
 			"costPerRunMean": "Average cost per run"
 		},
 		"overall": "Overall:",
@@ -3819,21 +3820,21 @@
 			"legend": "Parts sum to the total. Hatched bar: unknown range.",
 			"lead": "",
 			"noMeasuring": "No judge or user simulator, no measuring costs.",
-			"shapley": "Exact Shapley split over every order of changes."
+			"shapley": "Split fairly over every order of changes."
 		},
 		"pareto": {
 			"title": "Cost against verified success",
 			"loadError": "Could not load the cost against success plane",
 			"summary_one": "Cost against verified success: {{placed}} of {{count}} config placed; x is {{axis}}.",
 			"summary_other": "Cost against verified success: {{placed}} of {{count}} configs placed; x is {{axis}}.",
-			"frontierList": "On the frontier: {{list}}.",
+			"frontierList": "Best for their cost: {{list}}.",
 			"noFrontier": "No config could be placed.",
-			"legendFrontier": "Filled, joined: on the frontier",
-			"legendDominated": "Hollow, grey: dominated",
+			"legendFrontier": "Filled, joined: best for their cost",
+			"legendDominated": "Hollow, grey: beaten on cost and score",
 			"legendInterval": "Bar: 95% success interval",
 			"notPlaced": "not placed: {{reason}}",
-			"onFrontier": "on the frontier at {{x}}, {{y}}",
-			"dominated": "at {{x}}, {{y}}, dominated by {{by}}"
+			"onFrontier": "best for its cost at {{x}}, {{y}}",
+			"dominated": "at {{x}}, {{y}}, beaten by {{by}}"
 		},
 		"switchLead": ""
 	},
