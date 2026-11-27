@@ -41,7 +41,7 @@ describe("LeaderboardTable", () => {
 
 	it("puts the tier reason and the Holm-adjusted p in the tier badge's accessible name", () => {
 		const html = render();
-		expect(row(html, 4)).toContain('aria-label="Behind: p 0.012 on 8 common tasks. Holm-adjusted p vs leader: 0.012."');
+		expect(row(html, 4)).toContain('aria-label="Behind: p 0.012 on 8 common tasks. Chance the gap to the leader is luck: 0.012."');
 		expect(row(html, 1)).toContain("Leader: every other entry is compared with this one.");
 	});
 
