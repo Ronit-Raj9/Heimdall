@@ -1,0 +1,13 @@
+{
+	"deleted": "{{name}} deleted.",
+	"undo": "Undo",
+	"stopped": "{{name}} stopped. Nothing more is charged.",
+	"started": "{{name}} started.",
+	"saved": "{{name}} saved.",
+	"revoked": "Link turned off.",
+	"copied": "Copied.",
+	"finished": "{{name}} finished.",
+	"viewResults": "View results",
+	"close": "Close notice",
+	"region": "Notices"
+}

@@ -1,8 +1,9 @@
-import { activeNavItem } from "@/lib/constants/navigation";
+import { OverflowMenu, type OverflowMenuItem } from "@/components/agents/overflowMenu";
+import { activeNavItem, BENCH_NAV } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
-import { isValidElement, type ComponentType, type ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmbedded } from "./embedded";
 
@@ -23,8 +24,20 @@ export interface PageHeaderProps {
 	actions?: ReactNode;
 	/** Badges beside the title (data mode, grading). */
 	meta?: ReactNode;
+	/**
+	 * Secondary actions (and Delete, always) in a "More" menu after the actions (Spec 3). Keep the
+	 * primary action and Share in `actions`; with more than three actions move the rest here.
+	 */
+	more?: OverflowMenuItem[];
+	/** Label of the More button; defaults to "More actions". */
+	moreLabel?: string;
+	/** The page's RouteTabs: rendered right under the title row, so the h1 is always above the tabs. */
+	tabs?: ReactNode;
 	breadcrumbs?: Crumb[];
-	/** Optional small muted icon before the title: a lucide component or a rendered node. */
+	/**
+	 * @deprecated No icon is drawn before the title (X-20): the sidebar already shows it. Kept so
+	 * callers compile; page lanes drop it.
+	 */
 	icon?: ComponentType<{ className?: string }> | ReactNode;
 	className?: string;
 	testId?: string;
@@ -47,9 +60,21 @@ function useSectionPath(): string | null {
  */
 export function pageCrumbs(crumbs: readonly Crumb[] | undefined, sectionPath: string | null): Crumb[] {
 	if (!crumbs || crumbs.length === 0) return [];
-	const [first, ...rest] = crumbs;
+	let list = [...crumbs];
+	// Home is never a parent worth a crumb: the top bar and the sidebar already lead there.
+	if (list[0].to === "/") list = list.slice(1);
+	if (list.length === 0) return [];
+	const [first, ...rest] = list;
 	if (sectionPath && first.to === sectionPath && rest.length > 0) return rest.length > 1 ? rest : [];
-	return [...crumbs];
+	// Only the current page left: no trail.
+	if (list.length === 1 && !list[0].to) return [];
+	return list;
+}
+
+/** The sidebar label key of a crumb that points at a sidebar entry, so crumbs and sidebar use one word. */
+export function crumbNavLabelKey(crumb: Crumb): string | null {
+	if (!crumb.to) return null;
+	return BENCH_NAV.find((item) => item.to === crumb.to)?.labelKey ?? null;
 }
 
 /**
@@ -57,9 +82,8 @@ export function pageCrumbs(crumbs: readonly Crumb[] | undefined, sectionPath: st
  * subtitle and the page's actions. Pages use it instead of their own h1 block so every page
  * starts the same way.
  */
-export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, className, testId }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, meta, more, moreLabel, tabs, breadcrumbs, className, testId }: PageHeaderProps) {
 	const { t } = useTranslation("bench");
-	const iconNode = renderIcon(icon);
 	// Inside another page's tab the title is a section heading, not the page's h1.
 	const Heading = useEmbedded() ? "h2" : "h1";
 	const trail = pageCrumbs(breadcrumbs, useSectionPath());
@@ -80,12 +104,12 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 												to={crumb.to as never}
 												params={crumb.params as never}
 												search={crumb.search as never}
-												className="hover:text-foreground focus-visible:ring-ring/60 rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+												className="hover:text-foreground rounded-sm transition-colors focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none"
 											>
-												{crumb.label}
+												{crumbNavLabelKey(crumb) ? t(crumbNavLabelKey(crumb) as never) : crumb.label}
 											</Link>
 										) : (
-											<span aria-current={last ? "page" : undefined} className={cn(last && "text-foreground/80")}>
+											<span aria-current={last ? "page" : undefined} className={cn(last && "text-foreground")}>
 												{crumb.label}
 											</span>
 										)}
@@ -96,36 +120,30 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 					</ol>
 				</nav>
 			)}
-			<div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-3">
-				{iconNode && (
-					<span aria-hidden="true" className="text-muted-foreground mt-1.5 flex shrink-0 items-center" data-testid="page-header-icon">
-						{iconNode}
-					</span>
-				)}
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
+			{/* The title never breaks inside a word; below md the actions take their own row under it. */}
+			<div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2">
+				<div className="flex min-w-0 basis-full flex-col gap-1 md:min-w-[18rem] md:flex-1 md:basis-0">
 					<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
 						<Heading
-							className={cn("text-foreground min-w-0 font-semibold tracking-tight break-words", Heading === "h1" ? "text-2xl" : "text-xl")}
+							className={cn(
+								"text-foreground min-w-0 font-semibold tracking-tight text-balance hyphens-none [overflow-wrap:normal]",
+								Heading === "h1" ? "text-[22px] leading-7" : "text-xl",
+							)}
 						>
 							{title}
 						</Heading>
 						{meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
 					</div>
-					{subtitle && <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{subtitle}</p>}
+					{subtitle && <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed text-pretty">{subtitle}</p>}
 				</div>
-				{actions && <div className="flex flex-wrap items-center gap-2 sm:ml-auto">{actions}</div>}
+				{(actions || (more && more.length > 0)) && (
+					<div className="flex w-full flex-wrap items-center gap-2 md:ml-auto md:w-auto" data-testid="page-header-actions">
+						{actions}
+						{more && more.length > 0 && <OverflowMenu label={moreLabel ?? t("shell.moreActions")} items={more} testId="page-header-more" />}
+					</div>
+				)}
 			</div>
+			{tabs && <div className="mt-1 min-w-0">{tabs}</div>}
 		</header>
 	);
-}
-
-function renderIcon(icon: PageHeaderProps["icon"]): ReactNode {
-	if (icon === undefined || icon === null || icon === false) return null;
-	if (isValidElement(icon)) return icon;
-	// A component: lucide icons are forwardRef objects, plain icons are functions.
-	if (typeof icon === "function" || (typeof icon === "object" && "$$typeof" in (icon as object))) {
-		const Icon = icon as ComponentType<{ className?: string }>;
-		return <Icon className="size-4" />;
-	}
-	return icon as ReactNode;
 }
