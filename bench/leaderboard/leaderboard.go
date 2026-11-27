@@ -167,15 +167,16 @@ func (q Query) Normalize() (Query, error) {
 // latest each experiment's runs are read from its newest regrade
 // (readGradeSource) before they are graded or excluded.
 func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, error) {
+	return NewSession(src).Build(ctx, q)
+}
+
+// build is Build over the records and synthetic classes a Session read.
+func build(ctx context.Context, src Source, q Query, sess *Session) (*schemas.Leaderboard, error) {
 	q, err := q.Normalize()
 	if err != nil {
 		return nil, err
 	}
-	recs, err := collect(ctx, src)
-	if err != nil {
-		return nil, err
-	}
-	synthetic, err := classify(ctx, src, recs)
+	recs, synthetic, err := sess.records(ctx)
 	if err != nil {
 		return nil, err
 	}

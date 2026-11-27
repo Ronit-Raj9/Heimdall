@@ -295,7 +295,7 @@ func (sc *scope) add(src Source, q Query, since time.Time, m *schemas.Manifest, 
 		return false, nil
 	}
 	in := Input{Run: r}
-	ledger, err := readEvidence(src, r.Run.RunID, FileLedger)
+	ledger, err := runEvidence(src, r, FileLedger)
 	if err != nil {
 		return false, err
 	}
@@ -337,20 +337,19 @@ func (sc *scope) exclusions() []Exclusion {
 
 // readInput reads the events, tool ledger and stderr of a run into in.
 func readInput(src Source, in *Input) error {
-	id := in.Run.Run.RunID
-	events, err := readEvidence(src, id, FileEvents)
+	events, err := runEvidence(src, in.Run, FileEvents)
 	if err != nil {
 		return err
 	}
 	in.Events = parseJSONL[schemas.Event](events)
 	sortEvents(in.Events)
-	tools, err := readEvidence(src, id, FileTools)
+	tools, err := runEvidence(src, in.Run, FileTools)
 	if err != nil {
 		return err
 	}
 	in.Tools = parseJSONL[schemas.ToolCall](tools)
 	slices.SortStableFunc(in.Tools, func(x, y schemas.ToolCall) int { return cmp.Compare(x.Seq, y.Seq) })
-	stderr, err := readEvidence(src, id, FileStderr)
+	stderr, err := runEvidence(src, in.Run, FileStderr)
 	if err != nil {
 		return err
 	}
