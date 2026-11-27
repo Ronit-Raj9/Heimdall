@@ -1,3 +1,4 @@
+import "./ufrkI18n";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,7 +190,7 @@ export type AuditGroup = keyof typeof AUDIT_GROUPS;
 
 /** True for an entry that only read something (its action ends in ".read" or ".list"). */
 export function isReadAction(action: string): boolean {
-	return /\.(read|list|view|export)$/.test(action);
+	return /\.(read|list|view|export|estimate)$/.test(action);
 }
 
 /** The group of an action id, or undefined when it is in none. */
@@ -236,10 +237,19 @@ export function auditSentence(t: AuditT, row: AuditEntry, actor: string): string
 	const what = parts.slice(0, -1).join(" ").replace(/_/g, " ");
 	const target = row.target_id || "";
 	const vars = { actor, what, target } as unknown as { defaultValue?: string };
-	const text = (VERBS as readonly string[]).includes(verb)
-		? t(`audit.verbs.${verb}${target ? "" : "NoTarget"}`, { ns: "uf8a", ...vars })
-		: t("audit.verbs.other", { ns: "uf8a", ...vars, action: row.action } as unknown as { defaultValue?: string });
+	// Q-52: a cost check is a read with its own verb; an action the page does not know reads as words, the id stays a tooltip.
+	const text =
+		verb === "estimate"
+			? t(`audit.estimate${target ? "" : "NoTarget"}`, { ns: "ufrk", ...vars })
+			: (VERBS as readonly string[]).includes(verb)
+				? t(`audit.verbs.${verb}${target ? "" : "NoTarget"}`, { ns: "uf8a", ...vars })
+				: t("audit.other", { ns: "ufrk", ...vars, label: actionWords(row.action) } as unknown as { defaultValue?: string });
 	return text.replace(/\s+/g, " ").trim();
+}
+
+/** An action id in plain words: "runner_tokens.rotate" is "runner tokens rotate". Pure, exported for tests. */
+export function actionWords(action: string): string {
+	return action.replace(/[._]+/g, " ").trim();
 }
 
 /** Older than a day: the absolute time reads better than "3 weeks ago". */
@@ -428,7 +438,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 								</span>
 								<div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
 									<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-										<span className="text-foreground min-w-0 break-words" title={row.actor_id}>
+										<span className="text-foreground min-w-0 break-words" title={`${row.action} · ${row.actor_id}`}>
 											{auditSentence(tx, row, who)}
 										</span>
 										<span className="text-muted-foreground ml-auto text-xs">

@@ -9,6 +9,8 @@ import { SettingsSection } from "./settingsBits";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import i18n from "@/lib/i18n";
 import "@/components/settings/uf8aI18n";
+import "@/components/settings/ufrkI18n";
+import { useSession } from "@/lib/session/sessionContext";
 
 /** Passwords shorter than this are refused here before the server refuses them (as on sign-up). */
 const MIN_PASSWORD = 12;
@@ -19,6 +21,9 @@ const MIN_PASSWORD = 12;
  */
 export function PasswordTab() {
 	const { t } = useTranslation("platform");
+	const { t: tr } = useTranslation("ufrk");
+	// Q-236: a GitHub-only account has no password to give; only a known false hides the field.
+	const setting = useSession().hasPassword === false;
 	const [current, setCurrent] = useState("");
 	const [next, setNext] = useState("");
 	const [repeat, setRepeat] = useState("");
@@ -48,8 +53,13 @@ export function PasswordTab() {
 	};
 
 	return (
-		<SettingsSection title={t("settings.password.title")} description={t("settings.password.description")} testId="settings-password">
+		<SettingsSection
+			title={setting ? tr("password.setTitle") : t("settings.password.title")}
+			description={setting ? tr("password.setDescription") : t("settings.password.description")}
+			testId="settings-password"
+		>
 			<form className="flex max-w-md flex-col gap-4" onSubmit={(event) => void onSubmit(event)} noValidate data-testid="password-form">
+				{!setting && (
 				<AuthField
 					label={t("settings.password.current")}
 					hint={t("settings.password.currentHint")}
@@ -59,6 +69,7 @@ export function PasswordTab() {
 					onChange={(event) => setCurrent(event.target.value)}
 					testId="password-current"
 				/>
+				)}
 				<AuthField
 					label={t("settings.password.new")}
 					hint={t("settings.password.newHint", { min: MIN_PASSWORD })}

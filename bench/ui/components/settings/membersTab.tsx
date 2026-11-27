@@ -5,6 +5,8 @@ import { looksLikeEmail } from "@/components/platform/platform.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { notify } from "@/lib/notify";
+import "./ufrkI18n";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { getLocale } from "@/lib/i18n";
@@ -72,6 +74,7 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 	const isOwner = session.role === "owner";
 	const { t: ts } = useTranslation("accountSafety");
 	const { t: tw } = useTranslation("w4b07");
+	const { t: tr } = useTranslation("ufrk");
 	const [createResetLink, resetState] = useCreateResetLinkMutation();
 	const [resetLink, setResetLink] = useState<ResetLink | null>(null);
 	const onResetLink = async (userId: string) => {
@@ -140,8 +143,19 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 										canReset={isOwner && member.user_id !== session.user?.id}
 										onResetLink={() => void onResetLink(member.user_id)}
 										resetBusy={resetState.isLoading && resetState.originalArgs?.userId === member.user_id}
-										onRole={(role) => void updateMember({ orgId: org.id, userId: member.user_id, role })}
-										onRemove={() => void removeMember({ orgId: org.id, userId: member.user_id })}
+										onRole={(role) =>
+											void updateMember({ orgId: org.id, userId: member.user_id, role })
+												.unwrap()
+												.then(
+													() => notify({ text: tr("members.roleChanged", { email: member.email, role: t(`roles.${role}`, { defaultValue: role }) }) }),
+													() => undefined,
+												)
+										}
+										onRemove={() =>
+											void removeMember({ orgId: org.id, userId: member.user_id })
+												.unwrap()
+												.then(() => notify({ text: tr("members.removed", { email: member.email }) }), () => undefined)
+										}
 										busy={
 											(updateState.isLoading && updateState.originalArgs?.userId === member.user_id) ||
 											(removeState.isLoading && removeState.originalArgs?.userId === member.user_id)
@@ -206,7 +220,7 @@ function MemberRow({
 	return (
 		<TableRow
 			data-testid={`member-row-${member.user_id}`}
-			className="max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:py-2"
+			className="max-sm:flex max-sm:h-auto max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:py-2"
 		>
 			<TableCell className="max-w-80 max-sm:w-full max-sm:max-w-none">
 				<div className="flex min-w-0 flex-col">
@@ -283,6 +297,7 @@ function InviteSection({ org }: { org: OrgSummary }) {
 	const [createInvitation, createState] = useCreateInvitationMutation();
 	const invitations = useListInvitationsQuery(org.id);
 	const [revoke, revokeState] = useRevokeInvitationMutation();
+	const { t: tr } = useTranslation("ufrk");
 
 	const emailError = touched && !looksLikeEmail(email) ? t("settings.invite.invalidEmail") : undefined;
 	const onSubmit = async (event: FormEvent) => {
@@ -297,6 +312,7 @@ function InviteSection({ org }: { org: OrgSummary }) {
 				link: result.url || (result.token ? invitationLink(pageOrigin(), result.token) : ""),
 				expires: result.expires_at,
 			});
+			notify({ text: tr("members.invited", { email: result.email }) });
 			setEmail("");
 			setTouched(false);
 		} catch {
@@ -407,7 +423,11 @@ function InviteSection({ org }: { org: OrgSummary }) {
 												cancelLabel={h("invite.revokeCancel")}
 												variant="destructive"
 												isLoading={revokeState.isLoading && revokeState.originalArgs?.invitationId === invite.id}
-												onConfirm={() => void revoke({ orgId: org.id, invitationId: invite.id })}
+												onConfirm={() =>
+													void revoke({ orgId: org.id, invitationId: invite.id })
+														.unwrap()
+														.then(() => notify({ text: tr("members.inviteRevoked", { email: invite.email }) }), () => undefined)
+												}
 												testId={`invitation-revoke-${invite.id}`}
 											/>
 										</TableCell>

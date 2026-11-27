@@ -90,7 +90,7 @@ export function ApiTokensTab() {
 						onRetry={() => void tokens.refetch()}
 						testId="tokens-error"
 					/>
-				) : all.length === 0 ? (
+				) : list.length === 0 ? (
 					<EmptyNote testId="tokens-empty">{t("settings.tokens.empty")}</EmptyNote>
 				) : (
 					<TableFrame testId="tokens-table">

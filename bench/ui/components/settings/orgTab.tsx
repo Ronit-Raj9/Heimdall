@@ -56,7 +56,7 @@ function WriteFailure({ error, title, testId, min }: { error: unknown; title: st
 /** A labelled row of the organization card. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
 	return (
-		<div className="grid grid-cols-1 items-center gap-1 py-2.5 text-sm sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
+		<div className="grid grid-cols-1 items-center gap-1 py-2.5 text-sm sm:grid-cols-[13rem_minmax(0,1fr)] sm:gap-3">
 			<span className="text-muted-foreground">{label}</span>
 			<span className="min-w-0">{children}</span>
 		</div>
