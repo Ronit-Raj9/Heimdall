@@ -180,6 +180,10 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 		st.rc.Run.Outcome = o
 		st.rc.Run.Failures = append(st.rc.Run.Failures, *pf)
 	}
+	if o, pf := remoteTimeoutOutcome(st.rc, st.rc.Run.Outcome); pf != nil { // a remote agent that did not finish in time: its own failure, said plainly (remotetimeout_iwint.go)
+		st.rc.Run.Outcome = o
+		st.rc.Run.Failures = append([]schemas.PartFailure{*pf}, st.rc.Run.Failures...)
+	}
 	if o, pf := gatewayOutcome(st.rc, st.ev, st.rc.Run.Outcome); pf != nil { // a gateway the agent could not reach is never the agent's score (gatewayinfra.go)
 		st.rc.Run.Outcome = o
 		st.rc.Run.Failures = append(st.rc.Run.Failures, *pf)
