@@ -399,14 +399,14 @@ export default function NewAgentView() {
 						{mostUsed.length > 0 && (
 							<div className="flex flex-col gap-2">
 								<h3 className="text-foreground text-sm font-semibold">{tx("agent.mostUsed")}</h3>
-								<div className="grid grid-cols-1 gap-1 md:grid-cols-2">{mostUsed.map(row)}</div>
+								<div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-3">{mostUsed.map(row)}</div>
 							</div>
 						)}
 						{groups.map(({ cat, items }) => {
 							const CatIcon = CATEGORY_ICON[cat];
-							const open = cat === "bring-your-own" || items.some((x) => x.id === tpl?.id);
+							// Q-107: every group starts open, so the whole gallery is in view; a group can still be folded.
 							return (
-								<details key={cat} className="group/cat flex flex-col gap-2" open={open || undefined}>
+								<details key={cat} className="group/cat flex flex-col gap-2" open>
 									<summary className="flex cursor-pointer list-none items-center gap-2 select-none">
 										<ChevronRight
 											className="text-muted-foreground size-4 transition-transform group-open/cat:rotate-90"
@@ -425,7 +425,7 @@ export default function NewAgentView() {
 											</span>
 										</h3>
 									</summary>
-									<div className="mt-2 grid grid-cols-1 gap-1 md:grid-cols-2">{items.map(row)}</div>
+									<div className="mt-2 grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-3">{items.map(row)}</div>
 								</details>
 							);
 						})}
@@ -513,13 +513,8 @@ export default function NewAgentView() {
 											{onlyProvider ? (
 												<>
 													{t("new.onlyProviders", { providers: providerLabel(onlyProvider) })}{" "}
-													{keyed.includes(onlyProvider as ProviderId) ? (
-														tx("agent.haveKey", { provider: providerLabel(onlyProvider) })
-													) : (
-														<Link to="/settings" search={{ tab: "keys" } as never} className="text-primary underline underline-offset-2" data-testid="agent-add-key">
-															{tx("agent.addKey", { provider: providerLabel(onlyProvider) })}
-														</Link>
-													)}
+													{/* A missing key is said once, by the model picker's own note (Q-125). */}
+													{keyed.includes(onlyProvider as ProviderId) && tx("agent.haveKey", { provider: providerLabel(onlyProvider) })}
 												</>
 											) : (
 												t("new.modelHelp")

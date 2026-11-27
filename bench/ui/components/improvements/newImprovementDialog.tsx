@@ -10,6 +10,8 @@ import type { ImprovementEstimate } from "@/lib/types/improve";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaidButton } from "@/components/ui/paidButton";
 import { useFormDraft } from "@/lib/hooks/useFormDraft";
 import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
@@ -260,7 +262,6 @@ export function NewImprovementForm({
 	const set = (patch: Partial<ImprovementForm>) => onChange({ ...form, ...patch });
 	const toggle = (path: string, on: boolean) => set({ files: on ? [...form.files, path].sort() : form.files.filter((p) => p !== path) });
 	const pickPreset = (preset: PresetName) => set({ preset, limit: String(PRESETS[preset].limit) });
-	const selectClass = "border-input bg-card h-9 w-full rounded-md border px-2 text-sm";
 	// The name suggested for the last picked agent: replaced on the next pick only while not edited.
 	const suggested = useRef("");
 	const pickAgent = (agent: string) => {
@@ -298,76 +299,79 @@ export function NewImprovementForm({
 					</span>
 				)}
 			</label>
-			<label className="flex flex-col gap-1 text-sm">
-				<span className="text-foreground font-medium">{t("create.agent")}</span>
+			<div className="flex flex-col gap-1 text-sm">
+				<span className="text-foreground font-medium" id="new-improvement-agent-label">
+					{t("create.agent")}
+				</span>
 				{agents.length === 0 ? (
 					<span className="text-muted-foreground" data-testid="new-improvement-no-agents">
 						{t("create.noAgents")}
 					</span>
 				) : (
-					<select
-						className={selectClass}
-						value={form.agent}
-						onChange={(e) => pickAgent(e.target.value)}
-						data-testid="new-improvement-agent"
-					>
-						<option value="">{t("create.agentPick")}</option>
-						{agents.map((a) => (
-							<option key={a} value={a}>
-								{a}
-							</option>
-						))}
-					</select>
-				)}
-			</label>
-			<label className="flex flex-col gap-1 text-sm">
-				<span className="text-foreground font-medium">{t("create.benchmark")}</span>
-				<select
-					className={selectClass}
-					value={form.suite}
-					onChange={(e) => set({ suite: e.target.value })}
-					data-testid="new-improvement-suite"
-				>
-					<option value="">{t("create.benchmarkPick")}</option>
-					{readyChoices.map((c) => (
-						<option key={c.value} value={c.value}>
-							{c.label}
-						</option>
-					))}
-					{notReadyChoices.length > 0 && (
-						<optgroup label={tu("improve.notReadyGroup")} data-testid="new-improvement-suite-not-ready">
-							{notReadyChoices.map((c) => (
-								<option key={c.value} value={c.value} disabled title={tu("improve.notReadyTitle")}>
-									{c.label}
-								</option>
+					// Q-109: the shared Select, like every other form; no value shows the placeholder.
+					<Select value={form.agent || undefined} onValueChange={pickAgent}>
+						<SelectTrigger className="w-full" aria-labelledby="new-improvement-agent-label" data-testid="new-improvement-agent">
+							<SelectValue placeholder={t("create.agentPick")} />
+						</SelectTrigger>
+						<SelectContent>
+							{agents.map((a) => (
+								<SelectItem key={a} value={a}>
+									{a}
+								</SelectItem>
 							))}
-						</optgroup>
-					)}
-				</select>
-			</label>
+						</SelectContent>
+					</Select>
+				)}
+			</div>
+			<div className="flex flex-col gap-1 text-sm">
+				<span className="text-foreground font-medium" id="new-improvement-suite-label">
+					{t("create.benchmark")}
+				</span>
+				<Select value={form.suite || undefined} onValueChange={(v) => set({ suite: v })}>
+					<SelectTrigger className="w-full" aria-labelledby="new-improvement-suite-label" data-testid="new-improvement-suite">
+						<SelectValue placeholder={t("create.benchmarkPick")} />
+					</SelectTrigger>
+					<SelectContent>
+						{readyChoices.map((c) => (
+							<SelectItem key={c.value} value={c.value}>
+								{c.label}
+							</SelectItem>
+						))}
+						{notReadyChoices.length > 0 && (
+							<SelectGroup data-testid="new-improvement-suite-not-ready">
+								<SelectLabel>{tu("improve.notReadyGroup")}</SelectLabel>
+								{notReadyChoices.map((c) => (
+									<SelectItem key={c.value} value={c.value} disabled title={tu("improve.notReadyTitle")}>
+										{c.label}
+									</SelectItem>
+								))}
+							</SelectGroup>
+						)}
+					</SelectContent>
+				</Select>
+			</div>
 			<fieldset className="flex flex-col gap-1 text-sm" data-testid="new-improvement-files">
 				<legend className="text-foreground mb-1 font-medium">{tw("form.surfaces")}</legend>
-				<label className="flex items-center gap-2">
-					<input
-						type="checkbox"
-						checked={form.instructions}
-						onChange={(e) => set({ instructions: e.target.checked })}
-						data-testid="new-improvement-instructions"
-					/>
-					<span>{tw("form.instructions")}</span>
-				</label>
+				<Checkbox
+					checked={form.instructions}
+					onChange={(on) => set({ instructions: on })}
+					label={tw("form.instructions")}
+					testId="new-improvement-instructions"
+				/>
 				{form.agent && agentFiles === undefined && <span className="text-muted-foreground">{t("create.filesLoading")}</span>}
 				{(agentFiles ?? []).map((p) => (
-					<label key={p} className="flex items-center gap-2">
-						<input
-							type="checkbox"
-							checked={form.files.includes(p)}
-							onChange={(e) => toggle(p, e.target.checked)}
-							data-testid="new-improvement-file"
-						/>
-						<code className="font-mono">{p}</code>
-						{p.endsWith("/") && <span className="text-muted-foreground">{tw("form.folder")}</span>}
-					</label>
+					<Checkbox
+						key={p}
+						checked={form.files.includes(p)}
+						onChange={(on) => toggle(p, on)}
+						label={
+							<>
+								<code className="font-mono">{p}</code>
+								{p.endsWith("/") && <span className="text-muted-foreground"> {tw("form.folder")}</span>}
+							</>
+						}
+						testId="new-improvement-file"
+					/>
 				))}
 				<span className="text-muted-foreground">{tw("form.fixed")}</span>
 				{problems.includes("surface") && <span className="text-chart-error-ink">{tw("form.surfaceNone")}</span>}
@@ -421,7 +425,7 @@ export function NewImprovementForm({
 				</p>
 			)}
 			{/* Sticky footer: the estimate stays right above the paid Start button however long the form is. */}
-			<div className="bg-card sticky bottom-0 -mx-6 -mb-6 flex flex-col gap-3 border-t px-6 pt-3 pb-6" data-testid="new-improvement-footer">
+			<div className="bg-card sticky bottom-0 -mx-5 -mb-5 flex flex-col gap-3 border-t px-5 pt-3 pb-5" data-testid="new-improvement-footer">
 				<EstimateCard estimate={estimate} loading={estimating} error={estimateError} model={model} waiting={problems.length > 0} />
 				<div className="flex flex-wrap items-center justify-end gap-2">
 				{block && (

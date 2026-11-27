@@ -24,21 +24,38 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } 
 import "@/components/improvements/uf2bI18n";
 import { useTranslation } from "react-i18next";
 import "@/app/agents/views/w4m1I18n";
+import "@/app/agents/views/ufreI18n";
 
 const POLL_MS = 5000;
 /** After this long with no trace, the waiting step says what to check. */
 export const STALE_MS = 2 * 60_000;
 const TOKEN_VAR = "$HEIMDALL_INGEST_TOKEN";
 
+/** Every setting line of an environment block as an export line (Q-35); blank lines and comments stay as they are. */
+export function exportLines(env: string): string {
+	return env
+		.split("\n")
+		.map((line) => (line.trim() === "" || line.trimStart().startsWith("#") || line.trimStart().startsWith("export ") ? line : `export ${line}`))
+		.join("\n");
+}
+
 /**
  * The environment block as shown: with a token made on this page, the token filled in; without
  * one, an export line for HEIMDALL_INGEST_TOKEN first, so nothing is copied with an unset variable.
+ * Every setting line is an export line, so the block works pasted into a shell as is.
  */
 export function envBlock(env: string, token: string | null): { text: string; needsExport: boolean } {
-	if (token) return { text: withToken(env, token), needsExport: false };
-	if (!env.includes(TOKEN_VAR)) return { text: env, needsExport: false };
-	return { text: `export HEIMDALL_INGEST_TOKEN=<your hmi_ token>
-${env}`, needsExport: true };
+	if (token) return { text: exportLines(withToken(env, token)), needsExport: false };
+	if (!env.includes(TOKEN_VAR)) return { text: exportLines(env), needsExport: false };
+	return { text: exportLines(`HEIMDALL_INGEST_TOKEN=<your hmi_ token>\n${env}`), needsExport: true };
+}
+
+/**
+ * A request that checks the endpoint and the token without an agent (Q-277): it sends an empty
+ * OTLP export, which keeps nothing; a 2xx answer means both work, 401 means the token is wrong.
+ */
+export function testRequest(endpoint: string): string {
+	return `curl -i -X POST '${endpoint}' -H "Authorization: Bearer ${TOKEN_VAR}" -H 'Content-Type: application/json' -d '{"resourceSpans":[]}'`;
 }
 
 /** A setup chip label "Name (frameworks)" split into the short name and the frameworks it covers. */
@@ -148,6 +165,7 @@ export default function FromTracesView() {
 							canWrite={canWrite}
 							onInferred={setFromFile}
 							total={total}
+							endpoint={info?.endpoint}
 							checkedAt={(query as { fulfilledTimeStamp?: number }).fulfilledTimeStamp}
 						/>
 					)}
@@ -332,13 +350,16 @@ function WaitingSection({
 	canWrite,
 	onInferred,
 	total,
+	endpoint,
 	checkedAt,
 }: {
 	canWrite: boolean;
 	onInferred: (r: TraceInferResult) => void;
 	total: number;
+	endpoint?: string;
 	checkedAt?: number;
 }) {
+	const { t: tr } = useTranslation("ufre");
 	const { t } = useTranslation("connectTraces");
 	const { t: tu } = useTranslation("uf2b");
 	const fileRef = useRef<HTMLInputElement>(null);
@@ -375,6 +396,12 @@ function WaitingSection({
 							{tu("traces.staleLink")}
 						</Link>
 					</p>
+				)}
+				{stale && endpoint && (
+					<div className="flex min-w-0 flex-col gap-1" data-testid="from-traces-stale-test">
+						<p className="text-muted-foreground text-sm">{tr("traces.testHelp")}</p>
+						<CopyBlock label={tr("traces.testLabel")} text={testRequest(endpoint)} testId="from-traces-test-request" />
+					</div>
 				)}
 				{canWrite && (
 					<div className="flex flex-col gap-2 border-t pt-4">

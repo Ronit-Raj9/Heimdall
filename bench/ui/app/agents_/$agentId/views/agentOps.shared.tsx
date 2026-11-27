@@ -25,7 +25,8 @@ export function OpsSection({ title, hint, children, testId }: { title: string; h
 	return (
 		<section className="border-border space-y-3 rounded-lg border p-4" data-testid={testId}>
 			<div>
-				<h3 className="text-sm font-semibold">{title}</h3>
+				{/* An h2: the tab sits right under the page h1 (Q-127). */}
+				<h2 className="text-sm font-semibold">{title}</h2>
 				{hint && <p className="text-muted-foreground mt-1 text-xs">{hint}</p>}
 			</div>
 			{children}

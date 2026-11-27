@@ -13,7 +13,7 @@ import "./uf2cI18n";
 import type { Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, ChevronRight, Circle, CircleMinus, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, CircleDashed, CircleMinus, Loader2, XCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { jobState, lastJobFor, type CheckState } from "../../../agents/views/agentDisplay";
@@ -82,7 +82,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 				<h2 className="text-base font-semibold tracking-tight">{tu("checks.title")}</h2>
 				<p className="text-muted-foreground text-sm">{tu("checks.subtitle")}</p>
 			</div>
-			<ol className="bg-card divide-y rounded-xl border">
+			<ol className="divide-y border-y">
 				<CheckStep
 					n={1}
 					title={tu("checks.step.check")}
@@ -298,13 +298,12 @@ const ICON: Record<StepState, { icon: typeof Circle; cls: string }> = {
 	failed: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	broken: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
 	running: { icon: Loader2, cls: "text-sky-600 animate-spin dark:text-sky-400" },
-	never: { icon: Circle, cls: "text-muted-foreground" },
+	never: { icon: CircleDashed, cls: "text-muted-foreground" },
 	skipped: { icon: CircleMinus, cls: "text-muted-foreground" },
 };
 
 /** One row of the checklist: status icon, title and short hint, the action, and options on demand. */
 function CheckStep({
-	n,
 	title,
 	hint,
 	detail,
@@ -314,6 +313,7 @@ function CheckStep({
 	testId,
 	problem,
 }: {
+	/** The step's place in the list; the ordered list says it, no number is printed (Q-117). */
 	n: number;
 	title: string;
 	hint: string;
@@ -327,18 +327,15 @@ function CheckStep({
 	const { t } = useTranslation("agentsUx");
 	const { icon: Icon, cls } = ICON[state];
 	return (
-		<li className="flex flex-col gap-3 p-5" data-testid={testId} data-state={state}>
+		<li className="flex flex-col gap-3 py-5" data-testid={testId} data-state={state}>
 			<div className="flex flex-wrap items-start gap-4">
 				<Icon className={cn("mt-0.5 size-5 shrink-0", cls)} aria-hidden="true" />
 				<div className="flex min-w-0 basis-full flex-col gap-0.5 sm:flex-1 sm:basis-0">
-					<h3 className="text-sm font-semibold">
-						<span className="text-muted-foreground mr-1.5 tabular-nums">{n}.</span>
-						{title}
-					</h3>
+					<h3 className="text-sm font-semibold">{title}</h3>
 					<p className="text-muted-foreground text-sm" title={detail}>
 						{hint}
 					</p>
-					<span className={cn("text-xs font-medium", cls.replace("animate-spin", ""))} data-testid={`${testId}-state`}>
+					<span className={cn("flex min-h-8 items-center text-sm font-medium", cls.replace("animate-spin", ""))} data-testid={`${testId}-state`}>
 						{t(`checks.state.${state}`)}
 					</span>
 					{problem}

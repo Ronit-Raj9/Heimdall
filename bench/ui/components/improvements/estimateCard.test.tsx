@@ -11,7 +11,7 @@ describe("EstimateCard", () => {
 		expect(html).toContain("60 tasks: 24 to practise on, 18 to decide, 18 kept hidden until the end.");
 		expect(html).toContain("Smallest gain this run can confirm: about 24 points.");
 		expect(html).toContain("Estimated cost: $15.80 to $33.90, about 80 to 160 minutes. Hard stop at $45.00.");
-		expect(html).toContain("Improver: Heimdall reflect-edit 1.1.0, on gpt-5-mini.");
+		expect(html).toContain("Improver: Heimdall on gpt-5-mini.");
 		expect(html).toContain('data-testid="estimate-warning"');
 		expect(estimateBlock(ESTIMATE_FIXTURE)).toBeUndefined();
 	});

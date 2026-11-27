@@ -243,23 +243,48 @@ export function homeUsageRange(now: Date = new Date()): { from: string; to: stri
 
 /** One step of the set-up card on a new organization (M2-10). */
 export interface SetupStep {
-	id: "keys" | "agent" | "evaluate" | "report";
+	id: "keys" | "agent" | "benchmark" | "evaluate" | "report";
 	done: boolean;
+	/** The first earlier step not done yet (Q-302): this one is shown locked, not as a link. */
+	blockedBy?: SetupStep["id"];
+	/** Benchmark step: how many benchmarks are still being prepared. */
+	preparing?: number;
 	to: string;
 	search?: Record<string, string>;
 }
 
+/** Benchmarks with ready tasks, and how many are still being prepared (no admitted task yet). Pure. */
+export function benchmarkReadiness(suites: readonly { admitted_count?: number | null }[]): { ready: number; preparing: number } {
+	const ready = suites.filter((s) => (s.admitted_count ?? 0) > 0).length;
+	return { ready, preparing: suites.length - ready };
+}
+
 /**
- * The four set-up steps and whether each is done: a model key exists, an agent of the org exists,
- * an evaluation was started, and one has finished with a report card. The card shows until then.
+ * The five set-up steps (Q-301): a model key exists, an agent of the org exists, a benchmark has
+ * ready tasks, an evaluation was started, and one has finished with a report card. A step after an
+ * undone one is locked (Q-302) and names that step. The card shows until a report card exists.
  */
-export function setupSteps(have: { keys: boolean; agent: boolean; evaluation: boolean; finished: boolean }): SetupStep[] {
-	return [
+export function setupSteps(have: {
+	keys: boolean;
+	agent: boolean;
+	benchmark: boolean;
+	preparing?: number;
+	evaluation: boolean;
+	finished: boolean;
+}): SetupStep[] {
+	const steps: SetupStep[] = [
 		{ id: "keys", done: have.keys, to: "/settings", search: { tab: "keys" } },
 		{ id: "agent", done: have.agent, to: "/agents/new" },
+		{ id: "benchmark", done: have.benchmark, to: "/suites", preparing: have.preparing },
 		{ id: "evaluate", done: have.evaluation, to: "/evaluate" },
 		{ id: "report", done: have.finished, to: "/evaluations" },
 	];
+	let blocker: SetupStep["id"] | undefined;
+	for (const s of steps) {
+		if (!s.done && blocker) s.blockedBy = blocker;
+		if (!s.done && !blocker) blocker = s.id;
+	}
+	return steps;
 }
 
 /** Whether an evaluation has finished with a report card: the set-up card hides from then on. */

@@ -1,5 +1,6 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
 import {
+	benchmarkReadiness,
 	evaluationStats,
 	hasFinishedEvaluation,
 	homeStats,
@@ -22,6 +23,7 @@ import { CardGridSkeleton, LoadError, TableSkeleton } from "@/components/runs/sc
 import { EmptyState, suiteIdOf } from "@/components/shell";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useGetUsageQuery } from "@/lib/store/apis/usageApi";
+import { useGetHomeSummaryQuery } from "@/lib/store/apis/homeApi";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -73,7 +75,12 @@ export default function HomeView() {
 	const evals = useListEvaluationsQuery(undefined, poll);
 	const [usageRange] = useState(() => homeUsageRange());
 	// M8-19: "Spent" is the Usage total of this calendar month (UTC), the same number Usage shows.
-	const usage = useGetUsageQuery(usageRange);
+	// Q-112: GET /home/summary answers Spent in one call; Usage is read only when the summary has no spend
+	// (an older server, or the summary failed).
+	const summary = useGetHomeSummaryQuery();
+	const summarySpend = typeof summary.data?.spend_month_usd === "number" ? summary.data.spend_month_usd : null;
+	const usage = useGetUsageQuery(usageRange, { skip: summary.isLoading || summarySpend !== null });
+	const spend = summarySpend ?? usage.data?.total_cost_usd ?? null;
 	const models = useGetModelsQuery();
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const evaluations = evals.data ?? [];
@@ -103,16 +110,19 @@ export default function HomeView() {
 
 	const showSetup = evals.isSuccess && !hasFinishedEvaluation(evaluations);
 	const agentList = agents.data?.agents ?? [];
+	const bench = benchmarkReadiness(suites.data?.suites ?? []);
 	const steps = setupSteps({
 		keys: (models.data?.keys.length ?? 0) > 0,
 		agent: ownAgents(agentList, Number.POSITIVE_INFINITY).length > 0,
+		benchmark: bench.ready > 0,
+		preparing: bench.preparing,
 		evaluation: evaluations.length > 0,
 		finished: hasFinishedEvaluation(evaluations),
 	});
 	// M2-8: each tile reads its own query state; a failed load says so, never "No scored runs yet" or $0.00.
 	const runsState = queryState(runs);
 	const evalsState = queryState(evals);
-	const usageState = queryState(usage);
+	const usageState = summarySpend !== null ? "ready" : summary.isLoading ? "loading" : queryState(usage);
 	const agentsState = queryState(agents);
 	const kpiError = (onRetry: () => void) => (
 		<span className="inline-flex flex-wrap items-center gap-1">
@@ -142,12 +152,14 @@ export default function HomeView() {
 
 			{showSetup && <SetupCard mayRun={mayRun} steps={steps} />}
 
+			{/* Q-302: no row of zeros before the first evaluation; the set-up card says what to do. */}
+			{!(evals.isSuccess && evaluations.length === 0) && (
 			<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="home-kpis">
 				<KpiLink to="/evaluations">
 					<StatCard
 						icon={Bot}
 						label={t("kpi.agents")}
-						value={evalsState === "error" || agentsState === "error" ? "-" : agents.data ? agentsWithResults(agentList, evaluations) : evStats.agents}
+						value={evalsState === "error" || agentsState === "error" || !agents.data ? "-" : agentsWithResults(agentList, evaluations)}
 						hint={
 							evalsState === "error"
 								? kpiError(() => void evals.refetch())
@@ -155,7 +167,7 @@ export default function HomeView() {
 									? kpiError(() => void agents.refetch())
 									: t("kpi.agentsHint")
 						}
-						loading={evalsState === "loading"}
+						loading={evalsState === "loading" || agentsState === "loading"}
 						testId="home-kpi-agents"
 					/>
 				</KpiLink>
@@ -191,7 +203,7 @@ export default function HomeView() {
 					<StatCard
 						icon={Wallet}
 						label={t("kpi.spend")}
-						value={usageState !== "ready" || !usage.data ? "-" : usd(usage.data.total_cost_usd)}
+						value={usageState !== "ready" || spend === null ? "-" : usd(spend)}
 						hint={
 							usageState === "error"
 								? kpiError(() => void usage.refetch())
@@ -204,6 +216,7 @@ export default function HomeView() {
 					/>
 				</KpiLink>
 			</div>
+			)}
 
 			<HomeSection title={ta("home.title")} testId="home-section-agents" link={{ to: "/agents", label: ta("home.viewAll") }}>
 				{agentsState === "error" ? (
@@ -455,9 +468,21 @@ export function SetupCard({ mayRun, steps }: { mayRun: boolean; steps: ReturnTyp
 				)}
 			</div>
 			{mayRun && (
-				<ol className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="home-setup-steps">
+				<ol className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5" data-testid="home-setup-steps">
 					{steps.map((step, i) => (
-						<li key={step.id} data-testid={`home-setup-${step.id}`} data-done={step.done}>
+						<li key={step.id} data-testid={`home-setup-${step.id}`} data-done={step.done} data-locked={step.blockedBy ? true : undefined}>
+							{step.blockedBy ? (
+								// Q-302: a step that cannot be done yet is not a link; it names the step before it.
+								<div className="text-muted-foreground flex min-h-12 items-center gap-3 rounded-lg border border-dashed px-3 py-2 text-sm">
+									<span className="flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold" aria-hidden="true">
+										{i + 1}
+									</span>
+									<span className="flex min-w-0 flex-col">
+										<span>{t(`onboarding.steps.${step.id}`)}</span>
+										<span className="text-xs">{t("onboarding.first", { step: t(`onboarding.steps.${step.blockedBy}`) })}</span>
+									</span>
+								</div>
+							) : (
 							<Link
 								to={step.to as never}
 								search={step.search as never}
@@ -475,11 +500,17 @@ export function SetupCard({ mayRun, steps }: { mayRun: boolean; steps: ReturnTyp
 								>
 									{step.done ? <Check className="size-3.5" /> : i + 1}
 								</span>
-								<span className="min-w-0">
-									{t(`onboarding.steps.${step.id}`)}
-									{step.done && <span className="sr-only"> ({t("onboarding.done")})</span>}
+								<span className="flex min-w-0 flex-col">
+									<span>
+										{t(`onboarding.steps.${step.id}`)}
+										{step.done && <span className="sr-only"> ({t("onboarding.done")})</span>}
+									</span>
+									{step.id === "benchmark" && !step.done && (step.preparing ?? 0) > 0 && (
+										<span className="text-muted-foreground text-xs font-normal">{t("onboarding.preparing", { count: step.preparing })}</span>
+									)}
 								</span>
 							</Link>
+							)}
 						</li>
 					))}
 				</ol>

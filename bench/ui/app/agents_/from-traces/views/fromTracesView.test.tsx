@@ -16,7 +16,7 @@ const base: TraceConnectInfo = {
 			id: "otel",
 			label: "OpenTelemetry SDK",
 			install: "pip install x",
-			env: "OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer%20$HEIMDALL_INGEST_TOKEN",
+			env: "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://h.example/otlp\nOTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer%20$HEIMDALL_INGEST_TOKEN",
 		},
 	],
 	exports: 0,
@@ -53,7 +53,7 @@ describe("FromTracesView", () => {
 
 	it("shows the endpoint and setup while waiting for the first trace", () => {
 		const html = renderToStaticMarkup(<FromTracesView />);
-		expect(html).toContain("Connect from traces");
+		expect(html).toContain("Agent from traces");
 		expect(html).toContain("https://h.example/api/bench/orgs/org_a/otlp/v1/traces");
 		expect(html).toContain("Create an ingest token");
 		expect(html).toContain('data-testid="from-traces-waiting"');
@@ -64,6 +64,9 @@ describe("FromTracesView", () => {
 		expect(html).not.toContain("1. Send traces");
 		expect(html).toContain("no prompts, answers or tool arguments. Failures you send to Production failures are different");
 		expect(html).toContain("export HEIMDALL_INGEST_TOKEN=");
+		// Q-35, Q-316: every line of the rendered block is exported, so pasted values reach the agent.
+		expect(html).toContain("export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://h.example/otlp");
+		expect(html).toContain("export OTEL_EXPORTER_OTLP_TRACES_HEADERS=");
 		expect(html).toContain('data-testid="from-traces-file-button"');
 	});
 

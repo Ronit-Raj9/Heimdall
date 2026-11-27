@@ -1,0 +1,37 @@
+{
+	"agents": {
+		"columns": {
+			"versions": "Versions",
+			"lastScore": "Last score",
+			"select": "Select"
+		},
+		"sortScore": "Last score",
+		"versions_one": "{{count}} version",
+		"versions_other": "{{count}} versions",
+		"lastScoreTitle": "{{passed}} of {{runs}} runs passed in the latest evaluation",
+		"neverRun": "Never run",
+		"selectAgent": "Select {{name}}",
+		"selectAll": "Select every agent in this list",
+		"deleteSelected": "Delete selected ({{count}})",
+		"deleteSelectedTitle_one": "Delete {{count}} agent?",
+		"deleteSelectedTitle_other": "Delete {{count}} agents?",
+		"deleteSelectedBody": "These agents' settings files are deleted: {{names}}. Their past runs and results stay.",
+		"deleteSelectedConfirm": "Delete",
+		"deleteSelectedCancel": "Cancel",
+		"deleteSelectedFailed": "Not deleted: {{names}}.",
+		"clearSelection": "Clear selection"
+	},
+	"traces": {
+		"testHelp": "Test the endpoint and the token without your agent: run this request. An answer of 200 means both work; 401 means the token is wrong. It sends no trace, so this page keeps waiting.",
+		"testLabel": "Test request"
+	},
+	"tools": {
+		"mcpFormat": {
+			"codex_toml": "TOML: mcp_servers tables in config.toml",
+			"claude_json": "JSON: mcpServers in .claude.json",
+			"opencode_json": "JSON: mcp key in opencode.json",
+			"generic_json": "JSON: mcpServers at the file path below",
+			"env": "No file: environment variables only"
+		}
+	}
+}

@@ -1,12 +1,12 @@
 {
-	"title": "Connect from traces",
+	"title": "Agent from traces",
 	"subtitle": "Point your OpenTelemetry exporter at Heimdall. When the first traces arrive, Heimdall proposes the agent they show.",
 	"crumbAgents": "Agents",
 	"crumbNew": "New agent",
 	"endpoint": {
 		"title": "Send traces",
 		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works.",
-		"privacy": "This traces endpoint keeps only names, models, tools called and routes: no prompts, answers or tool arguments. Failures you send to Production failures are different: Heimdall keeps the request, the answer and the tool calls there, with keys, tokens and contact details removed.",
+		"privacy": "This traces endpoint keeps only names, models, tools called and routes: no prompts, answers or tool arguments. Failures you send to Production failures are different: Heimdall keeps the request, the answer and the tool calls there, with keys, tokens, email addresses and phone numbers removed; names and street addresses are not removed.",
 		"url": "Traces endpoint",
 		"auth": "Send your ingest token in the Authorization header. Create one with the button below.",
 		"makeToken": "Create an ingest token",

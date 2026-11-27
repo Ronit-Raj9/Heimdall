@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { formatWhen } from "@/components/platform/platform.utils";
 import { getLocale } from "@/lib/i18n";
 import { useGetAgentCardQuery, type AgentCard } from "@/lib/store/apis/agentCardApi";
+import { preferredAgentEvaluation } from "@/components/home/agentEvaluation";
 import { useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
 import "@/components/agents/gw17I18n";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
@@ -31,22 +32,13 @@ export function modelOptions(models: readonly string[] | undefined, selected: st
 	return selected && !list.includes(selected) ? [selected, ...list] : list;
 }
 
-/** True when an evaluation entry reads as a failure test (its saved name starts so; the list has no mode yet). */
-function looksLikeFailureTest(ev: { name?: string }): boolean {
-	return /^failure test/i.test(ev.name ?? "");
-}
-
 /**
- * The evaluation the tab should open on when the address names none (M3-2): the server's newest pick, unless that is a
- * failure test and a plain score evaluation exists, then the newest plain one. Undefined keeps the server's pick.
+ * The evaluation the tab should open on when the address names none (M3-2, Q-17): the server's newest pick, unless
+ * that is a test object or a failure test; the same rule as Home's agent cards (preferredAgentEvaluation).
+ * Undefined keeps the server's pick.
  */
-export function preferredEvaluation(card: Pick<AgentCard, "evaluation_id" | "evaluations" | "reliability">): string | undefined {
-	const list = card.evaluations ?? [];
-	const shown = list.find((e) => e.id === card.evaluation_id);
-	const shownIsFault = (shown && looksLikeFailureTest(shown)) || (card.reliability ?? []).some((r) => r.fault !== "clean");
-	if (!shownIsFault) return undefined;
-	const plain = list.find((e) => e.id !== card.evaluation_id && !looksLikeFailureTest(e));
-	return plain?.id;
+export function preferredEvaluation(card: Pick<AgentCard, "evaluation_id" | "evaluation_name" | "evaluations" | "reliability">): string | undefined {
+	return preferredAgentEvaluation(card);
 }
 
 /** Runs the card counts: every shown arm's runs over every benchmark. */
