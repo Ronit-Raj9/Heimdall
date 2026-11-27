@@ -87,7 +87,7 @@ type githubSource struct{}
 func (githubSource) Name() string { return "github" }
 func (githubSource) Kind() Kind   { return KindGitHub }
 
-const githubNext = "A repository becomes tasks from its fix commits: open the benchmark's Build tab and use Tasks from commits (connect GitHub in Settings for a private repository). A repository that holds a benchmark folder (Harbor task.toml files) can be downloaded as a zip and dropped here."
+const githubNext = "A repository becomes tasks from its fix commits: create a new benchmark and pick Commits in your repository as where its tasks come from, or open an existing benchmark's Build tab and use Tasks from commits; connect GitHub in Settings for a private repository. A repository that holds a benchmark folder (Harbor task.toml files) can be downloaded as a zip and dropped here."
 
 func githubRepo(p Peek) (string, bool) {
 	if p.URL == nil {
@@ -128,7 +128,7 @@ type openAPISource struct{}
 func (openAPISource) Name() string { return "openapi" }
 func (openAPISource) Kind() Kind   { return KindOpenAPI }
 
-const openAPINext = "An API spec becomes a stateful mock service on a benchmark's Build tab (OpenAPI mock); tasks over it are scenario rows against that mock. Drafting tasks straight from a spec is not built yet."
+const openAPINext = "An API spec becomes tasks on the Tasks from your API page (Add a benchmark, then Build tasks from your OpenAPI file and policy): give it this spec and a policy and it drafts scenario tasks against a stateful mock of the API. A benchmark's Build tab can also host the spec as a mock (OpenAPI mock)."
 
 func looksOpenAPI(b []byte) bool {
 	h := head(b, 4096)
