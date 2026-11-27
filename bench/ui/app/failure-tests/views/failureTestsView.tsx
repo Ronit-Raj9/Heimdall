@@ -520,11 +520,6 @@ export default function FailureTestsView() {
 								{tu("ft.faultsPicked", { count: form.faults.length })}
 							</span>
 						</legend>
-						{isDefaultFaults(form.faults) && (
-							<p className="text-muted-foreground text-xs" data-testid="ft-faults-defaults">
-								{tu("ft.defaultsTicked", { count: FAILURE_FAULTS.length })}
-							</p>
-						)}
 						<div className="flex flex-col gap-2">
 							{faultGroups.map((g) => {
 								const ids = g.faults.map((x) => x.id);
@@ -736,7 +731,7 @@ capUsd={cost.capUsd}
 			</Section>
 			)}
 
-			<Section title={t("ft.pastTitle")} description={t("ft.pastHint")} testId="ft-past">
+			<Section title={t("ft.pastTitle")} testId="ft-past">
 				{evals.isLoading ? (
 					<BlockSkeleton rows={3} testId="ft-past-loading" />
 				) : evals.isError ? (

@@ -26,7 +26,7 @@ export function FeatureHero({
 			className={cn("bg-card flex flex-col items-center gap-4 rounded-xl border px-6 py-10 text-center", className)}
 			data-testid={testId}
 		>
-			<div className="flex max-w-md flex-col gap-1">
+			<div className="flex w-full max-w-md min-w-0 flex-col gap-1">
 				{/* An empty title (a hero whose page header already names it) renders no heading at all. */}
 				{hasTitle(title) ? (
 					<h2 className="text-foreground flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
@@ -34,10 +34,10 @@ export function FeatureHero({
 						{title}
 					</h2>
 				) : null}
-				<p className="text-muted-foreground text-sm">{message}</p>
+				<p className="text-muted-foreground line-clamp-2 text-sm break-words">{message}</p>
 			</div>
 			{action}
-			{children && <div className="text-muted-foreground flex max-w-md flex-col items-center gap-2 text-sm">{children}</div>}
+			{children && <div className="text-muted-foreground flex w-full max-w-md min-w-0 flex-col items-center gap-2 text-sm break-words">{children}</div>}
 		</div>
 	);
 }

@@ -34,7 +34,6 @@ export function TriageDrillDown({ group, arms, locations, renderEvidence, onClos
 			<div className="flex flex-wrap items-start justify-between gap-2">
 				<div className="flex flex-col gap-0.5">
 					<h2 className="text-foreground text-sm font-semibold tracking-tight">{t("triage.drill.title", { pattern: name })}</h2>
-					<p className="text-muted-foreground max-w-prose text-xs">{t("triage.drill.description")}</p>
 				</div>
 				<Button variant="ghost" size="sm" onClick={onClose} dataTestId="triage-drilldown-close" aria-label={t("triage.drill.close")}>
 					<X className="size-4" aria-hidden="true" />

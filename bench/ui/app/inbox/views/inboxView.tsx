@@ -120,7 +120,7 @@ export function InboxTab() {
 					defaultOpen={(data.sources ?? []).length === 0}
 					testId="inbox-integrations"
 				>
-					<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
+					<Section title={t("inbox.sources.title")} testId="inbox-sources">
 						<InboxSourcesTable sources={data.sources ?? []} manage onChanged={() => void list.refetch()} blocked={blocked} />
 						{(data.sources ?? []).length > 0 && <InboxConnectAnotherLink />}
 					</Section>
@@ -303,7 +303,7 @@ export function InboxBody({
 				</div>
 			)}
 			{showSources && (
-				<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
+				<Section title={t("inbox.sources.title")} testId="inbox-sources">
 					<InboxSourcesTable sources={sources} manage={manageSources} onChanged={onSourcesChanged} blocked={blockedSources} />
 					{manageSources && sources.length > 0 && <InboxConnectAnotherLink />}
 				</Section>

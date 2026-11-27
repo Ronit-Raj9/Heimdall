@@ -77,7 +77,6 @@ export default function FindingsTab() {
 			) : bothEmpty ? (
 				<EmptyState
 					title={t("emptyTitle")}
-					body={t("emptyBody")}
 					action={investigating ? undefined : { label: t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) }), onClick: () => setInvestigating(true) }}
 					testId="findings-empty"
 				/>
