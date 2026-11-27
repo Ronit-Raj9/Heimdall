@@ -1,3 +1,4 @@
+import { isTestObject } from "@/lib/testObjects";
 import type { SuiteSummary } from "@/lib/types/bench";
 
 // Lane R02: how a benchmark reads to a person. Suites carry only an id and a technical description,
@@ -180,26 +181,13 @@ const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 
 const MAX_DESCRIPTION = 90;
 
-function titleCase(id: string): string {
-	const words = id
-		.replace(/[-_]+/g, " ")
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean)
-		.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-	return words.length ? words.join(" ") : id;
-}
-
 /**
- * "acme-orders" reads as "Node.js bug fixing". Without a curated name, a benchmark the team added
- * (its summary given, not built in) shows its id exactly as typed ("zz-test-own"); only a built-in
- * id, or an id with no summary, is title-cased ("my-pack" reads as "My Pack").
+ * "acme-orders" reads as "Node.js bug fixing". Without a curated name the id is shown exactly as it
+ * is ("hd-harbor-tb2", "zz-test-own"): title-casing an id made names such as "Hd Harbor Tb2" (M3-34).
+ * The summary is still accepted so callers need no change.
  */
-export function suiteDisplayName(id: string, summary?: Pick<SuiteSummary, "builtin" | "source">): string {
-	const curated = SUITE_DISPLAY[id]?.name;
-	if (curated) return curated;
-	if (summary && !isBuiltinSuite(summary)) return id;
-	return titleCase(id);
+export function suiteDisplayName(id: string, _summary?: Pick<SuiteSummary, "builtin" | "source">): string {
+	return SUITE_DISPLAY[id]?.name ?? id;
 }
 
 /** The curated capability group ("memory", "safety", ...) when the id has one; undefined otherwise. */
@@ -301,7 +289,8 @@ export const LIBRARY_SUITE_IDS: readonly string[] = LIBRARY_ORDER;
 
 /** The small made-up practice suites: the Acme examples and the coding-core starter. */
 export function isPracticeSuite(id: string): boolean {
-	return id.startsWith("acme-") || id === "coding-core" || id.startsWith("zz-test-");
+	// Test objects (zz-test-*) by the shared rule (M6-46, M1-18); the list hides them unless shown.
+	return id.startsWith("acme-") || id === "coding-core" || isTestObject(id);
 }
 
 /**

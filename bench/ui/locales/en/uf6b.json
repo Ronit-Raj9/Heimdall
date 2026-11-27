@@ -24,7 +24,8 @@
 		"failures": {
 			"label": "From production failures",
 			"needs": "Traces from a connected source. Each failure becomes a test."
-		}
+		},
+		"platformImport": "Or import traces from another platform"
 	},
 	"list": {
 		"makeReady": "Make it ready",
@@ -35,13 +36,16 @@
 			"tasks": "Tasks",
 			"ready": "Ready share"
 		},
-		"count": "{{shown}} of {{total}}"
+		"count": "{{shown}} of {{total}}",
+		"pageOf": "{{first}} to {{last}} of {{total}} benchmarks"
 	},
 	"add": {
 		"pageTitle": "Add a benchmark · Benchmarks · Heimdall",
 		"steps": "Steps",
 		"drafts_one": "Earlier drafts ({{count}})",
-		"drafts_other": "Earlier drafts ({{count}})"
+		"drafts_other": "Earlier drafts ({{count}})",
+		"draftMore": "More actions for the draft of {{suite}}",
+		"draftDeleteTitle": "Delete the draft of {{suite}}?"
 	},
 	"newSuite": {
 		"advanced": "Advanced"
@@ -57,7 +61,9 @@
 		"addYes": "Add",
 		"detailsOf": "Details of {{name}}",
 		"colName": "Benchmark",
-		"colAction": "Action"
+		"colAction": "Action",
+		"pageOf": "{{first}} to {{last}} of {{total}} benchmarks",
+		"added": "{{name}} added to your benchmarks."
 	},
 	"labelling": {
 		"emptyAdd": "Empty. Add items",
@@ -67,13 +73,29 @@
 		"openQueue": "Open the queue",
 		"done": "Done"
 	},
+	"source": {
+		"runsOf": "People check agent answers from {{benchmark}}.",
+		"runs": "People check agent answers.",
+		"judgeOf": "People check the judge's decisions on {{benchmark}}.",
+		"judge": "People check the judge's decisions."
+	},
+	"queue": {
+		"deleteTitle": "Delete queue {{name}}?",
+		"deleteYes": "Delete queue",
+		"deleted": "Queue {{name}} deleted."
+	},
 	"confirm": {
 		"syncRemove": "Remove the weekly sync of {{repo}}? It stops adding tasks. The benchmark and its tasks stay.",
+		"syncRemoveTitle": "Remove the weekly sync of {{repo}}?",
+		"syncRemoveYes": "Remove sync",
+		"syncRemoved": "Weekly sync of {{repo}} removed.",
 		"serveStart": "Start a GPU on your Modal account for {{hours}} hours? Modal bills you per minute, at most about ${{max}}.",
 		"serveStop": "Stop serving {{model}}? Running evaluations that use it will fail."
 	},
 	"serve": {
-		"hoursRange": "The time limit is 0.1 to 24 hours."
+		"hoursRange": "The time limit is 0.1 to 24 hours.",
+		"stopTitle": "Stop serving {{model}}?",
+		"noEvaluation": "No evaluation (stops at the time limit)"
 	},
 	"fromApi": {
 		"problem": {

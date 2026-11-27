@@ -18,9 +18,9 @@ describe("suiteDisplay", () => {
 		);
 	});
 
-	it("title-cases unknown built-in ids and ids without a summary", () => {
-		expect(suiteDisplayName("my_new-pack")).toBe("My New Pack");
-		expect(suiteDisplayName("my_new-pack", { builtin: true, source: "library" })).toBe("My New Pack");
+	it("shows unknown ids as they are, never title-cased (M3-34)", () => {
+		expect(suiteDisplayName("my_new-pack")).toBe("my_new-pack");
+		expect(suiteDisplayName("my_new-pack", { builtin: true, source: "library" })).toBe("my_new-pack");
 	});
 
 	it("shows a benchmark the team added exactly as its id was typed", () => {

@@ -38,13 +38,13 @@ describe("My benchmarks list", () => {
 	});
 
 	it("shows a team benchmark by the id the team typed", () => {
-		const html = render(<NuqsTestingAdapter><SuitesList suites={suites} /></NuqsTestingAdapter>);
+		const html = render(<NuqsTestingAdapter searchParams={{ tests: "1" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(html).toContain(">zz-test-own<");
 		expect(html).not.toContain("Zz Test Own");
 	});
 
 	it("narrows the list and says when nothing matches", () => {
-		const one = render(<NuqsTestingAdapter searchParams={{ q: "zz-test" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
+		const one = render(<NuqsTestingAdapter searchParams={{ q: "zz-test", tests: "1" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
 		expect(one).toContain("suites-row-zz-test-own");
 		expect(one).not.toContain("suites-row-hd-swe-verified");
 		const none = render(<NuqsTestingAdapter searchParams={{ q: "no such thing" }}><SuitesList suites={suites} /></NuqsTestingAdapter>);
@@ -60,15 +60,31 @@ describe("My benchmarks list", () => {
 		);
 		expect(html).toContain('data-testid="suites-sort"');
 		expect(html).toContain('data-testid="suites-count"');
+		// zz-test-own is a test object: hidden by default and counted as hidden (M1-18).
+		expect(html).toContain("1 of 1");
+		expect(html).toContain('data-testid="suites-show-tests"');
+		expect(html).not.toContain("zz-test-own");
+	});
+
+	it("shows test benchmarks with ?tests=1 and pages the list (M1-59)", () => {
+		const html = render(
+			<NuqsTestingAdapter searchParams={{ tests: "1" }}>
+				<SuitesList suites={suites} />
+			</NuqsTestingAdapter>,
+		);
 		expect(html).toContain("2 of 2");
+		expect(html).toContain("zz-test-own");
+		expect(html).toContain('data-testid="suites-pager"');
 	});
 });
 
 describe("Add benchmark menu (M6-41)", () => {
-	it("lists the same six entries as the chooser, with Tasks from your API", async () => {
+	it("is the shared dropdown, closed until opened (its six items come from ADD_ENTRIES, see addChooser.test.ts)", async () => {
 		const { AddBenchmarkMenu } = await import("./suitesView");
 		const html = render(<AddBenchmarkMenu />);
-		for (const id of ["file", "catalog", "api", "create", "code", "failures"]) expect(html).toContain(`data-testid="suites-add-${id}"`);
-		expect(html).toContain("Tasks from your API");
+		expect(html).toContain('data-testid="suites-add-menu"');
+		expect(html).toContain('data-testid="suites-add-button"');
+		expect(html).toContain('aria-haspopup="menu"');
+		expect(html).not.toContain('data-testid="suites-add-file"');
 	});
 });

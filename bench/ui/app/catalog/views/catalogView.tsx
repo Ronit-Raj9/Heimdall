@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pager, pageSlice } from "@/components/ui/pager";
+import { LoadError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { firstReason, WhyDisabled } from "@/components/ui/whyDisabled";
 import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
-import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { Dialog } from "@/components/ui/dialog";
 import { idProblem, wholeNumberProblem } from "@/lib/inputChecks";
 import { transportErrorText } from "@/lib/requestErrors";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
@@ -20,9 +23,9 @@ import type { Job } from "@/lib/types/bench";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Library, X } from "lucide-react";
-import { parseAsString, useQueryState } from "nuqs";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Library } from "lucide-react";
+import { parseAsInteger, parseAsString, useQueryState } from "nuqs";
+import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	CATEGORIES,
@@ -120,6 +123,9 @@ export interface CatalogBodyProps {
 	importFailure?: ImportFailure | null;
 	/** Suite ids the server's built-in library serves: such entries show Built in and Run, listed first. */
 	builtinSuites?: ReadonlySet<string>;
+	/** 1-based page of the filtered list (M6-65); 1 when absent. */
+	page?: number;
+	onPage?(page: number): void;
 }
 
 /** A failed catalog import: the job's error and every task it skipped with the reason. */
@@ -208,38 +214,33 @@ function EntryFacts({ e }: { e: CatalogEntry }) {
 }
 
 /** Right-hand drawer: entry details, and the import form for importers. */
+/** The details or import drawer: the shared Dialog as a right-hand drawer (focus trap, Escape, overlay close). */
 function SidePanel({ e, onClose, children, testId }: { e: CatalogEntry; onClose(): void; children: ReactNode; testId: string }) {
 	const { t } = useTranslation("catalog");
 	const { title: name, description, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
-	const panel = useRef<HTMLElement | null>(null);
-	useDialogFocus(panel, onClose);
 	return (
-		<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={name}>
-			<button type="button" aria-label={t("close")} className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-			<aside
-				ref={panel}
-				tabIndex={-1}
-				className="bg-background border-border relative flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto border-l p-6 shadow-xl"
-				data-testid={testId}
-			>
-				<div className="flex items-start gap-3">
-					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-2">
-							<CategoryIcon category={cat} />
-							<h2 className="truncate text-lg font-semibold tracking-tight">{name}</h2>
-							{example && <QuietTag>{t("pillExample")}</QuietTag>}
-						</div>
-						<p className="text-muted-foreground mt-1 text-sm">{description}</p>
-					</div>
-					<Button size="icon" variant="ghost" onClick={onClose} aria-label={t("close")}>
-						<X className="size-4" />
-					</Button>
-				</div>
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onClose()}
+			side="right"
+			size="md"
+			closeLabel={t("close")}
+			title={
+				<span className="flex min-w-0 items-center gap-2">
+					<CategoryIcon category={cat} />
+					<span className="truncate">{name}</span>
+					{example && <QuietTag>{t("pillExample")}</QuietTag>}
+				</span>
+			}
+			description={description}
+			testId={testId}
+		>
+			<div className="flex flex-col gap-5">
 				{e.summary && <p className="text-sm leading-relaxed">{e.summary}</p>}
 				{children}
-			</aside>
-		</div>
+			</div>
+		</Dialog>
 	);
 }
 
@@ -487,13 +488,17 @@ export function CatalogBody(props: CatalogBodyProps) {
 		] as (FilterToken | false | "" | null | undefined)[]
 	).filter((x): x is FilterToken => Boolean(x));
 	const res = props.lastAdded?.result;
-	const grouped = SECTIONS.map((id) => ({ id, items: shown.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
+	// M6-65: 50 entries a page, in section order, then grouped by section within the page.
+	const ordered = SECTIONS.flatMap((id) => shown.filter((e) => sectionOf(e) === id));
+	const slice = pageSlice(ordered, props.page ?? 1);
+	const grouped = SECTIONS.map((id) => ({ id, items: slice.rows.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
 	const details = props.detailsFor && !props.importFor ? props.detailsFor : null;
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-8" data-testid="catalog-view">
 			<header className="flex flex-col gap-5">
 				<div>
-					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("title")}</h1>
+					{/* X-42: the Benchmarks hub header holds the page's one h1; the tab's title is an h2. */}
+					<h2 className="text-lg font-semibold">{t("title")}</h2>
 					<p className="text-muted-foreground mt-1 text-sm text-pretty">{t("subtitle")}</p>
 				</div>
 				<div className="flex flex-col gap-2">
@@ -613,6 +618,15 @@ export function CatalogBody(props: CatalogBodyProps) {
 					</section>
 				))
 			)}
+			{shown.length > 0 && props.onPage && (
+				<Pager
+					page={slice.page}
+					pageCount={slice.pageCount}
+					onPage={props.onPage}
+					rangeText={tu("catalog.pageOf", { first: slice.first, last: slice.last, total: ordered.length })}
+					testId="catalog-pager"
+				/>
+			)}
 			{props.importFor && props.importForm && <ImportPanel {...props} importFor={props.importFor} importForm={props.importForm} />}
 			{details && (
 				<SidePanel e={details} onClose={() => props.onDetails?.(null)} testId="catalog-details-panel">
@@ -677,7 +691,7 @@ function CatalogSkeleton() {
 
 export default function CatalogView() {
 	const { t } = useTranslation("catalog");
-	const { data, isLoading, isError, refetch } = useGetBenchCatalogQuery();
+	const { data, isLoading, isError, refetch, error: loadError } = useGetBenchCatalogQuery();
 	const suites = useGetSuitesLightQuery();
 	const builtinSuites = useMemo(
 		() => new Set((suites.data?.suites ?? []).filter((s) => isBuiltinSuite(s) && !s.error).map((s) => s.id)),
@@ -691,8 +705,10 @@ export default function CatalogView() {
 	// p12-2: the search term lives in the address (?q=), the other filters stay on the page.
 	const [q, setQ] = useQueryState("q", parseAsString.withDefault("").withOptions({ history: "replace" }));
 	const filters: CatalogFilters = { ...localFilters, query: q ?? "" };
+	const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1).withOptions({ history: "replace" }));
 	const onFilters = (f: CatalogFilters) => {
 		setFilters(f);
+		void setPage(null);
 		if (f.query !== filters.query) void setQ(f.query === "" ? null : f.query);
 	};
 	const [busyId, setBusyId] = useState<string | null>(null);
@@ -709,9 +725,7 @@ export default function CatalogView() {
 	if (isLoading) return <CatalogSkeleton />;
 	if (isError || !data)
 		return (
-			<div className="p-6">
-				<EmptyState message={t("loadError")} testId="catalog-load-error" action={{ label: t("reload"), onClick: () => void refetch() }} />
-			</div>
+			<LoadError title={t("loadError")} error={loadError} onRetry={() => void refetch()} testId="catalog-load-error" />
 		);
 
 	const run = async (e: CatalogEntry, body: Omit<CatalogAddRequest, "id"> = {}, file?: File | null) => {
@@ -725,6 +739,7 @@ export default function CatalogView() {
 			const res = await addEntry({ id: e.id, ...body }).unwrap();
 			setLastAdded(res);
 			setImportFailure(null);
+			if (!res.job) notify({ text: tu("catalog.added", { name: e.title || e.id }) });
 			if (res.job) setJobId(res.job.id);
 			setImportFor(null);
 		} catch (err) {
@@ -741,6 +756,8 @@ export default function CatalogView() {
 			sourceAvailable={data.source_available}
 			filters={filters}
 			onFilters={onFilters}
+			page={page}
+			onPage={(p) => void setPage(p)}
 			busyId={busyId}
 			detailsFor={detailsFor}
 			onDetails={setDetailsFor}

@@ -1,6 +1,8 @@
 import { DraftPreview, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
 import { InventoryPanel, MatchChips } from "@/components/onboard/inventoryPanel";
-import { ConfirmButton } from "@/components/platform/badges";
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { OverflowMenu } from "@/components/agents/overflowMenu";
+import { notify } from "@/lib/notify";
 import { type SourceChoice, SourceBox } from "@/components/onboard/sourceBox";
 import { BlockSkeleton, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
@@ -21,15 +23,15 @@ import { AddChooser } from "@/components/suites/addChooserView";
 import "@/components/suites/uf6bI18n";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { cn } from "@/lib/utils";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	ONBOARD_STEPS,
-	SOURCE_STORAGE_KEY,
 	draftSourceName,
 	keepableSource,
-	readKeptSource,
 	stepReached,
 	visibleDrafts,
 } from "./addBenchmarkState";
@@ -66,43 +68,27 @@ export default function AddBenchmarkView() {
 	const { t: tu } = useTranslation("uf6b");
 	usePageTitle(tu("add.pageTitle"));
 
-	// X-83: the looked-at link or pasted rows survive a reload; leaving with an unsaved source asks first.
+	// X-83: the looked-at link or pasted rows are a form draft (shared useFormDraft), so they survive
+	// a reload and are looked at again; leaving with a source that has no saved draft asks first.
+	const [kept, updateKept, clearKept] = useFormDraft<{ source: OnboardInput | null }>("addBenchmark.source", { source: null });
 	const keep = (inp: OnboardInput | null) => {
-		try {
-			const k = keepableSource(inp);
-			if (k) sessionStorage.setItem(SOURCE_STORAGE_KEY, JSON.stringify(k));
-			else sessionStorage.removeItem(SOURCE_STORAGE_KEY);
-		} catch {
-			// Storage can be blocked; the page works without it.
-		}
+		const k = keepableSource(inp);
+		if (k) updateKept({ source: k });
+		else clearKept();
 	};
 	const restored = useRef(false);
 	useEffect(() => {
 		if (restored.current) return;
 		restored.current = true;
 		if (setId) return;
-		let kept: OnboardInput | null = null;
-		try {
-			kept = readKeptSource(sessionStorage.getItem(SOURCE_STORAGE_KEY));
-		} catch {
-			kept = null;
-		}
-		if (kept) {
-			setInput(kept);
-			void look(kept);
+		const again = keepableSource(kept.source);
+		if (again) {
+			setInput(again);
+			void look(again);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-	const unsaved = !!input && !setId;
-	useEffect(() => {
-		if (!unsaved) return;
-		const warn = (e: BeforeUnloadEvent) => {
-			e.preventDefault();
-			e.returnValue = "";
-		};
-		window.addEventListener("beforeunload", warn);
-		return () => window.removeEventListener("beforeunload", warn);
-	}, [unsaved]);
+	useLeaveGuard(!!input && !setId);
 
 	const look = async (inp: OnboardInput, source?: string) => {
 		setError("");
@@ -246,7 +232,7 @@ export function StepLine({ reached }: { reached: number }) {
 					data-state={i < reached ? "done" : i === reached ? "current" : "future"}
 					className={cn(
 						"whitespace-nowrap",
-						i <= reached ? "text-foreground font-medium" : "text-muted-foreground/70",
+						i <= reached ? "text-foreground font-medium" : "text-muted-foreground",
 					)}
 				>
 					{t(`steps.${step}`)}
@@ -266,6 +252,23 @@ function DraftList({ current, onOpen }: { current: string | null; onOpen(id: str
 	const tx = (k: string, o?: Record<string, unknown>) => t(k as never, o as never) as unknown as string;
 	const q = useListOnboardDraftsQuery();
 	const [remove, removeState] = useDeleteOnboardDraftMutation();
+	const confirm = useConfirm();
+	// Delete sits in the row's More menu (M6-53) and asks first, naming the draft.
+	const askDelete = async (d: { id: string; suite: string; tasks: number }) => {
+		const opts: DestructiveConfirmOptions = {
+			destructive: true,
+			title: tu("add.draftDeleteTitle", { suite: d.suite }),
+			confirmLabel: t("drafts.deleteYes"),
+			cancelLabel: t("drafts.keep"),
+		};
+		if (!(await confirm(tx("drafts.deleteAsk", { suite: d.suite, tasks: d.tasks }), opts))) return;
+		try {
+			await remove(d.id).unwrap();
+			notify({ text: tx("deleted", { ns: "toast", name: d.suite }) });
+		} catch {
+			// The error line above the list shows why (removeState.error).
+		}
+	};
 	const drafts = visibleDrafts(q.data?.drafts ?? [], Date.now(), current);
 	if (drafts.length === 0) return null;
 	const day = (iso: string) => {
@@ -297,15 +300,10 @@ function DraftList({ current, onOpen }: { current: string | null; onOpen(id: str
 								{t("drafts.open")}
 							</Button>
 						)}
-						<ConfirmButton
-							label={t("drafts.delete")}
-							question={tx("drafts.deleteAsk", { suite: d.suite, tasks: d.tasks })}
-							confirmLabel={t("drafts.deleteYes")}
-							cancelLabel={t("drafts.keep")}
-							onConfirm={() => void remove(d.id)}
-							isLoading={removeState.isLoading && removeState.originalArgs === d.id}
-							variant="ghost"
-							testId={`onboard-draft-delete-${d.id}`}
+						<OverflowMenu
+							label={tu("add.draftMore", { suite: d.suite })}
+							items={[{ label: t("drafts.delete"), onSelect: () => void askDelete(d), destructive: true, testId: `onboard-draft-delete-${d.id}` }]}
+							testId={`onboard-draft-more-${d.id}`}
 						/>
 					</li>
 				))}

@@ -2,11 +2,11 @@
 	"nav": "Human review",
 	"title": "Human review",
 	"subtitle": "Have people check agent answers. When labellers agree, the result tunes the benchmark's automatic judge.",
-	"loadError": "Could not load labelling queues",
-	"empty": "No labelling queues yet. Create one, then add the runs of an evaluation to label.",
-	"fromCalibration": "Have several people label answers, with agreement measured, in a labelling queue.",
+	"loadError": "Could not load human review queues",
+	"empty": "No human review queues yet. Create one, then add the runs of an evaluation to label.",
+	"fromCalibration": "Have several people label answers, with agreement measured, in a human review queue.",
 	"fromCalibrationLink": "Open human review",
-	"viewerNote": "Your role can read labelling queues but not label or change them.",
+	"viewerNote": "Your role can read human review queues but not label or change them.",
 	"create": {
 		"title": "New queue",
 		"description": "A queue holds the answers people label, how many people label each one, and what they may see.",
@@ -107,7 +107,7 @@
 		"filterAll": "All",
 		"state": {
 			"open": "Not labelled",
-			"labelling": "Labelling",
+			"labelling": "In review",
 			"disputed": "Disagreement",
 			"done": "Done"
 		},
@@ -127,7 +127,7 @@
 	"add": {
 		"title": "Add items",
 		"description": "Add the finished runs of an evaluation's benchmark. A sample with balance takes runs evenly from those the judge passed and failed.",
-		"experiment": "Experiment id",
+		"experiment": "Comparison id",
 		"experimentPlaceholder": "e_2026_11_20_support",
 		"sample": "At most this many runs (0: all)",
 		"stratify": "Balance passed and failed runs",

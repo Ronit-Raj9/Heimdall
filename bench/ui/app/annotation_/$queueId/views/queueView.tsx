@@ -1,4 +1,7 @@
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { notify } from "@/lib/notify";
+import "@/components/suites/uf6bI18n";
+import { queueSourceLine } from "./queueSource";
 import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
 import { humanExperimentName, isCheckPracticeOrDebug, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -32,7 +35,7 @@ import type {
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, Tags, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -55,6 +58,9 @@ export default function QueueView({ queueId }: { queueId: string }) {
 
 export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 	const { t } = useTranslation("annotation");
+	const { t: tu } = useTranslation("uf6b");
+	const source = queueSourceLine(queue);
+	const sourceText = tu(source.key, { benchmark: source.benchmark });
 	const tabs: RouteTab[] = [
 		{ id: "label", label: t("queue.tabs.label"), hidden: !queue.can_label },
 		{ id: "items", label: t("queue.tabs.items"), badge: queue.counts.total },
@@ -65,8 +71,7 @@ export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="annotation-queue-screen">
 			<PageHeader
 				title={queue.name}
-				subtitle={queue.description}
-				icon={Tags}
+				subtitle={[sourceText, queue.description].filter(Boolean).join(" ")}
 				breadcrumbs={[{ label: t("queue.back"), to: "/annotation" }, { label: queue.name }]}
 			/>
 			<StatGrid>
@@ -771,6 +776,7 @@ export function AgreementPanel({ data }: { data: AnnotationAgreement }) {
 
 export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 	const { t } = useTranslation("annotation");
+	const { t: tu } = useTranslation("uf6b");
 	const navigate = useNavigate();
 	const [update, updated] = useUpdateAnnotationQueueMutation();
 	const [remove, removed] = useDeleteAnnotationQueueMutation();
@@ -864,10 +870,18 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 							disabled={removed.isLoading}
 							onClick={() =>
 								void (async () => {
-									if (!(await confirm(t("settings.deleteConfirm"), { destructive: true, confirmLabel: t("settings.delete") }))) return;
+									const opts: DestructiveConfirmOptions = {
+										destructive: true,
+										title: tu("queue.deleteTitle", { name: queue.name }),
+										confirmLabel: tu("queue.deleteYes"),
+									};
+									if (!(await confirm(t("settings.deleteConfirm"), opts))) return;
 									await remove(queue.id)
 										.unwrap()
-										.then(() => void navigate({ to: "/annotation" }))
+										.then(() => {
+											notify({ text: tu("queue.deleted", { name: queue.name }) });
+											void navigate({ to: "/annotation" });
+										})
 										.catch(() => {});
 								})()
 							}

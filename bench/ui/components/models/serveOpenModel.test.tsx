@@ -20,6 +20,14 @@ vi.mock("@/lib/store/apis/openModelsApi", async (orig) => {
 	};
 });
 
+// M8-15: the evaluation is picked from the experiments list.
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
+	useListExperimentsQuery: () => ({
+		data: { experiments: [{ exp_id: "e_open", name: "Support run", state: "running" }, { exp_id: "e_done", name: "Old", state: "done" }] },
+	}),
+}));
+
 const CATALOG: OpenModelCatalog = {
 	engines: [
 		{ id: "vllm", title: "vLLM", version: "0.33.0", provider: "vllm", licence: "Apache-2.0" },
@@ -87,6 +95,10 @@ describe("ServeOpenModel", () => {
 		expect(html).toContain("vllm/Qwen/Qwen2.5-0.5B-Instruct");
 		expect(html).toContain('data-testid="serve-stop-abcdefghij"');
 		expect(html).toContain("For evaluation exp-1");
+		// Start is the shared paid button; the evaluation is a select of unfinished ones.
+		expect(html).toContain('data-testid="serve-start"');
+		expect(html).toContain(">Support run<");
+		expect(html).not.toContain(">Old<");
 	});
 	it("shows a viewer the deployments only", () => {
 		const html = render(<ServeOpenModel />, hosted("viewer"));

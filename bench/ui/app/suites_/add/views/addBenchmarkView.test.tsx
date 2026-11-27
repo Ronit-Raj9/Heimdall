@@ -16,6 +16,7 @@ vi.mock("@tanstack/react-router", () => ({
 			{children}
 		</a>
 	),
+	useBlocker: () => undefined,
 }));
 
 const { idleMutation } = vi.hoisted(() => ({ idleMutation: () => [() => undefined, { isLoading: false, error: undefined }] }));

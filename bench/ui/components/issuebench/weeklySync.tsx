@@ -1,6 +1,7 @@
 // Weekly issue sync (W4-48): under From issues, turn the named repository into a benchmark that gets new
 // tasks every week from its merged fixes, within a weekly spending cap.
-import { useConfirm } from "@/components/platform/confirmDialog";
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { notify } from "@/lib/notify";
 import "@/components/suites/uf6bI18n";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -153,8 +154,17 @@ function SyncCard({ sync, writable, t }: { sync: IssueSyncRepo; writable: boolea
 	const { t: tu } = useTranslation("uf6b");
 	// M6-75: Remove stops the weekly sync for good, so it asks first.
 	const onRemove = async () => {
-		const ok = await confirm(tu("confirm.syncRemove", { repo: sync.repo }), { destructive: true, confirmLabel: t("sync.remove") });
-		if (ok) await act(remove(sync.id).unwrap());
+		const opts: DestructiveConfirmOptions = {
+			destructive: true,
+			title: tu("confirm.syncRemoveTitle", { repo: sync.repo }),
+			confirmLabel: tu("confirm.syncRemoveYes"),
+		};
+		if (!(await confirm(tu("confirm.syncRemove", { repo: sync.repo }), opts))) return;
+		await act(
+			remove(sync.id)
+				.unwrap()
+				.then(() => notify({ text: tu("confirm.syncRemoved", { repo: sync.repo }) })),
+		);
 	};
 	const busy = runState.isLoading || updateState.isLoading || removeState.isLoading;
 	const act = async (p: Promise<unknown>) => {

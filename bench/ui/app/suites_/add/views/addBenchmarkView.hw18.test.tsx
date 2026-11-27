@@ -14,6 +14,7 @@ vi.mock("@tanstack/react-router", () => ({
 			{children}
 		</a>
 	),
+	useBlocker: () => undefined,
 }));
 
 // ConfirmButton asks on its first click; the tests read what it asks and run its confirm.
@@ -23,6 +24,23 @@ vi.mock("@/components/platform/badges", async (orig) => ({
 	ConfirmButton: (p: { label: string; question: string; testId?: string; onConfirm(): void }) => {
 		asked.list.push(p);
 		return <button data-testid={p.testId}>{p.label}</button>;
+	},
+}));
+
+// M6-53: a draft's Delete sits in its row's More menu and asks through the shared confirm.
+const menus = vi.hoisted(() => ({ list: [] as { testId?: string; items: { label: string; testId?: string; onSelect?(): void }[] }[] }));
+vi.mock("@/components/agents/overflowMenu", () => ({
+	OverflowMenu: (p: { testId?: string; items: { label: string; testId?: string; onSelect?(): void }[] }) => {
+		menus.list.push(p);
+		return <button data-testid={p.testId}>more</button>;
+	},
+}));
+const confirmed = vi.hoisted(() => ({ asks: [] as { message: string; opts?: { title?: string; destructive?: boolean } }[] }));
+vi.mock("@/components/platform/confirmDialog", async (orig) => ({
+	...(await orig<typeof import("@/components/platform/confirmDialog")>()),
+	useConfirm: () => async (message: string, opts?: { title?: string; destructive?: boolean }) => {
+		confirmed.asks.push({ message, opts });
+		return true;
 	},
 }));
 
@@ -104,13 +122,19 @@ beforeEach(() => {
 });
 
 describe("Earlier drafts Delete (N289)", () => {
-	it("asks first, naming the benchmark and its drafted tasks, and deletes on confirm", () => {
+	it("asks first, naming the benchmark and its drafted tasks, and deletes on confirm", async () => {
+		api.remove.mockReturnValue({ unwrap: () => Promise.resolve({}) });
 		renderToStaticMarkup(<NuqsTestingAdapter><AddBenchmarkView /></NuqsTestingAdapter>);
-		const del = asked.list.find((p) => p.testId === "onboard-draft-delete-d1");
-		expect(del?.question).toBe("Delete the draft for faq? Its 2 drafted task(s) go. A benchmark it already published stays.");
+		const menu = menus.list.find((m) => m.testId === "onboard-draft-more-d1");
+		const del = menu?.items.find((i) => i.testId === "onboard-draft-delete-d1");
+		expect(del?.label).toBe("Delete");
 		expect(api.remove).not.toHaveBeenCalled();
-		del?.onConfirm();
-		expect(api.remove).toHaveBeenCalledWith("d1");
+		del?.onSelect?.();
+		await vi.waitFor(() => expect(api.remove).toHaveBeenCalledWith("d1"));
+		const ask = confirmed.asks.at(-1);
+		expect(ask?.message).toBe("Delete the draft for faq? Its 2 drafted task(s) go. A benchmark it already published stays.");
+		expect(ask?.opts?.title).toBe("Delete the draft of faq?");
+		expect(ask?.opts?.destructive).toBe(true);
 	});
 
 	it("shows a failed delete", () => {

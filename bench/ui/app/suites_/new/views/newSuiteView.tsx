@@ -12,6 +12,7 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/suites/uf6bI18n";
+import { STARTS, startFromUrl, type StartingPoint } from "./newSuiteStart";
 
 // One id rule for agents and benchmarks (M6-60): 1 to 63 characters.
 const ID_RE = AGENT_ID_RE;
@@ -19,9 +20,6 @@ const FALLBACK_TEMPLATES = ["python-pytest", "node-test", "go-test", "generic-re
 /** Templates of a benchmark cut from repository commits, graded by tests. */
 const CODE_TEMPLATES = new Set(["python-pytest", "node-test", "go-test", "generic-reward"]);
 
-/** Where a new benchmark's tasks come from (X13): own questions and tickets, repository commits, or any template. */
-export type StartingPoint = "questions" | "code" | "other";
-const STARTS = ["questions", "code", "other"] as const satisfies readonly StartingPoint[];
 
 /** /suites/new: create benchmarks/<id>/ from a template, then open its Edit tab. */
 export default function NewSuiteView({ initialId = "" }: { initialId?: string } = {}) {
@@ -29,15 +27,17 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 	const { t: th } = useTranslation("hw02");
 	const { t: tb } = useTranslation("bench");
 	const { t: tu } = useTranslation("uf6b");
-	// ?start=code opens on "From code changes" (the add chooser's code row).
+	// ?start=code opens on "From code changes" (the add chooser's code row); ?template=support,
+	// qa or commits (links from other pages) map to the same choices; start wins when both are given.
 	const [startParam] = useQueryState("start", parseAsStringLiteral(STARTS));
+	const [templateParam] = useQueryState("template");
 	const session = useSession();
 	const writable = canUse(session, "member");
 	const templatesQuery = useGetSuiteTemplatesQuery();
 	const [createSuite, { isLoading, error }] = useCreateSuiteMutation();
 	const navigate = useNavigate();
 	const [id, setId] = useState(initialId);
-	const [start, setStart] = useState<StartingPoint>(startParam ?? "questions");
+	const [start, setStart] = useState<StartingPoint>(() => startFromUrl(startParam, templateParam));
 	const [template, setTemplate] = useState("");
 	const [image, setImage] = useState("");
 	const [notVisible, setNotVisible] = useState(false);
