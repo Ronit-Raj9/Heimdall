@@ -4,16 +4,11 @@
 		"searchPlaceholder": "Task id or title",
 		"pageOf": "{{first}} to {{last}} of {{total}} tasks",
 		"pageOfFiltered": "{{first}} to {{last}} of {{total}} matching tasks ({{all}} in all)",
-		"pager": "Task pages",
-		"prev": "Previous",
-		"next": "Next",
-		"pageN": "Page {{page}} of {{pages}}",
 		"usedVersion": "The run used version {{rev}} of this benchmark.",
 		"columns": "Columns",
 		"moreColumns": "Show more columns",
 		"fewerColumns": "Show fewer columns",
 		"statusColumn": "Status",
-		"onlyReadyNote": "Only ready tasks are used when you run this benchmark.",
 		"skipTable": "Skip to the page controls"
 	},
 	"status": {

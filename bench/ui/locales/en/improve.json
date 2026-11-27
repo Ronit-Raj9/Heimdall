@@ -45,7 +45,7 @@
 		"sealed": "Held-out tasks"
 	},
 	"detail": {
-		"back": "Improvements",
+		"back": "Auto-improve",
 		"loadError": "Could not load this improvement run",
 		"verdictTitle": "Verdict",
 		"sealedGain": "Held-out gain",

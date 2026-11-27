@@ -20,7 +20,6 @@
 		"removeQuestion": "Disconnect Bifrost? Feature lines stop updating.",
 		"removeTitle": "Remove the connection to {{host}}?",
 		"removeYes": "Remove connection",
-		"removeFailed": "Could not disconnect: {{error}}",
 		"details": "Details"
 	},
 	"line": {
@@ -205,9 +204,7 @@
 			"estimated": "Estimated"
 		}
 	},
-	"use": {
-		"noSetting": "Nothing to copy yet"
-	},
+	"use": {},
 	"agents": {
 		"connect": "Connect your Bifrost to list its agents.",
 		"create": "Create agent from this",
@@ -215,9 +212,7 @@
 		"go": "Create the agent and open it"
 	},
 	"watch": {
-		"providersHint": "Up to five providers.",
-		"evaluationOption": "{{name}}, {{date}}, {{models}}",
-		"setupOption": "{{label}}: {{model}}"
+		"providersHint": "Up to five providers."
 	},
 	"skill": {
 		"openTools": "Open the agent's Tools tab"

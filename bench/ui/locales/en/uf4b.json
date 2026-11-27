@@ -24,7 +24,7 @@
 		"cost": "Cost",
 		"runsMobile": "{{done}} of {{total}} runs",
 		"notPriced": "Not priced",
-		"notPricedHint": "No price is set for this model. Add one in Settings, API keys, price per 1M tokens.",
+		"notPricedHint": "No price is set for this model. Add one in Settings, Model keys, price per 1M tokens.",
 		"compareVersions": "Compare two versions",
 		"useCommandLine": "Use the command line",
 		"changedResults": "Changed results ({{count}})"

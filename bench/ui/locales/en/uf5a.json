@@ -43,7 +43,6 @@
 		"rerunHint": "Opens the evaluate wizard with this task, agent and model. Nothing starts until you confirm the cost.",
 		"details": "Run facts and metrics",
 		"setupB": "Setup {{arm}}: {{value}}",
-		"tabDisabled": "This run did not record anything for this tab.",
 		"suite": "Benchmark {{name}}"
 	},
 	"gates": {

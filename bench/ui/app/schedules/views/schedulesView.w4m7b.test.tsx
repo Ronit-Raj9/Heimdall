@@ -49,7 +49,7 @@ describe("schedule alerts", () => {
 			<AlertsEditor alerts={[{ url_env: "SLACK_URL" }]} events={[]} secrets={[]} busy={false} onChange={() => undefined} />,
 		);
 		const b = asked.buttons.find((x) => x.testId === "alert-remove-0");
-		expect(b?.question).toBe("Remove the alert that sends to SLACK_URL? Schedules stop sending to it.");
+		expect(b?.question).toBe("Remove the alert that sends to SLACK_URL? Checks stop sending to it.");
 		expect(b?.confirmLabel).toBe("Remove alert");
 	});
 });

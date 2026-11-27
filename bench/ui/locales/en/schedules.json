@@ -3,7 +3,7 @@
 	"subtitle": "Repeat an evaluation or a comparison at set times, with a daily spending limit.",
 	"loadError": "Could not load the schedules.",
 	"empty": "No schedules yet. Add one below: pick a comparison file, a time and a daily spending limit.",
-	"noTicker": "This server cannot start scheduled runs right now (it is offline). Schedules are saved and start once it is back.",
+	"noTicker": "This server cannot start scheduled runs right now (it is offline). Saved checks start once it is back.",
 	"noTickerLink": "Check the server status",
 	"hostedLimits": "Up to {{max}} repeat runs for this organization, {{count}} used. Each runs at most once every {{min}} minutes.",
 	"hostedRunnersLink": "Workers",

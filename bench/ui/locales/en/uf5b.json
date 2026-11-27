@@ -81,7 +81,6 @@
 	},
 	"picker": {
 		"search": "Search models",
-		"searchFor": "Search {{label}}",
 		"model": "Model",
 		"pickAgentFirst": "Pick the agent's model first",
 		"choose": "Choose a model",
@@ -92,9 +91,6 @@
 		"more": "More providers (needs a key)...",
 		"open": "open",
 		"openTitle": "Open-weight model",
-		"modelId": "Model id",
-		"keyBroken": "The {{name}} key does not work.",
-		"keyNone": "No {{name}} key yet.",
-		"addKey": "Add one in Models & keys"
+		"modelId": "Model id"
 	}
 }

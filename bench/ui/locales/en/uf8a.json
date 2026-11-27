@@ -123,9 +123,7 @@
 	},
 	"unsaved": {
 		"title": "Leave without saving?",
-		"body": "You have changes on this page that are not saved. They are lost if you leave.",
-		"leave": "Leave",
-		"stay": "Stay"
+		"body": "You have changes on this page that are not saved. They are lost if you leave."
 	},
 	"retention": {
 		"confirm_one": "Delete comparisons older than {{count}} day now? Comparisons and their runs older than that are deleted. This cannot be undone.",

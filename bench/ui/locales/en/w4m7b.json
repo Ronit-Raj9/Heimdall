@@ -10,7 +10,7 @@
 		"toAdd": "To add it: {{list}}.",
 		"limitHint": "Leave the limit empty only for a practice comparison file; any other comparison needs one.",
 		"alerts": {
-			"removeAsk": "Remove the alert that sends to {{name}}? Schedules stop sending to it.",
+			"removeAsk": "Remove the alert that sends to {{name}}? Checks stop sending to it.",
 			"removeConfirm": "Remove alert"
 		}
 	},

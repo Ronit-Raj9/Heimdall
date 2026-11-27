@@ -9,9 +9,7 @@
 		"title": "Rerun the failed runs?",
 		"confirmN_one": "Rerun the {{count}} failed run? It is charged like a new run.",
 		"confirmN_other": "Rerun the {{count}} failed runs? They are charged like new runs.",
-		"confirm": "Rerun the failed runs? They are charged like new runs.",
-		"ok": "Rerun",
-		"keep": "Not now"
+		"confirm": "Rerun the failed runs? They are charged like new runs."
 	},
 	"picker": {
 		"keyOk": "Key: {{label}} ...{{last4}}"

@@ -9,8 +9,6 @@
 	"sampleHint": "People's labels come first. 0 checks all {{count}} labelled answer(s).",
 	"approxCalls": "About {{calls}} grader call(s).",
 	"hostedCap": "Hosted cap: {{calls}} calls and ${{usd}} per run, paid with your org's own key.",
-	"noKey": "Your organisation has no working {{provider}} key. The hosted check only uses your own key.",
-	"addKey": "Add a model key",
 	"estimate": "Estimate cost",
 	"run": "Run the check",
 	"confirm": "This calls the grader model about {{calls}} time(s), billed to your key. Run it?",

@@ -4,9 +4,7 @@
 		"nameHelp": "Lowercase letters, digits and dashes, up to 63.",
 		"notReadyGroup": "Not ready yet",
 		"notReadyTitle": "This benchmark has no ready task yet. Open it on Benchmarks to finish it.",
-		"confirmTitle": "Start this improvement run?",
 		"confirm": "The run calls your organization's model keys round by round and can spend up to ${{limit}}.",
-		"confirmLabel": "Start run, costs up to ${{limit}}",
 		"startVerb": "Start run",
 		"confirmText": "The run calls your organization's model keys round by round.",
 		"close": "Close"
@@ -66,7 +64,6 @@
 		"addKey": "Add a {{provider}} key",
 		"secretSuffix": " (stored as a secret)",
 		"secretPick": "Pick a secret",
-		"looksLikeKey": "This looks like a key. Save it as a secret instead.",
-		"pullName": "Your own code"
+		"looksLikeKey": "This looks like a key. Save it as a secret instead."
 	}
 }

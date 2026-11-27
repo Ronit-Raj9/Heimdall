@@ -50,7 +50,7 @@
 		},
 		"noModelKey": {
 			"what": "No model key for this provider.",
-			"why": "Runs call the model with your organization's key. Add one in Settings, API keys."
+			"why": "Runs call the model with your organization's key. Add one in Settings, Model keys."
 		},
 		"budgetReached": {
 			"what": "Stopped: the budget is reached.",
