@@ -184,6 +184,13 @@ describe("SettingsView", () => {
 		expect(settingsTabsFor(LOCAL_SESSION)).not.toContain("billing");
 		expect(settingsTab("billing")).toBe("billing");
 	});
+	it("lists Shared links only for organization admins", () => {
+		expect(settingsTabsFor(hostedSession("admin"))).toContain("shares");
+		expect(settingsTabsFor(hostedSession("owner"))).toContain("shares");
+		expect(settingsTabsFor(hostedSession("member"))).not.toContain("shares");
+		expect(settingsTabsFor(hostedSession("viewer"))).not.toContain("shares");
+		expect(settingsTab("shares")).toBe("shares");
+	});
 	it("lists Server admin only for server admins", () => {
 		const tabs = (session: Parameters<typeof settingsTabsFor>[0]) => settingsTabsFor(session);
 		expect(tabs(hostedSession())).not.toContain("admin");

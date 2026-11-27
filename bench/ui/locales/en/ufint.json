@@ -21,5 +21,8 @@
 	},
 	"redTeam": {
 		"admitConfirm": "Run the readiness check of every task in {{suite}}? It plays fixed attacks on a worker and calls no model."
+	},
+	"settings": {
+		"tabShares": "Shared links"
 	}
 }

@@ -13,7 +13,9 @@ import { EmbeddedPage, RouteTabs } from "@/components/shell";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePageTitle } from "@/lib/routing/pageTitle";
-import { useSession, type SessionInfo } from "@/lib/session/sessionContext";
+import { canUse, useSession, type SessionInfo } from "@/lib/session/sessionContext";
+import { OrgShareLinks } from "@/components/share/orgShareLinks";
+import "@/components/platform/ufintI18n";
 import AdminView from "@/app/admin/views/adminView";
 import FilesView from "@/app/files/views/filesView";
 import IntegrationsView from "@/app/integrations/views/integrationsView";
@@ -26,6 +28,7 @@ import WorkersView from "@/app/workers/views/workersView";
 import {
 	Building2,
 	CreditCard,
+	Link2,
 	FolderTree,
 	Gauge,
 	Github,
@@ -66,6 +69,7 @@ export const SETTINGS_TABS = [
 	"github",
 	"audit",
 	"org",
+	"shares",
 	"account",
 	"admin",
 ] as const;
@@ -79,7 +83,7 @@ export const SETTINGS_GROUPS: readonly { id: SettingsGroup; tabs: readonly Setti
 	{ id: "credentials", tabs: ["secrets", "tokens", "github"] },
 	{ id: "running", tabs: ["runners", "jobs", "integrations", "operations"] },
 	{ id: "project", tabs: ["files"] },
-	{ id: "team", tabs: ["members", "org", "audit"] },
+	{ id: "team", tabs: ["members", "org", "shares", "audit"] },
 	{ id: "you", tabs: ["account"] },
 	{ id: "server", tabs: ["admin"] },
 ];
@@ -109,6 +113,7 @@ const TAB_ICON: Record<SettingsTab, ComponentType<{ className?: string }>> = {
 	github: Github,
 	audit: ScrollText,
 	org: Building2,
+	shares: Link2,
 	account: UserRound,
 	admin: Shield,
 };
@@ -119,10 +124,18 @@ export function settingsTab(raw: string | null | undefined): SettingsTab {
 	return SETTINGS_TABS.includes(raw as SettingsTab) ? (raw as SettingsTab) : DEFAULT_SETTINGS_TAB;
 }
 
-/** The tabs this session sees: team tabs only in hosted mode, Server admin only for server admins. */
+/**
+ * The tabs this session sees: team tabs only in hosted mode, Server admin only for server admins,
+ * Shared links (every share link of the organization) only for organization admins.
+ */
 export function settingsTabsFor(session: SessionInfo): SettingsTab[] {
 	const hosted = session.authMode !== "local";
-	return SETTINGS_TABS.filter((id) => (hosted || !HOSTED_ONLY.includes(id)) && (id !== "admin" || session.serverAdmin === true));
+	return SETTINGS_TABS.filter(
+		(id) =>
+			(hosted || !HOSTED_ONLY.includes(id)) &&
+			(id !== "admin" || session.serverAdmin === true) &&
+			(id !== "shares" || canUse(session, "admin")),
+	);
 }
 
 export interface SettingsViewProps {
@@ -140,6 +153,7 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 	const { t } = useTranslation("platform");
 	const { t: tSecrets } = useTranslation("secrets");
 	const { t: tl } = useTranslation("uf8a");
+	const { t: ti } = useTranslation("ufint");
 	const session = useSession();
 	const org = session.org;
 	const local = session.authMode === "local";
@@ -147,7 +161,7 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 	const active = tabs.includes(tab) ? tab : DEFAULT_SETTINGS_TAB;
 	// Renamed tabs (Model keys, Password) read from this lane's catalog; the rest keep their names.
 	const tabLabel = (id: SettingsTab) =>
-		id === "keys" ? tl("settings.tabKeys") : id === "account" ? tl("settings.tabAccount") : t(`settings.tabs.${id}`);
+		id === "keys" ? tl("settings.tabKeys") : id === "account" ? tl("settings.tabAccount") : id === "shares" ? ti("settings.tabShares") : t(`settings.tabs.${id}`);
 	usePageTitle(`${tabLabel(active)} · ${t("settings.title")} · Heimdall`);
 
 	if (!local && (!session.signedIn || !org)) {
@@ -289,6 +303,8 @@ function SettingsTabBody({ tab }: { tab: SettingsTab }) {
 			return <AdminView param="section" />;
 		case "github":
 			return <GithubTab />;
+		case "shares":
+			return <OrgShareLinks />;
 		case "members":
 		case "tokens":
 		case "audit":
