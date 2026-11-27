@@ -260,6 +260,8 @@ export interface EvaluationChild {
 	experiment_id: string;
 	status: string;
 	skipped?: string;
+	/** Why it was skipped, as a fixed code (G1), for example "no_worker". Older servers send none. */
+	cause?: string;
 	next_run_usd?: number;
 	/** Tasks left out of this benchmark alone (quarantined); the rest runs. */
 	skipped_tasks?: EvaluationSkippedTask[];
@@ -377,6 +379,8 @@ export interface Estimate {
 	from_library?: boolean;
 	/** The preset sizes of the same setup, when asked with `presets: true`. */
 	presets?: EstimatePreset[] | null;
+	/** Where the cost came from; "list_price" for an arm with no run history (server wiring). */
+	estimate_basis?: string;
 }
 
 export type BudgetFit = "fits" | "may_exceed" | "exceeds" | "unknown";
@@ -923,6 +927,28 @@ export function normalizeEvaluationList(raw: unknown): Evaluation[] {
 	return [];
 }
 
+/** listEvaluations' optional parameters (G3). status is a comma list on the server. */
+export interface ListEvaluationsParams {
+	limit?: number;
+	offset?: number;
+	q?: string;
+	status?: string | readonly string[];
+	fields?: "light";
+}
+
+/** The search parameters of an evaluations list call: only set ones. Pure. */
+export function listEvaluationsSearch(params: ListEvaluationsParams | void): Record<string, string | number> {
+	const out: Record<string, string | number> = {};
+	if (!params) return out;
+	if (typeof params.limit === "number") out.limit = params.limit;
+	if (typeof params.offset === "number") out.offset = params.offset;
+	if (params.q && params.q.trim()) out.q = params.q.trim();
+	const status = typeof params.status === "string" ? params.status : params.status?.join(",");
+	if (status) out.status = status;
+	if (params.fields) out.fields = params.fields;
+	return out;
+}
+
 // The agent leaderboard (A17) lives in ./agentLeaderboardApi; its types are re-exported here.
 export type { AgentCapabilityScore as AgentLeaderboardCell, AgentLeaderboardRow, AgentLeaderboardResponse } from "./agentLeaderboardApi";
 export { useGetAgentLeaderboardQuery } from "./agentLeaderboardApi";
@@ -962,8 +988,18 @@ export const evaluationsApi = benchApi
 				}),
 				invalidatesTags: (_r, _e, { agent }) => [{ type: "AgentVersions", id: agent }],
 			}),
-			listEvaluations: builder.query<Evaluation[], void>({
-				query: () => "/evaluations",
+			// A plain call asks the whole list; limit and offset page it on the server (G3).
+			listEvaluations: builder.query<Evaluation[], ListEvaluationsParams | void>({
+				query: (params) => {
+					const search = listEvaluationsSearch(params);
+					return Object.keys(search).length > 0 ? { url: "/evaluations", params: search } : "/evaluations";
+				},
+				transformResponse: (body: unknown) => normalizeEvaluationList(body),
+				providesTags: [{ type: "Evaluations", id: "LIST" }],
+			}),
+			// The light rows of finished evaluations (M7-41): fields=light, status=done by default. Same LIST tag.
+			listEvaluationsLight: builder.query<Evaluation[], ListEvaluationsParams | void>({
+				query: (params) => ({ url: "/evaluations", params: listEvaluationsSearch({ status: "done", ...(params ?? {}), fields: "light" }) }),
 				transformResponse: (body: unknown) => normalizeEvaluationList(body),
 				providesTags: [{ type: "Evaluations", id: "LIST" }],
 			}),
@@ -1035,6 +1071,7 @@ export const evaluationsApi = benchApi
 
 export const {
 	useGetAgentCompatibilityQuery,
+	useListEvaluationsLightQuery,
 	useGetAgentVersionsQuery,
 	useGetAgentVersionQuery,
 	useSnapshotAgentVersionMutation,

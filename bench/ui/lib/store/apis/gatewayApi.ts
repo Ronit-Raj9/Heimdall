@@ -13,6 +13,18 @@ import { benchApi } from "./benchApi";
 
 const enc = encodeURIComponent;
 
+/** The effect in an answer, or null for {"effect": null}, an empty answer or anything that is no effect. Pure. */
+export function effectOf(answer: unknown): GwEffect | null {
+	if (!answer || typeof answer !== "object") return null;
+	if ("effect" in answer) {
+		const inner = (answer as { effect: unknown }).effect;
+		if (inner === null || inner === undefined) return null;
+		return effectOf(inner);
+	}
+	const e = answer as Partial<GwEffect>;
+	return typeof e.feature === "string" && typeof e.state === "string" ? (answer as GwEffect) : null;
+}
+
 /** The Bifrost feature test routes (audit/W4_DESIGN_3_BIFROST.md 3.6, 6.6, 14.4, 16.3, 17.3). */
 export const gatewayApi = benchApi.enhanceEndpoints({ addTagTypes: ["Gateway"] }).injectEndpoints({
 	endpoints: (builder) => ({
@@ -25,6 +37,14 @@ export const gatewayApi = benchApi.enhanceEndpoints({ addTagTypes: ["Gateway"] }
 		}),
 		getGatewayEffect: builder.query<GwEffect, string>({
 			query: (expId) => `/experiments/${enc(expId)}/gateway-effect`,
+			providesTags: (_r, _e, expId) => [{ type: "Gateway", id: `effect:${expId}` }],
+		}),
+		// M4-7: with ?optional=1 a comparison that is no feature test answers {"effect": null} instead of
+		// a 404. The answer is read with effectOf, so the hook gives the effect or null; an older server
+		// still answers 404 for no effect, read as nothing by the caller.
+		getGatewayEffectOptional: builder.query<GwEffect | null, string>({
+			query: (expId) => `/experiments/${enc(expId)}/gateway-effect?optional=1`,
+			transformResponse: (raw: unknown) => effectOf(raw),
 			providesTags: (_r, _e, expId) => [{ type: "Gateway", id: `effect:${expId}` }],
 		}),
 		getGatewayReportCard: builder.query<GwReportCard, void>({
@@ -71,6 +91,7 @@ export const gatewayApi = benchApi.enhanceEndpoints({ addTagTypes: ["Gateway"] }
 export const {
 	useDraftGatewayTestMutation,
 	useGetGatewayEffectQuery,
+	useGetGatewayEffectOptionalQuery,
 	useGetGatewayReportCardQuery,
 	useSetGatewaySourceMutation,
 	useRemoveGatewaySourceMutation,
