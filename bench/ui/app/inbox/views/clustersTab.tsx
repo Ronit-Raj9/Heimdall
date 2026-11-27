@@ -5,6 +5,8 @@ import { ClustersBanner } from "@/components/clusters/clustersBanner";
 import { ClustersFilters, type ClusterTextFilter } from "@/components/clusters/clustersFilters";
 import { ClustersSummary } from "@/components/clusters/clustersSummary";
 import { ClustersTable, filterClusters } from "@/components/clusters/clustersTable";
+import { EmptyState } from "@/components/shell/emptyState";
+import { ListCount, Pager, pageSlice } from "@/components/ui/pager";
 import { ToolbarSearch } from "@/components/ui/toolbar";
 import "./uf7aI18n";
 import {
@@ -65,6 +67,9 @@ export default function ClustersTab() {
 	// The search is kept in the URL, so a narrowed list can be shared (M7-13, M5-24).
 	const [q, setQ] = useQueryState("q", parseAsString);
 	const { t: f } = useTranslation("uf7a");
+	// The groups list pages 50 at a time in the browser (M1-59); the request still reads every group.
+	const [pageParam, setPage] = useQueryState("page", parseAsInteger);
+	const page = pageParam ?? 1;
 
 	const query = useMemo<ClusterQuery>(() => ({ suite, agent, exp, since, min, synthetic }), [suite, agent, exp, since, min, synthetic]);
 	const params = useMemo(() => clusterParams(query), [query]);
@@ -87,6 +92,8 @@ export default function ClustersTab() {
 		void setMin(null);
 		void setSynthetic(null);
 	};
+	const matching = useMemo(() => filterClusters(data?.clusters ?? [], q ?? ""), [data?.clusters, q]);
+	const slice = pageSlice(matching, page);
 	const agentOptions = useMemo(() => [...new Set((data?.clusters ?? []).flatMap((c) => c.agents ?? []))].sort(), [data?.clusters]);
 
 	return (
@@ -146,21 +153,38 @@ export default function ClustersTab() {
 							<div className="flex min-w-0 flex-col gap-3">
 								<ToolbarSearch
 									value={q ?? ""}
-									onChange={(next) => void setQ(next || null)}
+									onChange={(next) => {
+										void setQ(next || null);
+										void setPage(null);
+									}}
 									label={f("clusters.search")}
 									placeholder={f("clusters.searchPlaceholder")}
 									testId="clusters-search"
 								/>
-								{filterClusters(data.clusters, q ?? "").length === 0 ? (
-									<EmptyNote testId="clusters-no-match">{f("clusters.noMatch")}</EmptyNote>
+								{matching.length === 0 ? (
+									<EmptyState
+										kind="filtered"
+										compact
+										body={f("clusters.noMatch")}
+										action={{ label: f("clusters.clearSearch"), onClick: () => void setQ(null) }}
+										testId="clusters-no-match"
+									/>
 								) : (
-									<div className="min-w-0 rounded-sm sm:border">
-										<ClustersTable
-											clusters={filterClusters(data.clusters, q ?? "")}
-											selected={sig}
-											onSelect={(next) => void setSig(next)}
-										/>
-									</div>
+									<>
+										<ListCount shown={matching.length} total={data.clusters.length} testId="clusters-count" />
+										<div className="min-w-0 rounded-sm sm:border">
+											<ClustersTable clusters={slice.rows} selected={sig} onSelect={(next) => void setSig(next)} />
+										</div>
+										{slice.pageCount > 1 && (
+											<Pager
+												page={slice.page}
+												pageCount={slice.pageCount}
+												onPage={(next) => void setPage(next)}
+												rangeText={f("clusters.pageOf", { first: slice.first, last: slice.last, total: matching.length })}
+												testId="clusters-pager"
+											/>
+										)}
+									</>
 								)}
 							</div>
 						)}

@@ -1,4 +1,11 @@
 {
+	"accept": {
+		"primary": "Add task to {{benchmark}}",
+		"more": "More ways",
+		"draft": "Draft with a model (up to ${{budget}})",
+		"draftVerb": "Draft it"
+	},
+	"importOpen": "Open it",
 	"inbox": {
 		"search": "Search failures",
 		"searchPlaceholder": "Task, trace id, model or error",
@@ -12,7 +19,7 @@
 		"openedOnAll": "No new failures. {{count}} already handled are shown.",
 		"emptyState": "No failures with status {{state}}.",
 		"showAll": "Show all ({{count}})",
-		"emptyFirst": "No production failures yet. Connect a source to pull them in, or send them in with an ingest token.",
+		"emptyFirst": "No production failures yet. Connect a source to pull them in, or send them in with an inbox token.",
 		"emptyFirstAction": "Connect a source",
 		"model": "Model",
 		"noModel": "-",
@@ -26,7 +33,7 @@
 		"notStored": "Not stored yet"
 	},
 	"ingest": {
-		"step1": "Generate an ingest token below (organization admins).",
+		"step1": "Generate an inbox token below (organization admins).",
 		"step2": "Store it where your tool runs as",
 		"step3": "Send failures with the request below: it sends the token as Authorization: Bearer.",
 		"howTo": "Each token is shown once. Store it where your tool runs as {{env}}."
@@ -59,7 +66,9 @@
 			"agent": "Agent",
 			"tool": "Tool",
 			"infra": "Infrastructure"
-		}
+		},
+		"clearSearch": "Clear search",
+		"pageOf": "{{first}} to {{last}} of {{total}} groups"
 	},
 	"patterns": {
 		"openComparison": "Open comparison"

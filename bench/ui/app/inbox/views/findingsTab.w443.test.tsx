@@ -128,7 +128,7 @@ describe("Findings tab", () => {
 	});
 
 	it("lists findings with their state badge, and says so when there are none", () => {
-		expect(renderToStaticMarkup(<FindingsTab />)).toContain("No tracked failures yet.");
+		expect(renderToStaticMarkup(<FindingsTab />)).toContain("No tracked failures yet");
 		state.list = {
 			isLoading: false,
 			data: { mode: "live", findings: [base], counts: { open: 1 } },

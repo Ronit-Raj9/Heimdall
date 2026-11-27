@@ -167,7 +167,7 @@ export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: 
 				data-testid={`inbox-source-${key}`}
 			/>
 			{key.endsWith("_env") && notStored((v[key] as string | undefined) ?? "") && (
-				<span className="text-chart-warning-ink text-sm" data-testid={`inbox-source-${key}-not-stored`}>
+				<span className="text-warning-ink text-sm" data-testid={`inbox-source-${key}-not-stored`}>
 					{f("source.notStored")}
 				</span>
 			)}
@@ -303,15 +303,18 @@ function CopyButton({ text, testId, label }: { text: string; testId: string; lab
 	);
 }
 
-/** The env name the ingest token is set under when the server names none (M1-14). */
-export const INGEST_TOKEN_ENV = "HEIMDALL_INGEST_TOKEN";
+/**
+ * The env name of the inbox webhook token when the server names none. This is the inbox's own
+ * secret, not the trace ingest token (HEIMDALL_INGEST_TOKEN, shown on the traces screen).
+ */
+export const INBOX_TOKEN_ENV = "HEIMDALL_INBOX_TOKEN";
 
 /** The webhook setup: ingest URL, token variable, next step, curl example and sources.yaml snippet. Exported for tests. */
 export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 	const { t } = useTranslation("liveinbox");
 	const [token, setToken] = useState<string | null>(null);
 	const { t: f } = useTranslation("uf7a");
-	const envName = info.token_env || INGEST_TOKEN_ENV;
+	const envName = info.token_env || INBOX_TOKEN_ENV;
 	return (
 		<Section title={t("inbox.webhook.title")} description={t("inbox.webhook.description")} testId="inbox-webhook">
 			<div className="flex min-w-0 flex-col gap-3 text-sm">
@@ -322,7 +325,7 @@ export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 					</code>
 					<CopyButton text={info.url} testId="inbox-webhook-copy-url" />
 					<span
-						className={info.enabled ? "text-chart-success-ink font-medium" : "text-muted-foreground font-medium"}
+						className={info.enabled ? "text-success-ink font-medium" : "text-muted-foreground font-medium"}
 						data-testid={info.enabled ? "inbox-webhook-on" : "inbox-webhook-off"}
 					>
 						{info.enabled ? t("inbox.webhook.on") : t("inbox.webhook.off")}
@@ -336,7 +339,7 @@ export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 					</p>
 				)}
 				{info.problem && (
-					<p className="text-chart-error-ink" role="note" data-testid="inbox-webhook-problem">
+					<p className="text-danger-ink" role="note" data-testid="inbox-webhook-problem">
 						{info.problem}
 					</p>
 				)}
@@ -416,7 +419,7 @@ export interface InboxTokensViewProps {
 	onRevoke(id: string): void;
 }
 
-/** The hosted per-org ingest tokens: generate (admins, server side, shown once), list and revoke. Exported for tests. */
+/** The hosted per-org inbox tokens: generate (admins, server side, shown once), list and revoke. Exported for tests. */
 export function InboxTokensView({
 	list,
 	envName,
@@ -481,7 +484,7 @@ export function InboxTokensView({
 				</p>
 			)}
 			{error && (
-				<p className="text-chart-error-ink" role="alert" data-testid="inbox-tokens-error">
+				<p className="text-danger-ink" role="alert" data-testid="inbox-tokens-error">
 					{error}
 				</p>
 			)}

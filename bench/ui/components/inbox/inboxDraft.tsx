@@ -22,7 +22,7 @@ export function InboxDraftResult({ draft }: { draft: InboxDraft }) {
 			<p className="text-foreground font-medium">{t("inbox.draft.title", { task: draft.task })}</p>
 			{draft.finished ? (
 				<p className="flex items-start gap-2 font-medium" data-testid="inbox-draft-finished">
-					<CircleCheck className="text-chart-success-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<CircleCheck className="text-success-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{tg("finished")}
 				</p>
 			) : (
@@ -64,7 +64,7 @@ export function InboxDraftResult({ draft }: { draft: InboxDraft }) {
 			{warnings.length > 0 && (
 				<div className="flex flex-col gap-1" data-testid="inbox-draft-warnings">
 					<p className="flex items-center gap-1.5 text-xs font-medium">
-						<AlertTriangle className="text-chart-warning-ink size-3.5" aria-hidden="true" />
+						<AlertTriangle className="text-warning-ink size-3.5" aria-hidden="true" />
 						{t("inbox.draft.warnings")}
 					</p>
 					<ul className="text-muted-foreground list-disc pl-5 text-xs break-words">

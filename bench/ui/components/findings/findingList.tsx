@@ -8,9 +8,9 @@ import { useTranslation } from "react-i18next";
 export function stateClass(state: Finding["state"]): string {
 	switch (state) {
 		case "fixed":
-			return "bg-chart-success/15 text-chart-success-ink";
+			return "bg-success-soft text-success-ink";
 		case "reopened":
-			return "bg-chart-warning/15 text-chart-warning-ink";
+			return "bg-warning-soft text-warning-ink";
 		case "expected":
 			return "bg-muted text-muted-foreground";
 		default:

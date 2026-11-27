@@ -36,6 +36,19 @@ describe("InboxWebhookCard", () => {
 		expect(html).toContain("set on the server");
 	});
 
+	it("names the inbox token, never the trace ingest token, when the server names none", () => {
+		const html = renderToStaticMarkup(<InboxWebhookCard info={{ ...base, token_env: undefined }} />);
+		const steps = html.match(/data-testid="inbox-webhook-steps".*?<\/ol>/)?.[0] ?? "";
+		expect(steps).toContain("HEIMDALL_INBOX_TOKEN");
+		expect(html).not.toContain("HEIMDALL_INGEST_TOKEN");
+		expect(html).not.toMatch(/ingest token/i);
+	});
+
+	it("shows the name the server reports for its own endpoint", () => {
+		const html = renderToStaticMarkup(<InboxWebhookCard info={{ ...base, token_env: "MY_INBOX_SECRET" }} />);
+		expect(html.match(/data-testid="inbox-webhook-steps".*?<\/ol>/)?.[0]).toContain("MY_INBOX_SECRET");
+	});
+
 	it("explains the hosted refusal", () => {
 		const html = renderToStaticMarkup(<InboxWebhookCard info={{ ...base, hosted: true, problem: "the inbox webhook is not served on the hosted server yet" }} />);
 		expect(html).toContain('data-testid="inbox-webhook-problem"');

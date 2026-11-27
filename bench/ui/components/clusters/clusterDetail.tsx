@@ -177,9 +177,9 @@ function ConfigChangeNotice({ change }: { change: ClusterConfigChange }) {
 		<div
 			role="note"
 			data-testid="cluster-after-change"
-			className="border-chart-warning/50 bg-chart-warning/10 flex items-start gap-3 rounded-sm border px-4 py-3 text-sm"
+			className="border-warning bg-warning-soft flex items-start gap-3 rounded-sm border px-4 py-3 text-sm"
 		>
-			<GitCommitHorizontal className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<GitCommitHorizontal className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 			<div className="flex flex-col gap-0.5">
 				<p className="text-foreground font-medium">{t("clusters.detail.afterChangeTitle")}</p>
 				<p className="text-muted-foreground text-xs">
@@ -203,7 +203,7 @@ function RelatedClusters({ related, onOpen }: { related: readonly ClusterRelated
 							type="button"
 							onClick={() => onOpen(r.signature)}
 							data-testid={`cluster-related-${r.signature}`}
-							className="hover:bg-accent focus-visible:ring-ring/50 flex w-full cursor-pointer flex-col gap-0.5 rounded-sm border px-3 py-2 text-left text-xs transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+							className="hover:bg-accent focus-visible:ring-(--focus) flex w-full cursor-pointer flex-col gap-0.5 rounded-sm border px-3 py-2 text-left text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
 						>
 							<span className="text-foreground font-medium break-words">{r.title}</span>
 							<span className="text-muted-foreground">
@@ -270,7 +270,7 @@ function ClusterRunsTable({ runs, renderRunLink }: { runs: readonly ClusterRun[]
 								{run.last_tool ? (
 									<span className="flex flex-col">
 										<span className="font-mono">{run.last_tool}</span>
-										{run.last_tool_errored && <span className="text-chart-error-ink text-xs">{t("clusters.detail.lastToolErrored")}</span>}
+										{run.last_tool_errored && <span className="text-danger-ink text-xs">{t("clusters.detail.lastToolErrored")}</span>}
 									</span>
 								) : (
 									<span className="text-muted-foreground">-</span>

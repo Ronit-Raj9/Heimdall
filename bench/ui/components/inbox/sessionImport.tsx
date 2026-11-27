@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { notify } from "@/lib/notify";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useImportInboxSessionMutation } from "@/lib/store/apis/traceDraftApi";
 import { FileUp } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./w445I18n";
+import "@/app/inbox/views/uf7aI18n";
 
 /** The largest session file the server keeps (handlers/inboxsession_w445.go). */
 export const SESSION_FILE_MAX_BYTES = 32 << 20;
@@ -16,6 +18,7 @@ export const SESSION_FILE_MAX_BYTES = 32 << 20;
  */
 export function SessionImport({ onImported, defaultOpen = false }: { onImported?: (itemId: string) => void; defaultOpen?: boolean } = {}) {
 	const { t } = useTranslation("w445");
+	const { t: f } = useTranslation("uf7a");
 	const input = useRef<HTMLInputElement>(null);
 	const [importSession, { isLoading }] = useImportInboxSessionMutation();
 	const [open, setOpen] = useState(defaultOpen);
@@ -46,7 +49,13 @@ export function SessionImport({ onImported, defaultOpen = false }: { onImported?
 			setMessage({ ok: true, text: t("import.done"), itemId: res?.item_id });
 			setFile(null);
 			setOpen(false);
-			if (res?.item_id) onImported?.(res.item_id);
+			const itemId = res?.item_id;
+			if (itemId) onImported?.(itemId);
+			// Feedback after the panel closes (M7-11): a toast with a way back to the new item.
+			notify({
+				text: t("import.done"),
+				action: itemId && onImported ? { label: f("importOpen"), onClick: () => onImported(itemId) } : undefined,
+			});
 		} catch (error) {
 			setMessage({ ok: false, text: getBenchErrorMessage(error) });
 		} finally {
@@ -99,7 +108,7 @@ export function SessionImport({ onImported, defaultOpen = false }: { onImported?
 			)}
 			{message && (
 				<p
-					className={message.ok ? "text-sm" : "text-chart-error-ink text-sm"}
+					className={message.ok ? "text-sm" : "text-danger-ink text-sm"}
 					role={message.ok ? "status" : "alert"}
 					data-testid="inbox-session-import-message"
 				>

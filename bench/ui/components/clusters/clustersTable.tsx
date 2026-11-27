@@ -128,7 +128,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 													onClick={toggle}
 													aria-expanded={open}
 													aria-controls="cluster-detail"
-													className="text-foreground focus-visible:ring-ring/50 w-fit cursor-pointer rounded-sm text-left font-medium break-words underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:outline-none"
+													className="text-foreground focus-visible:ring-(--focus) w-fit cursor-pointer rounded-sm text-left font-medium break-words underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
 													data-testid={`clusters-title-${cluster.signature}`}
 												>
 													{plainClusterTitle(clusterTitle(cluster, sentence))}
@@ -149,7 +149,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 											/>
 											{cluster.after_config_change && (
 												<span
-													className="text-chart-warning-ink inline-flex items-center gap-1 text-xs font-medium"
+													className="text-warning-ink inline-flex items-center gap-1 text-xs font-medium"
 													data-testid={`clusters-after-change-${cluster.signature}`}
 												>
 													<GitCommitHorizontal className="size-3" aria-hidden="true" />
@@ -199,7 +199,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 											onClick={toggle}
 											data-testid={`clusters-show-${cluster.signature}`}
 											className={cn(
-												"focus-visible:ring-ring/50 inline-flex cursor-pointer items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium transition-colors focus-visible:ring-[3px]",
+												"focus-visible:ring-(--focus) inline-flex cursor-pointer items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium transition-colors focus-visible:ring-2",
 												open ? "border-primary bg-primary/10" : "hover:bg-accent",
 											)}
 										>
@@ -243,7 +243,7 @@ function ClusterCards({ clusters, selected, onSelect }: ClustersTableProps) {
 							onClick={() => onSelect(open ? null : cluster.signature)}
 							aria-expanded={open}
 							aria-controls="cluster-detail"
-							className="focus-visible:ring-ring/50 flex w-full flex-col items-start gap-1 rounded-sm text-left focus-visible:ring-[3px] focus-visible:outline-none"
+							className="focus-visible:ring-(--focus) flex w-full flex-col items-start gap-1 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
 						>
 							<span className="flex flex-wrap items-center gap-2">
 								<ClusterKindBadge cluster={cluster} />

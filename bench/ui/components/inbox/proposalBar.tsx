@@ -1,16 +1,19 @@
 import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { Input } from "@/components/ui/input";
+import { PaidButton } from "@/components/ui/paidButton";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useAcceptInboxItemMutation } from "@/lib/store/apis/inboxApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import { useGetInboxProposalQuery, type ProposalReason, type TraceProposal } from "@/lib/store/apis/traceDraftApi";
 import type { InboxAcceptRequest, InboxTaskKind } from "@/lib/types/bench";
-import { Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { guideFormErrors, guideFrom, isToolKind, type GuideCallRow, type GuideFormValues } from "./inboxGuide.utils";
 import "./w445I18n";
+import "@/app/inbox/views/uf7aI18n";
 
 /** Default spending cap of one draft, in US dollars (the job caps it at 2.00). */
 export const DEFAULT_DRAFT_BUDGET = 0.5;
@@ -99,6 +102,7 @@ export interface ProposalBarProps {
  */
 export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: ProposalBarProps) {
 	const { t } = useTranslation("w445");
+	const { t: f } = useTranslation("uf7a");
 	const ids = useId();
 	const [confirming, setConfirming] = useState(false);
 	const [provider, setProvider] = useState("");
@@ -187,24 +191,38 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 
 	return (
 		<div className="border-border flex flex-col gap-2 rounded-sm border px-3 py-2" data-testid="proposal-bar">
+			{/* One primary (add the task), the other ways in "More ways" (M7-4). */}
 			<div className="flex flex-wrap items-center gap-2">
-				<Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirming(true)} dataTestId="proposal-draft">
-					<Sparkles className="size-3.5" aria-hidden="true" />
-					{t("proposal.draft")}
-				</Button>
 				<Button type="button" size="sm" disabled={busy || invalid} onClick={() => void submit(true)} dataTestId="proposal-approve">
-					{t("proposal.approve")}
+					{f("accept.primary", { benchmark: suite })}
 				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant="ghost"
-					disabled={busy || invalid}
-					onClick={() => void submit(false)}
-					dataTestId="proposal-save"
-				>
-					{t("proposal.saveOnly")}
-				</Button>
+				<DropdownMenu
+					label={f("accept.more")}
+					align="start"
+					testId="proposal-more"
+					trigger={(props) => (
+						<Button {...props} size="sm" variant="outline" disabled={busy} dataTestId="proposal-more-button">
+							{f("accept.more")}
+							<ChevronDown className="size-3.5" aria-hidden="true" />
+						</Button>
+					)}
+					items={[
+						{
+							id: "draft",
+							icon: Sparkles,
+							label: f("accept.draft", { budget: Number(budget).toFixed(2) }),
+							onSelect: () => setConfirming(true),
+							testId: "proposal-draft",
+						},
+						{
+							id: "save",
+							label: t("proposal.saveOnly"),
+							disabled: invalid,
+							onSelect: () => void submit(false),
+							testId: "proposal-save",
+						},
+					]}
+				/>
 			</div>
 			{confirming && (
 				<div
@@ -249,15 +267,16 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 								data-testid="proposal-budget"
 							/>
 						</label>
-						<Button
-							type="button"
+						{/* The cap and the cost were just shown above, so the click starts without a second ask. */}
+						<PaidButton
 							size="sm"
+							verb={f("accept.draftVerb")}
+							capUsd={Number(budget) > 0 ? Number(budget) : null}
+							confirm="never"
 							disabled={starting || !provider.trim() || !model.trim() || !(Number(budget) > 0)}
-							onClick={() => void startDraft()}
-							dataTestId="proposal-start"
-						>
-							{t("proposal.start")}
-						</Button>
+							onConfirm={startDraft}
+							testId="proposal-start"
+						/>
 						<Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)} dataTestId="proposal-cancel">
 							{t("proposal.cancel")}
 						</Button>
@@ -316,7 +335,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 				</p>
 			)}
 			{error && (
-				<p className="text-chart-error-ink text-xs" role="alert" data-testid="proposal-error">
+				<p className="text-danger-ink text-xs" role="alert" data-testid="proposal-error">
 					{error}
 				</p>
 			)}

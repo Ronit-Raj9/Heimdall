@@ -9,7 +9,7 @@ import "@/app/inbox/views/uf7aI18n";
 import { isActionable } from "./inbox.utils";
 
 const FIELD =
-	"placeholder:text-muted-foreground/70 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50";
+	"placeholder:text-neutral-500 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50";
 
 export interface BulkAcceptValues {
 	ids: string[];
@@ -127,7 +127,7 @@ export function InboxBulkAccept({
 					})}
 				</ul>
 				{touched && errors.includes("none") && (
-					<p className="text-chart-error-ink text-xs" role="alert" data-testid="inbox-bulk-error-none">
+					<p className="text-danger-ink text-xs" role="alert" data-testid="inbox-bulk-error-none">
 						{t("bulk.none")}
 					</p>
 				)}
@@ -153,7 +153,7 @@ export function InboxBulkAccept({
 					))}
 				</select>
 				{touched && errors.includes("suite") && (
-					<p className="text-chart-error-ink text-xs" role="alert" data-testid="inbox-bulk-error-suite">
+					<p className="text-danger-ink text-xs" role="alert" data-testid="inbox-bulk-error-suite">
 						{t("bulk.needsSuite")}
 					</p>
 				)}
@@ -206,7 +206,7 @@ export function InboxBulkAccept({
 				</Button>
 			</div>
 			{result.isError && (
-				<p role="alert" className="text-chart-error-ink text-sm break-words" data-testid="inbox-bulk-request-error">
+				<p role="alert" className="text-danger-ink text-sm break-words" data-testid="inbox-bulk-request-error">
 					{getBenchErrorMessage(result.error)}
 				</p>
 			)}

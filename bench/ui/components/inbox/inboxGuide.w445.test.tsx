@@ -92,9 +92,9 @@ describe("review screen with a model draft (wave 4, trace to environment)", () =
 				suite="support"
 			/>,
 		);
-		expect(html).toContain("Draft with a model");
-		expect(html).toContain("Add task to the benchmark");
-		expect(html).toContain("Save without checking");
+		// One primary names the benchmark; drafting and saving without the check are in "More ways" (M7-4).
+		expect(html).toContain("Add task to support");
+		expect(html).toContain("More ways");
 		expect(html).toContain("Suggested by a model");
 		expect(html).toContain('data-testid="proposal-field-calls"');
 		expect(html).toContain("The refund call failed.");

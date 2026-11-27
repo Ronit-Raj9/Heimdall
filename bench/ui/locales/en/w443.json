@@ -1,13 +1,29 @@
 {
-	"tabs": { "findings": "Tracked" },
+	"tabs": {
+		"findings": "Tracked"
+	},
 	"intro": "Failures you track until a rerun proves them fixed. One reopens by itself when one of its tasks fails again.",
 	"loadError": "Could not load the tracked failures",
 	"search": "Search tracked failures",
+	"clearSearch": "Clear search",
 	"noMatch": "No tracked failure matches this search.",
+	"emptyTitle": "No tracked failures yet",
+	"emptyBody": "Find out why a comparison failed, keep a cause you agree with, then rerun to check the fix.",
+	"emptyTrackedBody": "Keep a cause from an investigation below to track it.",
 	"empty": "No tracked failures yet. Find out why a comparison failed, keep a cause you agree with, then rerun to check the fix.",
 	"emptyTracked": "No tracked failures yet. Keep a cause from an investigation below to track it.",
-	"states": { "open": "Open", "expected": "Known, not fixing", "fixed": "Fixed", "reopened": "Reopened" },
-	"sources": { "inbox": "Inbox", "cluster": "Failure group", "investigation": "Investigation", "check": "Behaviour check" },
+	"states": {
+		"open": "Open",
+		"expected": "Known, not fixing",
+		"fixed": "Fixed",
+		"reopened": "Reopened"
+	},
+	"sources": {
+		"inbox": "Inbox",
+		"cluster": "Failure group",
+		"investigation": "Investigation",
+		"check": "Behaviour check"
+	},
 	"list": {
 		"title": "Title",
 		"state": "State",
@@ -26,7 +42,9 @@
 		"history": "History",
 		"event": "{{date}}: {{from}} to {{to}}. {{reason}}",
 		"fixed": "Fixed: the fixed agent passed {{k}} of {{n}} runs; the old agent passed {{a}} of {{b}}.",
-		"close": "Close"
+		"close": "Close",
+		"from": "Comparison it came from",
+		"arm": "setup {{arm}}"
 	},
 	"actions": {
 		"checkFix": "Check the fix",
@@ -41,6 +59,7 @@
 		"experiment": "Comparison the failure came from",
 		"from": "From comparison {{name}}",
 		"change": "Change",
+		"verb": "Rerun",
 		"startPaid": "Rerun, about ${{usd}}",
 		"startPaidUnknown": "Rerun, cost not known yet",
 		"ask": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times each, old and fixed agent)? About ${{usd}}, from the cost per run of the source comparison.",
@@ -57,6 +76,7 @@
 		"findOut": "Find out why",
 		"experiment": "Comparison",
 		"option": "{{name}}, {{count}} failed runs",
+		"verb": "Start investigation",
 		"startPaid": "Start, up to ${{cap}} (uses your model key)",
 		"ask": "Start an investigation of {{name}}? A model reads its failed runs and spends at most ${{cap}} of your model key.",
 		"yes": "Yes, start",

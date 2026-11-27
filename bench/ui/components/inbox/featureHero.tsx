@@ -27,16 +27,26 @@ export function FeatureHero({
 			data-testid={testId}
 		>
 			<div className="flex max-w-md flex-col gap-1">
-				<h2 className="text-foreground flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
-					<Icon className="text-muted-foreground size-5 shrink-0" aria-hidden="true" />
-					{title}
-				</h2>
+				{/* An empty title (a hero whose page header already names it) renders no heading at all. */}
+				{hasTitle(title) ? (
+					<h2 className="text-foreground flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
+						<Icon className="text-muted-foreground size-5 shrink-0" aria-hidden="true" />
+						{title}
+					</h2>
+				) : null}
 				<p className="text-muted-foreground text-sm">{message}</p>
 			</div>
 			{action}
 			{children && <div className="text-muted-foreground flex max-w-md flex-col items-center gap-2 text-sm">{children}</div>}
 		</div>
 	);
+}
+
+/** True when a title has something to show: not null, false or a blank string. Exported for tests. */
+export function hasTitle(title: ReactNode): boolean {
+	if (title === null || title === undefined || title === false) return false;
+	if (typeof title === "string") return title.trim() !== "";
+	return true;
 }
 
 /** A rounded card with a title row; the body holds a stepped setup form. */
@@ -146,10 +156,10 @@ export type PillTone = "ok" | "warn" | "error" | "running" | "muted";
 
 const PILL: Record<PillTone, { box: string; dot: string }> = {
 	// Status tokens, not palette classes, so both themes keep their contrast (X-67).
-	ok: { box: "bg-chart-success/10 text-chart-success-ink", dot: "bg-chart-success" },
-	warn: { box: "bg-chart-warning/10 text-chart-warning-ink", dot: "bg-chart-warning" },
-	error: { box: "bg-chart-error/10 text-chart-error-ink", dot: "bg-chart-error" },
-	running: { box: "bg-chart-info/10 text-chart-info-ink", dot: "bg-chart-info animate-pulse" },
+	ok: { box: "bg-success-soft text-success-ink", dot: "bg-success" },
+	warn: { box: "bg-warning-soft text-warning-ink", dot: "bg-warning" },
+	error: { box: "bg-error-soft text-danger-ink", dot: "bg-danger" },
+	running: { box: "bg-info-soft text-info-ink", dot: "bg-info animate-pulse" },
 	muted: { box: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
 };
 

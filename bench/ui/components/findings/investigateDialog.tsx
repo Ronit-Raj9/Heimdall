@@ -1,7 +1,8 @@
 import "@/app/inbox/views/w443I18n";
 
-import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useEffect, useMemo, useState } from "react";
@@ -13,12 +14,11 @@ const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 te
 /**
  * "Find out why": picks a comparison (the newest with failed runs first) and a spending cap held
  * between 0.1 and 5 dollars, says what will run and what it may cost, and starts the
- * findings.investigate job (POST /jobs) only after a confirm. When the server does not know the job
+ * findings.investigate job (POST /jobs) only after the shared paid confirm. When the server does not know the job
  * yet, its own message is shown.
  */
 export function InvestigateDialog({ onDone }: { onDone: () => void }) {
 	const { t } = useTranslation("w443");
-	const confirm = useConfirm();
 	const raw = useListExperimentsQuery().data?.experiments;
 	const experiments = useMemo(() => investigableExperiments(raw ?? []), [raw]);
 	const [expId, setExpId] = useState("");
@@ -35,20 +35,17 @@ export function InvestigateDialog({ onDone }: { onDone: () => void }) {
 		}
 	}, [experiments, expId, touched]);
 
+	const name = experiments.find((e) => e.exp_id === expId)?.name ?? expId;
+	// Paid work: PaidButton always asks first, naming what runs and the cap (M7-26).
 	const start = async () => {
-		const name = experiments.find((e) => e.exp_id === expId)?.name ?? expId;
-		// Paid work: say what runs and the most it spends, and start only on a yes (M7-26).
-		if (
-			!(await confirm(t("investigations.ask", { name, cap: cap.toFixed(2) }), {
-				confirmLabel: t("investigations.yes"),
-			}))
-		)
-			return;
 		const res = await create({
 			kind: "findings.investigate",
 			params: { exp_id: expId, budget_usd: cap, yes: true },
 		});
-		if ("data" in res && res.data) setStarted(true);
+		if ("data" in res && res.data) {
+			setStarted(true);
+			notify({ text: t("started", { ns: "toast", name: t("investigations.verb") }) });
+		}
 	};
 
 	return (
@@ -96,9 +93,16 @@ export function InvestigateDialog({ onDone }: { onDone: () => void }) {
 			) : null}
 			{started ? <p className="text-sm">{t("investigations.started")}</p> : null}
 			<div className="flex flex-wrap gap-2">
-				<Button size="sm" disabled={!expId || state.isLoading || started} onClick={() => void start()} data-testid="investigate-start">
-					{t("investigations.startPaid", { cap: cap.toFixed(2) })}
-				</Button>
+				<PaidButton
+					size="sm"
+					verb={t("investigations.verb")}
+					capUsd={cap}
+					confirm="always"
+					confirmText={t("investigations.ask", { name, cap: cap.toFixed(2) })}
+					disabled={!expId || state.isLoading || started}
+					onConfirm={start}
+					testId="investigate-start"
+				/>
 				<Button size="sm" variant="outline" onClick={onDone}>
 					{t("actions.cancel")}
 				</Button>

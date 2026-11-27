@@ -5,7 +5,8 @@ import { FindingList, filterFindings } from "@/components/findings/findingList";
 import { ToolbarSearch } from "@/components/ui/toolbar";
 import { InvestigateDialog } from "@/components/findings/investigateDialog";
 import { InvestigationList, investigationRows } from "@/components/findings/investigationList";
-import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { useGetFindingsQuery, useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
 import { parseAsString, useQueryState } from "nuqs";
@@ -32,7 +33,7 @@ export default function FindingsTab() {
 	const findOut = (
 		<Button
 			size="sm"
-			variant={bothEmpty ? "default" : "outline"}
+			variant="outline"
 			onClick={() => setInvestigating(true)}
 			data-testid="findings-find-out-why"
 		>
@@ -48,14 +49,14 @@ export default function FindingsTab() {
 			) : list.error ? (
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="findings-error" />
 			) : bothEmpty ? (
-				<EmptyNote testId="findings-empty">
-					<span className="flex flex-col items-start gap-3">
-						<span>{t("empty")}</span>
-						{!investigating && findOut}
-					</span>
-				</EmptyNote>
+				<EmptyState
+					title={t("emptyTitle")}
+					body={t("emptyBody")}
+					action={investigating ? undefined : { label: t("investigations.findOutPaid"), onClick: () => setInvestigating(true) }}
+					testId="findings-empty"
+				/>
 			) : all.length === 0 ? (
-				<EmptyNote testId="findings-empty">{t("emptyTracked")}</EmptyNote>
+				<EmptyState compact title={t("emptyTitle")} body={t("emptyTrackedBody")} testId="findings-empty" />
 			) : (
 				<div className="flex min-w-0 flex-col gap-3">
 					<ToolbarSearch
@@ -66,7 +67,13 @@ export default function FindingsTab() {
 						testId="findings-search"
 					/>
 					{findings.length === 0 ? (
-						<EmptyNote testId="findings-no-match">{t("noMatch")}</EmptyNote>
+						<EmptyState
+							kind="filtered"
+							compact
+							body={t("noMatch")}
+							action={{ label: t("clearSearch"), onClick: () => void setQ(null) }}
+							testId="findings-no-match"
+						/>
 					) : (
 						<div className="min-w-0 overflow-x-auto">
 							<FindingList findings={findings} selected={selected} onSelect={(id) => void setSelected(id)} />

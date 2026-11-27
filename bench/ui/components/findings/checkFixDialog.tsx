@@ -1,7 +1,8 @@
 import "@/app/inbox/views/w443I18n";
 
-import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { useRerunFindingMutation, type Finding } from "@/lib/store/apis/findingsApi";
 import { useState } from "react";
@@ -18,7 +19,6 @@ const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 te
  */
 export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: () => void }) {
 	const { t } = useTranslation("w443");
-	const confirm = useConfirm();
 	const experiments = useListExperimentsQuery().data?.experiments ?? [];
 	const fromHistory = findingExperiment(finding);
 	const [expId, setExpId] = useState(fromHistory);
@@ -34,20 +34,21 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 	const n = finding.tasks.length;
 	const estimate = rerunEstimate(n, trials, source);
 	const usd = estimate.usd === null ? null : estimate.usd.toFixed(2);
+	const ask =
+		usd === null
+			? t("checkFix.askUnknown", { runs: estimate.runs, n, trials })
+			: t("checkFix.ask", { runs: estimate.runs, n, trials, usd });
 
+	// Paid work: PaidButton always asks first, naming the runs and the estimate (M7-26). A rerun has
+	// no server cap, so the label says it uses the model key.
 	const start = async () => {
-		// Paid work: name the runs and the estimate, and start only on a yes (M7-26).
-		const ask =
-			usd === null
-				? t("checkFix.askUnknown", { runs: estimate.runs, n, trials })
-				: t("checkFix.ask", { runs: estimate.runs, n, trials, usd });
-		if (!(await confirm(ask, { confirmLabel: t("checkFix.yes") }))) return;
 		const res = await rerun({
 			id: finding.id,
 			body: { exp_id: expId, arm: armValue, trials, yes: true },
 		});
 		if ("data" in res && res.data) {
 			setNote(res.data.note ?? t("checkFix.started"));
+			notify({ text: t("started", { ns: "toast", name: t("checkFix.verb") }) });
 		}
 	};
 
@@ -120,9 +121,18 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 				</p>
 			) : null}
 			<div className="flex flex-wrap gap-2">
-				<Button size="sm" disabled={!expId || !armValue || state.isLoading} onClick={() => void start()} data-testid="check-fix-start">
-					{usd === null ? t("checkFix.startPaidUnknown") : t("checkFix.startPaid", { usd })}
-				</Button>
+				<PaidButton
+					size="sm"
+					verb={t("checkFix.verb")}
+					capUsd={null}
+					estimateRuns={estimate.runs}
+					estimateUsd={estimate.usd}
+					confirm="always"
+					confirmText={ask}
+					disabled={!expId || !armValue || state.isLoading}
+					onConfirm={start}
+					testId="check-fix-start"
+				/>
 				<Button size="sm" variant="outline" onClick={onDone}>
 					{t("actions.cancel")}
 				</Button>

@@ -61,17 +61,26 @@ export function FindingDetail({ finding, onClose }: { finding: Finding; onClose:
 				</Button>
 			</header>
 			{reopened ? (
-				<p className="text-chart-warning-ink text-sm" role="status" data-testid="finding-reopened">
+				<p className="text-warning-ink text-sm" role="status" data-testid="finding-reopened">
 					{reopened}
 				</p>
 			) : null}
 			{finding.state === "fixed" && fix ? (
-				<p className="text-chart-success-ink text-sm" data-testid="finding-fixed">
+				<p className="text-success-ink text-sm" data-testid="finding-fixed">
 					{t("detail.fixed", { k: fix.fixed_passed, n: fix.fixed_runs, a: fix.old_passed, b: fix.old_runs })}
 				</p>
 			) : null}
 			<div className="flex flex-col gap-2">
 				<h4 className="text-sm font-medium">{t("detail.saw")}</h4>
+				{finding.experiment ? (
+					<p className="text-sm" data-testid="finding-origin">
+						{t("detail.from")}:{" "}
+						<Link to="/experiments/$expId" params={{ expId: finding.experiment }} className="text-primary font-medium underline underline-offset-2">
+							{finding.experiment}
+						</Link>
+						{finding.arm ? ` (${t("detail.arm", { arm: finding.arm })})` : null}
+					</p>
+				) : null}
 				<p className="text-sm">
 					{t("detail.tasks")}: {finding.tasks.map((x) => `${x.suite}/${x.task}`).join(", ")}
 				</p>

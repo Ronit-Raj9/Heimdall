@@ -109,7 +109,7 @@ export function InboxTab() {
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
 				{data?.mode === "live" && <InboxPullButton check={ready?.inbox} />}
-				<Link to="/maxim" className="text-primary text-sm underline-offset-2 hover:underline" data-testid="inbox-maxim-link">
+				<Link to="/maxim" className="text-primary text-sm font-medium underline underline-offset-2" data-testid="inbox-maxim-link">
 					{m("showcaseLink")}
 				</Link>
 			</div>
