@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/shell";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { StatusPill } from "@/components/ui/statusPill";
@@ -36,7 +38,7 @@ export default function ImprovementsView() {
 	const admin = canUse(useSession(), "admin");
 	const [creating, setCreating] = useState(false);
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="improvements-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="improvements-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

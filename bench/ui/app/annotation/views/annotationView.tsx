@@ -1,4 +1,5 @@
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -177,7 +178,7 @@ export default function AnnotationView() {
 	const [creating, setCreating] = useState(false);
 	const list = queues.data?.queues ?? [];
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="annotation-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-8")} data-page-width="wide" data-testid="annotation-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

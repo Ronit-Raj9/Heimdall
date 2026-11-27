@@ -1,6 +1,7 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { blockEnterSubmit } from "./proposalBar";
 import { describe, expect, it, vi } from "vitest";
 import { acceptDefaults, acceptRequestFrom } from "./inbox.utils";
 import { INBOX_LIST_FIXTURE, INBOX_NEW_DETAIL_FIXTURE } from "./inbox.fixtures";
@@ -54,7 +55,15 @@ describe("AcceptForm", () => {
 		expect(kindOptions).toContain('<option value="mcp" selected="">MCP</option>');
 		for (const kind of ["qa", "tool-use", "memory"]) expect(kindOptions).toContain(`<option value="${kind}">`);
 		expect(html).toContain("Suggested: MCP.");
-		expect(tag(html, "inbox-accept-submit")).not.toContain('disabled=""');
+		// With the suite picked the review bar holds the one primary; the plain accept moved to its "More ways" (no second submit).
+		expect(html).not.toContain('data-testid="inbox-accept-submit"');
+		expect(html).toContain('data-testid="proposal-approve"');
+	});
+
+	it("shows its own submit while no benchmark is picked", () => {
+		const html = renderToStaticMarkup(<AcceptForm item={{ ...item, suggested_suite: undefined }} suites={suites} onSubmit={noop} />);
+		expect(html).toContain('data-testid="inbox-accept-submit"');
+		expect(html).not.toContain('data-testid="proposal-bar"');
 	});
 
 	it("posts the suite, the kind and the typed task id, and nothing else", () => {
@@ -132,7 +141,8 @@ describe("InboxActions", () => {
 			const html = renderToStaticMarkup(<InboxActions {...base} mode={mode} />);
 			expect(html).toContain('data-testid="inbox-actions-read-only"');
 			expect(html).toContain(`runs in ${mode} mode`);
-			expect(tag(html, "inbox-accept-submit")).toContain('disabled=""');
+			// The accept's controls sit in the guide fieldset, disabled as one block.
+			expect(tag(html, "inbox-guide")).toContain('disabled=""');
 		});
 	}
 
@@ -154,5 +164,16 @@ describe("InboxActions", () => {
 		);
 		expect(html).toContain("The server refused: item inc-3f9a1c2b7d10 is accepted, not new or snoozed");
 		expect(html).toContain('data-testid="inbox-done-snooze"');
+	});
+});
+describe("blockEnterSubmit (paid draft panel)", () => {
+	it("stops Enter in a field and lets other keys through", () => {
+		let stopped = 0;
+		const ev = (key: string, tagName: string) => ({ key, target: { tagName } as unknown as EventTarget, preventDefault: () => void stopped++ });
+		blockEnterSubmit(ev("Enter", "INPUT"));
+		expect(stopped).toBe(1);
+		blockEnterSubmit(ev("a", "INPUT"));
+		blockEnterSubmit(ev("Enter", "BUTTON"));
+		expect(stopped).toBe(1);
 	});
 });

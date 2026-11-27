@@ -9,11 +9,19 @@ import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import { useGetInboxProposalQuery, type ProposalReason, type TraceProposal } from "@/lib/store/apis/traceDraftApi";
 import type { InboxAcceptRequest, InboxTaskKind } from "@/lib/types/bench";
 import { ChevronDown, Sparkles } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { guideFormErrors, guideFrom, isToolKind, type GuideCallRow, type GuideFormValues } from "./inboxGuide.utils";
 import "./w445I18n";
 import "@/app/inbox/views/uf7aI18n";
+
+/**
+ * Enter in a field of the paid draft panel does nothing: the panel sits inside the accept form, and Enter
+ * there would submit that form (or start paid work) on one key press. Exported for tests.
+ */
+export function blockEnterSubmit(e: Pick<KeyboardEvent, "key" | "target" | "preventDefault">): void {
+	if (e.key === "Enter" && (e.target as { tagName?: string } | null)?.tagName === "INPUT") e.preventDefault();
+}
 
 /** Default spending cap of one draft, in US dollars (the job caps it at 2.00). */
 export const DEFAULT_DRAFT_BUDGET = 0.5;
@@ -105,6 +113,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 	const { t: f } = useTranslation("uf7a");
 	const ids = useId();
 	const [confirming, setConfirming] = useState(false);
+	const barRef = useRef<HTMLDivElement>(null);
 	const [provider, setProvider] = useState("");
 	const [model, setModel] = useState("");
 	const [budget, setBudget] = useState(String(DEFAULT_DRAFT_BUDGET));
@@ -190,7 +199,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 	const invalid = values.mode !== "guided" || guideFormErrors(values, kind).length > 0;
 
 	return (
-		<div className="border-border flex flex-col gap-2 rounded-sm border px-3 py-2" data-testid="proposal-bar">
+		<div ref={barRef} className="border-border flex flex-col gap-2 rounded-sm border px-3 py-2" data-testid="proposal-bar">
 			{/* One primary (add the task), the other ways in "More ways" (M7-4). */}
 			<div className="flex flex-wrap items-center gap-2">
 				<Button type="button" size="sm" disabled={busy || invalid} onClick={() => void submit(true)} dataTestId="proposal-approve">
@@ -218,7 +227,12 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 							id: "save",
 							label: t("proposal.saveOnly"),
 							disabled: invalid,
-							onSelect: () => void submit(false),
+							// Inside the accept form this is the form's own accept (task id and grader switch kept); alone it saves the guide.
+							onSelect: () => {
+								const form = barRef.current?.closest("form");
+								if (form) form.requestSubmit();
+								else void submit(false);
+							},
 							testId: "proposal-save",
 						},
 					]}
@@ -230,6 +244,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 					role="dialog"
 					aria-label={t("proposal.draft")}
 					data-testid="proposal-confirm"
+					onKeyDown={blockEnterSubmit}
 				>
 					<p className="text-sm">{t("proposal.confirm", { budget: Number(budget).toFixed(2) })}</p>
 					<div className="flex flex-wrap items-end gap-2">
@@ -267,12 +282,12 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 								data-testid="proposal-budget"
 							/>
 						</label>
-						{/* The cap and the cost were just shown above: a budget up to $1 starts on this click, a larger one asks once more. */}
+						{/* A paid model call: it always asks once more through the shared confirm, which opens on Cancel. */}
 						<PaidButton
 							size="sm"
 							verb={f("accept.draftVerb")}
 							capUsd={Number(budget) > 0 ? Number(budget) : null}
-							confirm="auto"
+							confirm="always"
 							kind="form"
 							disabled={starting || !provider.trim() || !model.trim() || !(Number(budget) > 0)}
 							onConfirm={startDraft}

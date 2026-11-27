@@ -11,7 +11,7 @@ const tabs = failuresTabs((key) => i18n.t(`failures.tabs.${key}` as never, { ns:
 describe("Failures page tabs (M7-1)", () => {
 	it("lists the tabs in order with their names", () => {
 		expect(tabs.map((tab) => tab.id)).toEqual(["production", "findings", "groups", "patterns", "agents"]);
-		expect(tabs.map((tab) => tab.label)).toEqual(["Production failures", "Findings", "Failure groups", "Failure patterns", "By agent version"]);
+		expect(tabs.map((tab) => tab.label)).toEqual(["Production failures", "Findings", "Failure groups", "Failure patterns", "Patterns by agent version"]);
 	});
 
 	it("opens the old tab ids on their new tab and defaults to production", () => {

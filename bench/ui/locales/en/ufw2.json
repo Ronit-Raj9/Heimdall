@@ -1,0 +1,5 @@
+{
+	"behaviour": {
+		"proxyErrorsNote": "Tool server errors seen only by the proxy are not counted."
+	}
+}

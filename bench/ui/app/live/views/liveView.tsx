@@ -1,4 +1,6 @@
 import { LiveBody } from "@/components/livescore/livePanel";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -27,7 +29,7 @@ export default function LiveView() {
 	// The setup form opens from the hero, or straight away when a "#live-setup" link brought the user here.
 	const [setupOpen, setSetupOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#live-setup");
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="live-screen">
 			<PageHeader title={t("live.title")} subtitle={t("live.subtitle")} />
 			{status.isLoading ? (
 				<BlockSkeleton rows={5} testId="live-loading" />

@@ -55,7 +55,7 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 		return <EmptyNote testId="pair-picker-no-experiments">{t("runs.picker.noExperiments")}</EmptyNote>;
 
 	return (
-		<Section title={t("runs.picker.title")} description={t("runs.picker.description", { exp: experiment.expId })} testId="pair-picker">
+		<Section title={t("runs.picker.title")} description={t("runs.picker.description", { exp: status.data?.name || experiment.expId })} testId="pair-picker">
 			{grid.isLoading ? (
 				<BlockSkeleton rows={5} testId="pair-picker-grid-loading" />
 			) : grid.error ? (

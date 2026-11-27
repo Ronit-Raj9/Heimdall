@@ -36,9 +36,25 @@ import {
 	type TraceKind,
 } from "./traceView.utils";
 
-/** Steps in recorded order (seq), so a model turn comes before the tool calls it asked for. */
+/**
+ * Steps in recorded order (seq), so a model turn comes before the tool calls it asked for. Rows the
+ * agent reported about itself are stamped when the run is exported, so their seq can sit before model
+ * turn 1 (F3-10): each goes right after the witnessed row it reports on (witness_of), and the rest
+ * follow every witnessed row, in seq order.
+ */
 export function bySeq(steps: readonly StepRecord[]): StepRecord[] {
-	return [...steps].sort((a, b) => a.seq - b.seq);
+	const sorted = [...steps].sort((a, b) => a.seq - b.seq);
+	const witnessed = sorted.filter((s) => s.source !== "agent_reported");
+	const reported = sorted.filter((s) => s.source === "agent_reported");
+	if (reported.length === 0) return sorted;
+	const known = new Set(witnessed.map((s) => s.seq));
+	const after = new Map<number, StepRecord[]>();
+	const tail: StepRecord[] = [];
+	for (const r of reported) {
+		if (r.witness_of !== undefined && known.has(r.witness_of)) after.set(r.witness_of, [...(after.get(r.witness_of) ?? []), r]);
+		else tail.push(r);
+	}
+	return [...witnessed.flatMap((s) => [s, ...(after.get(s.seq) ?? [])]), ...tail];
 }
 
 /** Tool server rows answered with an error (status 400 or more, or flagged), protocol rows included. */

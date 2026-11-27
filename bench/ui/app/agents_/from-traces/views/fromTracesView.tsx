@@ -1,4 +1,6 @@
 import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { InlineError } from "@/components/runs/screenStates";
 import { notify } from "@/lib/notify";
 import { LoadError } from "@/components/runs/screenStates";
@@ -138,7 +140,7 @@ export default function FromTracesView() {
 	const [tokenMade, setTokenMade] = useState(false);
 	const total = draft && canWrite ? 3 : 2;
 	return (
-		<div className="flex min-w-0 flex-col gap-6" data-testid="from-traces">
+		<div className={cn(pageWidthClass("read"), "flex flex-col gap-6")} data-page-width="read" data-testid="from-traces">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}

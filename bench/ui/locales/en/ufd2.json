@@ -8,7 +8,7 @@
 			"findings": "Findings",
 			"groups": "Failure groups",
 			"patterns": "Failure patterns",
-			"agents": "By agent version"
+			"agents": "Patterns by agent version"
 		}
 	}
 }

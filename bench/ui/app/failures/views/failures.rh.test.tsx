@@ -33,7 +33,8 @@ describe("Failures round 2 (lane RH)", () => {
 		expect(i18n.t("investigations.findOutPaid", { ns: "w443", cap: formatUsd(INVESTIGATION_START_CAP_USD) })).toBe(
 			"Find out why (paid, up to $1.00 by default)",
 		);
-		expect(src("components/findings/investigateDialog.tsx")).toContain(`useState("${INVESTIGATION_START_CAP_USD}")`);
+		// The dialog starts from the same constant the button names (findingPlans), so the two cannot drift.
+		expect(src("components/findings/investigateDialog.tsx")).toContain("useState(String(INVESTIGATION_START_CAP_USD))");
 	});
 
 	it("Q-25: below sm the inbox renders stacked rows; the wide table hides there", () => {

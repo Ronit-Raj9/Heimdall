@@ -89,7 +89,7 @@ vi.mock("@/lib/store/apis/benchApi", () => ({
 }));
 vi.mock("./platformImport", () => ({ PlatformImportCard: () => <div data-testid="platform-import" /> }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
-vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
+vi.mock("@/components/models/groupedModelPicker", () => ({ GroupedModelPicker: () => <div data-testid="model-picker" /> }));
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => vi.fn(),
 	useBlocker: () => undefined,

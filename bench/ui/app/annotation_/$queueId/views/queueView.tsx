@@ -1,4 +1,5 @@
 import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { notify } from "@/lib/notify";
 import "@/components/suites/uf6bI18n";
 import { queueSourceLine } from "./queueSource";
@@ -68,7 +69,7 @@ export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 		{ id: "settings", label: t("queue.tabs.settings") },
 	];
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="annotation-queue-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-8")} data-page-width="dash" data-testid="annotation-queue-screen">
 			<PageHeader
 				title={queue.name}
 				subtitle={[sourceText, queue.description].filter(Boolean).join(" ")}

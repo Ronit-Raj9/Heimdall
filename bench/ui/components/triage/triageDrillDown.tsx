@@ -1,4 +1,5 @@
 import { EmptyNote } from "@/components/runs/screenStates";
+import { patternName } from "./triageTable";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { TriageGroup, Value } from "@/lib/types/bench";
@@ -23,13 +24,16 @@ export interface TriageDrillDownProps {
 /** The runs showing one pattern, each with a link to its matched pair and the events that show it. */
 export function TriageDrillDown({ group, arms, locations, renderEvidence, onClose }: TriageDrillDownProps) {
 	const { t } = useTranslation("bench");
+	const { t: af } = useTranslation("agentFirst");
 	const runs = patternRuns(group, arms);
+	// The same name as the pattern's row and the By agent version tab (RH).
+	const name = patternName(group, (key) => (af(`failures.pattern.${key}` as never, { defaultValue: "" }) as string) || undefined);
 
 	return (
 		<section id="triage-drilldown" className="flex flex-col gap-3" data-testid={`triage-drilldown-${group.pattern}`}>
 			<div className="flex flex-wrap items-start justify-between gap-2">
 				<div className="flex flex-col gap-0.5">
-					<h2 className="text-foreground text-sm font-semibold tracking-tight">{t("triage.drill.title", { pattern: group.label })}</h2>
+					<h2 className="text-foreground text-sm font-semibold tracking-tight">{t("triage.drill.title", { pattern: name })}</h2>
 					<p className="text-muted-foreground max-w-prose text-xs">{t("triage.drill.description")}</p>
 				</div>
 				<Button variant="ghost" size="sm" onClick={onClose} dataTestId="triage-drilldown-close" aria-label={t("triage.drill.close")}>

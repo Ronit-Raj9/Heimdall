@@ -331,9 +331,9 @@ export function RunTable({
 							</TableCell>
 							<TableCell className="font-mono text-xs font-semibold">{row.arm}</TableCell>
 							<TableCell className="text-xs">
-								<span className="font-mono">{row.condition}</span>
-								<span className="text-muted-foreground ml-1.5 tabular-nums" title={t("runs.list.trialHint", { trial: row.trial })}>
-									{t("runs.list.trial", { trial: row.trial })}
+								{/* One text "clean, attempt 1" so copied or read-aloud text never runs the two together (Q-255). */}
+								<span className="whitespace-nowrap" title={t("runs.list.trialHint", { trial: row.trial })} data-testid={`run-row-${row.run_id}-fault`}>
+									{faultText(row.condition, t("runs.list.trial", { trial: row.trial }))}
 								</span>
 							</TableCell>
 							<TableCell>
@@ -384,11 +384,19 @@ export function RunTable({
 }
 
 /** The task: its title when the server sends one (M4-18), with the id as a tooltip; else the id link. */
+/** The Fault cell's text: the condition and the attempt, "clean, attempt 1" (Q-255). Pure, exported for tests. */
+export function faultText(condition: string, attempt: string): string {
+	return condition ? `${condition}, ${attempt}` : attempt;
+}
+
 function TaskCell({ row }: { row: TitledRow }) {
 	if (!row.task_title) return <EntityLink kind="task" id={row.task} suite={row.suite} />;
 	return (
-		<span className="flex min-w-0 flex-col" title={row.task}>
-			<span className="text-foreground text-sm">{row.task_title}</span>
+		<span className="flex max-w-80 min-w-0 flex-col" title={`${row.task_title}\n${row.task}`}>
+			{/* One line per task title so the table fits at 1440; the full title is the tooltip (Q-30). */}
+			<span className="text-foreground line-clamp-1 text-sm [overflow-wrap:anywhere]" data-testid={`run-row-${row.run_id}-task-title`}>
+				{row.task_title}
+			</span>
 			<EntityLink kind="task" id={row.task} suite={row.suite} />
 		</span>
 	);
@@ -433,9 +441,7 @@ function RunCards({ rows, showExperiment }: { rows: readonly TitledRow[]; showEx
 						<span>
 							{t("runs.list.col.arm")} <span className="text-foreground font-mono font-semibold">{row.arm}</span>
 						</span>
-						<span className="font-mono">
-							{row.condition} {t("runs.list.trial", { trial: row.trial })}
-						</span>
+						<span>{faultText(row.condition, t("runs.list.trial", { trial: row.trial }))}</span>
 					</div>
 					<div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
 						{showExperiment && <EntityLink kind="experiment" id={row.exp_id} />}

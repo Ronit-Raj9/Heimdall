@@ -1,4 +1,5 @@
 import { RunCodeScanPanel } from "@/components/codescan/codeScanPanel"; // X4
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { RunActions } from "@/components/experiments/runControls"; // run control: cancel or requeue one run
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { HardwarePanel } from "@/components/gpu/hardwarePanel"; // X7
@@ -155,7 +156,7 @@ export default function RunView({ runId }: { runId: string }) {
 	});
 
 	return (
-		<div className="flex min-w-0 flex-col gap-6" data-testid="run-screen" data-run-id={runId} data-output={output}>
+		<div className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="run-screen" data-run-id={runId} data-output={output}>
 			<PageHeader
 				breadcrumbs={crumbs}
 				title={<span className="text-balance">{tu("page.title", { task: taskName, arm: slot.arm })}</span>}

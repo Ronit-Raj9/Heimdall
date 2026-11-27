@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/shell";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { useArchiveItems } from "@/components/ui/archiveAction";
 import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { useConfirm } from "@/components/platform/confirmDialog";
@@ -72,7 +74,7 @@ export default function ImprovementView({ id }: { id: string }) {
 	};
 	const live = d && (d.status === "running" || d.status === "awaiting_approval" || d.status === "planned");
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="improvement-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="improvement-screen">
 			<PageHeader
 				title={d?.name ?? id}
 				subtitle={d ? `${d.agent} on ${d.suite}` : undefined}

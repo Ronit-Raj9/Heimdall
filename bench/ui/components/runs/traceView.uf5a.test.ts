@@ -8,6 +8,17 @@ describe("trace order, times and error count (M5-10, M5-11)", () => {
 		expect(bySeq(steps).map((s) => s.seq)).toEqual([1, 2, 3]);
 	});
 
+	it("puts agent-reported rows after the witnessed row they report on, the rest after every witnessed row (F3-10)", () => {
+		const steps = [
+			{ seq: 1, source: "agent_reported", witness_of: 4 },
+			{ seq: 2, source: "agent_reported" },
+			{ seq: 3, source: "gateway" },
+			{ seq: 4, source: "tool_proxy" },
+			{ seq: 5, source: "gateway" },
+		] as StepRecord[];
+		expect(bySeq(steps).map((s) => s.seq)).toEqual([3, 4, 1, 5, 2]);
+	});
+
 	it("formats a time in the given locale, keeping bad input", () => {
 		expect(localStepTime("2026-11-20T17:13:46Z", "en-GB")).toMatch(/^\d\d:\d\d:46$/);
 		expect(localStepTime("nope")).toBe("nope");

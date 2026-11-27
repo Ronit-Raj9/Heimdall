@@ -1741,7 +1741,6 @@
 			"since": "Since",
 			"sincePlaceholder": "2026-11-01",
 			"min": "Smallest group shown",
-			"apply": "Press Enter or click away to apply.",
 			"synthetic": "Runs",
 			"syntheticExclude": "Real",
 			"syntheticExcludeHint": "Runs with a real model only. Practice runs are left out.",

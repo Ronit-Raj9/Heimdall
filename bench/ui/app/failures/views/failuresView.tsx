@@ -1,4 +1,6 @@
 import ClustersTab from "@/app/inbox/views/clustersTab";
+import { cn } from "@/lib/utils";
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import FindingsTab from "@/app/inbox/views/findingsTab";
 import { InboxTab } from "@/app/inbox/views/inboxView";
 import TriageTab from "@/app/inbox/views/triageTab";
@@ -28,7 +30,7 @@ export default function FailuresView() {
 	const { t } = useTranslation("ufd2");
 	const tabs = failuresTabs((key) => t(`failures.tabs.${key}` as never));
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="failures-page">
+		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="failures-page">
 			<PageHeader
 				title={t("failures.title")}
 				subtitle={t("failures.subtitle")}

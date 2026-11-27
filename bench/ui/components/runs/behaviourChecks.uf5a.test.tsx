@@ -63,3 +63,12 @@ describe("behaviour editor (M5-25)", () => {
 		expect(ruleComplete({ id: "x", title: "Runs bash", kind: "present", a: { tool: "bash" }, version: 1 })).toBe(true);
 	});
 });
+
+describe("Ignores a tool error note (Q-260)", () => {
+	it("says under that check only that proxy-only tool server errors are not counted", () => {
+		const data = { run_id: "r1", available: true, results: [r("ignores_tool_error", "clear"), r("other", "clear")] } as unknown as RunBehaviourResponse;
+		const html = renderToStaticMarkup(<RunBehaviourView data={data} rules={[]} runId="r1" />);
+		expect(html.split('data-testid="behaviour-proxy-errors-note"').length - 1).toBe(1);
+		expect(html).toContain("Tool server errors seen only by the proxy are not counted.");
+	});
+});

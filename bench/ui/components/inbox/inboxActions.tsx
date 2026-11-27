@@ -192,9 +192,13 @@ export function AcceptForm({ item, session, suites, disabled, submitting, initia
 				suite={values.suite || undefined}
 				onQuote={scrollSessionTo}
 			/>
-			<Button type="submit" disabled={off} isLoading={submitting} dataTestId="inbox-accept-submit">
-				{t("inbox.actions.acceptForm.submit")}
-			</Button>
+			{/* With a benchmark picked the review bar above holds the one primary ("Add task to ..."); this plain
+			    accept then sits in its "More ways" menu, so the form never shows two submits (RH, proposalBar). */}
+			{!(item.id && values.suite) && (
+				<Button type="submit" disabled={off} isLoading={submitting} dataTestId="inbox-accept-submit">
+					{t("inbox.actions.acceptForm.submit")}
+				</Button>
+			)}
 		</form>
 	);
 }
