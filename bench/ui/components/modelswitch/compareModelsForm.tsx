@@ -184,16 +184,21 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 				<legend className="font-medium">{t("form.benchmarks")}</legend>
 				<span className="text-muted-foreground text-xs">{t("form.benchmarksHint")}</span>
 				{!compat.isLoading && runnable.length === 0 && <span className="text-muted-foreground">{t("form.noBenchmarks")}</span>}
+				<div className="mt-1 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
 				{runnable.map((b) => (
-					<label key={b.id} className="flex items-center gap-2">
+					<label key={b.id} className="flex min-h-8 min-w-0 items-center gap-2 sm:min-h-7">
 						<input
 							type="checkbox"
+							className="accent-primary size-4 shrink-0"
 							checked={benchmarks.includes(b.id)}
 							onChange={(e) => setBenchmarks((bs) => (e.target.checked ? [...bs, b.id] : bs.filter((x) => x !== b.id)))}
 						/>
-						{b.id}
+						<span className="truncate" title={b.id}>
+							{b.id}
+						</span>
 					</label>
 				))}
+				</div>
 			</fieldset>
 			<div className="flex flex-wrap gap-4 text-sm">
 				<NumberField label={t("form.tasks")} value={tasks} min={1} onChange={setTasks} testId="compare-models-tasks" />
@@ -304,7 +309,7 @@ function NumberField({
 			<input
 				type="number"
 				min={min}
-				className="border-input bg-background h-9 w-28 rounded-lg border px-2"
+				className="border-input bg-card h-(--control-h) w-28 rounded-md border px-2.5 text-sm tabular-nums"
 				value={value}
 				onChange={(e) => onChange(Math.max(min, Number(e.target.value) || 0))}
 				data-testid={testId}

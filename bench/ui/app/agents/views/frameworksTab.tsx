@@ -60,6 +60,8 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 		);
 	const native = rows.filter((row) => row.nativeTrace).length;
 	const scripted = rows.filter((row) => row.scripted).length;
+	// "Reports steps" is hidden while no config reports its own steps (rule 5: no column empty in every row).
+	const anySelf = rows.some((row) => row.selfReported);
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="frameworks-tab">
 			<div className="flex flex-wrap items-center gap-2 text-xs" data-testid="frameworks-summary">
@@ -68,14 +70,14 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 				{scripted > 0 && <ToneBadge tone="warn">{t("agents.frameworks.scriptedCount", { count: scripted })}</ToneBadge>}
 				{testsToggle}
 			</div>
-			<div className="min-w-0 rounded-sm border">
+			<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
 				<Table aria-label={t("agents.frameworks.label")} stickyColumns={1} data-testid="frameworks-table">
 					<TableHeader>
 						<TableRow>
 							<TableHead>{t("agents.table.config")}</TableHead>
 							<TableHead>{t("agents.table.adapter")}</TableHead>
 							<TableHead>{t("agents.frameworks.nativeTrace")}</TableHead>
-							<TableHead>{t("agents.frameworks.selfReported")}</TableHead>
+							{anySelf && <TableHead>{t("agents.frameworks.selfReported")}</TableHead>}
 							<TableHead>{t("agents.frameworks.provider")}</TableHead>
 							<TableHead>{t("agents.frameworks.build")}</TableHead>
 							<TableHead>{t("agents.frameworks.kind")}</TableHead>
@@ -84,7 +86,7 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 					</TableHeader>
 					<TableBody>
 						{rows.map((row) => (
-							<FrameworkTableRow key={row.id} row={row} />
+							<FrameworkTableRow key={row.id} row={row} selfCol={anySelf} />
 						))}
 					</TableBody>
 				</Table>
@@ -111,7 +113,7 @@ function Mark({ on, label }: { on: boolean; label?: string }) {
 	);
 }
 
-function FrameworkTableRow({ row }: { row: FrameworkRow }) {
+function FrameworkTableRow({ row, selfCol }: { row: FrameworkRow; selfCol: boolean }) {
 	const { t } = useTranslation("bench");
 	return (
 		<TableRow data-testid={`frameworks-row-${row.id.replace(/[^A-Za-z0-9_-]/g, "-")}`}>
@@ -122,9 +124,11 @@ function FrameworkTableRow({ row }: { row: FrameworkRow }) {
 			<TableCell>
 				<Mark on={row.nativeTrace} label={row.parser || undefined} />
 			</TableCell>
-			<TableCell>
-				<Mark on={row.selfReported} />
-			</TableCell>
+			{selfCol && (
+				<TableCell>
+					<Mark on={row.selfReported} />
+				</TableCell>
+			)}
 			<TableCell className="text-xs">
 				{row.provider}
 				{row.fallbacks > 0 && <span className="text-muted-foreground"> {t("agents.frameworks.fallbacks", { count: row.fallbacks })}</span>}

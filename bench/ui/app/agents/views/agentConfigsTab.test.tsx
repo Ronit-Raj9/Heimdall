@@ -193,9 +193,11 @@ describe("AgentConfigsTab", () => {
 
 	it("says scored runs and, when more were started, how many", () => {
 		const html = render(more);
-		expect(html).toMatch(/data-testid="agents-row-my-plain-loop-runs"[^>]*>0 scored runs \(4 started\)/);
-		expect(html).toMatch(/data-testid="agents-row-claude-code-runs"[^>]*>9 scored runs</);
-		expect(html).toMatch(/data-testid="agents-row-claude-code-last"[^>]*>Last run /);
+		// Round 3 (rule 5): the "Scored runs" column holds the number; started runs follow as "/ 4" with a title.
+		expect(html).toMatch(/data-testid="agents-row-my-plain-loop-runs" title="0 scored, 4 started"[^>]*>0<span[^>]*> \/ (<!-- -->)?4</);
+		expect(html).toMatch(/data-testid="agents-row-claude-code-runs"[^>]*>9</);
+		expect(html).toMatch(/data-testid="agents-row-claude-code-last"[^>]*>[^<]+</);
+		expect(html).toContain(">Scored runs<");
 	});
 
 	it("hides test agents on the Frameworks tab until Show them", () => {
@@ -244,7 +246,7 @@ describe("agents list round 2 (Q-2, Q-114, Q-123, Q-124, Q-122)", () => {
 
 	it("shows versions and last score, and sorts by last score with unscored last", () => {
 		const html = render(scored);
-		expect(html).toContain("2 versions");
+		expect(html).toMatch(/data-testid="agents-row-a-low-versions"[^>]*>2</);
 		expect(html).toContain(">40%<");
 		expect(sortAgents(scored, "score").map((a) => a.id)).toEqual(["c-high", "a-low", "b-none"]);
 	});

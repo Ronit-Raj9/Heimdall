@@ -249,8 +249,8 @@ function EndpointSection({
 			description={
 				<>
 					<p>{t("endpoint.description")}</p>
-					<p className="text-foreground mt-1 flex items-center gap-2 text-sm" data-testid="from-traces-privacy">
-						<ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+					<p className="text-foreground mt-1 flex items-start gap-2 text-sm" data-testid="from-traces-privacy">
+						<ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{t("endpoint.privacy")}
 					</p>
 				</>

@@ -60,6 +60,7 @@ export function VersionPicker(props: VersionPickerProps) {
 					size="icon"
 					onClick={props.onSwap}
 					disabled={disabled || (!a && !b)}
+					className="size-(--control-h)"
 					aria-label={t("agentDiff.picker.swap")}
 					title={t("agentDiff.picker.swap")}
 					dataTestId="agentdiff-picker-swap"
@@ -76,7 +77,7 @@ export function VersionPicker(props: VersionPickerProps) {
 					testId="agentdiff-picker-b"
 				/>
 				{systemCount > 0 && props.onShowSystem && (
-					<label className="text-muted-foreground flex h-9 items-center gap-2 text-xs" title={tg("diffPicker.showSystemHint")}>
+					<label className="text-muted-foreground flex h-(--control-h) items-center gap-2 text-xs" title={tg("diffPicker.showSystemHint")}>
 						<input
 							type="checkbox"
 							checked={showSystem}
@@ -102,7 +103,7 @@ export function VersionPicker(props: VersionPickerProps) {
 					});
 				}}
 			>
-				<div className="flex flex-col gap-1">
+				<div className="flex flex-col gap-1.5">
 					<label htmlFor={`${scopeId}-suite`} className="text-muted-foreground text-xs">
 						{t("agentDiff.picker.suite")}
 					</label>
@@ -124,7 +125,7 @@ export function VersionPicker(props: VersionPickerProps) {
 						))}
 					</datalist>
 				</div>
-				<div className="flex flex-col gap-1">
+				<div className="flex flex-col gap-1.5">
 					<label htmlFor={`${scopeId}-condition`} className="text-muted-foreground text-xs">
 						{t("agentDiff.picker.condition")}
 					</label>
@@ -139,12 +140,12 @@ export function VersionPicker(props: VersionPickerProps) {
 						data-testid="agentdiff-picker-condition"
 					/>
 				</div>
-				<Button type="submit" variant="outline" size="sm" disabled={disabled} dataTestId="agentdiff-picker-apply">
+				<Button type="submit" variant="outline" size="sm" className="h-(--control-h)" disabled={disabled} dataTestId="agentdiff-picker-apply">
 					{t("agentDiff.picker.apply")}
 				</Button>
 				<label
 					htmlFor={syntheticId}
-					className="text-foreground flex h-8 items-center gap-2 text-xs"
+					className="text-foreground flex h-(--control-h) items-center gap-2 text-xs"
 					title={t("agentDiff.picker.syntheticHint")}
 				>
 					<input
@@ -185,7 +186,7 @@ function VersionSelect({ label, value, versions, onChange, showSystem, disabled,
 	const selected = matched ? matched.config_hash : value;
 	const extra = selected && !matched ? selected : null;
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className="flex min-w-0 flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
