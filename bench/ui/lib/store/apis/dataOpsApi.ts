@@ -12,6 +12,7 @@ import type {
 import type { WebhookDelivery } from "@/lib/types/integrations";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
+import { withOrgParam } from "./orgParam";
 
 const id = (value: string) => encodeURIComponent(value);
 
@@ -30,7 +31,7 @@ export function auditExportUrl(orgId: string, format: AuditExportFormat, f?: { a
 	if (action) params.set("action", action);
 	if (actor) params.set("actor_type", actor);
 	if (q) params.set("q", q);
-	return `${BENCH_API_BASE}/orgs/${id(orgId)}/audit/export?${params.toString()}`;
+	return withOrgParam(`${BENCH_API_BASE}/orgs/${id(orgId)}/audit/export?${params.toString()}`);
 }
 
 export const dataOpsApi = benchApi
