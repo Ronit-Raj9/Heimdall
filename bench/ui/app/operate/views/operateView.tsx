@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import "@/components/canaries/uf7bI18n";
 import { HealthTile, Panel } from "./uxBits";
+import "@/components/platform/ufintI18n";
 
 /** Drops empty strings so a job gets only the fields the user filled in. */
 function compact(o: Record<string, string | boolean | undefined>): Record<string, string | boolean> {
@@ -215,6 +216,7 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 export async function deleteBackup(confirm: ConfirmFn, remove: (name: string) => unknown, name: string): Promise<boolean> {
 	const ok = await confirm(i18n.t("operate.deleteConfirm", { ns: "w4m8", name }), {
 		destructive: true,
+		title: i18n.t("confirm.deleteBackup", { ns: "ufint", name }),
 		confirmLabel: i18n.t("operate.delete", { ns: "w4m8" }),
 	});
 	if (!ok) return false;

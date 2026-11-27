@@ -2,7 +2,7 @@ import { CopyCodeBlock } from "@/components/suites/copyCodeBlock";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { Button } from "@/components/ui/button";
 import { StatusPill, type StatusTone } from "@/components/ui/statusPill";
-import { getLocale } from "@/lib/i18n";
+import i18n, { getLocale } from "@/lib/i18n";
 import {
 	kubernetesManifestUrl,
 	useCreateWorkerConnectionMutation,
@@ -26,6 +26,7 @@ import { useConfirmTarget } from "./whereRunsGo";
 import { useTranslation } from "react-i18next";
 
 import type byoworkerEn from "@/locales/en/byoworker.json";
+import "@/components/platform/ufintI18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -128,6 +129,7 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 		if (
 			action === "remove" &&
 			!(await confirm(t("actions.confirmRemove", { name: conn.name }), {
+				title: i18n.t("confirm.removeWorker", { ns: "ufint", name: conn.name }),
 				confirmLabel: th("remove.confirmOk"),
 				cancelLabel: th("remove.confirmKeep"),
 				destructive: true,

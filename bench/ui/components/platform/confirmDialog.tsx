@@ -35,11 +35,6 @@ export type StrictConfirmOptions = SafeConfirmOptions | DestructiveConfirmOption
 
 export interface ConfirmFn {
 	(message: string, opts?: StrictConfirmOptions): Promise<boolean>;
-	/**
-	 * @deprecated A destructive confirm must pass a title that names the thing (X-104). Kept only so
-	 * the callers listed in fixwave/notes/C0.md compile until their lanes add the title; remove then.
-	 */
-	(message: string, opts?: ConfirmOptions): Promise<boolean>;
 }
 
 interface PendingConfirm {

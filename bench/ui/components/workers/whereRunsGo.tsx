@@ -1,4 +1,4 @@
-import { type ConfirmFn, type ConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { type ConfirmFn, type StrictConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -37,7 +37,7 @@ export function targetConfirm(
 	view: WorkerTargetView | undefined,
 	target: string,
 	t: TFunction<"hw05">,
-): { message: string; opts: ConfirmOptions } {
+): { message: string; opts: StrictConfirmOptions } {
 	const chosen = view?.choices.find((c) => c.target === target);
 	const current = view?.choices.find((c) => c.current) ?? view?.choices.find((c) => c.target === view?.target);
 	const name = targetTitle(view, target);

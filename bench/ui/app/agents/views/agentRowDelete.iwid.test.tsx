@@ -41,7 +41,7 @@ describe("agent card Delete (X4)", () => {
 		const remove = async (id: string) => void removed.push(id);
 		const yes = async (message: string) => (asked.push(message), true);
 		const question = "Delete the agent my-agent? Past results stay.";
-		const labels = { confirm: "Delete", cancel: "Cancel" };
+		const labels = { title: "Delete agent my-agent?", confirm: "Delete", cancel: "Cancel" };
 		expect(await deleteAgentRow(async () => false, yes, remove, "lib-agent", question, labels)).toBe("builtin");
 		expect(asked).toEqual([]);
 		expect(removed).toEqual([]);

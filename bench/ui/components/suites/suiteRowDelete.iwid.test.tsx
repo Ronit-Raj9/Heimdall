@@ -39,11 +39,11 @@ describe("benchmark row Delete (N288)", () => {
 		const remove = async (id: string) => void removed.push(id);
 		const no = async (message: string, opts?: { destructive?: boolean }) => (asked.push({ message, opts }), false);
 		const question = "Delete the benchmark FAQ? Its tasks and files are removed. Past results stay.";
-		expect(await deleteSuiteRow(no, remove, "faq-bench", question, { confirm: "Delete", cancel: "Cancel" })).toBe(false);
+		expect(await deleteSuiteRow(no, remove, "faq-bench", question, { title: "Delete benchmark FAQ?", confirm: "Delete", cancel: "Cancel" })).toBe(false);
 		expect(asked[0].message).toBe(question);
 		expect(asked[0].opts?.destructive).toBe(true);
 		expect(removed).toEqual([]);
-		expect(await deleteSuiteRow(async () => true, remove, "faq-bench", question, { confirm: "Delete", cancel: "Cancel" })).toBe(true);
+		expect(await deleteSuiteRow(async () => true, remove, "faq-bench", question, { title: "Delete benchmark FAQ?", confirm: "Delete", cancel: "Cancel" })).toBe(true);
 		expect(removed).toEqual(["faq-bench"]);
 	});
 

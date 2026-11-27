@@ -17,7 +17,7 @@ import { notify } from "@/lib/notify";
 import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getLocale } from "@/lib/i18n";
+import i18n, { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useListJobsFilteredQuery } from "@/lib/store/apis/jobsApi";
@@ -31,6 +31,7 @@ import { parseAsString, useQueryStates } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { canRetryJob, firstErrorLine, isTestJob, jobBudgetUsd, jobsPollMs, parseJobStatus } from "./jobsView.utils";
+import "@/components/platform/ufintI18n";
 
 /** Jobs shown per step of "Load older jobs". */
 export const JOBS_PAGE_SIZE = 50;
@@ -105,7 +106,7 @@ export default function JobsView() {
 	const cancelSelected = async () => {
 		const picked = jobs.filter((j) => selected.has(j.id) && isActiveJob(j) && !j.cancel_requested);
 		if (picked.length === 0) return;
-		if (!(await confirm(t("bulk.confirm", { count: picked.length }), { confirmLabel: t("confirm"), cancelLabel: t("keep"), destructive: true }))) return;
+		if (!(await confirm(t("bulk.confirm", { count: picked.length }), { title: i18n.t("confirm.cancelJobs", { ns: "ufint", count: picked.length }), confirmLabel: t("confirm"), cancelLabel: t("keep"), destructive: true }))) return;
 		for (const job of picked) await doCancel(job);
 		setSelected(new Set());
 	};

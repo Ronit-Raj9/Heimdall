@@ -10,6 +10,7 @@ describe("delete backup", () => {
 		await deleteBackup(confirm, remove, "backup-1.tar.gz");
 		expect(confirm).toHaveBeenCalledWith("Delete the copy backup-1.tar.gz? It cannot be brought back.", {
 			destructive: true,
+			title: "Delete backup backup-1.tar.gz?",
 			confirmLabel: "Delete",
 		});
 		expect(remove).not.toHaveBeenCalled();

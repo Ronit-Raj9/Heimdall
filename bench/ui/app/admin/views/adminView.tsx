@@ -16,6 +16,8 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AdminContainersPanel, AdminImagesPanel, AdminOrgsPanel, AdminUsagePanel, AdminUsersPanel } from "./adminPanels";
 import { AdminSignupPanel } from "./adminSignupPanel";
+import i18n from "@/lib/i18n";
+import "@/components/platform/ufintI18n";
 
 export const ADMIN_TABS = ["overview", "users", "orgs", "signup", "images", "usage", "workers"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
@@ -129,10 +131,10 @@ export function AdminOverviewPanel() {
 	// Both directions ask: stopping blocks every organization, allowing again starts queued runs at once.
 	const toggle = async () => {
 		const ask = killAsk(on);
-		const ok = await confirm(on ? tl("kill.confirmOff") : t("kill.confirmOn"), {
-			confirmLabel: tl(ask.label),
-			destructive: ask.destructive,
-		});
+		const message = on ? tl("kill.confirmOff") : t("kill.confirmOn");
+		const ok = await (ask.destructive
+			? confirm(message, { confirmLabel: tl(ask.label), destructive: true, title: i18n.t("confirm.stopAll", { ns: "ufint" }) })
+			: confirm(message, { confirmLabel: tl(ask.label) }));
 		if (!ok) return;
 		void setKill(!on);
 	};

@@ -25,6 +25,8 @@ import { useTranslation } from "react-i18next";
 import "@/app/agents/views/w4m1I18n";
 import { RegistryLoginsSection } from "./registryLogins";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
+import i18n from "@/lib/i18n";
+import "@/components/platform/ufintI18n";
 
 function byteLength(v: string): number {
 	return new TextEncoder().encode(v).length;
@@ -112,6 +114,7 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 												if (!value || !onRotate) return;
 												// The old value cannot be recovered, so a replace always asks first.
 												void confirm(tl("secrets.confirmRotate", { name: s.name }), {
+													title: i18n.t("confirm.replaceSecret", { ns: "ufint", name: s.name }),
 													confirmLabel: tl("secrets.confirmRotateLabel"),
 													destructive: true,
 												}).then((yes) => {

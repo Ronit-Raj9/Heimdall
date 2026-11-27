@@ -1,0 +1,13 @@
+{
+	"confirm": {
+		"deleteAgent": "Delete agent {{name}}?",
+		"deleteSuite": "Delete benchmark {{name}}?",
+		"cancelJobs_one": "Cancel {{count}} job?",
+		"cancelJobs_other": "Cancel {{count}} jobs?",
+		"deleteBackup": "Delete backup {{name}}?",
+		"replaceSecret": "Replace secret {{name}}?",
+		"revokeShare": "Turn off share link {{name}}?",
+		"removeWorker": "Remove worker {{name}}?",
+		"stopAll": "Stop runs for every organization?"
+	}
+}

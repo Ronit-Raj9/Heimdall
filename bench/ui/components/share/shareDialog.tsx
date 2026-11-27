@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
+import "@/components/platform/ufintI18n";
 
 /** Expiry choices, in days; 0 is never. */
 export const EXPIRY_CHOICES = [1, 7, 30, 90, 0] as const;
@@ -213,6 +215,7 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 		if (
 			!(await confirm(tu("share.revokeConfirmNamed", { name, expiry }), {
 				destructive: true,
+				title: i18n.t("confirm.revokeShare", { ns: "ufint", name }),
 				confirmLabel: t("revoke"),
 			}))
 		)

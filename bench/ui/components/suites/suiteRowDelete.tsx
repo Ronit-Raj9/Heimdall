@@ -8,6 +8,8 @@ import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isBuiltinSuite } from "./suiteDisplay";
 import "./w4iwidI18n";
+import i18n from "@/lib/i18n";
+import "@/components/platform/ufintI18n";
 
 /** Built-in ids a hosted list may hide but that stay built-in names (the server's practice suites, N46). */
 const RESERVED_SUITE_IDS: ReadonlySet<string> = new Set(["coding-core"]);
@@ -23,9 +25,9 @@ export async function deleteSuiteRow(
 	remove: (id: string) => Promise<unknown>,
 	id: string,
 	question: string,
-	labels: { confirm: string; cancel: string },
+	labels: { title: string; confirm: string; cancel: string },
 ): Promise<boolean> {
-	if (!(await confirm(question, { confirmLabel: labels.confirm, cancelLabel: labels.cancel, destructive: true }))) return false;
+	if (!(await confirm(question, { title: labels.title, confirmLabel: labels.confirm, cancelLabel: labels.cancel, destructive: true }))) return false;
 	await remove(id).catch(() => undefined);
 	return true;
 }
@@ -50,6 +52,7 @@ export function SuiteRowDelete({ suite, name }: { suite: Pick<SuiteSummary, "id"
 				dataTestId={testId}
 				onClick={() =>
 					void deleteSuiteRow(confirm, (id) => remove(id).unwrap(), suite.id, t("delete.suite", { name }), {
+						title: i18n.t("confirm.deleteSuite", { ns: "ufint", name }),
 						confirm: t("delete.confirm"),
 						cancel: t("delete.cancel"),
 					})

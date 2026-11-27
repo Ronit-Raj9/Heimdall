@@ -11,6 +11,8 @@ import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isBaselineAgent } from "./agentDisplay";
+import i18n from "@/lib/i18n";
+import "@/components/platform/ufintI18n";
 
 /** Whether the agents list offers Delete on this card: the role the server lets delete (DELETE_ROLE), never on a built-in baseline agent (X4). */
 export function agentRowDeletable(session: SessionInfo, agent: Pick<AgentSummary, "id">): boolean {
@@ -29,10 +31,10 @@ export async function deleteAgentRow(
 	remove: (id: string) => Promise<unknown>,
 	id: string,
 	question: string,
-	labels: { confirm: string; cancel: string },
+	labels: { title: string; confirm: string; cancel: string },
 ): Promise<AgentRowDeleteOutcome> {
 	if (!(await hasOwnFile(id))) return "builtin";
-	if (!(await confirm(question, { confirmLabel: labels.confirm, cancelLabel: labels.cancel, destructive: true }))) return "cancelled";
+	if (!(await confirm(question, { title: labels.title, confirmLabel: labels.confirm, cancelLabel: labels.cancel, destructive: true }))) return "cancelled";
 	await remove(id).catch(() => undefined);
 	return "asked";
 }
@@ -53,6 +55,7 @@ export function AgentRowDelete({ agent, name, testId }: { agent: Pick<AgentSumma
 			.catch((e: unknown) => (e as { status?: unknown } | undefined)?.status !== 404);
 	const run = async () => {
 		const outcome = await deleteAgentRow(hasOwnFile, confirm, (id) => remove(id).unwrap(), agent.id, t("delete.agent", { name }), {
+			title: i18n.t("confirm.deleteAgent", { ns: "ufint", name }),
 			confirm: t("delete.confirm"),
 			cancel: t("delete.cancel"),
 		});
