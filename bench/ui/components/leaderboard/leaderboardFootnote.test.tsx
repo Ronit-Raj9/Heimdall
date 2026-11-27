@@ -25,7 +25,7 @@ describe("LeaderboardFootnote", () => {
 		expect(html).toContain("Scope all: entries use their own tasks");
 		expect(html).toContain("Rank alone does not prove one agent beats another.");
 		expect(html).toContain("Resilience columns: success under a failure test minus normal");
-		expect(html).toContain("Sorted by verified_success. Tiers split at luck chance below 0.05.");
+		expect(html).toContain("Sorted by verified_success. Tiers split at false alarm rate 0.05.");
 	});
 
 	it("explains a common-scope board and says when nothing was left out", () => {

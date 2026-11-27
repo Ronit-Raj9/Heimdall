@@ -441,7 +441,7 @@
 		},
 		"footnote": {
 			"title": "About this board",
-			"generated": "Generated {{time}}. Sorted by {{metric}}. Tiers split at luck chance below {{alpha}}.",
+			"generated": "Generated {{time}}. Sorted by {{metric}}. Tiers split at false alarm rate {{alpha}}.",
 			"rankClaim": "Rank alone does not prove one agent beats another. Only Behind means clearly worse.",
 			"scopeAll": "Scope all: entries use their own tasks. Tiers compare on shared tasks.",
 			"scopeCommon_one": "Scope common: every entry is measured over the same {{count}} common task only.",
