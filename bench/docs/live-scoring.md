@@ -326,7 +326,7 @@ or one more occurrence of an existing one. Items have `source_kind` `live`
 and source `live-<version>`; that is their provenance, and an accepted
 item's task carries `provenance.incident.source: live-<version>`. Every
 pushed session keeps its inbox item id, so the Live page links the worst
-sessions to `/inbox?item=<id>`, and `inbox accept <id> -suite <suite>` drafts
+sessions to `/failures?item=<id>`, and `inbox accept <id> -suite <suite>` drafts
 the regression task as for any inbox item (checked: a live item accepted
 into a tool-use suite wrote a draft with the incident provenance).
 

@@ -59,11 +59,23 @@ HEAD`) needs a checkout of that repo. On the website use the CI gate in
 ([web-integrations.md](web-integrations.md)), or run it with the CLI and
 **Upload** the sealed runs.
 
-## Schedules and canaries
+## Checks: repeat runs and drift monitors
 
-- **Production > Schedules**: run an experiment file on a cron with a daily
-  USD cap. **Run now** fires it once.
-- **Production > Drift canaries**: a drift canary re-runs a pinned suite against a
-  known-good baseline. **Create canary**, record its baseline, then run.
+- **Checks > Repeat runs**: run an evaluation or comparison on a cron with a
+  daily USD cap. **Run now** fires it once and always asks first, naming the
+  daily limit.
+- **Checks > Drift monitors**: a drift monitor re-runs a pinned benchmark against a
+  known-good baseline. **Create drift monitor**, record its baseline, then run.
+  Practice mode answers every model call from a scripted model: no model
+  cost, and it cannot find real drift.
+
+## Archive
+
+Evaluations, comparisons, runs, auto-improve runs and findings have
+**Archive** in their row menu or the page's **More** menu. An archived item
+is hidden from its list; **Show archived** in the list's toolbar brings it
+back into view with an "Archived" pill, and **Unarchive** returns it to the
+list. Nothing is deleted: the item's page, its share links, leaderboards,
+verdicts, report cards, usage and spend stay exactly as they were.
 
 Next: [web-analysis.md](web-analysis.md).

@@ -46,7 +46,7 @@ deliver only to public https URLs.
 
 ## Inbox ingest
 
-[Production failures](/inbox): flagged production sessions become task drafts.
+[Production failures](/failures): flagged production sessions become task drafts.
 
 - **Push failures in**: add the shown snippet to `inbox/sources.yaml` and
   point your tracing tool's webhook at the ingest URL. Works hosted.

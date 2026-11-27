@@ -390,7 +390,7 @@ not parse is an error.
   (`/suites/<suite>/tasks/<task>`) shows provenance, the admission checks,
   the instruction and the visible files. The **Agents** page (`/agents`)
   lists every config with its image, whether it builds per suite, and its
-  evidence level. `/verdict`, `/runs`, `/leaderboard` and `/triage` work as
+  evidence level. `/verdict`, `/runs`, `/leaderboard` and `/failures?tab=patterns` work as
   for the built-in suite.
 
 ## The CI gate on your own recorded run

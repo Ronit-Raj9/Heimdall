@@ -9,7 +9,8 @@ leaderboard view. Press **Share** on that page.
 A share link is read-only and opens one item only. Whoever has it sees that
 item and nothing else in your organization.
 
-- **Expiry**: 1, 7, 30 or 90 days, or never. The default is 30 days.
+- **Expiry**: 1, 7, 30 or 90 days, or never. The default is 7 days. Only an
+  organization admin or owner can make a link that never expires.
 - **Turn off**: any member can turn a link off in the same dialog. It stops
   working at once.
 - **Secrets are never shown.** Keys, tokens, passwords, environment values
@@ -19,7 +20,10 @@ item and nothing else in your organization.
 - Leaderboard links keep the filters you had on (skill, model, benchmark,
   condition). The held-out board is never shareable.
 
-Members create and turn off links; viewers can see and copy existing ones.
+Members create, copy and turn off links. Viewers see that links exist, but
+not the links themselves, so they cannot copy one. Admins see every link of
+the organization in [Settings > Shared links](/settings?tab=shares): what it
+opens, who made it and when, its expiry and state, with **Revoke**.
 The link looks like `https://<your heimdall>/s/<token>`. The token is signed
 with a key kept in your organization's project folder, so it cannot be
 guessed or moved to another item.
@@ -54,8 +58,9 @@ working when the link expires or is turned off.
 
 | Route | Who | What |
 |---|---|---|
-| `POST /api/bench/shares` | member | `{kind, target, query?, label?, hide_prompts?, expires_in_days?}`; kind is `evaluation`, `report_card`, `verdict`, `run_trace` or `leaderboard` |
-| `GET /api/bench/shares?kind=&target=` | viewer | the links, with state `active`, `expired` or `revoked` |
+| `POST /api/bench/shares` | member | `{kind, target, query?, label?, hide_prompts?, expires_in_days?}`; kind is `evaluation`, `report_card`, `verdict`, `run_trace` or `leaderboard`; no `expires_in_days` is 7 days, `0` (never) is for admins only |
+| `GET /api/bench/shares?kind=&target=` | viewer | the links of one item, with state `active`, `expired` or `revoked`; a viewer's rows have no token or url |
+| `GET /api/bench/shares` | admin | every link of the organization |
 | `POST /api/bench/shares/{id}/revoke` | member | turn a link off |
 | `GET /api/bench/shared/{token}` | anyone with the link | the item, redacted; 410 when expired or turned off |
 | `GET /api/bench/shared/{token}/badge.svg` | anyone with the link | the badge |

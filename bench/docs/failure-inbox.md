@@ -16,7 +16,7 @@ inbox only reads what they flagged.
 
 The code is `bench/traceinbox` (sources, store, signature, accept), the
 command `cmd/bifrost-bench/inbox.go`, the API `handlers/inbox.go` and the
-Inbox page in the UI (`ui/app/inbox`, `ui/components/inbox`).
+Production failures tab of the Failures page in the UI (`/failures`, `ui/app/failures`, `ui/app/inbox/views`, `ui/components/inbox`).
 
 ## The loop
 
@@ -443,9 +443,9 @@ A job schedule names no experiment, no policy and no `max_usd_per_day`, and
 spends nothing. A pull where every source failed is a failed run and fires
 the schedule's `schedule_failed` alert.
 
-## The Inbox page
+## The Production failures tab
 
-`/inbox` in the UI: counts by state, a table of items (title, source, why it
+`/failures` in the UI (the old `/inbox` redirects there): counts by state, a table of items (title, source, why it
 was flagged, occurrences, first and last seen, suggested kind and suite, the
 accepted task and its release status, a link to the original trace), the
 redacted preview of the selected item, and Accept (choose the suite, the

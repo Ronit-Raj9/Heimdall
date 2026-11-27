@@ -8,7 +8,7 @@ Triage answers "why did version B get worse?" with **observed patterns, not root
 |---|---|
 | Detectors (per-run metrics) | `metrics/patternloop.go`, `metrics/patternunverified.go`, `metrics/patternignorederror.go`, shared rules in `metrics/patternevents.go` |
 | API | `GET /api/bench/experiments/{id}/triage`, `handlers/triage.go`, returns `schemas.Triage` plus `mode` |
-| Screen | `/triage?exp=<id>&pattern=<name>`, `ui/app/triage/`, `ui/components/triage/` |
+| Screen | `/failures?tab=patterns&exp=<id>&pattern=<name>` (the old `/triage` redirects there), `ui/app/inbox/views/triageTab.tsx`, `ui/components/triage/` |
 
 The detectors are ordinary metrics: kind `rate`, lower is better, version 1.0.0, computed at the measure stage into each run's `metrics.json`. Each returns observed `1` when the pattern appears, observed `0` when the events exist and it does not, and `unknown` with a reason when there are no usable events. A run sealed before these metrics existed has no value for them and counts as unknown until it is measured again.
 

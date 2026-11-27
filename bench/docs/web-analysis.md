@@ -59,9 +59,12 @@ Releases page, pick a release, **Write compliance pack**: writes `compliance-<re
 **Govern > Monitors**: **Certify a monitor** or guardrail on labelled sealed
 runs; see past certifications.
 
-## Inbox, clusters, leaderboard
+## Failures, leaderboard
 
-- [Production failures](/inbox): production failures become task drafts; accept,
-  reject or snooze. Failure clusters and triage live here too.
+- [Failures](/failures): one page with five tabs. **Production failures**
+  become task drafts (accept, reject or snooze); **Findings** are tracked
+  failures; **Failure groups** and **Failure patterns** group failed runs
+  across benchmark runs and per comparison; **By agent version** shows where each
+  version of an agent breaks.
 - [Results > Leaderboard](/leaderboard): agent configs ranked by verified success,
   with tiers and trends.

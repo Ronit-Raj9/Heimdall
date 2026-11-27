@@ -11,7 +11,7 @@ Triage (`docs/triage.md`) stays the per-experiment view: it counts observed patt
 | Signatures, clustering (pure functions) | `clusters/` |
 | CLI | `bifrost-bench clusters`, `cmd/bifrost-bench/clusters.go` |
 | API | `GET /api/bench/clusters`, `GET /api/bench/clusters/{signature}`, `handlers/clusters.go` |
-| Screen | `/clusters`, `ui/app/clusters/`, `ui/components/clusters/` |
+| Screen | `/failures?tab=groups` (the old `/clusters` redirects there), `ui/app/inbox/views/clustersTab.tsx`, `ui/components/clusters/` |
 
 ## Which runs enter
 
