@@ -1,3 +1,4 @@
+import { isImporterText, plainDescription, suiteDisplayName } from "@/components/suites/suiteDisplay";
 import type { CatalogEntry } from "@/lib/types/catalog";
 
 /** The human name and one-line description shown on a catalog card. */
@@ -70,10 +71,14 @@ function oneLine(s: string | undefined): string {
 	return first.length > 90 ? `${first.slice(0, 87).trimEnd()}...` : first;
 }
 
-/** Fallback name for ids not in the map: the title without "Acme ... example" noise. */
+/**
+ * Fallback name for ids not in the map: the title without "Acme ... example" noise. A bundled
+ * suite reads the same name as on the benchmarks list (M6-48: one name source).
+ */
 function fallbackTitle(e: CatalogEntry): string {
 	const m = /^acme\s+(.*?)\s*example/i.exec(e.title.trim());
 	if (m?.[1]) return cap(m[1].trim());
+	if (e.kind === "bundled" && e.suite_id) return suiteDisplayName(e.suite_id);
 	if (/^[a-z0-9_-]+$/.test(e.title)) return cap(e.title.replace(/^(hd|suite)-/, "").replace(/[-_]/g, " "));
 	return e.title;
 }
@@ -82,6 +87,9 @@ function fallbackTitle(e: CatalogEntry): string {
 function fallbackDescription(e: CatalogEntry): string {
 	const colon = e.title.indexOf(":");
 	if (colon > 0) return cap(e.title.slice(colon + 1).trim());
+	// Importer text ("Imported by ...", "through the harbor importer") is never a description (M6-48).
+	if (isImporterText(e.summary ?? "")) return "";
+	if (e.kind === "bundled") return plainDescription(e.summary);
 	return oneLine(e.summary);
 }
 

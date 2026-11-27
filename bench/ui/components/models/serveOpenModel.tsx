@@ -1,8 +1,13 @@
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { InlineError } from "@/components/runs/screenStates";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import { notify } from "@/lib/notify";
+import "@/components/suites/uf6bI18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	activeDeployments,
 	defaultGPU,
@@ -16,6 +21,11 @@ import {
 import { Server } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+
+/** A time limit the server can bound: 0.1 to 24 hours (M8-15; 0 used to mean no limit). */
+export function hoursProblem(limit: number): boolean {
+	return !Number.isFinite(limit) || limit < 0.1 || limit > 24;
+}
 
 const STATE_TONE: Record<string, "success" | "warning" | "outline"> = {
 	ready: "success",
@@ -46,7 +56,12 @@ export function ServeOpenModel() {
 	const [gpu, setGPU] = useState("");
 	const [hours, setHours] = useState("2");
 	const [expId, setExpId] = useState("");
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	const [stopError, setStopError] = useState<unknown>(null);
+	// M8-15: the evaluation is picked from a list, not typed; only unfinished ones can stop a server.
+	const experiments = useListExperimentsQuery(undefined, { skip: !hosted || !isAdmin });
+	const confirm = useConfirm();
+	const { t: tu } = useTranslation("uf6b");
 	if (!hosted) return null;
 
 	const model = models.find((m) => m.id === modelId) ?? models[0];
@@ -56,22 +71,38 @@ export function ServeOpenModel() {
 	const deployments = list.data?.deployments ?? [];
 	const running = activeDeployments(deployments);
 
-	const onSubmit = async (e: FormEvent) => {
-		e.preventDefault();
-		if (!model) return;
+	// M8-15: starting a GPU bills the org's Modal account, so the shared paid button asks first,
+	// with the hours and the most it can cost.
+	const startServing = async () => {
+		if (!model || hoursProblem(limit)) return;
 		setError(null);
 		try {
 			await start({
 				model: model.id,
 				engine,
 				gpu: gpuName,
-				max_hours: limit > 0 ? limit : undefined,
+				max_hours: limit,
 				experiment_id: expId.trim() || undefined,
 			}).unwrap();
+			notify({ text: t("started", { ns: "toast", name: model.title }) });
 		} catch (err) {
-			setError(getBenchErrorMessage(err));
+			setError(err);
 		}
 	};
+	// X-70, M1-44: Stop ends the server at once, so it asks first; a failed stop says why.
+	const stopServing = async (d: OpenModelDeployment) => {
+		const name = d.model_name || d.title;
+		const opts: DestructiveConfirmOptions = { destructive: true, title: tu("serve.stopTitle", { model: name }), confirmLabel: t("serve.stop") };
+		if (!(await confirm(tu("confirm.serveStop", { model: name }), opts))) return;
+		setStopError(null);
+		try {
+			await stop(d.id).unwrap();
+			notify({ text: t("stopped", { ns: "toast", name }) });
+		} catch (err) {
+			setStopError(err);
+		}
+	};
+	const openExperiments = (experiments.data?.experiments ?? []).filter((x) => x.state !== "done" && x.state !== "failed" && x.state !== "cancelled");
 
 	return (
 		<section className="flex flex-col gap-3" data-testid="serve-open-model">
@@ -83,7 +114,7 @@ export function ServeOpenModel() {
 				<p className="text-muted-foreground text-sm">{t("serve.subtitle")}</p>
 			</div>
 			{isAdmin && models.length > 0 && (
-				<form className="bg-card grid gap-3 rounded-xl border px-5 py-4 sm:grid-cols-2" onSubmit={onSubmit} data-testid="serve-form">
+				<form className="bg-card grid gap-3 rounded-xl border px-5 py-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => e.preventDefault()} data-testid="serve-form">
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="text-muted-foreground text-xs">{t("serve.model")}</span>
 						<select
@@ -126,27 +157,60 @@ export function ServeOpenModel() {
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="text-muted-foreground text-xs">{t("serve.hours")}</span>
-						<Input type="number" min="0.1" max="24" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} data-testid="serve-hours" />
+						<Input
+							type="number"
+							min="0.1"
+							max="24"
+							step="0.5"
+							required
+							value={hours}
+							onChange={(e) => setHours(e.target.value)}
+							aria-invalid={hoursProblem(limit) || undefined}
+							data-testid="serve-hours"
+						/>
+						{hoursProblem(limit) && (
+							<span className="text-destructive text-xs" data-testid="serve-hours-problem">
+								{tu("serve.hoursRange")}
+							</span>
+						)}
 					</label>
 					<label className="flex flex-col gap-1 text-sm sm:col-span-2">
 						<span className="text-muted-foreground text-xs">{t("serve.evaluation")}</span>
-						<Input value={expId} placeholder={t("serve.evaluationHint")} onChange={(e) => setExpId(e.target.value)} data-testid="serve-exp" />
+						<select
+							className="bg-background h-9 min-w-0 rounded-md border px-2"
+							value={expId}
+							onChange={(e) => setExpId(e.target.value)}
+							data-testid="serve-exp"
+						>
+							<option value="">{tu("serve.noEvaluation")}</option>
+							{openExperiments.map((x) => (
+								<option key={x.exp_id} value={x.exp_id}>
+									{x.name || x.exp_id}
+								</option>
+							))}
+						</select>
+						<span className="text-muted-foreground text-xs">{t("serve.evaluationHint")}</span>
 					</label>
 					<div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-						<Button type="submit" size="sm" disabled={started.isLoading || !choice || choice.count === 0} data-testid="serve-start">
-							{t("serve.start")}
-						</Button>
+						<PaidButton
+							size="sm"
+							verb={t("serve.start")}
+							capUsd={maxCost(choice, limit)}
+							confirm="always"
+							confirmText={tu("confirm.serveStart", { hours: limit, max: maxCost(choice, limit).toFixed(2) })}
+							disabled={started.isLoading || !choice || choice.count === 0 || hoursProblem(limit)}
+							isLoading={started.isLoading}
+							onConfirm={startServing}
+							testId="serve-start"
+						/>
 						<span className="text-muted-foreground text-xs" data-testid="serve-cost">
 							{t("serve.cost", { max: maxCost(choice, limit).toFixed(2) })}
 						</span>
-						{error && (
-							<span className="text-destructive text-xs" role="alert" data-testid="serve-error">
-								{error}
-							</span>
-						)}
+						<InlineError error={error} onRetry={() => void startServing()} testId="serve-error" className="sm:col-span-2" />
 					</div>
 				</form>
 			)}
+			<InlineError error={stopError} testId="serve-stop-error" />
 			{deployments.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="serve-empty">
 					{t("serve.empty")}
@@ -154,7 +218,12 @@ export function ServeOpenModel() {
 			) : (
 				<ul className="bg-card flex flex-col divide-y rounded-xl border" data-testid="serve-list">
 					{deployments.slice(0, 20).map((d) => (
-						<DeploymentRow key={d.id} d={d} canStop={isAdmin && running.includes(d)} onStop={() => void stop(d.id)} />
+						<DeploymentRow
+							key={d.id}
+							d={d}
+							canStop={isAdmin && running.includes(d)}
+							onStop={() => void stopServing(d)}
+						/>
 					))}
 				</ul>
 			)}

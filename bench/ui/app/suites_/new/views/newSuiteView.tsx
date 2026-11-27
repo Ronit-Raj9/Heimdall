@@ -1,4 +1,5 @@
 import "@/components/agents/hw02I18n";
+import { AGENT_ID_RE } from "@/components/agents/agentName";
 import { PageHeader } from "@/components/shell";
 import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { Button } from "@/components/ui/button";
@@ -7,29 +8,36 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { authoringError, useCreateSuiteMutation, useGetSuiteTemplatesQuery } from "@/lib/store/apis/suiteAuthoringApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/suites/uf6bI18n";
+import { STARTS, startFromUrl, type StartingPoint } from "./newSuiteStart";
 
-const ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+// One id rule for agents and benchmarks (M6-60): 1 to 63 characters.
+const ID_RE = AGENT_ID_RE;
 const FALLBACK_TEMPLATES = ["python-pytest", "node-test", "go-test", "generic-reward"];
 /** Templates of a benchmark cut from repository commits, graded by tests. */
 const CODE_TEMPLATES = new Set(["python-pytest", "node-test", "go-test", "generic-reward"]);
 
-/** Where a new benchmark's tasks come from (X13): own questions and tickets, repository commits, or any template. */
-export type StartingPoint = "questions" | "code" | "other";
-const STARTS: StartingPoint[] = ["questions", "code", "other"];
 
 /** /suites/new: create benchmarks/<id>/ from a template, then open its Edit tab. */
 export default function NewSuiteView({ initialId = "" }: { initialId?: string } = {}) {
 	const { t } = useTranslation("suiteAuthoring");
 	const { t: th } = useTranslation("hw02");
+	const { t: tb } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf6b");
+	// ?start=code opens on "From code changes" (the add chooser's code row); ?template=support,
+	// qa or commits (links from other pages) map to the same choices; start wins when both are given.
+	const [startParam] = useQueryState("start", parseAsStringLiteral(STARTS));
+	const [templateParam] = useQueryState("template");
 	const session = useSession();
 	const writable = canUse(session, "member");
 	const templatesQuery = useGetSuiteTemplatesQuery();
 	const [createSuite, { isLoading, error }] = useCreateSuiteMutation();
 	const navigate = useNavigate();
 	const [id, setId] = useState(initialId);
-	const [start, setStart] = useState<StartingPoint>("questions");
+	const [start, setStart] = useState<StartingPoint>(() => startFromUrl(startParam, templateParam));
 	const [template, setTemplate] = useState("");
 	const [image, setImage] = useState("");
 	const [notVisible, setNotVisible] = useState(false);
@@ -62,7 +70,7 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 			<PageHeader
 				title={t("new.title")}
 				subtitle={t("new.subtitle")}
-				breadcrumbs={[{ label: "Suites", to: "/suites" }, { label: t("new.title") }]}
+				breadcrumbs={[{ label: tb("suites.title"), to: "/suites" }, { label: t("new.title") }]}
 			/>
 			{!writable && (
 				<p role="note" className="text-muted-foreground text-sm" data-testid="suites-new-readonly">
@@ -75,7 +83,7 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 					<Input
 						value={id}
 						onChange={(e) => setId(e.target.value.toLowerCase())}
-						placeholder="my-suite"
+						placeholder="my-benchmark"
 						aria-invalid={id !== "" && !idOk}
 						data-testid="suites-new-id"
 					/>
@@ -135,11 +143,14 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 						</div>
 					</fieldset>
 				)}
-				<label className="flex flex-col gap-1.5 text-sm font-medium">
-					{t("new.image")}
-					<Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="python:3.12-slim" data-testid="suites-new-image" />
-					<span className="text-muted-foreground text-xs font-normal">{t("new.imageHint")}</span>
-				</label>
+				<details className="group" open={image !== ""} data-testid="suites-new-advanced">
+					<summary className="text-muted-foreground hover:text-foreground cursor-pointer text-sm font-medium">{tu("newSuite.advanced")}</summary>
+					<label className="mt-3 flex flex-col gap-1.5 text-sm font-medium">
+						{t("new.image")}
+						<Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="python:3.12-slim" data-testid="suites-new-image" />
+						<span className="text-muted-foreground text-xs font-normal">{t("new.imageHint")}</span>
+					</label>
+				</details>
 				{error && (
 					<p role="alert" className="text-destructive text-sm" data-testid="suites-new-error">
 						{authoringError(error, t("new.failed"))}

@@ -1,3 +1,7 @@
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { notify } from "@/lib/notify";
+import "@/components/suites/uf6bI18n";
+import { queueSourceLine } from "./queueSource";
 import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
 import { humanExperimentName, isCheckPracticeOrDebug, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -31,7 +35,7 @@ import type {
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, Tags, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -54,6 +58,9 @@ export default function QueueView({ queueId }: { queueId: string }) {
 
 export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 	const { t } = useTranslation("annotation");
+	const { t: tu } = useTranslation("uf6b");
+	const source = queueSourceLine(queue);
+	const sourceText = tu(source.key, { benchmark: source.benchmark });
 	const tabs: RouteTab[] = [
 		{ id: "label", label: t("queue.tabs.label"), hidden: !queue.can_label },
 		{ id: "items", label: t("queue.tabs.items"), badge: queue.counts.total },
@@ -64,8 +71,7 @@ export function QueueScreen({ queue }: { queue: AnnotationQueue }) {
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="annotation-queue-screen">
 			<PageHeader
 				title={queue.name}
-				subtitle={queue.description}
-				icon={Tags}
+				subtitle={[sourceText, queue.description].filter(Boolean).join(" ")}
 				breadcrumbs={[{ label: t("queue.back"), to: "/annotation" }, { label: queue.name }]}
 			/>
 			<StatGrid>
@@ -770,6 +776,7 @@ export function AgreementPanel({ data }: { data: AnnotationAgreement }) {
 
 export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 	const { t } = useTranslation("annotation");
+	const { t: tu } = useTranslation("uf6b");
 	const navigate = useNavigate();
 	const [update, updated] = useUpdateAnnotationQueueMutation();
 	const [remove, removed] = useDeleteAnnotationQueueMutation();
@@ -780,13 +787,16 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 	const [labellers, setLabellers] = useState<string[]>(queue.reviewers ?? []);
 	const disabled = !queue.can_manage;
 	const badPerItem = perItemProblem(reviewers);
+	// M6-73: a queue keeps a name; Save stays off while the name is blank.
+	const noName = name.trim() === "";
+	const confirm = useConfirm();
 	return (
 		<Section title={t("settings.title")} description={disabled ? t("settings.readOnly") : undefined} testId="annotation-settings">
 			<form
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
 					e.preventDefault();
-					if (badPerItem) return;
+					if (badPerItem || noName) return;
 					void update({
 						id: queue.id,
 						name: name.trim(),
@@ -798,7 +808,14 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 				}}
 			>
 				<Field label={t("create.name")}>
-					<Input value={name} onChange={(e) => setName(e.target.value)} disabled={disabled} data-testid="annotation-settings-name" />
+					<Input
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						disabled={disabled}
+						required
+						aria-invalid={noName || undefined}
+						data-testid="annotation-settings-name"
+					/>
 				</Field>
 				<Field label={t("create.reviewers")} hint={badPerItem ? t("create.reviewersRange") : t("create.reviewersHint")}>
 					<Input
@@ -851,18 +868,28 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 							type="button"
 							variant="destructive"
 							disabled={removed.isLoading}
-							onClick={() => {
-								if (!window.confirm(t("settings.deleteConfirm"))) return;
-								void remove(queue.id)
-									.unwrap()
-									.then(() => void navigate({ to: "/annotation" }))
-									.catch(() => {});
-							}}
+							onClick={() =>
+								void (async () => {
+									const opts: DestructiveConfirmOptions = {
+										destructive: true,
+										title: tu("queue.deleteTitle", { name: queue.name }),
+										confirmLabel: tu("queue.deleteYes"),
+									};
+									if (!(await confirm(t("settings.deleteConfirm"), opts))) return;
+									await remove(queue.id)
+										.unwrap()
+										.then(() => {
+											notify({ text: tu("queue.deleted", { name: queue.name }) });
+											void navigate({ to: "/annotation" });
+										})
+										.catch(() => {});
+								})()
+							}
 							data-testid="annotation-settings-delete"
 						>
 							{t("settings.delete")}
 						</Button>
-						<Button type="submit" disabled={updated.isLoading || badPerItem} data-testid="annotation-settings-save">
+						<Button type="submit" disabled={updated.isLoading || badPerItem || noName} data-testid="annotation-settings-save">
 							{t("settings.save")}
 						</Button>
 					</div>

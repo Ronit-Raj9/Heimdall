@@ -1,0 +1,108 @@
+{
+	"chooser": {
+		"title": "How do you want to add tasks?",
+		"file": {
+			"label": "From a file or link",
+			"needs": "A JSON, CSV or zip file, or a dataset or repository link."
+		},
+		"catalog": {
+			"label": "From the catalog",
+			"needs": "Nothing. Pick a public benchmark and add it."
+		},
+		"api": {
+			"label": "Tasks from your API",
+			"needs": "Your OpenAPI file and a short policy. Uses your model key."
+		},
+		"create": {
+			"label": "Create your own",
+			"needs": "Your own questions or tickets, written here."
+		},
+		"code": {
+			"label": "From code changes",
+			"needs": "A repository with tests. Tasks come from its commits."
+		},
+		"failures": {
+			"label": "From production failures",
+			"needs": "Traces from a connected source. Each failure becomes a test."
+		},
+		"platformImport": "Or import traces from another platform"
+	},
+	"list": {
+		"makeReady": "Make it ready",
+		"sort": "Sort",
+		"sortDefault": "Default order",
+		"sorts": {
+			"name": "Name",
+			"tasks": "Tasks",
+			"ready": "Ready share"
+		},
+		"count": "{{shown}} of {{total}}",
+		"pageOf": "{{first}} to {{last}} of {{total}} benchmarks"
+	},
+	"add": {
+		"pageTitle": "Add a benchmark · Benchmarks · Heimdall",
+		"steps": "Steps",
+		"drafts_one": "Earlier drafts ({{count}})",
+		"drafts_other": "Earlier drafts ({{count}})",
+		"draftMore": "More actions for the draft of {{suite}}",
+		"draftDeleteTitle": "Delete the draft of {{suite}}?"
+	},
+	"newSuite": {
+		"advanced": "Advanced"
+	},
+	"catalog": {
+		"addHint": "Adds the benchmark to your project. Nothing runs and nothing is charged.",
+		"importHint": "Import, about 2 min, no model cost.",
+		"importWhat_one": "Imports up to {{count}} task from your copy of the data. No model runs and nothing is charged.",
+		"importWhat_other": "Imports up to {{count}} tasks from your copy of the data. No model runs and nothing is charged.",
+		"addTitle": "Add this benchmark?",
+		"addAsk": "Add {{name}} to your project as benchmark {{id}}? Nothing runs and nothing is charged.",
+		"addAskExample": "Add the {{name}} example to your project, with its benchmarks and agents? Nothing runs and nothing is charged.",
+		"addYes": "Add",
+		"detailsOf": "Details of {{name}}",
+		"colName": "Benchmark",
+		"colAction": "Action",
+		"pageOf": "{{first}} to {{last}} of {{total}} benchmarks",
+		"added": "{{name}} added to your benchmarks."
+	},
+	"labelling": {
+		"emptyAdd": "Empty. Add items",
+		"start_one": "Start labelling ({{count}})",
+		"start_other": "Start labelling ({{count}})",
+		"created": "Queue {{name}} is created. Now add the runs people will label.",
+		"openQueue": "Open the queue",
+		"done": "Done"
+	},
+	"source": {
+		"runsOf": "People check agent answers from {{benchmark}}.",
+		"runs": "People check agent answers.",
+		"judgeOf": "People check the judge's decisions on {{benchmark}}.",
+		"judge": "People check the judge's decisions."
+	},
+	"queue": {
+		"deleteTitle": "Delete queue {{name}}?",
+		"deleteYes": "Delete queue",
+		"deleted": "Queue {{name}} deleted."
+	},
+	"confirm": {
+		"syncRemove": "Remove the weekly sync of {{repo}}? It stops adding tasks. The benchmark and its tasks stay.",
+		"syncRemoveTitle": "Remove the weekly sync of {{repo}}?",
+		"syncRemoveYes": "Remove sync",
+		"syncRemoved": "Weekly sync of {{repo}} removed.",
+		"serveStart": "Start a GPU on your Modal account for {{hours}} hours? Modal bills you per minute, at most about ${{max}}.",
+		"serveStop": "Stop serving {{model}}? Running evaluations that use it will fail."
+	},
+	"serve": {
+		"hoursRange": "The time limit is 0.1 to 24 hours.",
+		"stopTitle": "Stop serving {{model}}?",
+		"noEvaluation": "No evaluation (stops at the time limit)"
+	},
+	"fromApi": {
+		"problem": {
+			"benchmark": "Benchmark id: use 1 to 63 lowercase letters, digits, '.', '-' or '_', starting with a letter or digit.",
+			"app": "Tool prefix: start with a letter, then up to 31 lowercase letters, digits, '-' or '_'.",
+			"appReserved": "Tool prefix: \"customer\" is taken by the simulated customer; pick another.",
+			"maxUsd": "Cost cap: type an amount above 0 in US dollars, or leave it empty."
+		}
+	}
+}
