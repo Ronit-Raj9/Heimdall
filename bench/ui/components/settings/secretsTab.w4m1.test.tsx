@@ -9,7 +9,7 @@ const row = { id: "key_1", name: "TAVILY_API_KEY", created_at: "2026-11-01T00:00
 describe("secret name hint (wave 4, p02-9)", () => {
 	it("states the name rule next to the box", () => {
 		expect(renderToStaticMarkup(<SecretNameHint />)).toContain(
-			"Names use capital letters, digits and underscores. What you type is changed to fit.",
+			"Capitals, digits and underscores.",
 		);
 	});
 });

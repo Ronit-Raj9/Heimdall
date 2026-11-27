@@ -96,7 +96,7 @@ describe("GatewayEffectCard", () => {
 
 	it("says what to do when the effect is unknown", () => {
 		const html = render(<GatewayEffectView effect={{ ...effect, state: "unknown", result: undefined, reason: "no rows" }} />);
-		expect(html).toContain("This test could not show an effect: no rows. Check that the setting is on in Bifrost, then run it again.");
+		expect(html).toContain("No effect shown: no rows. Check the setting is on in Bifrost, then rerun.");
 	});
 
 	it("offers to run an unknown test again, and only then", () => {

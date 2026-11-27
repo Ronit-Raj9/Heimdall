@@ -96,7 +96,6 @@ export function McpInstallPanel({ origin }: { origin?: string }) {
 				<CopyLine text={vscodeConfig(base)} testId="mcp-vscode" />
 			</div>
 			<p className="text-muted-foreground text-xs">{t("ide.noSecret")}</p>
-			<p className="text-muted-foreground text-xs">{t("ide.tools")}</p>
 		</section>
 	);
 }

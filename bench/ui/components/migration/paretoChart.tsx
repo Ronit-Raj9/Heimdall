@@ -81,8 +81,8 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 							data-testid={`${testId}-frontier`}
 						/>
 					)}
-					{model.placed.map((p) => (
-						<Point key={p.point.id} placed={p} locale={locale} testId={testId} name={names.get(p.point.id) ?? p.point.id} />
+					{model.placed.map((p, i, all) => (
+						<Point key={p.point.id} placed={p} locale={locale} testId={testId} name={names.get(p.point.id) ?? p.point.id} spot={paretoLabelSpots(all, right)[i]} />
 					))}
 				</svg>
 			</div>
@@ -149,7 +149,32 @@ export function paretoPointNames(points: readonly Pick<ParetoPoint, "id" | "agen
 	);
 }
 
-function Point({ placed, locale, testId, name }: { placed: PlacedParetoPoint; locale: string; testId: string; name: string }) {
+export interface LabelSpot {
+	x: number;
+	y: number;
+	anchor: "start" | "end";
+}
+
+/**
+ * Where each point's short label goes: right of the point, or left near the right edge; a label that
+ * would sit on an earlier one moves below its point, then further down. Pure.
+ */
+export function paretoLabelSpots(placed: readonly Pick<PlacedParetoPoint, "x" | "y">[], right: number): LabelSpot[] {
+	const taken: LabelSpot[] = [];
+	return placed.map((p) => {
+		const anchor = p.x > right - 40 ? "end" : "start";
+		const x = anchor === "end" ? p.x - 8 : p.x + 8;
+		const clash = (y: number) => taken.some((o) => Math.abs(o.y - y) < 13 && Math.abs(o.x - x) < 40);
+		let y = p.y - 8;
+		if (clash(y)) y = p.y + 16;
+		while (clash(y)) y += 13;
+		const spot = { x, y, anchor } as LabelSpot;
+		taken.push(spot);
+		return spot;
+	});
+}
+
+function Point({ placed, locale, testId, name, spot }: { placed: PlacedParetoPoint; locale: string; testId: string; name: string; spot: LabelSpot }) {
 	const { point, x, y, interval } = placed;
 	const color = point.frontier ? "var(--color-chart-cat-1)" : "var(--color-chart-neutral)";
 	const tip = `${name}: ${costText(point.x, locale) ?? ""}, ${formatShare(observed(point.y), locale) ?? ""}`;

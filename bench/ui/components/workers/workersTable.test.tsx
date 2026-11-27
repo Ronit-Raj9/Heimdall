@@ -35,7 +35,7 @@ describe("WorkersTable", () => {
 
 describe("WorkerStateBadge", () => {
 	it("explains a lost worker and shows an unknown state as sent", () => {
-		expect(renderToStaticMarkup(<WorkerStateBadge state="lost" />)).toContain("its work goes back to the queue");
+		expect(renderToStaticMarkup(<WorkerStateBadge state="lost" />)).toContain("Its work returns to the queue.");
 		expect(renderToStaticMarkup(<WorkerStateBadge state="draining" />)).toContain(">draining<");
 	});
 });
@@ -45,7 +45,7 @@ describe("WorkersOff", () => {
 		const html = renderToStaticMarkup(<WorkersOff />);
 		expect(html).toContain('data-state="disabled"');
 		expect(html).not.toContain('role="alert"');
-		expect(html).toContain("Extra workers are not turned on");
+		expect(html).toContain("Extra workers off");
 		expect(html).toContain("BENCH_WORKER_TOKEN");
 		expect(html).toContain("heimdall worker -server &lt;url&gt;");
 	});

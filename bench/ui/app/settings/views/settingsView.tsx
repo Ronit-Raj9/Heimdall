@@ -192,9 +192,11 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 		>
 			<header className="flex flex-col gap-1.5">
 				<h1 className="text-foreground text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
-				<p className="text-muted-foreground text-sm" data-testid={local ? "settings-local" : undefined}>
-					{local ? t("settings.localBody") : t("settings.subtitle", { org: org?.name ?? "" })}
-				</p>
+				{local ? (
+					<p className="text-muted-foreground text-sm" data-testid="settings-local">
+						{t("settings.localBody")}
+					</p>
+				) : null}
 			</header>
 			<Tabs
 				value={active}

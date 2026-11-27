@@ -19,7 +19,7 @@ const view: WorkerTargetView = {
 	],
 };
 
-const line = "Modal takes evaluations. Comparisons and readiness checks run on the shared worker.";
+const line = "Modal takes evaluations. Comparisons and readiness checks use the shared worker.";
 
 describe("EvaluationWorkerPicker on a per-evaluation platform", () => {
 	it("enables the platform option and says what it takes when it is picked", () => {

@@ -631,7 +631,6 @@ export function McpTestView() {
 				</label>
 				<p className="text-muted-foreground max-w-prose text-xs" data-testid="mcp-inspect-note">
 					{tr("mcp.inspectNote", { count: MCP_MAX_REQUESTS })}
-					<span className="block">{t5("mcp.youGet")}</span>
 				</p>
 				<div className="flex flex-wrap items-center gap-3">
 					<Button

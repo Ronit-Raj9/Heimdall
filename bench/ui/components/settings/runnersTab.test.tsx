@@ -91,7 +91,7 @@ describe("RunnersTab shared worker (N12, N13)", () => {
 		api.runners = okQuery({ mode: "live", runners: [shared] });
 		const html = render(<RunnersTab org={org} />, hostedSession("admin"));
 		expect(html).toContain('data-testid="runner-row-rnr_s-shared-note-host-cap"');
-		expect(html).toContain("This server&#x27;s shared worker runs 2 at a time for all organizations together.");
+		expect(html).toContain("Shared worker runs 2 at a time across all organizations.");
 		api.runners = okQuery({ mode: "live", runners: [{ ...shared, labels: ["shared"] }] });
 		expect(render(<RunnersTab org={org} />, hostedSession("admin"))).not.toContain("for all organizations together");
 	});

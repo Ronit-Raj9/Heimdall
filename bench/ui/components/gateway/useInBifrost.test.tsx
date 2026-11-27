@@ -29,7 +29,7 @@ describe("Use this in Bifrost", () => {
 		expect(html).toContain("heimdall-e1&quot;, &quot;enabled&quot;: false");
 		expect(html).toContain(">Copy</button>");
 		expect(html).toContain("The rule is created switched off.");
-		expect(html).toContain("Heimdall does not change your Bifrost. Paste this where it says, review it, then switch it on.");
+		expect(html).toContain("Heimdall does not change your Bifrost. Paste, review, then switch on.");
 	});
 
 	it("is disabled with the reason when there is no setting", () => {

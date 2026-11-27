@@ -88,7 +88,7 @@ describe("UsageBody runs without a cost (F1.price)", () => {
 		};
 		const html = renderToStaticMarkup(<UsageBody data={data} />);
 		expect(html).toMatch(
-			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; Model keys to include them\.</,
+			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) with no known cost are left out\. Set a price in Settings &gt; Model keys\.</,
 		);
 		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 runs with no model call</);
 		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');
@@ -155,8 +155,8 @@ describe("usage link parameters", () => {
 				]}
 			/>,
 		);
-		expect(html).toContain("The date 2026-02-30 in the link is not a valid date, so the last 30 days are shown.");
-		expect(html).toContain("The grouping week in the link is not one of Day, Model, Agent or Provider key, so Day is used.");
+		expect(html).toContain("Invalid date 2026-02-30 in the link. Showing the last 30 days.");
+		expect(html).toContain("Grouping week is not one of Day, Model, Agent or Provider key. Using Day.");
 		expect(renderToStaticMarkup(<UsageLinkNotes ignored={[]} />)).toBe("");
 	});
 });

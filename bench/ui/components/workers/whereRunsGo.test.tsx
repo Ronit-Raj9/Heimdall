@@ -94,7 +94,7 @@ describe("EvaluationWorkerPicker", () => {
 	it("lists every choice when there are several", () => {
 		q.target = okQuery(view);
 		const html = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />);
-		expect(html).toContain("Modal (a fresh sandbox per run), where runs go");
+		expect(html).toContain("Modal (a fresh sandbox per run)");
 		const t = i18n.getFixedT("en", "byoworker") as unknown as (k: string, o?: Record<string, unknown>) => string;
 		const opts = evalWorkerOptions(view, t);
 		expect(opts.find((o) => o.value === "worker:gpu")).toMatchObject({ label: "gpu (Fly Machines), ready", disabled: false });

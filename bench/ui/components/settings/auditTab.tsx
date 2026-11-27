@@ -326,7 +326,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	return (
 		<SettingsSection
 			title={t("settings.audit.title")}
-			description={t("settings.audit.description", { org: org.name })}
+			
 			testId="settings-audit"
 		>
 			<AuditTools org={org} filters={{ actor: actor === "all" ? undefined : actor, q: urlText }} />

@@ -232,7 +232,7 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 			<h2 id="gateway-connect-title" className="text-base font-medium">
 				{u("page.connectTitle")}
 			</h2>
-			{source.connected ? (
+			{source.connected && (
 				<div className="flex flex-wrap items-center gap-2">
 					<span>{t("source.connected", { host: source.host })}</span>
 					{admin && !editing && (
@@ -241,8 +241,6 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 						</Button>
 					)}
 				</div>
-			) : (
-				<p className="font-medium">{t("source.connect")}</p>
 			)}
 			{source.error && (
 				<p className="text-chart-warning-ink" role="alert">
@@ -318,7 +316,6 @@ export function TraceIngestLine() {
 	return (
 		<p className="text-sm" data-testid="gateway-traces">
 			<span className="font-medium">{u("page.tracesTitle")}: </span>
-			{u("page.tracesText")}{" "}
 			<Link to="/agents/from-traces" className="text-primary hover:underline">
 				{u("page.tracesAgents")}
 			</Link>
@@ -338,7 +335,7 @@ export default function GatewayView() {
 	const [starting, setStarting] = useState<GwCardLine | null>(null);
 	return (
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="gateway-screen">
-			<PageHeader title={t("page.title")} subtitle={t("page.subtitle")} />
+			<PageHeader title={t("page.title")} />
 			{q.isLoading ? (
 				<BlockSkeleton rows={6} testId="gateway-loading" />
 			) : q.error || !q.data ? (

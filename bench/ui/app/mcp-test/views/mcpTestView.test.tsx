@@ -170,7 +170,7 @@ describe("DraftEvaluateLink (N113)", () => {
 	it("explains the missing key and links Settings, Model keys, when no agent has one", () => {
 		const html = render(<DraftEvaluateLink done={done()} />);
 		expect(html).not.toContain('data-testid="mcp-draft-evaluate"');
-		expect(html).toContain("None of the reference agents (claude-code, codex, opencode) has a model key in this organization.");
+		expect(html).toContain("claude-code, codex and opencode have no model key in this organization.");
 		expect(html).toContain('href="/settings?tab=keys&amp;return=%2Fmcp-test"');
 		expect(html).toContain("Settings &gt; Model keys");
 	});

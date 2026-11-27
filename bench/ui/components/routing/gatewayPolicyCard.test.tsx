@@ -120,7 +120,7 @@ describe("GatewayPolicyCard", () => {
 
 	it("says so when the arms run the same policy", () => {
 		const html = renderToStaticMarkup(<GatewayPolicyCard summary={{ ...summary, differences: [] }} />);
-		expect(html).toContain("The setups run the same gateway policy.");
+		expect(html).toContain("Same gateway policy.");
 	});
 });
 

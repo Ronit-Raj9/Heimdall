@@ -92,7 +92,7 @@ export function BifrostUsePanel() {
 	if (q.error || !q.data)
 		return <LoadError title={t("loadError")} error={q.error} onRetry={() => void q.refetch()} testId="bifrost-use-error" />;
 	return (
-		<Section title={t("title")} description={t("orgDesc")} testId="bifrost-use-panel">
+		<Section title={t("title")} testId="bifrost-use-panel">
 			<div className="flex flex-col gap-4">
 				<BifrostGatewayLine use={q.data} />
 				<BifrostFeatureList features={q.data.features} testId="bifrost-use-features" />
@@ -129,7 +129,6 @@ export function EvaluationBifrostSection({ evaluationId, summary }: { evaluation
 			<details className="group rounded-xl border" data-testid="evaluation-bifrost">
 				<summary className="hover:bg-muted/50 cursor-pointer rounded-xl px-4 py-3 text-sm font-medium">{summary}</summary>
 				<div className="flex flex-col gap-2 border-t px-4 py-4">
-					<p className="text-muted-foreground text-sm">{t("evalDesc")}</p>
 					{body}
 				</div>
 			</details>

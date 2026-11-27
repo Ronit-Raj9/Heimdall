@@ -62,7 +62,7 @@ function Section({
 	testId,
 }: {
 	title: string;
-	description: string;
+	description?: string;
 	icon?: LucideIcon;
 	children: ReactNode;
 	testId: string;
@@ -304,7 +304,6 @@ export function OperatePanels({
 			<div className="grid min-w-0 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
 				<Section
 					title={t("health.title")}
-					description={hosted ? t("health.hostedDescription") : t("health.description")}
 					icon={Stethoscope}
 					testId="operate-health"
 				>
@@ -338,7 +337,6 @@ export function OperatePanels({
 				{showEvidence && (
 					<Section
 						title={t("evidence.title")}
-						description={hosted ? t("evidence.hostedDescription") : t("evidence.description")}
 						icon={ShieldCheck}
 						testId="operate-evidence"
 					>
@@ -435,7 +433,7 @@ export function OperatePanels({
 				)}
 
 				{(has("voice.check") || has("visual.compare")) && (
-					<Section title={t("suite.title")} description={t("suite.description")} icon={ShieldCheck} testId="operate-suite">
+					<Section title={t("suite.title")} icon={ShieldCheck} testId="operate-suite">
 						<div className="grid gap-2 sm:grid-cols-2">
 							<Field label={t("suite.suite")} value={suite} onChange={setSuite} testId="operate-suite-id" />
 							<Field label={t("suite.task")} value={task} onChange={setTask} testId="operate-task-id" />

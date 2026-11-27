@@ -35,7 +35,7 @@ describe("AdminSignupPanel", () => {
 		expect(html).toMatch(/aria-checked="true"[^>]*data-testid="admin-signup-mode-invite"/);
 		expect(html).toContain("HEIMDALL_SIGNUP");
 		expect(html).not.toContain('data-testid="admin-signup-reset"');
-		expect(html).toContain("verification links go to the server log");
+		expect(html).toContain("links go to the server log");
 	});
 
 	it("shows the allowed domains and who changed the setting", () => {

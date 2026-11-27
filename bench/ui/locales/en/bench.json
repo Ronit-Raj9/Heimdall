@@ -3149,7 +3149,7 @@
 		"loadError": "Could not load the workers.",
 		"sharedExplain_one": "Shared worker from this server owner. Isolated containers. Free, model calls use your model key. Up to {{count}} run at once.",
 		"sharedExplain_other": "Shared worker from this server owner. Isolated containers. Free, model calls use your model key. Up to {{count}} runs at once.",
-		"useOwnMachine": "Use own machine",
+		"useOwnMachine": "Use your own machine",
 		"offTitle": "Extra workers off",
 		"offBody": "All runs use this machine. Others need BENCH_WORKER_TOKEN.",
 		"offHow": "Set BENCH_WORKER_TOKEN on the server, then on the other machine (same project and commit):",

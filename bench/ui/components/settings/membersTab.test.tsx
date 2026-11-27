@@ -47,7 +47,7 @@ describe("MembersTab invitations", () => {
 		const html = render(<MembersTab org={ORG} />, hostedSession("owner"));
 		expect(html).toContain('data-testid="invitation-revoke-inv_1"');
 		const revoke = sent.buttons.find((b) => b.testId === "invitation-revoke-inv_1");
-		expect(revoke?.question).toBe("Revoke the invitation for edsger@acme.dev? The link stops working at once.");
+		expect(revoke?.question).toBe("Revoke the invitation for edsger@acme.dev? The link stops working immediately.");
 		expect(revoke?.confirmLabel).toBe("Revoke invitation");
 		expect(sent.revoke).toEqual([]);
 		revoke?.onConfirm();

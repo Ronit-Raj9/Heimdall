@@ -25,7 +25,7 @@ describe("PlatformCard (fix wave 3, N216)", () => {
 		expect(html).toContain('data-testid="platform-modal-registry"');
 		expect(html).toContain("Modal needs an image registry it can pull from. Add one below.");
 		expect(html).toContain("Runs on Modal: repository tasks graded on the code change, with gateway faults.");
-		expect(html).toContain("Not on Modal: some tasks cannot run in a cloud sandbox");
+		expect(html).toContain("Not on Modal: tasks that start services or need a GPU.");
 	});
 
 	it("has neither before Modal is connected, nor on another platform", () => {

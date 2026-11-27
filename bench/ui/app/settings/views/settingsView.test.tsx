@@ -173,7 +173,7 @@ describe("SettingsView", () => {
 	it("shows the plumbing tabs in local mode, without team tabs", () => {
 		const html = render(<SettingsView tab="secrets" onTabChange={() => undefined} />, LOCAL_SESSION);
 		expect(html).toContain('data-testid="settings-local"');
-		expect(html).toContain("local mode");
+		expect(html).toContain("Local mode.");
 		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "secrets"])
 			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
 		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin", "billing"])
@@ -229,7 +229,7 @@ describe("SettingsView", () => {
 			"account",
 		])
 			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		expect(html).toContain("Model keys, workers and files for Acme Agents, and who can use it.");
+		expect(html).not.toContain("who can use it");
 		expect(html).toContain('data-testid="settings-members"');
 	});
 	it("reads the tab from the URL, API keys by default, workers as the Workers tab", () => {
@@ -329,15 +329,15 @@ describe("RunnersTab", () => {
 		api.q.runners = okQuery({ mode: "live", runners: [shared] });
 		const html = render(<RunnersTab org={org} />, hostedSession("admin"));
 		expect(html).toContain('data-testid="runner-row-rnr_s-shared-note"');
-		expect(html).toContain("provided by the owner of this Heimdall server");
+		expect(html).toContain("Shared worker from this server owner");
 		expect(html).toContain("Up to 3 runs at once.");
 		expect(html).toContain('href="#runner-token-setup"');
 		expect(html).toContain('id="runner-token-setup"');
-		expect(html).toContain("Use your own machine instead");
+		expect(html).toContain("Use your own machine");
 	});
 	it("says how to get a first runner", () => {
 		api.q.runners = okQuery({ mode: "live", runners: [] });
-		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a worker token below, then start the worker with it.");
+		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("No worker yet. Create a worker token below.");
 	});
 	it("shows the role refusal to members (runners are admin)", () => {
 		api.q.runners = errorQuery(403, "workers and worker tokens need the admin role");
@@ -412,7 +412,7 @@ describe("PasswordTab", () => {
 		expect(tagOf(html, "password-current")).toContain('autoComplete="current-password"');
 		expect(tagOf(html, "password-new")).toContain('autoComplete="new-password"');
 		expect(html).toContain('data-testid="password-repeat"');
-		expect(html).toContain("Your other signed-in sessions end; this one stays signed in.");
+		expect(html).toContain("Other sessions are signed out. This one stays.");
 	});
 	it("shows the server's reason when the change fails", () => {
 		api.m.changePassword = { error: { status: 403, data: { error: { message: "current password is wrong" } } } };
@@ -428,7 +428,7 @@ describe("audit export and integrity (X16)", () => {
 		expect(html).toContain(`href="/api/bench/orgs/${org.id}/audit/export?format=jsonl"`);
 		expect(html).toContain(`href="/api/bench/orgs/${org.id}/audit/export?format=csv"`);
 		expect(html).toContain('data-testid="audit-verify"');
-		expect(html).toContain("Reads of traces, evidence and exports are logged here too");
+		expect(html).toContain("Reads of traces, evidence and exports are logged too");
 	});
 	it("shows an intact chain with its head and the older unchained entries", () => {
 		api.m.verify = {
@@ -436,7 +436,7 @@ describe("audit export and integrity (X16)", () => {
 		};
 		const html = render(<AuditTab org={org} />, hostedSession("admin"));
 		expect(html).toContain("Audit log intact: 120 entries, chain head abcdef012345");
-		expect(html).toContain("2 older entries were written before the chain existed");
+		expect(html).toContain("2 older entries predate the chain");
 	});
 	it("shows where a tampered chain breaks", () => {
 		api.m.verify = {
@@ -444,7 +444,7 @@ describe("audit export and integrity (X16)", () => {
 		};
 		const html = render(<AuditTab org={org} />, hostedSession("admin"));
 		expect(html).toContain('data-testid="audit-verify-broken"');
-		expect(html).toContain("the chain breaks at entry 57");
+		expect(html).toContain("The chain breaks at entry 57");
 		expect(html).toContain("Reason: hash mismatch");
 		api.m.verify = {};
 	});

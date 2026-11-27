@@ -208,7 +208,7 @@ function ReposSection({
 	const repos = useListGithubReposQuery(page);
 	const list = filterRepos(repos.data?.repos ?? [], filter);
 	return (
-		<SettingsSection title={t("repos.title")} description={t("repos.description")} testId="github-repos">
+		<SettingsSection title={t("repos.title")} testId="github-repos">
 			<Input
 				value={filter}
 				onChange={(e) => setFilter(e.target.value)}

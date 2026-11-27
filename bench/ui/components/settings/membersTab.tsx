@@ -91,7 +91,7 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 		<div className="flex flex-col gap-10" data-testid="settings-members">
 			<SettingsSection
 				title={t("settings.members.title")}
-				description={t("settings.members.description", { org: org.name })}
+				
 				testId="settings-members-list"
 			>
 				{resetLink && (
