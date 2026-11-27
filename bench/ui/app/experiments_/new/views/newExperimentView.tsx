@@ -6,7 +6,7 @@ import { RoleGate } from "@/components/platform/accessNotes";
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { splitAgents } from "@/app/agents/views/agentConfigsTab";
 import {
@@ -22,6 +22,8 @@ import { launchAvailable, type ExperimentStatus } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
+import "@/app/leaderboard/views/uf4bI18n";
 import { ExperimentForm } from "./experimentForm";
 import { dateSeed, defaultFormValues } from "./experimentFormSchema";
 import { MatrixBuilder } from "./matrixBuilder";
@@ -39,6 +41,7 @@ import {
 export default function NewExperimentView() {
 	const { t } = useTranslation("bench");
 	const { t: tb } = useTranslation("builder");
+	const { t: tu } = useTranslation("uf4b");
 	const [expId, setExpId] = useQueryState("exp", parseAsString);
 	// ?mode=ab opens the A/B config-change form; the default is the agents x models builder.
 	const [mode, setMode] = useQueryState("mode", parseAsString);
@@ -96,6 +99,13 @@ export default function NewExperimentView() {
 				title={t("experiments.new.title")}
 				subtitle={t("experiments.new.subtitle")}
 			/>
+			{/* M4-69 (P4-14): until the forms merge, point a two-versions comparison at the guided form. */}
+			<p className="text-muted-foreground -mt-3 text-sm" data-testid="new-experiment-versions-hint">
+				{tu("form.versionsHint")}{" "}
+				<Link to={"/evaluate?mode=versions" as never} className="text-primary font-medium hover:underline">
+					{tu("form.versionsLink")}
+				</Link>
+			</p>
 
 			{expId && <LiveProgress key={expId} expId={expId} capUsd={capUsd} onNew={() => void setExpId(null)} />}
 
@@ -120,29 +130,36 @@ export default function NewExperimentView() {
 				// Hosted: starting experiments needs the member role; demo visitors see no form.
 				<RoleGate min="member">
 					<div className="flex flex-col gap-4">
-						<div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={tb("mode.label")} data-testid="builder-mode">
-							<Button
-								type="button"
-								size="sm"
-								variant={abMode ? "outline" : "default"}
-								role="tab"
-								aria-selected={!abMode}
-								onClick={() => void setMode(null)}
-								dataTestId="builder-mode-matrix"
+						<div className="flex flex-wrap items-center gap-2">
+							{/* M4-90: one segmented control, not two buttons. */}
+							<div
+								className="bg-muted inline-flex h-8 items-center rounded-lg p-0.5"
+								role="tablist"
+								aria-label={tb("mode.label")}
+								data-testid="builder-mode"
 							>
-								{tb("mode.matrix")}
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant={abMode ? "default" : "outline"}
-								role="tab"
-								aria-selected={abMode}
-								onClick={() => void setMode("ab")}
-								dataTestId="builder-mode-ab"
-							>
-								{tb("mode.ab")}
-							</Button>
+								{(
+									[
+										{ on: !abMode, label: tb("mode.matrix"), go: () => void setMode(null), testId: "builder-mode-matrix" },
+										{ on: abMode, label: tb("mode.ab"), go: () => void setMode("ab"), testId: "builder-mode-ab" },
+									] as const
+								).map((m) => (
+									<button
+										key={m.testId}
+										type="button"
+										role="tab"
+										aria-selected={m.on}
+										onClick={m.go}
+										data-testid={m.testId}
+										className={cn(
+											"focus-visible:ring-ring/50 h-7 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+											m.on ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+										)}
+									>
+										{m.label}
+									</button>
+								))}
+							</div>
 							{abMode && <span className="text-muted-foreground text-xs">{tb("mode.abHint")}</span>}
 						</div>
 						{linkMissing && (

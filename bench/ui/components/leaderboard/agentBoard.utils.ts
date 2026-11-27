@@ -11,12 +11,30 @@ export const DEFAULT_MIN_RUNS = 10;
 export const DEFAULT_MIN_TASKS = 5;
 
 /** The row's cost display: the cost per run, or not known with how many runs are unpriced and why. */
-export function rowCost(row: AgentLeaderboardRow): { known: boolean; text: string; unpriced: number; runs: number; note: string } {
+export function rowCost(row: AgentLeaderboardRow): {
+	known: boolean;
+	text: string;
+	unpriced: number;
+	runs: number;
+	note: string;
+} {
 	const runs = row.runs ?? 0;
 	if (row.cost_usd !== null && row.cost_usd !== undefined && Number.isFinite(row.cost_usd)) {
-		return { known: true, text: formatCost(row.cost_usd), unpriced: 0, runs, note: "" };
+		return {
+			known: true,
+			text: formatCost(row.cost_usd),
+			unpriced: 0,
+			runs,
+			note: "",
+		};
 	}
-	return { known: false, text: "", unpriced: Math.max(0, runs - (row.cost_runs ?? 0)), runs, note: row.cost_note ?? "" };
+	return {
+		known: false,
+		text: "",
+		unpriced: Math.max(0, runs - (row.cost_runs ?? 0)),
+		runs,
+		note: row.cost_note ?? "",
+	};
 }
 
 /** A cost per run in US dollars, "-" when never observed. */
@@ -25,7 +43,11 @@ export function formatCost(v: number | null | undefined): string {
 }
 
 /** The search of the agent page's report card for a row: version only when saved. */
-export function reportCardSearch(row: AgentLeaderboardRow): { tab: string; version?: string; model?: string } {
+export function reportCardSearch(row: AgentLeaderboardRow): {
+	tab: string;
+	version?: string;
+	model?: string;
+} {
 	return {
 		tab: "report-card",
 		...(row.version > 0 ? { version: String(row.version) } : {}),
@@ -72,16 +94,17 @@ export function formatCostPerRun(v: number | null | undefined): string {
 }
 
 /** The score a row is ranked by: the filtered capability, or the run-weighted share over its ranked capabilities (the All score). */
-export function rankScore(
-	row: AgentLeaderboardRow,
-	capability?: string,
-): { score: number; low: number; high: number } | null {
+export function rankScore(row: AgentLeaderboardRow, capability?: string): { score: number; low: number; high: number } | null {
 	const list = capability ? [row.capabilities[capability]] : Object.values(row.capabilities);
 	const ranked = list.filter((s): s is NonNullable<typeof s> => scoreState(s) === "ranked");
 	if (ranked.length === 0) return null;
 	const runs = ranked.reduce((n, s) => n + s.runs, 0);
 	const avg = (pick: (s: (typeof ranked)[number]) => number) => ranked.reduce((n, s) => n + pick(s) * s.runs, 0) / runs;
-	return { score: avg((s) => s.score), low: avg((s) => s.ci_low), high: avg((s) => s.ci_high) };
+	return {
+		score: avg((s) => s.score),
+		low: avg((s) => s.ci_low),
+		high: avg((s) => s.ci_high),
+	};
 }
 
 /** A row's place: its number, whether its range overlaps the row above (shown "=n"), and whether it is a clear best. */
@@ -99,7 +122,14 @@ export interface BoardRank {
 export function boardRanks(rows: readonly AgentLeaderboardRow[], capability?: string): Map<string, BoardRank> {
 	const scored = rows
 		.map((row) => ({ row, s: rankScore(row, capability) }))
-		.filter((x): x is { row: AgentLeaderboardRow; s: NonNullable<ReturnType<typeof rankScore>> } => x.s !== null)
+		.filter(
+			(
+				x,
+			): x is {
+				row: AgentLeaderboardRow;
+				s: NonNullable<ReturnType<typeof rankScore>>;
+			} => x.s !== null,
+		)
 		.sort((a, b) => b.s.score - a.s.score || (a.row.cost_usd ?? Infinity) - (b.row.cost_usd ?? Infinity));
 	const out = new Map<string, BoardRank>();
 	scored.forEach((x, i) => {
@@ -107,7 +137,11 @@ export function boardRanks(rows: readonly AgentLeaderboardRow[], capability?: st
 		const tied = above !== undefined && x.s.high >= above.s.low;
 		const rank = tied ? (out.get(rowKey(above.row))?.rank ?? i + 1) : i + 1;
 		const next = scored[i + 1];
-		out.set(rowKey(x.row), { rank, tied, best: i === 0 && (next === undefined || next.s.high < x.s.low) && scored.length > 1 });
+		out.set(rowKey(x.row), {
+			rank,
+			tied,
+			best: i === 0 && (next === undefined || next.s.high < x.s.low) && scored.length > 1,
+		});
 	});
 	return out;
 }

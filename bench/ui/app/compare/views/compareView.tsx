@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { AlignedLanes } from "@/components/runs/alignedLanes";
 import { DivergencePanel } from "@/components/runs/divergencePanel"; // I28 first divergence
@@ -29,14 +28,14 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetCatalogQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
 import { frozenSuiteRef, type Pair, type PairResponse, type PairRun, type RunProvenance } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
-import { ArrowLeft, Columns2 } from "lucide-react";
+import { ArrowLeft, FlaskConical } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { cn } from "@/lib/utils";
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { allPractice, defaultSetupSelection, pickedRuns, SetupPicker } from "./setupPicker";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -61,12 +60,13 @@ export default function CompareView() {
 	);
 
 	return (
-		<div className="flex flex-col gap-6" data-testid="runs-screen">
+		<div className="flex min-w-0 flex-col gap-6" data-testid="runs-screen">
 			<PageHeader
 				breadcrumbs={
+					// M1-7, M5-7: the trail starts where the sidebar points (Runs and traces), not at Comparisons.
 					expParam
 						? [
-								{ label: t("experiments.list.title"), to: "/experiments" },
+								{ label: t("runs.list.title"), to: "/runs" },
 								{
 									label: expParam,
 									to: "/experiments/$expId",
@@ -94,20 +94,10 @@ export default function CompareView() {
 function PickOrLaunch({ expParam, onPick }: { expParam: string | null; onPick: (id: string) => void }) {
 	const { t } = useTranslation("compareUx");
 	return (
-		<div className="flex flex-col gap-8">
-			<div className="bg-card flex flex-col gap-4 rounded-xl border p-5">
-				<div className="flex items-start gap-3">
-					<span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
-						<Columns2 className="size-4.5" />
-					</span>
-					<div className="flex flex-col gap-0.5">
-						<h2 className="text-base font-semibold tracking-tight">{t("launch.pickTitle")}</h2>
-						<p className="text-muted-foreground text-sm">{t("launch.pickSubtitle")}</p>
-					</div>
-				</div>
-				<PairPicker expParam={expParam} onPick={onPick} />
-			</div>
-			<div className="flex flex-col gap-3">
+		<div className="flex min-w-0 flex-col gap-8">
+			{/* X-34: the picker's own Section heading is the one heading here; no outer card or icon tile. */}
+			<PairPicker expParam={expParam} onPick={onPick} />
+			<div className="flex min-w-0 flex-col gap-3">
 				<div className="flex flex-col gap-0.5">
 					<h2 className="text-base font-semibold tracking-tight">{t("launch.newTitle")}</h2>
 					<p className="text-muted-foreground text-sm">{t("launch.newSubtitle")}</p>
@@ -149,12 +139,21 @@ type LoadedLane = ReturnType<typeof useRunLane> & { pairRun: PairRun };
 
 function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => void }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
 	const pair = useGetPairQuery(pairId);
 	const catalog = useGetCatalogQuery();
-	const lanes = useRunLanes(pair.data?.runs);
+	// M4-60: one setup picker drives every section; the lane hooks load the picked setups (at most MAX_LANES).
+	const allRuns = pair.data?.runs;
+	const [picked, setPicked] = useState<string[] | null>(null);
+	useEffect(() => setPicked(null), [pairId]);
+	const chosen = useMemo(
+		() => (allRuns ? pickedRuns(allRuns, picked ?? defaultSetupSelection(allRuns), MAX_LANES) : undefined),
+		[allRuns, picked],
+	);
+	const lanes = useRunLanes(chosen);
 
 	const back = (
-		<Button variant="ghost" size="sm" onClick={onClear} dataTestId="runs-choose-pair" className="w-fit">
+		<Button variant="outline" size="sm" onClick={onClear} dataTestId="runs-choose-pair" className="w-fit">
 			<ArrowLeft aria-hidden="true" />
 			{t("runs.choosePair")}
 		</Button>
@@ -190,8 +189,28 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 	}
 
 	return (
-		<div className="flex flex-col gap-8">
+		<div className="flex min-w-0 flex-col gap-8">
 			<PairHeader pair={data} back={back} />
+
+			{/* M4-55: practice runs check the benchmark's grader, not an agent. */}
+			{allPractice(data.runs) && (
+				<div className="bg-muted/50 flex items-start gap-2 rounded-lg border p-3 text-sm" data-testid="compare-practice-note">
+					<FlaskConical className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<span>{tu("compare.practiceNote")}</span>
+				</div>
+			)}
+
+			{/* M4-61: a pair with one graded setup says so and offers another pair. */}
+			{data.runs.length === 1 && (
+				<div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm" data-testid="compare-one-side">
+					<span className="min-w-0 flex-1">{tu("compare.oneSide", { arm: data.runs[0].arm })}</span>
+					<Button variant="outline" size="sm" onClick={onClear} dataTestId="compare-one-side-other">
+						{tu("compare.otherRun")}
+					</Button>
+				</div>
+			)}
+
+			<SetupPicker arms={data.runs.map((r) => r.arm)} picked={lanes.map((l) => l.pairRun.arm)} max={MAX_LANES} onChange={setPicked} />
 
 			<RunDiff
 				lanes={lanes.map((lane) => ({
@@ -202,7 +221,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			/>
 
 			<Section title={t("runs.metrics.title")} description={t("runs.metrics.description")} testId="runs-metrics-section">
-				<Card className="py-0 shadow-none">
+				<Card className="min-w-0 overflow-x-auto py-0 shadow-none">
 					<MetricStrip
 						lanes={lanes.map((lane) => ({
 							arm: lane.pairRun.arm,
@@ -214,9 +233,9 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			<Section title={t("runs.evidence.title")} description={t("runs.evidence.description")} testId="runs-evidence-section">
-				<div className="grid gap-6 xl:grid-cols-2">
+				<div className="grid min-w-0 gap-6 xl:grid-cols-2">
 					{lanes.map((lane) => (
-						<Card key={lane.pairRun.arm} className="py-0 shadow-none">
+						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
 							<CardContent className="space-y-2 px-4 py-4 text-sm">
 								<div className="font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
 								{lane.detail.data ? (
@@ -235,9 +254,9 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			<Section title={t("review.runs.title")} description={t("review.runs.description")} testId="runs-reviews-section">
-				<div className="grid gap-6 2xl:grid-cols-2">
+				<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
 					{lanes.map((lane) => (
-						<Card key={lane.pairRun.arm} className="py-0 shadow-none">
+						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
 							<CardContent className="flex flex-col gap-2 px-4 py-4">
 								<div className="text-sm font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
 								<RunReviewsBlock runId={lane.pairRun.run.run_id} testId={`runs-reviews-${lane.pairRun.arm}`} />
@@ -252,7 +271,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			<Section title={t("runs.gateway.title")} description={t("runs.gateway.description")} testId="runs-gateway-section">
-				<div className="grid gap-6 2xl:grid-cols-2">
+				<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
 					{lanes.map((lane) => (
 						<GatewayLaneBlock key={lane.pairRun.arm} lane={lane} />
 					))}
@@ -260,16 +279,9 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			<Section title={t("runs.steps.title")} description={t("runs.steps.description")} testId="runs-steps-section">
-				<Tabs defaultValue={lanes[0].pairRun.arm}>
-					<TabsList>
-						{lanes.map((lane) => (
-							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-steps-tab-${lane.pairRun.arm}`}>
-								{t("runs.arm", { arm: lane.pairRun.arm })}
-							</TabsTrigger>
-						))}
-					</TabsList>
-					{lanes.map((lane) => (
-						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+				<PerSetup lanes={lanes}>
+					{(lane) => (
+						<>
 							<RunRemoteCoverage runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 							{/* W9 routing policy under test */}
 							<RunGatewayPolicy runId={lane.pairRun.run.run_id} />
@@ -279,79 +291,51 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 							<RunVoicePanel runId={lane.pairRun.run.run_id} />
 							<HardwarePanel hardware={lane.pairRun.run.hardware} arm={lane.pairRun.arm} /> {/* X7: the GPUs a GPU run held */}
 							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
-						</TabsContent>
-					))}
-				</Tabs>
+						</>
+					)}
+				</PerSetup>
 			</Section>
 
 			<Section title={t("runs.agents.title")} description={t("runs.agents.description")} testId="runs-agents-section">
-				<Tabs defaultValue={lanes[0].pairRun.arm}>
-					<TabsList>
-						{lanes.map((lane) => (
-							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-agents-tab-${lane.pairRun.arm}`}>
-								{t("runs.arm", { arm: lane.pairRun.arm })}
-							</TabsTrigger>
-						))}
-					</TabsList>
-					{lanes.map((lane) => (
-						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+				<PerSetup lanes={lanes}>
+					{(lane) => (
+						<>
 							<RunAgentsPanel runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
-						</TabsContent>
-					))}
-				</Tabs>
+						</>
+					)}
+				</PerSetup>
 			</Section>
 
 			<Section title={t("runs.output.title")} description={t("runs.output.description")} testId="runs-diff-section">
-				<Tabs defaultValue={lanes[0].pairRun.arm}>
-					<TabsList>
-						{lanes.map((lane) => (
-							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-diff-tab-${lane.pairRun.arm}`}>
-								{t("runs.arm", { arm: lane.pairRun.arm })}
-							</TabsTrigger>
-						))}
-					</TabsList>
-					{lanes.map((lane) => (
-						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+				<PerSetup lanes={lanes}>
+					{(lane) => (
+						<>
 							<LaneOutput lane={lane} />
-						</TabsContent>
-					))}
-				</Tabs>
+						</>
+					)}
+				</PerSetup>
 			</Section>
 
 			{/* X4: security findings on the lines each arm's agent added, annotated in place. */}
 			<Section title={t("codescan.title")} description={t("codescan.description")} testId="runs-codescan-section">
-				<Tabs defaultValue={lanes[0].pairRun.arm}>
-					<TabsList>
-						{lanes.map((lane) => (
-							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-codescan-tab-${lane.pairRun.arm}`}>
-								{t("runs.arm", { arm: lane.pairRun.arm })}
-							</TabsTrigger>
-						))}
-					</TabsList>
-					{lanes.map((lane) => (
-						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+				<PerSetup lanes={lanes}>
+					{(lane) => (
+						<>
 							<RunCodeScanPanel runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
-						</TabsContent>
-					))}
-				</Tabs>
+						</>
+					)}
+				</PerSetup>
 			</Section>
 
 			{scenarioLanes.length > 0 && (
 				<Section title={t("runs.scenario.title")} description={t("runs.scenario.description")} testId="runs-scenario-section">
-					<Tabs defaultValue={scenarioLanes[0].pairRun.arm}>
-						<TabsList>
-							{scenarioLanes.map((lane) => (
-								<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-scenario-tab-${lane.pairRun.arm}`}>
-									{t("runs.arm", { arm: lane.pairRun.arm })}
-								</TabsTrigger>
-							))}
-						</TabsList>
-						{scenarioLanes.map((lane) => (
-							<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+					<PerSetup lanes={scenarioLanes}>
+						{(lane) => (
+							<>
 								<RunScenarioEvidence detail={lane.detail.data!} arm={lane.pairRun.arm} />
-							</TabsContent>
-						))}
-					</Tabs>
+							</>
+						)}
+					</PerSetup>
 				</Section>
 			)}
 
@@ -373,18 +357,20 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 	return (
 		<div className="flex flex-col gap-2">
 			{back}
-			<div className="flex flex-wrap items-center gap-3">
-				<h2 className="text-foreground text-lg font-semibold" data-testid="runs-pair-heading">
+			<div className="flex min-w-0 flex-wrap items-center gap-3">
+				<h2
+					className="text-foreground min-w-0 text-lg font-semibold break-words"
+					data-testid="runs-pair-heading"
+					title={t("runs.pairId", { id: pair.pair_id })}
+				>
 					<EntityLink kind="task" id={pair.task} suite={frozenSuiteRef(pair.suite, pair.suite_version)} testId="runs-pair-task" />{" "}
 					{t("runs.pairHeadingAfterTask", {
 						condition: pair.condition,
 						trial: pair.trial,
 					})}
 				</h2>
-				<ModeBadge mode={pair.mode} />
 			</div>
-			<p className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-				<span className="font-mono">{t("runs.pairId", { id: pair.pair_id })}</span>
+			<p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 				<span>
 					{t("runs.experimentLabel")} <EntityLink kind="experiment" id={pair.exp_id} />
 				</span>
@@ -397,11 +383,6 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 					))}
 				</span>
 			</p>
-			{pair.runs.length > MAX_LANES && (
-				<p className="text-chart-warning-ink text-xs" data-testid="runs-pair-capped">
-					{t("runs.lanesCapped", { shown: MAX_LANES, total: pair.runs.length })}
-				</p>
-			)}
 		</div>
 	);
 }
@@ -517,4 +498,18 @@ function LaneOutput({ lane }: { lane: LoadedLane }) {
 		);
 	}
 	return <RunOutput detail={lane.detail.data} arm={arm} />;
+}
+/** A section's body once per picked setup, each under a small "Setup X" heading (M4-60: no per-section tab strip). */
+function PerSetup({ lanes, children }: { lanes: LoadedLane[]; children: (lane: LoadedLane) => React.ReactNode }) {
+	const { t } = useTranslation("bench");
+	return (
+		<div className="flex min-w-0 flex-col gap-6">
+			{lanes.map((lane) => (
+				<div key={lane.pairRun.arm} className="flex min-w-0 flex-col gap-2" data-testid={`compare-setup-block-${lane.pairRun.arm}`}>
+					{lanes.length > 1 && <h3 className="text-sm font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</h3>}
+					{children(lane)}
+				</div>
+			))}
+		</div>
+	);
 }

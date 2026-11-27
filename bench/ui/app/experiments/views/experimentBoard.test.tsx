@@ -85,6 +85,8 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useListExperimentsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
 }));
+// The list page asks how many results changed (M4-97).
+vi.mock("@/lib/store/apis/validityApi", () => ({ useGetValidityQuery: () => okQuery({ entries: [], unseen: 0, stale: [] }) }));
 vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "other" }] }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
@@ -134,7 +136,7 @@ describe("ExperimentBoard", () => {
 		expect(html).not.toContain("experiment-row-e_eval_child");
 		expect(html).not.toContain("experiment-row-e_practice");
 		expect(html).toContain("experiment-row-e_named");
-		expect(html).toContain("Also show readiness checks, practice runs, debug runs and single benchmarks of evaluations (3)");
+		expect(html).toContain("Show 3 system runs");
 		expect(html).toContain("Showing 2 of 2");
 		url.all = "1";
 		const every = render(<ExperimentBoard />);
@@ -148,7 +150,8 @@ describe("ExperimentBoard", () => {
 		const html = render(<ExperimentListView />);
 		expect(tagOf(html, "experiments-new")).toContain('href="/experiments/new"');
 		expect(html).toContain("New comparison");
-		expect(html).toContain("The single benchmarks of an evaluation are on its evaluation page.");
+		// M4-73: the subtitle is one short line now.
+		expect(html).toContain("A and B on the same tasks: which is better, and at what cost.");
 	});
 
 	it("offers Cancelled, counts each status and puts analyzing under Running (N1)", () => {
@@ -190,7 +193,7 @@ describe("ExperimentBoard", () => {
 		expect(html).toContain("experiment-row-e_eval_two");
 		expect(html).toContain("codex: two models · BFCL function calling");
 		expect(html).not.toContain("experiment-row-e_named");
-		expect(html).toContain("Search by name, evaluation or benchmark");
+		expect(html).toContain("Search comparisons");
 	});
 	it("hides debug runs by default and tags them when shown (N29)", () => {
 		url.extra = [{ ...rows[1], exp_id: "e_replay_r_n697kiewjt_x4qq", name: "replay r_n697kiewjt", arms: ["A"], decision: undefined }];
@@ -222,8 +225,10 @@ describe("ExperimentBoard kinds, practice rule and hidden matches (fix wave 3)",
 		expect(html).toContain(">Readiness check<");
 		expect(html).toContain(">Debug run (not scored)<");
 		expect(html).toContain(">Agent check<");
-		expect(html).not.toContain("No clear winner yet");
-		expect(html).not.toContain("Test was broken");
+		// The Result filter lists every verdict word; the rows must not show one.
+		const table = html.slice(html.indexOf('data-testid="experiment-table"'));
+		expect(table).not.toContain("No clear winner yet");
+		expect(table).not.toContain("Test was broken");
 		expect(html).not.toContain("experiment-row-e_admit_draft_x_d7wy-decision");
 	});
 	it("does not say a debug run was only created with 0 runs (N247)", () => {
@@ -243,7 +248,7 @@ describe("ExperimentBoard kinds, practice rule and hidden matches (fix wave 3)",
 		url.extra = [];
 		expect(tagOf(html, "experiment-row-e_live-decision")).toBeNull();
 		expect(html).toContain("Waiting for result");
-		expect(html).not.toContain("Test was broken");
+		expect(html.slice(html.indexOf('data-testid="experiment-table"'))).not.toContain("Test was broken");
 	});
 	it("lists a named comparison of two setups on coding-core (N202)", () => {
 		url.extra = [named({ exp_id: "e_zz_test_c10_matrix_gsz9", name: "zz-test-c10-matrix", suite: "coding-core@1.0.0" })];

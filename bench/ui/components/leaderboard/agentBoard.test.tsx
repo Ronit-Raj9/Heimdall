@@ -5,7 +5,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { nextTableSort, sortRows, type TableSort } from "@/components/ui/useTableSort";
 import { AgentBoardTable, AgentBoardToolbar, agentFirstDir, agentSortAccessors, scoreKey } from "./agentBoard";
-import { ALL, boardRanks, filterParam, formatCost, formatCostPerRun, formatShare, reportCardSearch, rowKey, sameAgent, scoreState, showRange } from "./agentBoard.utils";
+import {
+	ALL,
+	boardRanks,
+	filterParam,
+	formatCost,
+	formatCostPerRun,
+	formatShare,
+	reportCardSearch,
+	rowKey,
+	sameAgent,
+	scoreState,
+	showRange,
+} from "./agentBoard.utils";
 
 const rows: AgentLeaderboardRow[] = [
 	{

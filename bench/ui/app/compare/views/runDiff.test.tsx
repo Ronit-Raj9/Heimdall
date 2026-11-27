@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { render, tagOf } from "@/lib/testing/render";
 import type { Run } from "@/lib/types/bench";
 import { describe, expect, it } from "vitest";
-import { formatDiffValue, knownNumber, rowDiffers, RunDiff } from "./runDiff";
+import { formatDiffValue, knownNumber, rowDiffers, rowEmpty, RunDiff } from "./runDiff";
 
 const run = (outcome: Run["outcome"], text?: string) =>
 	({
@@ -43,6 +43,13 @@ describe("RunDiff", () => {
 		expect(tagOf(html, "compare-diff-tokens")).toContain('data-differs="true"');
 		expect(html).toContain("3,400");
 		expect(html).toContain("gave up");
+		// Wall time is unknown for every setup: hidden behind the toggle.
+		expect(html).not.toContain('data-testid="compare-diff-time"');
+		expect(html).toContain("Show 1 row with no data");
+	});
+	it("treats rows of only zeros and unknowns as empty", () => {
+		expect(rowEmpty([null, 0])).toBe(true);
+		expect(rowEmpty([null, 2])).toBe(false);
 	});
 	it("formats values and treats unknown as missing", () => {
 		expect(knownNumber({ state: "unknown", v: null } as never)).toBeNull();

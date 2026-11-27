@@ -36,11 +36,17 @@ export interface CompareModelsInput {
 	budget: number;
 }
 
+/** The rows with a model picked; the form starts with two empty rows, which never count (M4-82). */
+export function filledModels(models: readonly PickedModel[]): PickedModel[] {
+	return models.filter((m) => m.model.trim() !== "");
+}
+
 /** The first problem with the input as an i18n key (modelSwitch form.*), or null when it can launch. */
 export function compareModelsProblem(i: CompareModelsInput): "needBenchmark" | "needModels" | "duplicate" | null {
 	if (i.benchmarks.length === 0) return "needBenchmark";
-	if (i.models.length < 2) return "needModels";
-	const keys = i.models.map((m) => `${m.provider}/${m.model}`);
+	const models = filledModels(i.models);
+	if (models.length < 2) return "needModels";
+	const keys = models.map((m) => `${m.provider}/${m.model}`);
 	if (new Set(keys).size !== keys.length) return "duplicate";
 	return null;
 }
@@ -50,7 +56,7 @@ export function compareModelsSpec(i: CompareModelsInput): EvaluationSpec {
 	return {
 		name: "",
 		mode: "model_switch" as EvaluationSpec["mode"],
-		arms: i.models.map((m, n) => ({
+		arms: filledModels(i.models).map((m, n) => ({
 			label: evalArmLabel(n), // N211: the server takes only A, B, C ... (evalArmIDRe)
 			agent: i.agent,
 			...(i.version ? { version: i.version } : {}),
@@ -101,6 +107,8 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const [tasks, setTasks] = useState(5);
 	const [trials, setTrials] = useState(2);
 	const [budget, setBudget] = useState(0);
+	const [budgetTouched, setBudgetTouched] = useState(false);
+	const { t: tu } = useTranslation("uf4b");
 	const [create, created] = useCreateEvaluationMutation();
 	const input: CompareModelsInput = { agent: agentId, version, models, benchmarks, tasks, trials, budget };
 	const problem = compareModelsProblem(input);
@@ -108,6 +116,12 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const estimate = useGetEvaluationEstimateQuery(spec, { skip: problem !== null });
 	// Launch waits for the estimate of the current settings, never an older one (p02-5).
 	const waiting = problem === null && estimate.isFetching;
+	// M4-82: the budget starts at the estimate's suggestion; 0 never launches as "no cap".
+	const suggested = estimate.data?.budget?.suggested_usd;
+	useEffect(() => {
+		if (!budgetTouched && suggested && suggested > 0) setBudget(Math.round(suggested * 100) / 100);
+	}, [suggested, budgetTouched]);
+	const noBudget = !(budget > 0);
 	const setModel = (i: number, v: PickedModel) => {
 		if (i === 0) setTouched(true);
 		setModels((ms) => ms.map((m, n) => (n === i ? v : m)));
@@ -173,7 +187,16 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			<div className="flex flex-wrap gap-4 text-sm">
 				<NumberField label={t("form.tasks")} value={tasks} min={1} onChange={setTasks} testId="compare-models-tasks" />
 				<NumberField label={t("form.trials")} value={trials} min={1} onChange={setTrials} testId="compare-models-trials" />
-				<NumberField label={t("form.budget")} value={budget} min={0} onChange={setBudget} testId="compare-models-budget" />
+				<NumberField
+					label={t("form.budget")}
+					value={budget}
+					min={0.01}
+					onChange={(n) => {
+						setBudgetTouched(true);
+						setBudget(n);
+					}}
+					testId="compare-models-budget"
+				/>
 			</div>
 			{problem ? (
 				<p className="text-muted-foreground text-sm" data-testid="compare-models-problem">
@@ -182,6 +205,11 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			) : (
 				<EstimateLine state={estimate} />
 			)}
+			{problem === null && noBudget && !waiting && (
+				<p className="text-muted-foreground text-sm" data-testid="compare-models-need-budget">
+					{tu("models.needBudget")}
+				</p>
+			)}
 			{err && (
 				<p className="text-destructive text-sm" role="alert">
 					{t("form.error", { message: err.data?.error?.message ?? "" })}
@@ -189,7 +217,7 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			)}
 			<Button
 				className="w-fit"
-				disabled={problem !== null || created.isLoading || waiting}
+				disabled={problem !== null || noBudget || created.isLoading || waiting}
 				aria-describedby={waiting ? "compare-models-launch-why" : undefined}
 				onClick={launch}
 				dataTestId="compare-models-launch"

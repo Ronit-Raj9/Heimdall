@@ -91,7 +91,11 @@ export function AgentBoardTab() {
 		void setModel(null);
 	};
 	const open = (row: AgentLeaderboardRow) =>
-		void navigate({ to: "/agents/$agentId", params: { agentId: row.agent }, search: reportCardSearch(row) as never });
+		void navigate({
+			to: "/agents/$agentId",
+			params: { agentId: row.agent },
+			search: reportCardSearch(row) as never,
+		});
 
 	// The filter lists come from the unfiltered columns the server reports; a URL value they lack still shows.
 	const capOptions = useMemo(() => {
@@ -121,7 +125,10 @@ export function AgentBoardTab() {
 			<section className="flex flex-col gap-3" data-testid="agent-board-ranking">
 				<h2 className="sr-only">{t("title")}</h2>
 				<p className="text-muted-foreground max-w-prose text-sm" data-testid="agent-board-description">
-					{t("description", { runs: data?.min_runs ?? DEFAULT_MIN_RUNS, tasks: data?.min_tasks ?? DEFAULT_MIN_TASKS })}
+					{t("description", {
+						runs: data?.min_runs ?? DEFAULT_MIN_RUNS,
+						tasks: data?.min_tasks ?? DEFAULT_MIN_TASKS,
+					})}
 				</p>
 				{board.isLoading ? (
 					<BlockSkeleton className="h-64" testId="agent-board-loading" />
@@ -260,7 +267,10 @@ export interface AgentBoardTableProps {
 export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, minTasks, head }: AgentBoardTableProps) {
 	const { t } = useTranslation("agentBoard");
 	const capLabel = useCapabilityLabel();
-	const mins = { minRuns: minRuns ?? DEFAULT_MIN_RUNS, minTasks: minTasks ?? DEFAULT_MIN_TASKS };
+	const mins = {
+		minRuns: minRuns ?? DEFAULT_MIN_RUNS,
+		minTasks: minTasks ?? DEFAULT_MIN_TASKS,
+	};
 	// Every row gets a place: by the filtered capability, else by the All score.
 	const ranks = useMemo(() => boardRanks(rows, rankBy), [rows, rankBy]);
 	const modelFirst = sameAgent(rows);
@@ -309,11 +319,7 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
 							data-testid={`agent-board-row-${row.agent}`}
 						>
 							<TableCell className="text-right tabular-nums" data-testid="agent-board-rank" title={place?.tied ? t("tieHint") : undefined}>
-								{place ? (
-									`${place.tied ? "=" : ""}${place.rank}`
-								) : (
-									<span className="text-muted-foreground">-</span>
-								)}
+								{place ? `${place.tied ? "=" : ""}${place.rank}` : <span className="text-muted-foreground">-</span>}
 							</TableCell>
 							<TableCell>
 								<div className="flex flex-col gap-0.5">
@@ -332,7 +338,9 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
 										{row.customer && (
 											<Badge
 												variant="neutral"
-												title={t("simulatedCustomerHint", { simulator: row.simulator ?? "" })}
+												title={t("simulatedCustomerHint", {
+													simulator: row.simulator ?? "",
+												})}
 												data-testid="agent-board-simulated-customer"
 											>
 												{t("simulatedCustomer")}
@@ -376,7 +384,13 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
  * muted text with the reason in the tooltip, never a percent or a range. Ranked: the share, a thin
  * bar with the 95% range as a lighter band, and the range only when its ends differ.
  */
-function ScoreCell({ s, mins }: { s: AgentLeaderboardRow["capabilities"][string] | undefined; mins: { minRuns: number; minTasks: number } }) {
+function ScoreCell({
+	s,
+	mins,
+}: {
+	s: AgentLeaderboardRow["capabilities"][string] | undefined;
+	mins: { minRuns: number; minTasks: number };
+}) {
 	const { t } = useTranslation("agentBoard");
 	const state = scoreState(s);
 	if (!s || state === "notMeasured") {
@@ -390,7 +404,11 @@ function ScoreCell({ s, mins }: { s: AgentLeaderboardRow["capabilities"][string]
 		return (
 			<span
 				className="text-muted-foreground text-xs"
-				title={t("notEnoughHint", { runs: s.runs, tasks: s.tasks ?? 0, ...mins })}
+				title={t("notEnoughHint", {
+					runs: s.runs,
+					tasks: s.tasks ?? 0,
+					...mins,
+				})}
 				data-testid="agent-board-not-enough"
 			>
 				{t("tooFew", { runs: s.runs })}
@@ -401,7 +419,12 @@ function ScoreCell({ s, mins }: { s: AgentLeaderboardRow["capabilities"][string]
 	return (
 		<span
 			className="inline-flex min-w-20 flex-col items-end gap-0.5 leading-tight"
-			title={t("range", { low: formatShare(s.ci_low), high: formatShare(s.ci_high), runs: s.runs, tasks: s.tasks ?? 0 })}
+			title={t("range", {
+				low: formatShare(s.ci_low),
+				high: formatShare(s.ci_high),
+				runs: s.runs,
+				tasks: s.tasks ?? 0,
+			})}
 		>
 			<span className="font-medium">{formatShare(s.score)}</span>
 			<span className="bg-muted relative h-1 w-full overflow-hidden rounded" aria-hidden data-testid="agent-board-bar">

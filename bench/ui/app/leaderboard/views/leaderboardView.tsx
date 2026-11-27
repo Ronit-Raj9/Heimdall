@@ -107,7 +107,17 @@ function LeaderboardShare() {
 	if (active === "trends" || active === "reference" || split) return null;
 	if (active === "agents") return <ShareButton kind="leaderboard" target="agents" query={shareQuery({ capability, model })} />;
 	return (
-		<ShareButton kind="leaderboard" target="models" query={shareQuery({ suite, condition, scope, synthetic, grade_source: gradeSource })} />
+		<ShareButton
+			kind="leaderboard"
+			target="models"
+			query={shareQuery({
+				suite,
+				condition,
+				scope,
+				synthetic,
+				grade_source: gradeSource,
+			})}
+		/>
 	);
 }
 
@@ -191,7 +201,11 @@ export function LeaderboardTab() {
 			</div>
 			{unknownSuite && suite && (
 				<UnknownLinkNote
-					text={tw("unknown.text", { thing: tw("unknown.benchmark"), name: suite, things: tw("unknown.benchmarks") })}
+					text={tw("unknown.text", {
+						thing: tw("unknown.benchmark"),
+						name: suite,
+						things: tw("unknown.benchmarks"),
+					})}
 					showAllLabel={tw("unknown.showAll")}
 					onShowAll={() => {
 						void setSuite(null);

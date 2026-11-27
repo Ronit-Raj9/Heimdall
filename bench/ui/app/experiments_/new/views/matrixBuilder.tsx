@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
+import "@/app/leaderboard/views/uf4bI18n";
 import { suiteRef } from "./experimentFormSchema";
 import "@/app/compare/views/w4m3I18n";
 import {
@@ -106,7 +108,10 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	const [actionError, setActionError] = useState<{
 		title: string;
 		error: unknown;
+		/** A comparison that was created but did not start (M4-81): linked from the error. */
+		createdId?: string;
 	} | null>(null);
+	const { t: tu } = useTranslation("uf4b");
 	const [plan, planState] = usePlanExperimentMutation();
 	const [estimate, estimateState] = useEstimateExperimentMutation();
 	const [estimateRetrying, setEstimateRetrying] = useState(false);
@@ -143,17 +148,22 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 		return (
 			<li key={a.path}>
 				<label
-					className={cn("flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm", on && "border-primary bg-primary/10")}
+					className={cn(
+						"flex min-w-0 cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm",
+						on && "border-primary bg-primary/10",
+					)}
 				>
 					<input
 						type="checkbox"
-						className="accent-primary size-4"
+						className="accent-primary mt-0.5 size-4 shrink-0"
 						checked={on}
 						onChange={(e) => toggleAgent(a.path, e.target.checked)}
 						data-testid={`builder-agent-${a.id}`}
 					/>
-					<span className="font-mono">{a.id}</span>
-					{a.model && <span className="text-muted-foreground text-xs">{t("fields.agentModel", { model: a.model })}</span>}
+					<span className="flex min-w-0 flex-col">
+						<span className="truncate text-sm whitespace-nowrap">{a.id}</span>
+						{a.model && <span className="text-muted-foreground truncate text-xs">{t("fields.agentModel", { model: a.model })}</span>}
+					</span>
 				</label>
 			</li>
 		);
@@ -166,19 +176,23 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	// N43: after a Plan or Estimate press on an invalid form, how many fields to fix, next to the buttons.
 	const invalidCount = touched ? Object.keys(errors).length : 0;
 	const busy = createState.isLoading || startState.isLoading;
+	// M4-80: a comparison needs 2 setups; say so before any click, and Plan waits for it.
+	const tooFew = preview.arms.length < 2;
 	const blockReason = needsToken
 		? t("actions.needsToken")
 		: readyBlock
 			? readyBlock
-			: !valid && touched
-				? t("actions.invalid")
-				: !planned
-					? t("actions.needsPlan")
-					: stale
-						? t("actions.planStale")
-						: planBlocksStart(planned.plan)
-							? t("actions.blocked")
-							: null;
+			: tooFew
+				? t("errors.tooFewArms")
+				: !valid && touched
+					? t("actions.invalid")
+					: !planned
+						? t("actions.needsPlan")
+						: stale
+							? t("actions.planStale")
+							: planBlocksStart(planned.plan)
+								? t("actions.blocked")
+								: null;
 
 	const experimentOrNull = (): Experiment | null => {
 		setTouched(true);
@@ -191,6 +205,8 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 			}, 0);
 		}
 		if (!valid || needsToken || readyBlock) return null;
+		// M4-94: the token is saved when it is used (Estimate, Plan, Run), never on every keystroke.
+		if (tokenBox) saveWriteToken(token);
 		return toMatrixExperiment(v, catalog, ready);
 	};
 
@@ -233,14 +249,16 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 			setActionError({ title: t("actions.createError"), error });
 			return;
 		}
+		// One plan, one experiment: a second run needs a new plan, so a double click never creates two.
+		setPlanned(null);
 		try {
 			await start(expId).unwrap();
 		} catch (error) {
-			setActionError({ title: t("actions.startError", { id: expId }), error });
+			// M4-81: the form stays as it was; the error links to the created, not started comparison.
+			setActionError({ title: t("actions.startError", { id: expId }), error, createdId: expId });
+			return;
 		}
-		// One plan, one experiment: a second run needs a new plan, so a double click never creates two.
 		onStarted(expId, planned.experiment.budget.total_usd);
-		setPlanned(null);
 	};
 
 	const setModel = (i: number, m: ModelRef) =>
@@ -284,7 +302,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 									}}
 								>
 									<SelectTrigger id={id} className="w-full" data-testid="builder-suite-select">
-										<SelectValue />
+										<SelectValue placeholder={t("fields.suitePlaceholder")} />
 									</SelectTrigger>
 									<SelectContent>
 										<SuiteMenuItems catalog={catalog} ready={ready} testIdPrefix="builder-suite-option" />
@@ -298,13 +316,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 				<Step n={2} title={t("steps.who")} hint={t("steps.whoHint")}>
 					<SubSection title={t("sections.agents")} description={t("sections.agentsHint")} error={shown.agents}>
 						{agentGroups && <p className="text-muted-foreground text-xs font-medium">{tf("builder.yourAgents")}</p>}
-						<ul className="flex flex-wrap gap-2" data-testid="builder-agents">
+						<ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="builder-agents">
 							{listed.yours.map((a) => agentChoice(a))}
 						</ul>
 						{listed.builtIn.length > 0 && (
 							<>
 								<p className="text-muted-foreground text-xs font-medium">{tf("builder.builtInAgents")}</p>
-								<ul className="flex flex-wrap gap-2" data-testid="builder-agents-builtin">
+								<ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="builder-agents-builtin">
 									{listed.builtIn.map((a) => agentChoice(a))}
 								</ul>
 							</>
@@ -313,13 +331,16 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 					<SubSection title={t("sections.models")} description={t("sections.modelsHint")} error={shown.models}>
 						<ul className="flex flex-col gap-2" data-testid="builder-models">
 							{v.models.map((m, i) => (
-								<li key={i} className="flex flex-wrap items-center gap-2">
-									<span className="text-muted-foreground w-5 text-xs">{i + 1}.</span>
-									<ModelPicker value={m} purpose="agent" onChange={(next) => setModel(i, next)} testId={`builder-model-${i}`} />
+								<li key={i} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+									<div className="w-full min-w-0">
+										<ModelPicker value={m} purpose="agent" onChange={(next) => setModel(i, next)} testId={`builder-model-${i}`} />
+									</div>
 									<Button
 										type="button"
 										variant="ghost"
-										size="sm"
+										size="icon"
+										className="size-9"
+										title={t("fields.removeModel", { n: i + 1 })}
 										aria-label={t("fields.removeModel", { n: i + 1 })}
 										onClick={() =>
 											set(
@@ -331,7 +352,11 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 									>
 										<X aria-hidden="true" />
 									</Button>
-									{shown[`models.${i}`] && <ErrorText code={shown[`models.${i}`]!} />}
+									{shown[`models.${i}`] && (
+										<div className="col-span-2">
+											<ErrorText code={shown[`models.${i}`]!} />
+										</div>
+									)}
 								</li>
 							))}
 						</ul>
@@ -376,16 +401,20 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 						<div className="flex flex-col gap-1.5 md:col-span-3">
 							<span className="text-xs font-medium">{t("fields.tasks")}</span>
 							<div className="flex flex-col gap-2 text-sm" role="radiogroup" data-testid="builder-task-scope">
-								<label className="flex items-center gap-2">
-									<input
-										type="radio"
-										className="accent-primary"
-										checked={v.taskScope === "first"}
-										onChange={() => set("taskScope", "first")}
-										data-testid="builder-tasks-first"
-									/>
-									{t("fields.tasksFirst")}
+								{/* M4-92: 16 px radios on 24 px rows; the count input sits after the label, outside it. */}
+								<div className="flex min-h-6 flex-wrap items-center gap-2">
+									<label className="flex items-center gap-2">
+										<input
+											type="radio"
+											className="accent-primary size-4"
+											checked={v.taskScope === "first"}
+											onChange={() => set("taskScope", "first")}
+											data-testid="builder-tasks-first"
+										/>
+										{t("fields.tasksFirst")}
+									</label>
 									<Input
+										aria-label={t("fields.tasksFirst")}
 										type="number"
 										min={1}
 										max={runnable}
@@ -400,11 +429,11 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 											? t("fields.tasksFirstSuffixReady", { count: runnable })
 											: t("fields.tasksFirstSuffix", { count: runnable })}
 									</span>
-								</label>
-								<label className="flex items-center gap-2">
+								</div>
+								<label className="flex min-h-6 items-center gap-2">
 									<input
 										type="radio"
-										className="accent-primary"
+										className="accent-primary size-4"
 										checked={v.taskScope === "all"}
 										onChange={() => set("taskScope", "all")}
 										data-testid="builder-tasks-all"
@@ -556,6 +585,11 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 						<CardDescription className="text-xs">{t("preview.description")}</CardDescription>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4 px-5">
+						{tooFew && (
+							<p className="text-foreground text-sm" data-testid="builder-preview-too-few">
+								{t("errors.tooFewArms")}
+							</p>
+						)}
 						{preview.arms.length === 0 || (preview.arms.length === 1 && !preview.arms[0].label) ? (
 							<p className="text-muted-foreground text-xs" data-testid="builder-preview-empty">
 								{t("preview.empty")}
@@ -582,11 +616,9 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								<dd className="text-base font-semibold tabular-nums">{Number.isFinite(v.totalUsd) ? `$${v.totalUsd}` : "-"}</dd>
 							</div>
 						</dl>
-						<p className="text-muted-foreground text-[11px]" data-testid="builder-preview-runs">
-							{t("preview.arms", { ns: "w4m3", count: preview.arms.length })}
-							{", "}
+						<p className="text-muted-foreground text-xs" data-testid="builder-preview-runs">
 							{t("preview.runs", {
-								runs: preview.maxRuns,
+								count: preview.maxRuns,
 								arms: preview.arms.length,
 								conditions: preview.conditions,
 								tasks: preview.tasks,
@@ -604,10 +636,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 										autoComplete="off"
 										placeholder={t("fields.tokenPlaceholder")}
 										value={token}
-										onChange={(e) => {
-											setToken(e.target.value);
-											saveWriteToken(e.target.value);
-										}}
+										onChange={(e) => setToken(e.target.value)}
 										data-testid="builder-write-token"
 									/>
 								)}
@@ -635,7 +664,8 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								type="button"
 								variant="outline"
 								size="sm"
-								disabled={needsToken || readyBlock !== null}
+								disabled={needsToken || readyBlock !== null || tooFew}
+								title={tooFew ? t("errors.tooFewArms") : undefined}
 								isLoading={planState.isLoading}
 								onClick={() => void onPlan()}
 								dataTestId="builder-plan"
@@ -679,6 +709,16 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 							<LoadError title={t("actions.planError")} error={planState.error} testId="builder-plan-error" />
 						)}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="builder-action-error" />}
+						{actionError?.createdId && (
+							<Link
+								to="/experiments/$expId"
+								params={{ expId: actionError.createdId }}
+								className="text-primary text-sm hover:underline"
+								data-testid="builder-created-link"
+							>
+								{tu("form.openCreated")}
+							</Link>
+						)}
 						{planned && (
 							<PlanResult
 								plan={planned.plan}
@@ -689,6 +729,27 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 					</CardContent>
 				</Card>
 			</aside>
+			{/* M4-84: below lg the preview sits at the end of a long form, so a bar keeps the count, the cap and Plan in reach. */}
+			<div
+				className="bg-background/95 sticky bottom-0 z-10 -mx-4 flex items-center gap-3 border-t px-4 py-2 backdrop-blur lg:hidden"
+				data-testid="builder-mobile-bar"
+			>
+				<span className="min-w-0 flex-1 text-xs tabular-nums">
+					{tu("form.mobileBar", { count: preview.arms.length, runs: preview.maxRuns })}
+					{Number.isFinite(v.totalUsd) ? `, ${tu("form.mobileCap", { usd: v.totalUsd })}` : ""}
+				</span>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					disabled={needsToken || readyBlock !== null || tooFew}
+					isLoading={planState.isLoading}
+					onClick={() => void onPlan()}
+					dataTestId="builder-plan-mobile"
+				>
+					{t("actions.plan")}
+				</Button>
+			</div>
 		</div>
 	);
 }

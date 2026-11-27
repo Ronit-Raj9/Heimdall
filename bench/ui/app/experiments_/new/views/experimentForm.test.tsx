@@ -110,7 +110,7 @@ describe("ExperimentForm benchmark and agent menus (N39)", () => {
 		const t = i18n.getFixedT("en", "builder");
 		const s = { id: "acme-desktop", version: "1.0.0", tasks: ["a", "b"], probes: [] };
 		expect(suiteOptionText(s, new Map([["acme-desktop@1.0.0", { ids: ["a"], total: 2 }]]), t)).toBe(
-			"acme-desktop@1.0.0 (1 of 2 ready) (practice)",
+			"acme-desktop@1.0.0, 1 of 2 tasks ready to run (practice)",
 		);
 		expect(suiteOptionText({ ...s, id: "hd-x" }, undefined, t)).toBe("hd-x@1.0.0 (2 tasks)");
 	});

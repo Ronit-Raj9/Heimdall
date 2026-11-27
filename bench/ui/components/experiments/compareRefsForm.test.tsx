@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { render } from "@/lib/testing/render";
-import { compareRefsParams } from "@/lib/types/refCompare";
+import { compareRefsParams, compareRefsProblem } from "@/lib/types/refCompare";
 import { describe, expect, it, vi } from "vitest";
 import { CompareRefsForm } from "./compareRefsForm";
 
@@ -26,7 +26,7 @@ const base = {
 	refB: "feature/x",
 	tasks: "",
 	trials: 3,
-	budget: 0,
+	budget: 1,
 };
 
 describe("compareRefsParams", () => {
@@ -37,6 +37,7 @@ describe("compareRefsParams", () => {
 			ref_a: "main",
 			ref_b: "feature/x",
 			trials: 3,
+			budget_usd: 1,
 		});
 		expect(compareRefsParams({ ...base, repo: "acme/agent", tasks: "t1, t2,t1", budget: 2 })).toMatchObject({
 			repo: "acme/agent",
@@ -48,6 +49,15 @@ describe("compareRefsParams", () => {
 		expect(compareRefsParams({ ...base, agent: "" })).toBeNull();
 		expect(compareRefsParams({ ...base, refB: " main " })).toBeNull();
 		expect(compareRefsParams({ ...base, refA: "" })).toBeNull();
+	});
+	it("never clamps trials silently and never sends a budget of 0 (M4-93)", () => {
+		expect(compareRefsProblem({ trials: 0, budget: 1 })).toBe("trials");
+		expect(compareRefsProblem({ trials: 51, budget: 1 })).toBe("trials");
+		expect(compareRefsProblem({ trials: 2.5, budget: 1 })).toBe("trials");
+		expect(compareRefsProblem({ trials: 3, budget: 0 })).toBe("budget");
+		expect(compareRefsProblem({ trials: 3, budget: 1 })).toBeNull();
+		expect(compareRefsParams({ ...base, trials: 80 })).toBeNull();
+		expect(compareRefsParams({ ...base, budget: 0 })).toBeNull();
 	});
 });
 

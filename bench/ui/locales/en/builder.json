@@ -6,16 +6,13 @@
 		"abHint": "Change one agent setting and test it against the baseline."
 	},
 	"sections": {
-		"what": "Benchmark and name",
 		"agents": "Agents",
 		"agentsHint": "One agent compares models; several compare agents.",
 		"models": "Models",
-		"modelsHint": "Leave empty to use each agent's own model.",
-		"size": "Run size",
-		"limits": "Budget and limits"
+		"modelsHint": "Leave empty to use each agent's own model."
 	},
 	"fields": {
-		"name": "Experiment name",
+		"name": "Comparison name",
 		"suite": "Benchmark",
 		"suiteOption": "{{id}}@{{version}} ({{count}} tasks)",
 		"agentModel": "own model: {{model}}",
@@ -39,24 +36,26 @@
 		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
 		"tokenPlaceholder": "paste the serve write token",
 		"tasks": "Tasks",
-		"suiteOptionReady": "{{id}}@{{version}} ({{ready}} of {{total}} ready)",
+		"suiteOptionReady": "{{id}}@{{version}}, {{ready}} of {{total}} tasks ready to run",
 		"practiceOption": "{{option}} (practice)",
 		"notReadyGroup": "Not ready yet",
 		"notReadyTitle": "Run its readiness check on the benchmark page first.",
 		"tasksAllReady": "All ready tasks ({{count}})",
-		"tasksFirstSuffixReady": "ready tasks of {{count}}"
+		"tasksFirstSuffixReady": "ready tasks of {{count}}",
+		"suitePlaceholder": "Pick a benchmark"
 	},
 	"preview": {
-		"title": "Matrix preview",
+		"title": "Preview",
 		"description": "Setup A is the baseline for the verdict.",
 		"arms": "{{count}} setups",
-		"runs": "up to {{runs}} runs ({{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries)",
-		"empty": "Pick at least one agent and fill in a model to see the setups."
+		"empty": "Pick at least one agent and fill in a model to see the setups.",
+		"runs_one": "{{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries = {{count}} run at most",
+		"runs_other": "{{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries = {{count}} runs at most"
 	},
 	"actions": {
 		"estimate": "Estimate cost",
 		"plan": "Plan",
-		"run": "Run experiment",
+		"run": "Start comparison (paid)",
 		"needsToken": "Enter the write token to estimate, plan and run.",
 		"needsPlan": "Plan the experiment first: the plan checks it and shows its power.",
 		"planStale": "The form changed after planning. Plan again before running.",

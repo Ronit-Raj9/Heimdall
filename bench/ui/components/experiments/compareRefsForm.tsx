@@ -1,7 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetGithubRefsQuery, useGetGithubStatusQuery, useListGithubReposQuery } from "@/lib/store/apis/githubApi";
-import { compareRefsParams } from "@/lib/types/refCompare";
+import { compareRefsParams, compareRefsProblem, REF_TRIALS_MAX, REF_TRIALS_MIN } from "@/lib/types/refCompare";
+import "@/app/leaderboard/views/uf4bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
@@ -25,6 +26,7 @@ export function CompareRefsForm({
 	testId?: string;
 }) {
 	const { t } = useTranslation("refCompare");
+	const { t: tu } = useTranslation("uf4b");
 	const uid = useId();
 	const agents = useGetAgentsQuery();
 	const status = useGetGithubStatusQuery();
@@ -39,7 +41,7 @@ export function CompareRefsForm({
 	const [refB, setRefB] = useState("");
 	const [tasks, setTasks] = useState("");
 	const [trials, setTrials] = useState(3);
-	const [budget, setBudget] = useState(0);
+	const [budget, setBudget] = useState(5);
 	const [owner, name] = repo.split("/");
 	const refs = useGetGithubRefsQuery(connected && owner && name ? { owner, repo: name } : skipToken);
 	const list = agents.data?.agents ?? [];
@@ -59,6 +61,7 @@ export function CompareRefsForm({
 	});
 	const params = needRepo ? null : built;
 	const same = refA.trim() !== "" && refA.trim() === refB.trim();
+	const problem = compareRefsProblem({ trials, budget });
 	const field = "flex flex-col gap-1 text-sm";
 	const select = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const pickRepo = (full: string) => {
@@ -163,11 +166,39 @@ export function CompareRefsForm({
 				</label>
 				<label className={field} htmlFor={`${uid}-trials`}>
 					{t("compare.trials")}
-					<Input id={`${uid}-trials`} type="number" min={1} max={50} value={trials} onChange={(e) => setTrials(Number(e.target.value))} />
+					<Input
+						id={`${uid}-trials`}
+						type="number"
+						min={REF_TRIALS_MIN}
+						max={REF_TRIALS_MAX}
+						value={trials}
+						aria-invalid={problem === "trials"}
+						onChange={(e) => setTrials(Number(e.target.value))}
+						data-testid={`${testId}-trials`}
+					/>
+					{problem === "trials" && (
+						<span className="text-chart-error-ink text-xs" role="alert">
+							{tu("refs.trials", { min: REF_TRIALS_MIN, max: REF_TRIALS_MAX })}
+						</span>
+					)}
 				</label>
 				<label className={field} htmlFor={`${uid}-budget`}>
 					{t("compare.budget")}
-					<Input id={`${uid}-budget`} type="number" min={0} step="0.5" value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
+					<Input
+						id={`${uid}-budget`}
+						type="number"
+						min={0.01}
+						step="0.5"
+						value={budget}
+						aria-invalid={problem === "budget"}
+						onChange={(e) => setBudget(Number(e.target.value))}
+						data-testid={`${testId}-budget`}
+					/>
+					{problem === "budget" && (
+						<span className="text-chart-error-ink text-xs" role="alert">
+							{tu("refs.budget")}
+						</span>
+					)}
 				</label>
 			</div>
 			<FollowUpJob
