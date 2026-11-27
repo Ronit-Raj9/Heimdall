@@ -1,5 +1,6 @@
 import { Section } from "@/components/runs/screenStates";
-import { useGetBifrostSettingQuery, useGetGatewayEffectQuery } from "@/lib/store/apis/gatewayApi";
+import { useGetBifrostSettingQuery } from "@/lib/store/apis/gatewayApi";
+import { useGetGatewayEffectOptionalQuery } from "./gatewayEffectQuery";
 import type { GwArmResult, GwBifrostSettingAnswer, GwEffect, GwResult } from "@/lib/types/gateway";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -168,7 +169,7 @@ export function effectOf(data: unknown): GwEffect | null {
 
 /** Experiment page: the feature test's Effect. Renders nothing when the comparison is not a feature test (404 or {"effect": null}) or on any error. */
 export function GatewayEffectCard({ expId }: { expId: string }) {
-	const q = useGetGatewayEffectQuery(expId);
+	const q = useGetGatewayEffectOptionalQuery(expId);
 	const effect = effectOf(q.data);
 	const setting = useGetBifrostSettingQuery(expId, { skip: !effect });
 	if (!effect) return null;

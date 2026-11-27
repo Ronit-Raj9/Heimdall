@@ -1,7 +1,11 @@
-import { GovDialog } from "@/components/govern/govDialog";
+import { InlineError } from "@/components/runs/screenStates";
 import { ModelPicker } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PaidButton } from "@/components/ui/paidButton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShowTestsChip } from "@/components/ui/toolbar";
 import {
 	useCreateExperimentMutation,
 	useGetAgentsQuery,
@@ -10,7 +14,7 @@ import {
 } from "@/lib/store/apis/benchApi";
 import { useDraftGatewayTestMutation } from "@/lib/store/apis/gatewayApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
-import { errorMessage } from "@/lib/store/apis/schedulesApi";
+import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import type { Experiment, ExperimentPlan } from "@/lib/types/bench";
 import type { GwDraftRequest, GwDraftResponse } from "@/lib/types/gateway";
 import { useNavigate } from "@tanstack/react-router";
@@ -79,9 +83,14 @@ export function budgetChoices(list: string | undefined): string[] {
 		.filter((v, i, all) => v !== "" && Number.isFinite(Number(v)) && all.indexOf(v) === i);
 }
 
-/** The suites a feature test can pick: zz-test benchmarks are left out. Pure. */
-export function pickableSuites<T extends { id: string }>(suites: readonly T[]): T[] {
-	return suites.filter((s) => !s.id.startsWith("zz-test"));
+/** The suites a feature test can pick: test benchmarks are left out unless shown. Pure. */
+export function pickableSuites<T extends { id: string; description?: string | null }>(suites: readonly T[], showTests = false) {
+	return withoutTests(suites, (s) => isTestObject(s.id, s), showTests);
+}
+
+/** The agents a feature test can pick: test agents (by id, file path or description) are left out unless shown. Pure. */
+export function pickableAgents<T extends { id: string; path?: string; description?: string | null }>(agents: readonly T[], showTests = false) {
+	return withoutTests(agents, (a) => isTestObject(a.id, a) || isTestObject(a.path?.split("/").pop()), showTests);
 }
 
 export const MAX_DRAFT_USD = 50;
@@ -273,9 +282,10 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 	const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
 	const [prepared, setPrepared] = useState<Prepared | null>(null);
 	const [estimating, setEstimating] = useState(false);
-	const [confirming, setConfirming] = useState(false);
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<{ text: string; detail: string } | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	const [showTests, setShowTests] = useShowTests();
+	const suiteList = pickableSuites(suites.data?.suites ?? [], showTests);
+	const agentList = pickableAgents(agents.data?.agents ?? [], showTests);
 	const calls: FeatureTestCalls = {
 		draft: (req) => draft(req).unwrap(),
 		plan: (exp) => plan(exp).unwrap(),
@@ -285,7 +295,6 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 	const set = (patch: Partial<FeatureTestForm>, field: string) => {
 		setForm((f) => ({ ...f, ...patch }));
 		setTouched((s) => new Set(s).add(field));
-		setConfirming(false);
 	};
 	const setOption = (key: string, value: string) => set({ options: { ...form.options, [key]: value } }, key);
 	const built = draftRequest(feature, form);
@@ -301,7 +310,7 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 		const timer = setTimeout(() => {
 			prepareFeatureTest(calls, JSON.parse(reqKey) as GwDraftRequest)
 				.then((p) => live && setPrepared(p))
-				.catch((e) => live && setError({ text: t("dialog.error", { error: errorMessage(e, t("dialog.needFields")) }), detail: errorDetail(e) }))
+				.catch((e) => live && setError(e))
 				.finally(() => live && setEstimating(false));
 		}, ESTIMATE_DELAY_MS);
 		return () => {
@@ -311,21 +320,20 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 		// calls is rebuilt each render; the request text is what matters.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reqKey, open]);
+	// PaidButton asks first (with the estimate and the cap); only then is the comparison created and started.
 	const onStart = async () => {
 		if (!prepared) return;
-		if (!confirming) return setConfirming(true);
-		setBusy(true);
+		setError(null);
 		try {
 			const id = await startFeatureTest(calls, prepared.draft.experiment);
 			onClose();
 			void navigate({ to: "/experiments/$expId", params: { expId: id } });
 		} catch (e) {
-			setError({ text: t("dialog.error", { error: errorMessage(e, t("dialog.needFields")) }), detail: errorDetail(e) });
-		} finally {
-			setBusy(false);
+			setError(e);
 		}
 	};
-	const field = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
+	const est = prepared ? planEstimate(prepared.plan) : null;
+	const budgetUsd = Number(form.budget);
 	const needed = (key: string, text?: string) =>
 		touched.has(key) && missing.has(key) ? (
 			<span className="text-destructive text-xs" data-testid={`feature-test-needed-${key}`}>
@@ -336,34 +344,49 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 	const modelRequired = NEEDS_MODEL.has(feature);
 	const budgets = budgetChoices(form.options.budgets);
 	return (
-		<GovDialog
+		<Dialog
 			open={open}
-			onClose={onClose}
+			onOpenChange={(next) => !next && onClose()}
 			title={t("dialog.title", { name })}
 			closeLabel={u("dialog.close")}
 			testId="feature-test-dialog"
-			className="max-w-2xl"
+			size="lg"
+			footer={
+				<div className="flex flex-wrap items-start justify-end gap-2">
+					<Button type="button" variant="outline" onClick={onClose}>
+						{t("dialog.cancel")}
+					</Button>
+					<PaidButton
+						verb={u("dialog.startTest")}
+						capUsd={Number.isFinite(budgetUsd) && budgetUsd > 0 ? budgetUsd : null}
+						estimateUsd={est?.usd ?? null}
+						confirm="always"
+						disabled={estimating || !built.req || !prepared || prepared.plan.errors.length > 0}
+						onConfirm={onStart}
+						testId="feature-test-start"
+					/>
+				</div>
+			}
 		>
 			<div className="flex flex-col gap-3 text-sm">
+				<ShowTestsChip count={suiteList.hidden + agentList.hidden} on={showTests} onChange={setShowTests} testId="feature-test-show-tests" />
 				<label className="flex flex-col gap-1">
 					<span>
 						{t("dialog.benchmark")}
 						<span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>
 					</span>
-					<select
-						className={field}
-						value={form.suite}
-						onChange={(e) => set({ suite: e.target.value }, "suite")}
-						aria-required
-						data-testid="feature-test-suite"
-					>
-						<option value="">{t("dialog.pick")}</option>
-						{pickableSuites(suites.data?.suites ?? []).map((s) => (
-							<option key={s.id} value={suiteOption(s)}>
-								{suiteLabel((k, o) => String(u(k, o)), s)}
-							</option>
-						))}
-					</select>
+					<Select value={form.suite || undefined} onValueChange={(v) => set({ suite: v }, "suite")}>
+						<SelectTrigger className="w-full" aria-required data-testid="feature-test-suite">
+							<SelectValue placeholder={t("dialog.pick")} />
+						</SelectTrigger>
+						<SelectContent>
+							{suiteList.shown.map((s) => (
+								<SelectItem key={s.id} value={suiteOption(s)}>
+									{suiteLabel((k, o) => String(u(k, o)), s)}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 					{needed("suite")}
 				</label>
 				<label className="flex flex-col gap-1">
@@ -371,20 +394,18 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 						{t("dialog.agent")}
 						<span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>
 					</span>
-					<select
-						className={field}
-						value={form.base}
-						onChange={(e) => set({ base: e.target.value }, "base")}
-						aria-required
-						data-testid="feature-test-agent"
-					>
-						<option value="">{t("dialog.pick")}</option>
-						{(agents.data?.agents ?? []).map((a) => (
-							<option key={a.id} value={a.path}>
-								{agentLabel((k, o) => String(u(k, o)), a)}
-							</option>
-						))}
-					</select>
+					<Select value={form.base || undefined} onValueChange={(v) => set({ base: v }, "base")}>
+						<SelectTrigger className="w-full" aria-required data-testid="feature-test-agent">
+							<SelectValue placeholder={t("dialog.pick")} />
+						</SelectTrigger>
+						<SelectContent>
+							{agentList.shown.map((a) => (
+								<SelectItem key={a.id} value={a.path}>
+									{agentLabel((k, o) => String(u(k, o)), a)}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 					{needed("base")}
 				</label>
 				<div className="flex flex-col gap-1" data-testid="feature-test-model">
@@ -418,29 +439,28 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 										testId={`feature-test-opt-${o.key}-input`}
 									/>
 								) : o.kind === "yesno" ? (
-									<select
-										id={`feature-test-opt-${o.key}-input`}
-										className={field}
-										value={form.options[o.key] || "yes"}
-										onChange={(e) => setOption(o.key, e.target.value)}
-									>
-										<option value="yes">{u("dialog.yes")}</option>
-										<option value="no">{u("dialog.no")}</option>
-									</select>
+									<Select value={form.options[o.key] || "yes"} onValueChange={(v) => setOption(o.key, v)}>
+										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="yes">{u("dialog.yes")}</SelectItem>
+											<SelectItem value="no">{u("dialog.no")}</SelectItem>
+										</SelectContent>
+									</Select>
 								) : o.kind === "budgetPick" ? (
-									<select
-										id={`feature-test-opt-${o.key}-input`}
-										className={field}
-										value={form.options[o.key] ?? ""}
-										onChange={(e) => setOption(o.key, e.target.value)}
-									>
-										<option value="">{t("dialog.pick")}</option>
-										{budgets.map((b) => (
-											<option key={b} value={b}>
-												{`$${b}`}
-											</option>
-										))}
-									</select>
+									<Select value={form.options[o.key] || undefined} onValueChange={(v) => setOption(o.key, v)}>
+										<SelectTrigger id={`feature-test-opt-${o.key}-input`} className="w-full">
+											<SelectValue placeholder={t("dialog.pick")} />
+										</SelectTrigger>
+										<SelectContent>
+											{budgets.map((b) => (
+												<SelectItem key={b} value={b}>
+													{`$${b}`}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								) : (
 									<Input
 										id={`feature-test-opt-${o.key}-input`}
@@ -487,30 +507,9 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 						{u("dialog.estimating")}
 					</p>
 				)}
-				{prepared && <PreparedView prepared={prepared} budget={Number(form.budget)} confirming={confirming} />}
-				{error && (
-					<div className="text-destructive" role="alert" data-testid="feature-test-error">
-						<p>{error.text}</p>
-						<details className="text-muted-foreground mt-1 text-xs">
-							<summary>{u("dialog.details")}</summary>
-							<pre className="whitespace-pre-wrap break-all">{error.detail}</pre>
-						</details>
-					</div>
-				)}
-				<div className="flex flex-wrap justify-end gap-2">
-					<Button type="button" variant="outline" onClick={onClose}>
-						{t("dialog.cancel")}
-					</Button>
-					<Button
-						type="button"
-						disabled={busy || estimating || !built.req || !prepared || prepared.plan.errors.length > 0}
-						onClick={() => void onStart()}
-						data-testid="feature-test-start"
-					>
-						{busy ? t("dialog.starting") : confirming ? u("dialog.confirmYes") : u("dialog.startTest")}
-					</Button>
-				</div>
+				{prepared && <PreparedView prepared={prepared} budget={budgetUsd} confirming={false} />}
+				<InlineError error={error} testId="feature-test-error" />
 			</div>
-		</GovDialog>
+		</Dialog>
 	);
 }

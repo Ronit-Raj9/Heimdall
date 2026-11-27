@@ -13,6 +13,7 @@ import {
 	budgetChoices,
 	draftRequest,
 	missingFields,
+	pickableAgents,
 	pickableSuites,
 	suiteLabel,
 	prepareFeatureTest,
@@ -126,7 +127,14 @@ describe("Feature test dialog", () => {
 		expect(suiteLabel(u, { id: "swe-lite", task_count: 120 })).toBe('dialog.suiteOption:{"name":"swe-lite","count":120}');
 		expect(agentLabel(u, { id: "codex", model: "gpt-6" })).toBe('dialog.agentOption:{"name":"codex","model":"gpt-6"}');
 		expect(agentLabel(u, { id: "codex", model: "" })).toBe("codex");
-		expect(pickableSuites([{ id: "zz-test-a" }, { id: "swe-lite" }])).toEqual([{ id: "swe-lite" }]);
+		expect(pickableSuites([{ id: "zz-test-a" }, { id: "swe-lite" }])).toEqual({ shown: [{ id: "swe-lite" }], hidden: 1 });
+		expect(pickableSuites([{ id: "zz-test-a" }, { id: "swe-lite" }], true).shown).toHaveLength(2);
+		const agents = [
+			{ id: "codex", path: "agents/codex.yaml" },
+			{ id: "stub", path: "agents/zz-test-stub.yaml" },
+			{ id: "demo", path: "agents/demo.yaml", description: "A stub agent for the example benchmarks" },
+		];
+		expect(pickableAgents(agents)).toEqual({ shown: [agents[0]], hidden: 2 });
 		expect(budgetChoices("0.5, 1, x, 1, 2")).toEqual(["0.5", "1", "2"]);
 	});
 

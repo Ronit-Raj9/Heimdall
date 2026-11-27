@@ -11,6 +11,9 @@ vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 	useNavigate: () => () => undefined,
 }));
+vi.mock("@/components/gateway/gatewayEffectQuery", () => ({
+	useGetGatewayEffectOptionalQuery: () => ({ data: undefined }),
+}));
 vi.mock("@/lib/store/apis/gatewayApi", () => ({
 	useGetGatewayReportCardQuery: () => state.card,
 	useSetGatewaySourceMutation: () => mutation(),
@@ -137,7 +140,9 @@ describe("Gateway report card", () => {
 		expect(html).toContain("https://bifrost.your-company.com");
 		expect(html).toContain("Add a secret");
 		expect(html).toContain("Connect your Bifrost to list its agents.");
-		expect(html).toContain("BIFROST_ADMIN");
+		// The shared Select renders its items only when opened; the trigger and its placeholder show.
+		expect(html).toContain("gateway-source-secret");
+		expect(html).toContain("Pick a secret");
 	});
 
 	it("shows the load error", () => {

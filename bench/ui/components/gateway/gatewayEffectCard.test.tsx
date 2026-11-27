@@ -8,8 +8,10 @@ import { GatewayEffectCard, GatewayEffectView, detailRows, effectOf } from "./ga
 const state = vi.hoisted(() => ({ effect: undefined as unknown }));
 
 vi.mock("@/lib/store/apis/gatewayApi", () => ({
-	useGetGatewayEffectQuery: () => state.effect,
 	useGetBifrostSettingQuery: () => ({ data: undefined }),
+}));
+vi.mock("./gatewayEffectQuery", () => ({
+	useGetGatewayEffectOptionalQuery: () => state.effect,
 }));
 
 const effect: GwEffect = {

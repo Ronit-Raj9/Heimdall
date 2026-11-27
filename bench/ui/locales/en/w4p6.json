@@ -96,7 +96,7 @@
 	},
 	"watch": {
 		"title": "Watch for new models",
-		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} USD that Bifrost enforces.",
+		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} that Bifrost enforces.",
 		"firstCheck": "The first check only records the models that exist today. Nothing runs until a new one appears.",
 		"none": "No new model watch is set up.",
 		"model": "Model",

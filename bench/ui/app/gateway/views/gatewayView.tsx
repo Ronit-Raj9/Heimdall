@@ -1,12 +1,13 @@
 import { RESULT_TONE } from "@/components/gateway/gatewayEffectCard";
-import { ConfirmButton } from "@/components/platform/badges";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { type DestructiveConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
+import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { type StatusTone, StatusPill } from "@/components/ui/statusPill";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetGatewayReportCardQuery, useRemoveGatewaySourceMutation, useSetGatewaySourceMutation } from "@/lib/store/apis/gatewayApi";
-import { errorMessage } from "@/lib/store/apis/schedulesApi";
 import { useListSecretsQuery } from "@/lib/store/apis/secretsApi";
 import type { GwCardLine, GwGatewayInfo, GwSourceInfo } from "@/lib/types/gateway";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,11 @@ import { SkillImportAction } from "./skillImport";
 import "./uf7cI18n";
 import "./w4p6I18n";
 
-// Status tokens, not palette classes: On green, Off and Not known neutral grey.
-const IN_USE_TONE: Record<GwCardLine["enabled"], string> = {
-	on: "bg-chart-success/10 text-chart-success-ink",
-	off: "bg-muted text-muted-foreground",
-	unknown: "bg-muted text-muted-foreground",
+// The shared status pill: On green, Off and Not known neutral grey.
+export const IN_USE_TONE: Record<GwCardLine["enabled"], StatusTone> = {
+	on: "ok",
+	off: "neutral",
+	unknown: "neutral",
 };
 
 /** Features whose test reads your own Bifrost (its prompt repository or its skills); the others use the built-in gateway. */
@@ -104,13 +105,9 @@ export function GatewayCardLineRow({
 				<div className="flex flex-wrap items-center gap-2">
 					<h3 className="font-medium">{line.name}</h3>
 					{connected && (
-						<span
-							className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs", IN_USE_TONE[line.enabled] ?? IN_USE_TONE.unknown)}
-							data-testid={`gateway-line-${line.feature}-inuse`}
-						>
-							<span className="size-1.5 rounded-full bg-current" aria-hidden />
+						<StatusPill tone={IN_USE_TONE[line.enabled] ?? IN_USE_TONE.unknown} testId={`gateway-line-${line.feature}-inuse`}>
 							{u(`line.state.${line.enabled}`)}
-						</span>
+						</StatusPill>
 					)}
 					{notTested && (
 						<span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs" data-testid={`gateway-line-${line.feature}-nottested`}>
@@ -199,27 +196,34 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 	const [editing, setEditing] = useState(false);
 	const [url, setUrl] = useState("");
 	const [secret, setSecret] = useState("");
-	const [error, setError] = useState("");
+	const [error, setError] = useState<unknown>(null);
+	const ask = useConfirm();
 	const secrets = useListSecretsQuery(undefined, { skip: !admin || !(editing || !source.connected) });
 	const [save, saving] = useSetGatewaySourceMutation();
 	const [remove, removing] = useRemoveGatewaySourceMutation();
 	const showForm = admin && (editing || !source.connected);
 	const onSave = async () => {
-		setError("");
+		setError(null);
 		try {
 			await save({ gateway_url: url.trim(), credential_secret: secret }).unwrap();
 			setEditing(false);
 		} catch (e) {
-			setError(errorMessage(e, String(e)));
+			setError(e);
 		}
 	};
 	const onRemove = async () => {
-		setError("");
+		const opts: DestructiveConfirmOptions = {
+			destructive: true,
+			title: u("page.removeTitle", { host: source.host ?? "" }),
+			confirmLabel: u("page.removeYes"),
+		};
+		if (!(await ask(u("page.removeQuestion"), opts))) return;
+		setError(null);
 		try {
 			await remove().unwrap();
 			setEditing(false);
 		} catch (e) {
-			setError(u("page.removeFailed", { error: errorMessage(e, String(e)) }));
+			setError(e);
 		}
 	};
 	return (
@@ -258,19 +262,18 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 					</label>
 					<label className="flex w-full flex-col gap-1 sm:w-auto">
 						{t("source.secret")}
-						<select
-							className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm sm:w-auto"
-							value={secret}
-							onChange={(e) => setSecret(e.target.value)}
-							data-testid="gateway-source-secret"
-						>
-							<option value="">{t("source.pickSecret")}</option>
-							{(secrets.data?.secrets ?? []).map((s) => (
-								<option key={s.id} value={s.name}>
-									{s.name}
-								</option>
-							))}
-						</select>
+						<Select value={secret || undefined} onValueChange={setSecret}>
+							<SelectTrigger className="w-full sm:w-56" data-testid="gateway-source-secret">
+								<SelectValue placeholder={t("source.pickSecret")} />
+							</SelectTrigger>
+							<SelectContent>
+								{(secrets.data?.secrets ?? []).map((s) => (
+									<SelectItem key={s.id} value={s.name}>
+										{s.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 						<Link to="/settings" search={{ tab: "secrets" } as never} className="text-primary text-xs hover:underline">
 							{u("page.addSecret")}
 						</Link>
@@ -289,23 +292,19 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 			)}
 			{admin && source.connected && editing && (
 				<div className="border-t pt-2">
-					<ConfirmButton
-						label={t("source.remove")}
-						question={u("page.removeQuestion")}
-						confirmLabel={u("page.removeYes")}
-						cancelLabel={t("source.cancel")}
-						onConfirm={() => void onRemove()}
-						isLoading={removing.isLoading}
+					<Button
+						type="button"
+						size="sm"
 						variant="destructive"
-						testId="gateway-source-remove"
-					/>
+						isLoading={removing.isLoading}
+						onClick={() => void onRemove()}
+						dataTestId="gateway-source-remove"
+					>
+						{t("source.remove")}
+					</Button>
 				</div>
 			)}
-			{error && (
-				<p className="text-destructive" role="alert" data-testid="gateway-source-error">
-					{error}
-				</p>
-			)}
+			<InlineError error={error} testId="gateway-source-error" />
 		</section>
 	);
 }

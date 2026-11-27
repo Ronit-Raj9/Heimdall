@@ -18,7 +18,8 @@
 		"addSecret": "Add a secret",
 		"addressPlaceholder": "https://bifrost.your-company.com",
 		"removeQuestion": "Disconnect Bifrost? Feature lines stop updating.",
-		"removeYes": "Yes, disconnect",
+		"removeTitle": "Remove the connection to {{host}}?",
+		"removeYes": "Remove connection",
 		"removeFailed": "Could not disconnect: {{error}}",
 		"details": "Details"
 	},
