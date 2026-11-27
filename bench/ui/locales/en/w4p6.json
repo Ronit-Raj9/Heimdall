@@ -1,7 +1,7 @@
 {
 	"page": {
 		"title": "Gateway report card",
-		"subtitle": "Each Bifrost feature and its measured effect.",
+		"subtitle": "",
 		"gateway": "Bifrost {{version}} at {{host}}",
 		"gatewayNoVersion": "Gateway: {{host}} (version not reported)",
 		"unreachable": "Heimdall could not reach your gateway: {{error}}",
@@ -11,7 +11,7 @@
 	"source": {
 		"connected": "Your Bifrost: connected to {{host}}",
 		"change": "Change",
-		"connect": "Connect your Bifrost",
+		"connect": "",
 		"address": "Bifrost address",
 		"secret": "Admin key (from your secrets)",
 		"pickSecret": "Pick a secret",

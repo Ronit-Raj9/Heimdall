@@ -132,7 +132,7 @@ describe("Gateway report card", () => {
 	it("shows the connect form to an admin when no Bifrost is connected", () => {
 		state.card = okQuery({ ...card, source: { connected: false, host: "", mode: "none", error: "" } });
 		const html = render(<GatewayView />);
-		expect(html).toContain("Connect your Bifrost");
+		expect(html).toContain("Bifrost address");
 		expect(html).toContain("Bifrost address");
 		expect(html).toContain("Admin key (from your secrets)");
 		expect(html).toContain("https://bifrost.your-company.com");

@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentPlatformsQuery, useImportAgentFromPlatformMutation } from "@/lib/store/apis/agentImportApi";
 import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
 	useDetectAgentMutation,
 	useGetConnectCatalogQuery,
@@ -33,7 +32,7 @@ import type {
 	ConnectVerifyStatus,
 } from "@/lib/types/connect";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CircleCheck, Info, Plug } from "lucide-react";
+import { CircleCheck, Plug } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@/components/improvements/uf2bI18n";
 import { useTranslation } from "react-i18next";
