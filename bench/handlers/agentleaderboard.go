@@ -153,7 +153,9 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, orgID, capFilt
 	if h.keys != nil {
 		keys = h.keys
 	}
-	src := PricedLeaderboardSource(h.index, KeyPriceLookup(ctx, keys, orgID))
+	// One request reads each run file and seal once, though Build runs per
+	// suite (UI fix wave G3, uifix_g3_leaderboard.go).
+	src := memoLeaderboardSource(PricedLeaderboardSource(h.index, KeyPriceLookup(ctx, keys, orgID)))
 	now := h.now()
 	// One session per request: the runs are collected and classified once
 	// and every board below is built from them (leaderboard.Session).

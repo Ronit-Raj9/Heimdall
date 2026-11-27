@@ -35,8 +35,16 @@ func (h *CatalogHandler) getCatalog(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, h.mode, "catalog")
 		return
 	}
+	paging, ok := readListPaging(ctx, h.mode) // UI fix wave (G3): limit, offset, q on the suites (uifix_g3_lists.go)
+	if !ok {
+		return
+	}
 	out := NormalizeCatalog(*src)
 	out.Mode = h.mode
+	if paging.on {
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, pagedCatalog(paging, out))
+		return
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
 
