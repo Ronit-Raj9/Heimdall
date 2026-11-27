@@ -52,8 +52,8 @@
 		"testFor": "Test {{name}}: asks the provider for its model list",
 		"testTitle": "Test asks the provider for its model list with the key, which is free. Sarvam has no list call, so for Sarvam it sends one tiny language check, which may be billed.",
 		"editFor": "Edit {{name}}",
-		"spent": "Spent this month (UTC): {{spent}} of {{budget}}",
-		"spentNoLimit": "Spent this month (UTC): {{spent}}",
+		"spent": "Charged to this key this month (UTC): {{spent}} of {{budget}}",
+		"spentNoLimit": "Charged to this key this month (UTC): {{spent}}",
 		"allModels_one": "All {{count}} {{provider}} model",
 		"allModels_other": "All {{count}} {{provider}} models",
 		"anyModel": "Every {{provider}} model",
@@ -73,7 +73,7 @@
 		"unavailableViewer": "This server cannot save model keys yet. The person who runs this server can turn it on.",
 		"whoRuns": "See who runs this server",
 		"keyMissing": "No working {{provider}} key. Add one in Settings > Model keys.",
-		"keyMissingAction": "Add a {{provider}} key"
+		"keyMissingAction": "Add a key for {{provider}}"
 	},
 	"secrets": {
 		"nameUnusable": "Name not usable in agents",

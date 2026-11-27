@@ -1,9 +1,10 @@
 import "@/components/platform/fw23I18n";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateOrgMutation, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
-import { useEffect, useId, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The org slug rule the server enforces (handlers/orgs.go slugPattern). */
@@ -35,17 +36,12 @@ export function CreateOrgDialog({ onClose }: CreateOrgDialogProps) {
 	const [name, setName] = useState("");
 	const [slug, setSlug] = useState("");
 	const [slugEdited, setSlugEdited] = useState(false);
-	const titleId = useId();
 	const effectiveSlug = slugEdited ? slug.trim() : slugFromName(name);
 	const slugOk = ORG_SLUG.test(effectiveSlug);
 	const busy = createState.isLoading || switchState.isLoading;
 	const error = createState.error ?? switchState.error;
 
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
+	const nameRef = useRef<HTMLInputElement>(null);
 
 	const submit = async () => {
 		if (!name.trim() || !slugOk || busy) return;
@@ -59,24 +55,25 @@ export function CreateOrgDialog({ onClose }: CreateOrgDialogProps) {
 	};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="create-org-backdrop">
+		// The shared Dialog (Q-31): focus trapped inside, Escape closes, focus returns to the opener.
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onClose()}
+			size="sm"
+			closeLabel={t("orgs.cancel")}
+			hideClose
+			initialFocus={nameRef}
+			title={t("orgs.createTitle")}
+			description={t("orgs.createIntro")}
+			testId="create-org-dialog"
+		>
 			<form
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-card text-card-foreground w-full max-w-md space-y-4 rounded-lg border p-5 text-left shadow-lg"
-				data-testid="create-org-dialog"
+				className="space-y-4 text-left"
 				onSubmit={(e) => {
 					e.preventDefault();
 					void submit();
 				}}
 			>
-				<div>
-					<h2 id={titleId} className="text-lg font-semibold">
-						{t("orgs.createTitle")}
-					</h2>
-					<p className="text-muted-foreground text-sm">{t("orgs.createIntro")}</p>
-				</div>
 				<label className="flex flex-col gap-1 text-xs">
 					<span className="text-muted-foreground">{t("orgs.name")}</span>
 					<Input
@@ -84,7 +81,7 @@ export function CreateOrgDialog({ onClose }: CreateOrgDialogProps) {
 						onChange={(e) => setName(e.target.value)}
 						placeholder={t("orgs.namePlaceholder")}
 						maxLength={120}
-						autoFocus
+						ref={nameRef}
 						data-testid="create-org-name"
 					/>
 				</label>
@@ -122,6 +119,6 @@ export function CreateOrgDialog({ onClose }: CreateOrgDialogProps) {
 					</Button>
 				</div>
 			</form>
-		</div>
+		</Dialog>
 	);
 }

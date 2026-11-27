@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { ExperimentRegradeRequest } from "@/lib/types/bench";
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/experiments_/$expId/views/fw11I18n";
 
@@ -77,33 +78,26 @@ export function RegradeDialog({ expId, initial, isLoading, onSubmit, onClose }: 
 	const { t: tf } = useTranslation("fw11");
 	const [v, setV] = useState<RegradeFormValues>(initial ?? EMPTY_REGRADE_FORM);
 	const suggestion = suggestRegradeId(v.id);
-	const titleId = useId();
 	const problem = regradeFormProblem(v);
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
 	const fieldCls = "flex flex-col gap-1 text-xs";
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="regrade-backdrop">
+		// The shared Dialog (Q-31): focus trapped inside, Escape closes, focus returns to the opener.
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onClose()}
+			closeLabel={t("experimentActions.regradeDialog.cancel")}
+			hideClose
+			title={t("experimentActions.regradeDialog.title", { id: expId })}
+			description={t("experimentActions.regradeDialog.intro")}
+			testId="regrade-dialog"
+		>
 			<form
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-card text-card-foreground w-full max-w-lg space-y-4 rounded-lg border p-5 text-left shadow-lg"
-				data-testid="regrade-dialog"
+				className="space-y-4 text-left"
 				onSubmit={(e) => {
 					e.preventDefault();
 					if (!problem) onSubmit(regradeRequest(v));
 				}}
 			>
-				<div>
-					<h2 id={titleId} className="text-lg font-semibold">
-						{t("experimentActions.regradeDialog.title", { id: expId })}
-					</h2>
-					<p className="text-muted-foreground text-sm">{t("experimentActions.regradeDialog.intro")}</p>
-				</div>
 				<fieldset className="flex flex-col gap-2 text-sm">
 					<legend className="text-muted-foreground mb-1 text-xs">{t("experimentActions.regradeDialog.lock")}</legend>
 					<label className="flex items-start gap-2">
@@ -178,6 +172,6 @@ export function RegradeDialog({ expId, initial, isLoading, onSubmit, onClose }: 
 					</Button>
 				</div>
 			</form>
-		</div>
+		</Dialog>
 	);
 }

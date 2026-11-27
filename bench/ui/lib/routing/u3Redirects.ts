@@ -61,8 +61,9 @@ const INBOX_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
 
 /** Old /why-agents-fail tab ids; a missing or unknown tab gives the per-agent view. */
 const WHY_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
-	patterns: "agents",
+	patterns: "patterns",
 	groups: "groups",
+	agents: "agents",
 };
 
 /** /inbox?tab=&state=&source=&item=&q=&finding=... becomes /failures with the matching tab, every other key kept. */
