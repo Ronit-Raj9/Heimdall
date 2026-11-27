@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { SiteHeader } from "@/components/site/publicFrame";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ export default function PricingView() {
 	const pricing = useGetPublicPricingQuery();
 	const signupTo = session.signedIn || session.authMode !== "hosted" ? "/" : signupOffered(session) ? "/signup" : "/login";
 	return (
-		<section className="flex min-w-0 flex-col gap-10" data-testid="pricing-view">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-10")} data-page-width="read" data-testid="pricing-view">
 			<SiteHeader title={pricing.data?.headline || t("pricing.title")} subtitle={t("pricing.subtitle")} />
 			{pricing.isLoading ? (
 				<BlockSkeleton rows={4} testId="pricing-loading" />

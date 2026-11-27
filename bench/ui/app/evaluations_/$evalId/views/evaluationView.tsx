@@ -1,3 +1,5 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { cn } from "@/lib/utils";
 import { EvaluationRerunNotice, EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import "./fw08I18n";
 import { EvaluationKindLabel, EvaluationStatusPill } from "@/app/evaluations/views/evaluationWords";
@@ -251,7 +253,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 		</>
 	);
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluation-screen" data-status={evaluation.status}>
+		<div className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="evaluation-screen" data-status={evaluation.status}>
 			<PageHeader
 				title={spec.name || evaluation.id}
 				subtitle={evaluationSubtitle(t as never, evaluation, i18n.language, reportQ.data, tu as never)}

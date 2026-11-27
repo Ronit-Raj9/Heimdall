@@ -1,3 +1,5 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
+import { cn } from "@/lib/utils";
 import "@/app/evaluations_/$evalId/views/fw08I18n";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { LoadError, TableSkeleton } from "@/components/runs/screenStates";
@@ -64,7 +66,7 @@ export default function EvaluationListView() {
 		void navigate({ to: "/evaluations", search: { ...evaluationFiltersSearch(next), ...(showTests ? { tests: "1" } : {}), ...(showArchived ? { archived: "1" } : {}) } as never, replace: true });
 
 	return (
-		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluations-screen">
+		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="evaluations-screen">
 			{/* No page action: the header's "Evaluate an agent" is the one way in (M3-54). */}
 			<PageHeader title={t("list.title")} subtitle={t("list.subtitle")} />
 			{list.isLoading ? (
@@ -292,7 +294,7 @@ export function EvaluationTable({
 									data-testid="evaluations-select-all"
 								/>
 							</TableHead>
-							<TableHead priority="primary">{t("list.col.name")}</TableHead>
+							<TableHead priority="primary" className="w-full">{t("list.col.name")}</TableHead>
 							<TableHead priority="status">{t("list.col.status")}</TableHead>
 							<TableHead priority="secondary" className="text-right">
 								{t("list.col.result")}
@@ -348,7 +350,7 @@ export function EvaluationTable({
 											</span>
 										)}
 										<span
-											className="text-muted-foreground block max-w-80 truncate text-xs font-normal"
+											className="text-muted-foreground block max-w-80 truncate text-xs 2xl:max-w-2xl font-normal"
 											title={benches.join(", ")}
 											data-testid={`evaluation-benchmarks-${ev.id}`}
 										>

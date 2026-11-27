@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { CopyMarkdownButton } from "@/components/leaderboard/copyMarkdownButton";
 import {
 	LEADERBOARD_SCOPES,
@@ -65,7 +66,7 @@ export default function LeaderboardView() {
 		{ id: "reference", label: tr("tab") }, // G4-03: scores of known agents from the Heimdall team's published runs
 	];
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="leaderboard-page">
 			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} actions={<LeaderboardShare />} />
 			<RouteTabs
 				tabs={tabs}

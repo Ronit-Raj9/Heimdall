@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { Pill, StatCard } from "@/components/home/homeBits";
 import {
 	benchmarkReadiness,
@@ -19,7 +20,7 @@ import { YourAgents, agentsWithResults, ownAgents } from "@/components/home/your
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
-import { CardGridSkeleton, LoadError, TableSkeleton } from "@/components/runs/screenStates";
+import { BlockSkeleton, CardGridSkeleton, LoadError, TableSkeleton } from "@/components/runs/screenStates";
 import { EmptyState, suiteIdOf } from "@/components/shell";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useGetUsageQuery } from "@/lib/store/apis/usageApi";
@@ -34,6 +35,7 @@ import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
 import "@/components/home/uf2aI18n";
+import "@/components/home/ufw1I18n";
 import { isTestObject } from "@/lib/testObjects";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -63,6 +65,7 @@ export default function HomeView() {
 	const { t } = useTranslation("home");
 	const { t: ta } = useTranslation("agentFirst");
 	const { t: tu } = useTranslation("uf2a");
+	const { t: tw } = useTranslation("ufw1");
 	const locale = getLocale();
 	// M2-14: lists poll only while something runs; a finished run is picked up by the next visit
 	// or by RunningNowList's onFinished refetch.
@@ -137,8 +140,11 @@ export default function HomeView() {
 	const greeting = t(`greeting.${greetingKey(now)}`);
 	const usd = (v: number) => formatValueNumber(v, "usd", locale);
 
+	const showRunning = !empty;
+	const showRecentEvals = Boolean(evals.error) || !empty || evaluations.length > 0;
+
 	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="home-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-8")} data-page-width="dash" data-testid="home-screen">
 			<header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" data-testid="home-header">
 				<div className="flex min-w-0 flex-col gap-1">
 					<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="home-greeting">
@@ -228,7 +234,9 @@ export default function HomeView() {
 				)}
 			</HomeSection>
 
-			{!empty && (
+			{/* At 2xl the live list and the recent evaluations sit side by side (W1); one column below. */}
+			<div className={cn("grid min-w-0 gap-8", showRunning && showRecentEvals && "2xl:grid-cols-2 2xl:gap-6")} data-testid="home-live-row">
+			{showRunning && (
 				<HomeSection
 					title={t("running.title")}
 					badge={running.total > 0 ? <Pill tone="info">{running.total}</Pill> : undefined}
@@ -245,7 +253,15 @@ export default function HomeView() {
 							testId="home-running-error"
 						/>
 					) : queryState(list) === "loading" || evalsState === "loading" ? (
-						<CardGridSkeleton count={2} columns={2} testId="home-running-loading" />
+						<BlockSkeleton
+								rows={2}
+								what={tw("home.runningWhat")}
+								onRetry={() => {
+									void list.refetch();
+									void evals.refetch();
+								}}
+								testId="home-running-loading"
+							/>
 					) : (
 						<RunningNowList
 							running={running}
@@ -259,7 +275,7 @@ export default function HomeView() {
 				</HomeSection>
 			)}
 
-			{(evals.error || !empty || evaluations.length > 0) && (
+			{showRecentEvals && (
 				<HomeSection
 					title={t("evaluations.title")}
 					testId="home-section-evaluations"
@@ -291,6 +307,7 @@ export default function HomeView() {
 					</div>
 				</HomeSection>
 			)}
+			</div>
 
 			<div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
 				{!empty && (

@@ -1,3 +1,4 @@
+import { pageWidthClass } from "@/components/shell/pageWidth";
 import { StickyFooter } from "@/components/ui/stickyFooter";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -468,7 +469,7 @@ function EvaluateWizard() {
 
 	return (
 		// gap-4, not 6: the first agent row sits high enough on a 900 px screen (Q-89).
-		<section className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-4" data-testid="evaluate-screen">
+		<section className={cn(pageWidthClass("read"), "flex flex-col gap-4")} data-page-width="read" data-testid="evaluate-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
