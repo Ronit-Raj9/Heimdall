@@ -355,10 +355,18 @@ export function EvaluationTable({
 											{benches.join(", ")}
 										</span>
 										{/* Phones: result, spend and start on a muted second line. */}
-										<span className="text-muted-foreground block text-xs font-normal tabular-nums sm:hidden">
-											{[evaluationResultText(ev), usd(evaluationSpend(ev)), started]
-												.filter(Boolean)
-												.join(" \u00b7 ")}
+										{/* Q-82: the status pill too (its column hides below sm); empty "-" parts are left out. */}
+										<span className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal tabular-nums sm:hidden">
+											{status === "notStarted" ? (
+												<EvaluationStatusPill status="notStarted" />
+											) : (
+												<EvaluationLivePill evaluation={ev} />
+											)}
+											<span>
+												{[evaluationResultText(ev), usd(evaluationSpend(ev)), started]
+													.filter((x) => x && x !== "-")
+													.join(" \u00b7 ")}
+											</span>
 										</span>
 									</TableCell>
 									<TableCell priority="status">

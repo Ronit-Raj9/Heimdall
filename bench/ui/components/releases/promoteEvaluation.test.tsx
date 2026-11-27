@@ -19,6 +19,7 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 
 const { GateResultCard, PromoteEvaluation, RepeatEvaluation, onlyLiveVersion, parseRepeatLimit, previewTitle, repeatAsk } = await import("./promoteEvaluation");
 const { releaseTitle } = await import("./releaseEvidence");
+const { repeatCost } = await import("@/app/schedules/views/repeatCost");
 
 const preview: EvaluationReleasePreview = {
 	evaluation: "ev_1",
@@ -181,17 +182,22 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		const i18n = (await import("@/lib/i18n")).default;
 		const t = i18n.getFixedT("en", "uf7b") as never;
 		const ask = repeatAsk("nightly", "Europe/Berlin", 0.4, t);
-		expect(ask.message).toBe("It runs again every night at 02:00 (Europe/Berlin). About $0.40 a run (what this run cost), up to $12.00 a month. Daily limit: $0.80.");
+		// R6-3: the confirm's numbers are the shared helper's, each labelled.
+		expect(ask.message).toBe(
+			"It runs again every night at 02:00 (Europe/Berlin). Expected cost of one run: $0.40 (what the last run cost). Daily limit: $0.80, so at most 1 run a day. The most it can spend in a month: $24.",
+		);
+		const helper = repeatCost(0.4, 0.8, 1);
+		for (const n of [helper.perRun, helper.dailyLimit, helper.monthMax]) expect(ask.message).toContain(n);
 		expect(ask.limit).toBe(0.8);
 		const unknown = repeatAsk("weekly", "UTC", undefined, t);
 		expect(unknown.message).toContain("every Monday at 02:00 (UTC)");
-		expect(unknown.message).toContain("Price per run not known");
+		expect(unknown.message).toContain("Expected cost of one run: not known yet");
 		expect(unknown.limit).toBeUndefined();
 		const typed = repeatAsk("nightly", "UTC", 0.4, t, 5);
-		expect(typed.message).toContain("Daily limit: $5.00.");
+		expect(typed.message).toContain("Daily limit: $5.00");
 		expect(typed.limit).toBe(5);
 		const unknownTyped = repeatAsk("weekly", "UTC", undefined, t, 3);
-		expect(unknownTyped.message).toContain("Daily limit: $3.00.");
+		expect(unknownTyped.message).toContain("Daily limit: $3.00. The most it can spend in a month: $13.");
 		expect(unknownTyped.limit).toBe(3);
 		expect(parseRepeatLimit("")).toBeUndefined();
 		expect(parseRepeatLimit("$2.5")).toBe(2.5);

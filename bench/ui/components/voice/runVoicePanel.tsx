@@ -8,10 +8,11 @@ import { useTranslation } from "react-i18next";
 
 /**
  * One run's voice call, fetched by run id. Renders nothing for a run without a voice caller, while
- * loading, or on an error: the run detail beside it reports those states.
+ * loading, or on an error: the run detail beside it reports those states. `skip` leaves the request out
+ * for a run with no voice call (Q-21: the server answers 404), as the run page does with runHasVoice.
  */
-export function RunVoicePanel({ runId }: { runId: string }) {
-	const q = useGetRunVoiceQuery(runId);
+export function RunVoicePanel({ runId, skip = false }: { runId: string; skip?: boolean }) {
+	const q = useGetRunVoiceQuery(runId, { skip });
 	if (!q.data) return null;
 	return <VoicePanel data={q.data} />;
 }

@@ -85,12 +85,13 @@ describe("waterfallBars", () => {
 
 describe("money", () => {
 	it("keeps small costs readable and signs differences", () => {
-		expect(formatUsd(0.00412)).toBe("$0.00412");
-		expect(formatUsd(0.0321)).toBe("$0.032");
+		expect(formatUsd(0.00412)).toBe("$0.0041");
+		expect(formatUsd(0.0321)).toBe("$0.03");
+		expect(formatUsd(0.104)).toBe("$0.10");
 		expect(formatUsd(1.25)).toBe("$1.25");
-		expect(signedUsd(0.012)).toBe("+$0.012");
-		expect(signedUsd(-0.004)).toBe("-$0.00400");
-		expect(costText({ state: "unknown", v: null, bounds: [0.01, 0.02] })).toBe("$0.010 to $0.020");
+		expect(signedUsd(0.012)).toBe("+$0.01");
+		expect(signedUsd(-0.004)).toBe("-$0.0040");
+		expect(costText({ state: "unknown", v: null, bounds: [0.01, 0.02] })).toBe("$0.01 to $0.02");
 		expect(costText({ state: "unknown", v: null })).toBeNull();
 	});
 });

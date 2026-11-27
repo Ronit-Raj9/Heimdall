@@ -69,7 +69,7 @@
 	"rankAllHint": "Place by the All score: the share solved over every capability with enough runs",
 	"tieHint": "Its 95% range overlaps the row above, so the two are not clearly apart",
 	"best": "Best",
-	"scoreHeader": "{{capability}} (solved)",
+	"scoreHeader": "Solved ({{capability}})",
 	"scoreHint": "Share of runs solved on this capability's benchmarks: higher is better",
 	"perRun": "{{cost}} per run"
 }

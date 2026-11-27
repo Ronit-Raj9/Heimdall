@@ -11,13 +11,15 @@ const render = (e: CostExplanation) => renderToStaticMarkup(<CostExplanationView
 describe("CostExplanationView", () => {
 	it("shows both arms, every part and the total of the recorded pilot", () => {
 		const html = render(COST_FIXTURE);
-		expect(html).toContain("Setup A: codex gpt-5.4-mini");
-		expect(html).toContain("Setup B: custom-python gpt-5.4-mini");
-		for (const id of ["price", "input_tokens", "output_tokens", "cache_read_share", "turns", "wasted_attempts"]) {
+		expect(html).toContain("A (gpt-5.4-mini)");
+		expect(html).toContain("B (gpt-5.4-mini)");
+		// Parts that are exactly $0 in the fixture (price, turns, wasted attempts) are left out (Q-157).
+		for (const id of ["price", "turns", "wasted_attempts"]) expect(html).not.toContain(`data-testid="cost-waterfall-run-part-${id}"`);
+		for (const id of ["input_tokens", "output_tokens", "cache_read_share"]) {
 			expect(html).toContain(`data-testid="cost-waterfall-run-part-${id}"`);
 		}
-		expect(html).toContain('data-testid="cost-waterfall-success-part-success_rate"');
-		expect(html).toMatch(/data-testid="cost-waterfall-run-total"[\s\S]*?-\$0\.021/);
+		expect(html).not.toContain('data-testid="cost-waterfall-success-part-success_rate"');
+		expect(html).toMatch(/data-testid="cost-waterfall-run-total"[\s\S]*?-\$0\.02/);
 		expect(html).toContain("No silent cache break");
 	});
 
@@ -40,8 +42,8 @@ describe("CostExplanationView", () => {
 		};
 		const html = render(e);
 		expect(html).toMatch(/data-testid="cost-waterfall-run-part-unpriced"[\s\S]*?data-known="false"/);
-		expect(html).toContain("$0 to $0.050");
-		expect(html).toMatch(/data-testid="cost-waterfall-run-total"[\s\S]*?-\$0\.021 to \$0\.029/);
+		expect(html).toContain("$0 to $0.05");
+		expect(html).toMatch(/data-testid="cost-waterfall-run-total"[\s\S]*?-\$0\.02 to \$0\.03/);
 	});
 
 	it("names a cache break and its likely cause, and says why a waterfall does not apply", () => {

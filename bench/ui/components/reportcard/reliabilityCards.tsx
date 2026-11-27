@@ -101,7 +101,7 @@ function OneReliability({ benchmark, arm, card, ab }: { benchmark: string; arm: 
 				<p className="text-muted-foreground text-xs">{tr("reliability.oneTry")}</p>
 			)}
 			{curve.length > 1 && (
-				<ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+				<ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
 					<li className="flex items-center gap-1.5">
 						<span aria-hidden="true" className="inline-block h-0.5 w-4" style={{ background: "var(--color-chart-cat-1)" }} />
 						Solved in any of k tries
@@ -116,7 +116,7 @@ function OneReliability({ benchmark, arm, card, ab }: { benchmark: string; arm: 
 					</li>
 				</ul>
 			)}
-			<dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+			<dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
 				<Pair label={tr("reliability.firstTry")} value={pct(card.pass1)} />
 				{/* One try per task measures no flakiness: only first try and cost are shown (M3-7). */}
 				{card.k >= 2 && (
@@ -222,7 +222,7 @@ function ResilienceRows({ report }: { report: Report }) {
 										<span className="text-muted-foreground text-xs">{range}</span>
 									</span>
 								</div>
-								<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">
+								<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
 									{/* A measure with no data is left out instead of a bare "-" (M3-13). */}
 									{[
 										{ label: "Recovery rate", value: pct(m.recovery_rate) },
