@@ -16,7 +16,11 @@ export const HOLD_POLL_MS = 1000;
  */
 export function HoldPanel({ runId }: { runId: string }) {
 	const { t } = useTranslation("runDebug");
-	const holds = useGetRunHoldsQuery(runId, { pollingInterval: HOLD_POLL_MS, skipPollingIfUnfocused: true });
+	// A live view, so it polls fast; it stops once the run says it is stopped (M1-62).
+	const [stopped, setStopped] = useState(false);
+	const holds = useGetRunHoldsQuery(runId, { pollingInterval: stopped ? 0 : HOLD_POLL_MS, skipPollingIfUnfocused: true });
+	const stoppedNow = Boolean(holds.data?.stopped);
+	useEffect(() => setStopped(stoppedNow), [stoppedNow]);
 	const hold: Hold | undefined = holds.data?.holds[0];
 	if (holds.data?.stopped && !hold) {
 		return (

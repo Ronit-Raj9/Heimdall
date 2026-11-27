@@ -31,7 +31,7 @@ export function actionLabel(f: ReplayFrame, fallback: string): string {
 
 /** Frames of a run: GET /runs/{id}/frames, polled every 3 s while the run is live. */
 export function useRunFrames(runId: string, live: boolean) {
-	return useGetRunFramesQuery(runId, { pollingInterval: live ? 3000 : 0 });
+	return useGetRunFramesQuery(runId, { pollingInterval: live ? 3000 : 0, skipPollingIfUnfocused: true });
 }
 
 /**

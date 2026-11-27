@@ -11,6 +11,23 @@ import "./uf5bI18n";
 import { outcomeTone, pairsOfRow, type PairCell } from "./runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "./screenStates";
 
+/** One setup of an experiment as GET /experiments/{id} names it. */
+export interface SetupName {
+	arm: string;
+	agent: string;
+	model: string;
+}
+
+/** "A: claude-code gpt-5" per arm that has a known setup, in the grid's arm order. */
+export function setupNames(arms: readonly string[], setups: readonly SetupName[] | undefined): string[] {
+	if (!setups?.length) return [];
+	return arms.flatMap((arm) => {
+		const s = setups.find((x) => x.arm === arm);
+		const what = s ? [s.agent, s.model].filter(Boolean).join(" ") : "";
+		return what ? [`${arm}: ${what}`] : [];
+	});
+}
+
 export interface PairPickerProps {
 	/** The experiment named in the URL; the newest experiment when null. */
 	expParam: string | null;
@@ -48,7 +65,13 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 			) : !grid.data || grid.data.rows.length === 0 ? (
 				<EmptyNote testId="pair-picker-empty">{t("runs.picker.noRows")}</EmptyNote>
 			) : (
-				<PairTable rows={grid.data.rows} arms={grid.data.arms} suite={frozenSuiteRef(status.data?.suite, status.data?.suite_version)} onPick={onPick} />
+				<PairTable
+					rows={grid.data.rows}
+					arms={grid.data.arms}
+					setups={status.data?.setups}
+					suite={frozenSuiteRef(status.data?.suite, status.data?.suite_version)}
+					onPick={onPick}
+				/>
 			)}
 		</Section>
 	);
@@ -58,10 +81,13 @@ export function PairTable({
 	rows,
 	arms,
 	suite,
+	setups,
 	onPick,
 }: {
 	rows: readonly GridRow[];
 	arms: readonly string[];
+	/** The experiment's setups (optional on the answer): named above the table so A and B are known (X-33). */
+	setups?: readonly SetupName[];
 	suite?: string;
 	onPick: (pairId: string) => void;
 }) {
@@ -74,6 +100,11 @@ export function PairTable({
 			<p className="text-muted-foreground text-xs" data-testid="pair-picker-legend">
 				{t5("pair.legend")}
 			</p>
+			{setupNames(arms, setups).length > 0 && (
+				<p className="text-sm" data-testid="pair-picker-setups">
+					{setupNames(arms, setups).join(" / ")}
+				</p>
+			)}
 			<Table stickyColumns={1} data-testid="pair-picker-table">
 				<TableHeader>
 					<TableRow>

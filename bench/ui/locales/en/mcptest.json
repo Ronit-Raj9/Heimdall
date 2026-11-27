@@ -48,6 +48,7 @@
 		"serverIssues": "Across all tools",
 		"scanHeading": "Hidden instructions and poisoning",
 		"scanNone": "No hidden instructions or tool poisoning found in what the server shows an agent.",
+		"poisoningLink": "How to test whether an agent follows poisoned tool descriptions",
 		"callsHeading": "Sample calls",
 		"callOk": "worked",
 		"callFailed": "failed",

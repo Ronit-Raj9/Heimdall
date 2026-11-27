@@ -95,3 +95,19 @@ describe("providers prop (N89)", () => {
 		expect(html).not.toContain("Groq");
 	});
 });
+describe("missing key and failed load (M8-12, M8-84)", () => {
+	it("opens Settings, Model keys, on the Add panel for the provider and comes back to this page", () => {
+		const html = render(<GroupedModelPicker value={{ provider: "groq", model: "llama-3-8b" }} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="key-missing-note"');
+		expect(html).toContain('href="/settings?tab=keys&amp;add=groq&amp;return=%2Fverdict"');
+		expect(html).toContain("Add one in Settings &gt; Model keys.");
+		expect(html).not.toContain('href="/models');
+	});
+
+	it("says the list could not load, with Retry, instead of Loading", () => {
+		q.models = { isError: true, error: { status: 500 }, refetch: () => undefined };
+		const html = render(<GroupedModelPicker value={null} onChange={() => undefined} />);
+		expect(html).toContain("Could not load the list of models.");
+		expect(html).toContain('data-testid="grouped-model-picker-error"');
+	});
+});
