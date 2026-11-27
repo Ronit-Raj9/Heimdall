@@ -45,7 +45,7 @@ export default function MaximFailuresView() {
 	const steps = ["pull", "cluster", "draft", "review", "ready"] as const;
 	return (
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-testid="maxim-failures-screen">
-			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+			<PageHeader title={t("title")} />
 			<ol className="grid gap-2 text-sm sm:grid-cols-5" data-testid="maxim-steps">
 				{steps.map((s, i) => (
 					<li key={s} className="bg-muted/30 flex gap-2 rounded-lg border px-3 py-2">

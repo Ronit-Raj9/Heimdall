@@ -10,7 +10,7 @@ import {
 import type { TFunction } from "i18next";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NativeSelect, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "./hw05I18n";
 import "./w4510I18n";
 
@@ -171,7 +171,7 @@ export function evalWorkerOptions(data: WorkerTargetView, t: (key: string, opts?
 	const current = data.choices.find((c) => c.current);
 	const first: EvalWorkerOption = {
 		value: CURRENT_TARGET,
-		label: current ? `${choiceLabel(current, sandbox)}, ${t("target.whereRunsGo")}` : t("target.whereRunsGo"),
+		label: current ? choiceLabel(current, sandbox) : t("target.whereRunsGo"),
 		disabled: false,
 	};
 	const rest = data.choices
@@ -235,24 +235,20 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 			<label htmlFor={fieldId} className="text-sm font-medium">
 				{t("target.evalLabel")}
 			</label>
-			<Select value={value || CURRENT_TARGET} onValueChange={(v) => onChange(v === CURRENT_TARGET ? "" : v)}>
-				<SelectTrigger
-					id={fieldId}
-					size="sm"
-					className="w-full min-w-0 sm:w-72"
-					data-testid="eval-worker-select"
-					data-value={value}
-				>
-					<SelectValue>{options.find((o) => o.value === (value || CURRENT_TARGET))?.label ?? null}</SelectValue>
-				</SelectTrigger>
-				<SelectContent>
-					{options.map((o) => (
-						<SelectItem key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
-							{o.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+			<NativeSelect
+				id={fieldId}
+				value={value || CURRENT_TARGET}
+				onChange={(e) => onChange(e.target.value === CURRENT_TARGET ? "" : e.target.value)}
+				wrapperClassName="w-full min-w-0 sm:w-72"
+				data-testid="eval-worker-select"
+				data-value={value}
+			>
+				{options.map((o) => (
+					<option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+						{o.label}
+					</option>
+				))}
+			</NativeSelect>
 			{onPlatform ? (
 				<p className="text-muted-foreground text-xs" data-testid="eval-worker-platform-line">
 					{t4510("perEvaluationLine", { platform: onPlatform.title })}

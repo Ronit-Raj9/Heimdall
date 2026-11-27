@@ -36,7 +36,7 @@ describe("skill import on the Gateway page", () => {
 	it("says whether the safety scan let the skill in", () => {
 		expect(importOutcome({ data: { folder: "triage-v3", extra_path: "agents/x/skills/triage-v3", scan: { installed: true } } }, t)).toEqual(
 			{
-				text: "Added to the agent's skills as triage-v3. Its safety scan let it in.",
+				text: "Added as triage-v3. It passed the safety scan.",
 				ok: true,
 			},
 		);

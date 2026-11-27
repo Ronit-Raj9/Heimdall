@@ -318,7 +318,6 @@ export function TraceIngestLine() {
 	return (
 		<p className="text-sm" data-testid="gateway-traces">
 			<span className="font-medium">{u("page.tracesTitle")}: </span>
-			{u("page.tracesText")}{" "}
 			<Link to="/agents/from-traces" className="text-primary hover:underline">
 				{u("page.tracesAgents")}
 			</Link>

@@ -6,9 +6,9 @@ import { ImportsEmpty } from "./maximFailuresParts";
 
 describe("ImportsEmpty (wave 4, p13-4)", () => {
 	it("points to the pull form only when Maxim is connected", () => {
-		expect(renderToStaticMarkup(<ImportsEmpty connected />)).toContain("No import yet. Pull failures above to start.");
+		expect(renderToStaticMarkup(<ImportsEmpty connected />)).toContain("No imports yet.");
 		const off = renderToStaticMarkup(<ImportsEmpty connected={false} />);
-		expect(off).toContain("No import yet. Connect Maxim in Settings first; the pull form then shows here.");
+		expect(off).toContain("No import yet. Connect Maxim in Settings first.");
 		expect(off).not.toContain("above");
 	});
 });

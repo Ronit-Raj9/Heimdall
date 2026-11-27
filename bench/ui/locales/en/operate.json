@@ -37,7 +37,7 @@
 		"hostedMirror": "An extra copy is kept for archive and restore.",
 		"hostedBackupConfirm": "Make a zip of your saved comparisons? Download it below.",
 		"hostedRestoreConfirm": "Restore this comparison from the extra copy?",
-		"days": "Days unused before archive",
+		"days": "Days unused before archive (default 30)",
 		"backupsTitle": "Copies to download",
 		"backupsEmpty": "No copies yet.",
 		"download": "Download",

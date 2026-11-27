@@ -360,21 +360,7 @@ export default function ConnectView() {
 				{importable ? (
 					<ConnectPlatformForm key={importable.id} platform={importable} />
 				) : (
-					<p className="text-muted-foreground flex items-center gap-1 text-sm">
-						{t("paste.hint")}
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<button
-									type="button"
-									className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded"
-									aria-label={tu("connect.userAgent")}
-								>
-									<Info className="size-3.5" aria-hidden="true" />
-								</button>
-							</TooltipTrigger>
-							<TooltipContent>{tu("connect.userAgent")}</TooltipContent>
-						</Tooltip>
-					</p>
+					<p className="text-muted-foreground text-sm">{t("paste.hint")}</p>
 				)}
 				{!importable && detectState.error ? (
 					<p className="text-chart-error-ink text-sm">{getBenchErrorMessage(detectState.error)}</p>

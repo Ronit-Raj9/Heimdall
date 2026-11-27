@@ -91,9 +91,6 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 					{t("migration.synthetic")}
 				</p>
 			)}
-			<p className="text-sm" data-testid="cost-lead">
-				{t("migration.cost.lead")}
-			</p>
 			<FadeScroll pinStart>
 				{/* Q-156: no fixed width on a phone, so setup B stays in view at 390 px; the wide layout keeps its minimum. */}
 				<table className="w-full text-sm sm:min-w-[420px]" data-testid="cost-arms">

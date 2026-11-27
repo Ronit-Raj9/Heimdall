@@ -20,7 +20,7 @@ describe("CostExplanationView", () => {
 		}
 		expect(html).not.toContain('data-testid="cost-waterfall-success-part-success_rate"');
 		expect(html).toMatch(/data-testid="cost-waterfall-run-total"[\s\S]*?-\$0\.02/);
-		expect(html).toContain("No silent cache break");
+		expect(html).toContain("No cache break. Read share never dropped 10 points or more.");
 	});
 
 	it("draws an unknown part as a hatched range, never as zero", () => {

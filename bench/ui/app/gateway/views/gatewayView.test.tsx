@@ -82,7 +82,7 @@ describe("Gateway report card", () => {
 		const html = render(<GatewayView />);
 		expect(html).toContain("Gateway report card");
 		expect(html).toContain("Built-in gateway: bifrost:8080, version v2.5.1");
-		expect(html).toContain("A feature test runs the same agent on the same benchmark twice");
+		expect(html).toContain("Same agent and benchmark, Bifrost feature off then on.");
 		expect(html).toContain("Send production traces");
 		expect(html).toContain("Your Bifrost: connected to bifrost.example.com");
 		for (const l of lines) expect(html).toContain(`data-testid="gateway-line-${l.feature}"`);
@@ -95,9 +95,9 @@ describe("Gateway report card", () => {
 		expect(measured).toContain(">On<");
 		expect(measured).not.toContain("In use");
 		expect(measured).toContain("Saved");
-		expect(measured).toContain("Checks how much the cache saves");
+		expect(measured).toContain("Checks cache savings");
 		expect(measured).toContain("From: 160 runs of comparison e1, 2026-11-20");
-		expect(measured).toContain("See the test result");
+		expect(measured).toContain("See result");
 		expect(measured).toContain("Test it");
 		const unknown = row(lines[1]);
 		expect(unknown).toContain("Not known");

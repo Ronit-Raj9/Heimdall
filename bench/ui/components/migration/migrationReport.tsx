@@ -79,9 +79,6 @@ export function MigrationReportView({
 				})}{" "}
 				{report.policy ? t("migration.policy", { name: report.policy }) : t("migration.noPolicy")}
 			</p>
-			<p className="text-sm" data-testid="migration-lead">
-				{t("migration.switchLead")}
-			</p>
 			<ul className="flex flex-col gap-2" data-testid="migration-recommendations">
 				{report.pairs.map((p) => (
 					<li key={p.to.arm} data-testid={`migration-recommendation-${p.to.arm}`} data-action={p.recommendation.action}>

@@ -8,7 +8,7 @@ import { FirstLookNote } from "./firstLookLauncher";
 describe("FirstLookNote", () => {
 	it("note shows the picked task count", () => {
 		const html = renderToStaticMarkup(<FirstLookNote tasks={2} />);
-		expect(html).toContain("First look: 2 tasks. Too small for a verdict. Run the full benchmark for one.");
+		expect(html).toContain("First look: 2 tasks, too few for a verdict.");
 	});
 	it("shows nothing without a count", () => {
 		expect(renderToStaticMarkup(<FirstLookNote />)).toBe("");

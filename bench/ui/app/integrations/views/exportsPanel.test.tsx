@@ -58,7 +58,7 @@ describe("ExportsPanel (N19)", () => {
 		expect(html).toContain('title="e_eval_x_kaky"');
 		expect(html).toContain("Prompt v2 vs v1 · Finished");
 		expect(html).not.toContain('value="e_admit_acme_safety_5e8q"');
-		expect(html).toContain("Also show checks, practice runs and debug runs");
+		expect(html).toContain("Show hidden runs");
 		expect(html.indexOf("codex score")).toBeLessThan(html.indexOf("Prompt v2 vs v1 · Finished"));
 	});
 	it("lists checks in their own group when the box is ticked", () => {

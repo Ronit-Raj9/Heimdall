@@ -43,7 +43,7 @@ describe("WorkersView", () => {
 		query.result = { ...idle, isError: true, error: { status: 404, data: { error: { message: "route not found: /api/bench/workers" } } } };
 		const html = renderToStaticMarkup(<WorkersView />);
 		expect(html).toContain('data-testid="workers-off"');
-		expect(html).toContain("Extra workers are not turned on");
+		expect(html).toContain("Extra workers off");
 		expect(html).not.toContain('data-testid="workers-error"');
 		expect(html).not.toContain("mode-badge-offline");
 	});
@@ -80,10 +80,10 @@ describe("WorkersView", () => {
 		expect(html).not.toContain(">shared-runner-org_abc<");
 		expect(html).toContain("Open worker tokens");
 		expect(html).toContain('data-testid="workers-row-shared-runner-org_abc-shared-note"');
-		expect(html).toContain("It runs your agents in isolated containers.");
+		expect(html).toContain("Isolated containers.");
 		expect(html).toContain(`Up to ${shared.slots} ${shared.slots === 1 ? "run" : "runs"} at once.`);
 		expect(html).toContain('href="/settings?tab=runners#runner-token-setup"');
-		expect(html).toContain("Use your own machine instead");
+		expect(html).toContain("Use your own machine");
 	});
 
 	it("shows no shared-worker note on a worker of your own", () => {

@@ -110,7 +110,7 @@ describe("BillingBody", () => {
 	it("says billing is off and shows limits as not enforced", () => {
 		const html = render(<BillingBody view={view()} />, hostedSession("owner"));
 		expect(html).toContain('data-testid="billing-off"');
-		expect(html).toContain("nothing is enforced");
+		expect(html).toContain("not enforced, and nothing is charged");
 		expect(html).toContain("320 of 300");
 		expect(html).toContain("not enforced while billing is off");
 		expect(html).toContain("2.0 KB");

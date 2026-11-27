@@ -43,7 +43,7 @@ describe("HardwarePanel", () => {
 		expect(html).toContain("compute 7.5");
 		expect(html).toContain("CUDA 13.4");
 		expect(html).toContain('data-testid="gpu-sampler-A"');
-		expect(html).toContain("1000 MiB above the 52 MiB");
+		expect(html).toContain("1000 MiB above 52 MiB baseline");
 		expect(html).toContain("Mean utilization 37%");
 		expect(html).not.toContain("gpu-sampler-error-A");
 	});

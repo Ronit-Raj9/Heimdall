@@ -23,7 +23,7 @@ describe("email panel", () => {
 		);
 		expect(html).toContain("ana@example.com");
 		expect(html).toContain('data-testid="email-not-delivering"');
-		expect(html).toContain("Ask your server owner to set up email"); // X-53: no variable name shown
+		expect(html).toContain("Ask the server owner to set it up"); // X-53: no variable name shown
 		expect(html).toContain("Weekly digest");
 		expect(html).toContain("An agent got worse");
 	});

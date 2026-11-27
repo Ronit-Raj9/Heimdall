@@ -17,7 +17,7 @@ describe("ImporterCard", () => {
 		expect(html).toMatch(/data-testid="imports-card-harbor-benchmarks".*?terminal-bench@2.x/);
 		expect(html).toMatch(/data-testid="imports-card-harbor-track"[^>]*>Terminal/);
 		expect(html).toMatch(/data-testid="imports-card-harbor-grading" data-tone="good"/);
-		expect(html).toMatch(/data-testid="imports-card-harbor-license".*?varies.*?check each task&#x27;s provenance/);
+		expect(html).toMatch(/data-testid="imports-card-harbor-license".*?varies per task, see provenance/);
 		expect(html).toMatch(/data-testid="imports-card-harbor-fetch".*?git clone --depth 1/);
 		expect(html).toMatch(/data-testid="imports-card-harbor-needs".*?<li>a per-task image built from each task&#x27;s Dockerfile<\/li>/);
 		expect(html).not.toContain("<a ");
@@ -34,7 +34,7 @@ describe("ImporterCard", () => {
 		const html = card("longmemeval");
 		expect(html).toMatch(/data-testid="imports-card-longmemeval-grading" data-tone="warn"/);
 		expect(html).toContain('data-testid="imports-card-longmemeval-judged"');
-		expect(html).toContain("Judged, not verified");
+		expect(html).toContain(">Judged<");
 	});
 
 	it("says when a run needs nothing extra and when no license is stated", () => {

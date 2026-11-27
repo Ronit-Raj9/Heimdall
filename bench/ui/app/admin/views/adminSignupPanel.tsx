@@ -91,7 +91,6 @@ export function SignupForm({ settings }: { settings: SignupSettings }) {
 			<Card>
 				<CardHeader>
 					<CardTitle>{t("admin.title")}</CardTitle>
-					<p className="text-muted-foreground text-sm">{t("admin.subtitle")}</p>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-5">
 					<div role="radiogroup" aria-label={t("admin.title")} className="grid grid-cols-1 gap-3 sm:grid-cols-2">

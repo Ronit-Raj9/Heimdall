@@ -25,8 +25,8 @@ describe("SecretsTable", () => {
 	});
 
 	it("offers a next step when empty", () => {
-		expect(renderToStaticMarkup(<SecretsTable secrets={[]} canWrite />)).toContain("Add one above");
-		expect(renderToStaticMarkup(<SecretsTable secrets={[]} canWrite={false} />)).toContain("Ask an org admin");
+		expect(renderToStaticMarkup(<SecretsTable secrets={[]} canWrite />)).toContain("No secrets yet.");
+		expect(renderToStaticMarkup(<SecretsTable secrets={[]} canWrite={false} />)).toContain("Ask an admin.");
 	});
 });
 
@@ -48,6 +48,6 @@ describe("secrets usage note", () => {
 	it("documents the agent env {{secret.NAME}} reference verbatim", () => {
 		const note = i18n.t("agentUsage", { ns: "secrets", ref: "{{secret.TAVILY_API_KEY}}" });
 		expect(note).toContain("{{secret.TAVILY_API_KEY}}");
-		expect(note).toContain("agent settings");
+		expect(note).toContain("A missing secret stops the run.");
 	});
 });

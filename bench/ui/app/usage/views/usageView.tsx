@@ -228,7 +228,7 @@ export default function UsageView() {
 
 	return (
 		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="usage-view">
-			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+			<PageHeader title={t("title")} />
 			<div className="flex flex-wrap items-end gap-3" data-testid="usage-controls">
 				<Segmented
 					label={tl("usage.period")}

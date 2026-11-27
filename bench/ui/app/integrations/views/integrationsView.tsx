@@ -328,7 +328,7 @@ export default function IntegrationsView() {
 					return (
 						<TabsContent key={k} value={k} className="flex min-w-0 flex-col gap-4">
 							<div className="flex flex-wrap items-center gap-2">
-								<p className="text-muted-foreground text-sm">{desc(k)}</p>
+								{desc(k) ? <p className="text-muted-foreground text-sm">{desc(k)}</p> : null}
 								{st && <StatusDot tone={st.tone} label={st.label} />}
 							</div>
 							{k === "webhooks" && (
@@ -361,7 +361,6 @@ function ProductionTracesCard() {
 	return (
 		<section className="bg-card flex flex-col gap-2 rounded-xl border p-5" data-testid="integrations-production-traces">
 			<h2 className="text-base font-semibold">{m("integrations.tracesTitle")}</h2>
-			<p className="text-muted-foreground text-sm">{m("integrations.tracesText")}</p>
 			<div className="flex flex-wrap gap-2">
 				<Button size="sm" variant="outline" asChild>
 					<Link to="/agents/from-traces">{m("integrations.tracesAgents")}</Link>
@@ -1042,7 +1041,7 @@ function CIPanel() {
 	);
 
 	return (
-		<Section title={t("ci.heading")} intro={t("ci.intro")}>
+		<Section title={t("ci.heading")} >
 			{!status.isLoading && <CIInstallLink step={ciNextStep(status.data, status.isError)} />}
 			<div className="grid gap-3 sm:grid-cols-3">
 				<label className="flex flex-col gap-1 text-sm">

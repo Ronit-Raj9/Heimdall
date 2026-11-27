@@ -67,7 +67,7 @@ describe("new model watch form", () => {
 		for (const label of [
 			"Providers to watch",
 			"Evaluation to run",
-			"Which setup in that evaluation is your current model",
+			"Current model setup",
 			"Budget for each new model (USD)",
 			"At most per day",
 			"Only models whose name contains (optional)",

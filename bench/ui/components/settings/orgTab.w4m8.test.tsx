@@ -10,7 +10,7 @@ describe("public read card", () => {
 		const body = i18n.t("settings.org.publicBody", { ns: "platform" });
 		expect(body).toContain("signed in");
 		expect(body).not.toContain("without signing in");
-		expect(i18n.t("settings.org.publicOn", { ns: "platform" })).toBe("Public: anyone signed in can read");
+		expect(i18n.t("settings.org.publicOn", { ns: "platform" })).toBe("Public to signed-in users");
 	});
 
 	it("asks before making the organization public", async () => {

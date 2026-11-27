@@ -22,7 +22,7 @@ describe("Maxim panel", () => {
 		const html = renderToStaticMarkup(
 			<MaximForm conn={conn} draft={maximDraft(conn)} onDraft={() => {}} onSave={() => {}} onTest={() => {}} onDisconnect={() => {}} />,
 		);
-		expect(html).toContain("Stored key ending in 9xQz");
+		expect(html).toContain("Key ending 9xQz stored");
 		expect(html).toContain("Sent 12");
 		expect(html).toContain("Failed 1");
 		expect(html).toContain("Last error: HTTP 401");

@@ -104,7 +104,7 @@
 		"sandbox": "a fresh sandbox per run",
 		"error": "Could not change where runs go",
 		"loadError": "Could not load where runs go",
-		"evalLabel": "This evaluation runs on",
+		"evalLabel": "Runs on",
 		"whereRunsGo": "where runs go",
 		"notForOne": "set it as where runs go on the Workers page",
 		"onlyOne": "Runs on: {{label}}.",
