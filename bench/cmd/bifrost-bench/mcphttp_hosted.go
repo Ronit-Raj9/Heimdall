@@ -77,6 +77,10 @@ func (m *mcpHTTP) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware
 
 func (m *mcpHTTP) notAllowed(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Allow", "POST")
+	if mcpBrowserGet(ctx) {
+		mcpHelpPage(ctx)
+		return
+	}
 	lib.SendError(ctx, m.mode, fasthttp.StatusMethodNotAllowed, lib.ErrTypeMethodNotAllowed,
 		"this MCP endpoint is stateless: POST one JSON-RPC message (or a batch) per request; there is no event stream or session to end")
 }
