@@ -285,7 +285,7 @@ export default function NewAgentView() {
 				onFocus={() => setHovered(x)}
 				onBlur={() => setHovered(null)}
 				className={cn(
-					"hover:bg-muted flex h-10 min-w-0 items-center gap-3 rounded-md px-3 text-left",
+					"hover:bg-muted flex min-h-11 min-w-0 items-center gap-3 rounded-md px-3 py-1.5 text-left",
 					on && "bg-muted ring-primary/40 ring-1",
 				)}
 				data-testid={`template-${x.id}`}
@@ -293,7 +293,7 @@ export default function NewAgentView() {
 				<span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
 					<Icon className="size-4" aria-hidden="true" />
 				</span>
-				<span className="min-w-0 flex-1 text-sm font-medium">{x.name}</span>
+				<span className="min-w-0 flex-1 text-sm leading-snug font-medium">{x.name}</span>
 				{x.builds && (
 					<span className="text-muted-foreground" title={tu("gallery.builds")}>
 						<Hammer className="size-3.5" aria-hidden="true" />
@@ -359,7 +359,7 @@ export default function NewAgentView() {
 	const error = createState.error ?? putState.error ?? dryRunState.error;
 
 	return (
-		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8")} data-page-width="read" data-testid="agents-new-screen">
+		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="agents-new-screen">
 			<PageHeader
 				title={t("new.title")}
 				subtitle={t("new.subtitle")}
@@ -397,7 +397,6 @@ export default function NewAgentView() {
 				<div className="grid min-w-0 grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
 					<div className="flex min-w-0 flex-col gap-5">
 						<h2 className="sr-only">{tu("gallery.step1")}</h2>
-						<PlatformImportCard returnTo={returnTo} />
 						{mostUsed.length > 0 && (
 							<div className="flex flex-col gap-2">
 								<h3 className="text-foreground text-sm font-semibold">{tx("agent.mostUsed")}</h3>
@@ -431,6 +430,8 @@ export default function NewAgentView() {
 								</details>
 							);
 						})}
+						{/* Import sits under the gallery, so the first template is near the top (Q-89); the band links here. */}
+						<PlatformImportCard returnTo={returnTo} />
 					</div>
 					<div
 						ref={formRef}

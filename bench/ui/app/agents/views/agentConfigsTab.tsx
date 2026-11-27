@@ -1,16 +1,17 @@
 import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
-import { ShowTestsChip } from "@/components/ui/toolbar";
+import { FilterBar, ShowTestsChip, ToolbarSearch } from "@/components/ui/toolbar";
+import { columnHasData } from "@/components/ui/table";
+import "./ufvp3I18n";
 import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AgentSummary, AgentsResponse, Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Bot, ChevronRight, Gauge, Info, MoreHorizontal, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Bot, ChevronRight, Gauge, Info, MoreHorizontal, Trash2 } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import "@/lib/types/agentFirstI18n";
@@ -111,6 +112,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const [type, setType] = useQueryState("type", parseAsString.withDefault(""));
 	const { t: tf } = useTranslation("uf2a");
 	const { t: tr } = useTranslation("ufre");
+	const { t: tv } = useTranslation("ufvp3");
 	const [showTests, setShowTests] = useShowTests();
 	const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
 	const session = useSession();
@@ -156,6 +158,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 				}
 			: undefined;
 	const pickedIds = pickedInList(picked, deletable);
+	const cols = agentColumns([...yours, ...baselines], selection !== undefined);
 	return (
 		<div className={cn("flex min-w-0 flex-col gap-6", query.isFetching && "opacity-60")}>
 			{missing && (
@@ -180,22 +183,15 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 					{tf("agents.jobsError")}
 				</p>
 			)}
-			<div className="flex min-w-0 flex-wrap items-center gap-2" data-testid="agents-controls">
-				<div className="relative min-w-0 flex-1 sm:max-w-sm">
-					<Search
-						className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-						aria-hidden="true"
-					/>
-					<Input
-						type="search"
-						value={q}
-						onChange={(e) => void setQ(e.target.value || null)}
-						placeholder={tu("list.searchPlaceholder")}
-						aria-label={tu("list.search")}
-						className="pl-8"
-						data-testid="agents-search"
-					/>
-				</div>
+			<FilterBar label={tv("agents.filter")} testId="agents-controls" count={tv("agents.shown", { count: yours.length + baselines.length })}>
+				<ToolbarSearch
+					value={q}
+					onChange={(next) => void setQ(next || null)}
+					placeholder={tu("list.searchPlaceholder")}
+					label={tu("list.search")}
+					testId="agents-search"
+					className="sm:w-72"
+				/>
 				<span className="text-muted-foreground text-sm" id="agents-sort-label">
 					{tf("agents.sortBy")}
 				</span>
@@ -212,7 +208,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 				</Select>
 				<ShowTestsChip count={all.hidden} on={showTests} onChange={setShowTests} />
 				{pickedIds.length > 0 && <BulkDelete ids={pickedIds} onDone={(left) => setPicked(new Set(left))} />}
-			</div>
+			</FilterBar>
 			{types.length > 1 && (
 				<div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label={tf("agents.typeLabel")} data-testid="agents-types">
 					{["", ...types].map((k) => (
@@ -269,7 +265,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 								</Button>
 							</div>
 						) : (
-							<AgentTable label={t("agents.label")} agents={yours} jobs={jobs} wanted={wanted} testId="agents-list" selection={selection} />
+							<AgentTable label={t("agents.label")} agents={yours} jobs={jobs} wanted={wanted} testId="agents-list" selection={selection} cols={cols} />
 						)}
 					</section>
 					{baselines.length > 0 && (
@@ -287,7 +283,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 									<p className="text-muted-foreground pl-5.5 text-sm">{ta("list.baselinesHint")}</p>
 								</summary>
 								<div className="mt-3">
-									<AgentTable label={ta("list.baselines")} agents={baselines} jobs={jobs} wanted={wanted} testId="agents-baseline-list" />
+									<AgentTable label={ta("list.baselines")} agents={baselines} jobs={jobs} wanted={wanted} testId="agents-baseline-list" cols={cols} />
 								</div>
 							</details>
 						</section>
@@ -311,6 +307,27 @@ interface Selection {
 	setAll(on: boolean): void;
 }
 
+/** Which optional columns both agent tables show, so "Your agents" and "Baseline agents" line up (rule 5). */
+export interface AgentColumns {
+	select: boolean;
+	type: boolean;
+	versions: boolean;
+	score: boolean;
+}
+
+/** The optional columns: a column empty in every row of both tables is left out, the type only when agents differ. */
+export function agentColumns(agents: readonly AgentSummary[], select: boolean): AgentColumns {
+	const ok = agents.filter((a) => !a.error);
+	return {
+		select,
+		type: new Set(agents.map((a) => adapterKey(a.adapter))).size > 1,
+		versions: columnHasData(ok, (a) => agentVersions(a)),
+		score: columnHasData(ok, (a) => agentLastScore(a)),
+	};
+}
+
+const headCls = "px-3 py-2 font-medium whitespace-nowrap";
+
 function AgentTable({
 	label,
 	agents,
@@ -318,6 +335,7 @@ function AgentTable({
 	wanted,
 	testId,
 	selection,
+	cols,
 }: {
 	label: string;
 	agents: readonly AgentSummary[];
@@ -325,47 +343,63 @@ function AgentTable({
 	wanted: string | null;
 	testId: string;
 	selection?: Selection;
+	cols: AgentColumns;
 }) {
 	const { t: tf } = useTranslation("uf2a");
 	const { t: tr } = useTranslation("ufre");
+	const { t: tv } = useTranslation("ufvp3");
 	const pickedCount = selection ? [...selection.deletable].filter((id) => selection.picked.has(id)).length : 0;
 	return (
 		<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
-			{/* Phones: a fixed layout, so the name takes the width the dot and actions leave (Q-2). */}
-			<table className="w-full table-fixed text-sm md:table-auto" aria-label={label}>
+			{/* One fixed column plan for both tables, so the two line up (rule 5). Phones: name, state, actions. */}
+			<table className="w-full table-fixed text-sm" aria-label={label}>
+				<colgroup>
+					{cols.select && <col className="hidden w-10 md:table-column" />}
+					<col />
+					{cols.type && <col className="hidden w-32 md:table-column" />}
+					<col className="hidden w-40 md:table-column" />
+					{cols.versions && <col className="hidden w-20 lg:table-column" />}
+					<col className="hidden w-26 lg:table-column" />
+					{cols.score && <col className="hidden w-24 lg:table-column" />}
+					<col className="hidden w-32 lg:table-column" />
+					<col className="w-10 md:w-40" />
+					<col className="w-22 md:w-36" />
+				</colgroup>
 				<thead className="bg-muted/40 text-muted-foreground hidden text-left text-xs md:table-header-group">
 					<tr className="border-b">
-						{selection && (
-							<th className="w-10 py-2 pl-4 font-medium">
-								<input
-									type="checkbox"
-									className="accent-primary size-4 cursor-pointer"
-									checked={pickedCount > 0 && pickedCount === selection.deletable.size}
-									ref={(el) => {
-										if (el) el.indeterminate = pickedCount > 0 && pickedCount < selection.deletable.size;
-									}}
-									onChange={(e) => selection.setAll(e.target.checked)}
-									aria-label={tr("agents.selectAll")}
-									data-testid={`${testId}-select-all`}
-								/>
+						{cols.select && (
+							<th className="py-2 pl-4 font-medium">
+								{selection && (
+									<input
+										type="checkbox"
+										className="accent-primary size-4 cursor-pointer align-middle"
+										checked={pickedCount > 0 && pickedCount === selection.deletable.size}
+										ref={(el) => {
+											if (el) el.indeterminate = pickedCount > 0 && pickedCount < selection.deletable.size;
+										}}
+										onChange={(e) => selection.setAll(e.target.checked)}
+										aria-label={tr("agents.selectAll")}
+										data-testid={`${testId}-select-all`}
+									/>
+								)}
 							</th>
 						)}
-						<th className="px-4 py-2 font-medium">{tf("agents.columns.name")}</th>
-						<th className="px-4 py-2 font-medium">{tf("agents.columns.runsAs")}</th>
-						<th className="px-4 py-2 font-medium">{tf("agents.columns.model")}</th>
-						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tr("agents.columns.versions")}</th>
-						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tf("agents.columns.runs")}</th>
-						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tr("agents.columns.lastScore")}</th>
-						<th className="hidden px-4 py-2 font-medium lg:table-cell">{tf("agents.columns.lastRun")}</th>
-						<th className="px-4 py-2 font-medium">{tf("agents.columns.check")}</th>
-						<th className="px-4 py-2 text-right font-medium">
-							<span className="sr-only">{tf("agents.columns.actions")}</span>
+						<th className={headCls}>{tf("agents.columns.name")}</th>
+						{cols.type && <th className={headCls}>{tf("agents.columns.runsAs")}</th>}
+						<th className={headCls}>{tf("agents.columns.model")}</th>
+						{cols.versions && <th className={cn(headCls, "hidden text-right lg:table-cell")}>{tv("agents.columns.versions")}</th>}
+						<th className={cn(headCls, "hidden text-right lg:table-cell")}>{tv("agents.columns.scoredRuns")}</th>
+						{cols.score && <th className={cn(headCls, "hidden text-right lg:table-cell")}>{tr("agents.columns.lastScore")}</th>}
+						<th className={cn(headCls, "hidden lg:table-cell")}>{tv("agents.columns.lastRun")}</th>
+						<th className={headCls}>{tv("agents.columns.setup")}</th>
+						<th className={cn(headCls, "text-right")}>
+							<span className="sr-only">{tv("agents.columns.actions")}</span>
 						</th>
 					</tr>
 				</thead>
 				<tbody data-testid={testId}>
 					{agents.map((agent) => (
-						<AgentRow key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} selection={selection} />
+						<AgentRow key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} selection={selection} cols={cols} />
 					))}
 				</tbody>
 			</table>
@@ -378,16 +412,19 @@ function AgentRow({
 	jobs,
 	selected,
 	selection,
+	cols,
 }: {
 	agent: AgentSummary;
 	jobs?: readonly Job[];
 	selected: boolean;
 	selection?: Selection;
+	cols: AgentColumns;
 }) {
 	const { t: tr } = useTranslation("ufre");
 	const { t } = useTranslation("agentsUx");
 	const { t: ta } = useTranslation("agentFirst");
 	const { t: tf } = useTranslation("uf2a");
+	const { t: tv } = useTranslation("ufvp3");
 	const adapterLabel = useAdapterLabel();
 	const key = agentKey(agent);
 	const name = agent.id || agent.path.replace(/^.*\//, "").replace(/\.ya?ml$/, "");
@@ -395,18 +432,21 @@ function AgentRow({
 	const testId = `agents-row-${key.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 	const { i18n } = useTranslation();
 	const lastRun = agent.error ? null : formatRelative(agent.last_run_at ?? null, i18n.language);
+	const started = agent.runs_total ?? 0;
 	const runs =
 		agent.sealed_runs !== null && !agent.error ? (
-			<span data-testid={`${testId}-runs`}>
-				{(agent.runs_total ?? 0) > agent.sealed_runs
-					? `${t("list.scoredRuns", { count: agent.sealed_runs })} ${t("list.startedRuns", { count: agent.runs_total ?? 0 })}`
-					: t("list.scoredRuns", { count: agent.sealed_runs })}
+			<span
+				data-testid={`${testId}-runs`}
+				title={started > agent.sealed_runs ? tv("agents.startedTitle", { scored: agent.sealed_runs, started }) : undefined}
+			>
+				{agent.sealed_runs}
+				{started > agent.sealed_runs && <span className="text-muted-foreground"> / {started}</span>}
 			</span>
 		) : null;
 	const versions = agent.error ? null : agentVersions(agent);
 	const score = agent.error ? null : agentLastScore(agent);
 	const model = agent.model ? (
-		<span className="truncate font-mono text-xs" title={agent.model}>
+		<span className="min-w-0 truncate font-mono text-xs" title={agent.model}>
 			{agent.model}
 		</span>
 	) : (
@@ -414,17 +454,17 @@ function AgentRow({
 	);
 	return (
 		<tr
-			className={cn("hover:bg-accent/40 relative border-b transition-colors last:border-b-0", selected && "bg-primary/5")}
+			className={cn("hover:bg-accent/40 relative h-11 border-b transition-colors last:border-b-0", selected && "bg-primary/5")}
 			aria-selected={selected || undefined}
 			data-state={selected ? "selected" : undefined}
 			data-testid={testId}
 		>
-			{selection && (
+			{cols.select && (
 				<td className="hidden py-2 pl-4 md:table-cell">
-					{selection.deletable.has(agent.id) && (
+					{selection?.deletable.has(agent.id) && (
 						<input
 							type="checkbox"
-							className="accent-primary relative z-10 size-4 cursor-pointer"
+							className="accent-primary relative z-10 size-4 cursor-pointer align-middle"
 							checked={selection.picked.has(agent.id)}
 							onChange={(e) => selection.toggle(agent.id, e.target.checked)}
 							aria-label={tr("agents.selectAgent", { name })}
@@ -433,7 +473,7 @@ function AgentRow({
 					)}
 				</td>
 			)}
-			<td className="px-4 py-2 md:h-10 md:w-[22%] md:max-w-0">
+			<td className="px-3 py-1.5 md:max-w-0 md:py-2">
 				<div className="flex min-w-0 items-center gap-2.5">
 					<AgentAvatar name={name} className="size-7 rounded-lg text-xs" />
 					<div className="flex min-w-0 flex-col">
@@ -448,40 +488,46 @@ function AgentRow({
 						</Link>
 						{/* Phones: the second line holds model and last run. */}
 						<span className="text-muted-foreground flex min-w-0 items-center gap-1.5 truncate text-xs md:hidden">
-							{model}
-							{lastRun && <span>· {t("list.lastRun", { when: lastRun })}</span>}
+							<span className="flex max-w-[60%] shrink-0">{model}</span>
+							{lastRun && <span className="min-w-0 truncate">· {lastRun}</span>}
 						</span>
 					</div>
 				</div>
 			</td>
-			<td className="text-muted-foreground hidden px-4 py-2 text-xs md:table-cell">{tf(`agents.type.${adapterKey(agent.adapter) as "command"}`)}</td>
-			<td className="hidden max-w-0 min-w-32 px-4 py-2 md:table-cell">
+			{cols.type && (
+				<td className="text-muted-foreground hidden truncate px-3 py-2 text-xs md:table-cell">{tf(`agents.type.${adapterKey(agent.adapter) as "command"}`)}</td>
+			)}
+			<td className="hidden max-w-0 px-3 py-2 md:table-cell">
 				<span className="flex min-w-0" title={adapterLabel(agent.adapter)}>
 					{model}
 				</span>
 			</td>
-			<td className="text-muted-foreground hidden px-4 py-2 text-xs tabular-nums lg:table-cell" data-testid={`${testId}-versions`}>
-				{versions !== null && tr("agents.versions", { count: versions })}
-			</td>
-			<td className="text-muted-foreground hidden px-4 py-2 text-xs tabular-nums lg:table-cell">{runs}</td>
-			<td className="hidden px-4 py-2 text-xs tabular-nums lg:table-cell" data-testid={`${testId}-score`}>
-				{score && (
-					<span title={tr("agents.lastScoreTitle", { passed: Math.round(score.score * score.runs), runs: score.runs })}>
-						{formatLastScore(score)}
-					</span>
-				)}
-			</td>
-			<td className="text-muted-foreground hidden px-4 py-2 text-xs whitespace-nowrap lg:table-cell">
+			{cols.versions && (
+				<td className="text-muted-foreground hidden px-3 py-2 text-right text-xs tabular-nums lg:table-cell" data-testid={`${testId}-versions`}>
+					{versions}
+				</td>
+			)}
+			<td className="hidden px-3 py-2 text-right text-xs tabular-nums lg:table-cell">{runs}</td>
+			{cols.score && (
+				<td className="hidden px-3 py-2 text-right text-xs tabular-nums lg:table-cell" data-testid={`${testId}-score`}>
+					{score && (
+						<span title={tr("agents.lastScoreTitle", { passed: Math.round(score.score * score.runs), runs: score.runs })}>
+							{formatLastScore(score)}
+						</span>
+					)}
+				</td>
+			)}
+			<td className="text-muted-foreground hidden truncate px-3 py-2 text-xs lg:table-cell">
 				{lastRun ? (
-					<span data-testid={`${testId}-last`}>{t("list.lastRun", { when: lastRun })}</span>
+					<span data-testid={`${testId}-last`}>{lastRun}</span>
 				) : (
 					!agent.error && <span data-testid={`${testId}-last`}>{tr("agents.neverRun")}</span>
 				)}
 			</td>
-			<td className="w-10 px-1 py-2 text-center md:w-auto md:px-4 md:text-left">
+			<td className="px-1 py-2 text-center md:px-3 md:text-left">
 				<CheckPill state={state} runs={agentRunsTotal(agent)} testId={`${testId}-status`} compact />
 			</td>
-			<td className="w-22 px-2 py-2 text-right md:w-auto md:px-4">
+			<td className="px-2 py-2 text-right md:px-3">
 				<div className="relative z-10 flex items-center justify-end gap-1">
 					{!agent.error && (
 						<Button asChild size="sm" variant="ghost" className="h-8">
@@ -492,6 +538,8 @@ function AgentRow({
 						</Button>
 					)}
 					<RowMenu agent={agent} name={name} testId={testId} />
+					{/* Baselines have no menu: keep the Evaluate buttons of both tables in one column. */}
+					{(agent.error || !agent.id || isBaselineAgent(agent)) && <span className="hidden size-8 shrink-0 md:block" aria-hidden="true" />}
 				</div>
 			</td>
 		</tr>

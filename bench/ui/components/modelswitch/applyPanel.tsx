@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import "@/lib/types/modelSwitchI18n";
 import "@/app/compare/views/w4m3I18n";
 import { PaidButton } from "@/components/ui/paidButton";
@@ -77,7 +78,7 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 			<label className="flex flex-col gap-1">
 				{t("export.apply.url")}
 				<input
-					className="border-input bg-background h-9 rounded-lg border px-2"
+					className="border-input bg-card h-(--control-h) rounded-md border px-2.5 text-sm"
 					value={url}
 					onChange={(e) => setUrl(e.target.value)}
 					placeholder="https://bifrost.example.com"
@@ -86,8 +87,8 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 			</label>
 			<label className="flex flex-col gap-1">
 				{t("export.apply.secret")}
-				<select
-					className="border-input bg-background h-9 rounded-lg border px-2"
+				<NativeSelect
+					wrapperClassName="w-full"
 					value={secret}
 					onChange={(e) => setSecret(e.target.value)}
 					data-testid="model-switch-apply-secret"
@@ -98,15 +99,15 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 							{n}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 				<span className="text-muted-foreground text-xs">
 					{secrets.error ? t("export.apply.secretLoadError") : t("export.apply.secretHint")}
 				</span>
 			</label>
 			<label className="flex flex-col gap-1">
 				{t("export.apply.scope")}
-				<select
-					className="border-input bg-background h-9 rounded-lg border px-2"
+				<NativeSelect
+					wrapperClassName="w-full"
 					value={scope}
 					onChange={(e) => setScope(e.target.value as ApplyScope)}
 					data-testid="model-switch-apply-scope"
@@ -116,13 +117,13 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 							{t(`export.apply.scopes.${s}`)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 			</label>
 			{scope !== "global" && (
 				<label className="flex flex-col gap-1">
 					{t(`export.apply.scopeId.${scope}`)}
 					<input
-						className="border-input bg-background h-9 rounded-lg border px-2"
+						className="border-input bg-card h-(--control-h) rounded-md border px-2.5 text-sm"
 						value={scopeId}
 						onChange={(e) => setScopeId(e.target.value)}
 						data-testid="model-switch-apply-scope-id"

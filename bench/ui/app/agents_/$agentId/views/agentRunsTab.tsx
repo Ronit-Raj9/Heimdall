@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Pager } from "@/components/ui/pager";
@@ -107,13 +108,11 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 		const base = why.text ?? (why.key ? tu(why.key as "runs.reason.other") : "");
 		return base && r.fault ? tu("runs.withFault", { reason: base, fault: r.fault }) : base;
 	};
-	const selectCls = "border-input bg-card h-9 rounded-md border px-2 text-sm";
 	const filters = (
 		<div className="flex flex-wrap items-center gap-3 sm:ml-auto">
 			<label className="inline-flex items-center gap-2 text-sm">
 				<span className="text-muted-foreground">{tu("runs.benchmark")}</span>
-				<select
-					className={selectCls}
+				<NativeSelect
 					value={suite}
 					onChange={(e) => {
 						void setSuite(e.target.value || null);
@@ -127,12 +126,11 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 							{s}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 			</label>
 			<label className="inline-flex items-center gap-2 text-sm">
 				<span className="text-muted-foreground">{tu("runs.result")}</span>
-				<select
-					className={selectCls}
+				<NativeSelect
 					value={outcome}
 					onChange={(e) => {
 						void setOutcome(e.target.value || null);
@@ -146,7 +144,7 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 							{tu(`runs.resultOption.${o}`)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 			</label>
 			<label className="inline-flex min-h-9 items-center gap-2 text-sm">
 				<input

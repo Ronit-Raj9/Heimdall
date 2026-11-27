@@ -1,0 +1,14 @@
+{
+	"agents": {
+		"columns": {
+			"scoredRuns": "Scored runs",
+			"versions": "Versions",
+			"lastRun": "Last run",
+			"setup": "Setup",
+			"actions": "Actions"
+		},
+		"startedTitle": "{{scored}} scored, {{started}} started",
+		"filter": "Filter agents",
+		"shown": "{{count}} shown"
+	}
+}

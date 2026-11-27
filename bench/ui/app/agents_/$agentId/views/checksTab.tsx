@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { JobRunButton, plainJobError } from "@/components/jobs/jobRunButton";
 import { PaidButton } from "@/components/ui/paidButton";
@@ -234,8 +235,8 @@ function BuildSuiteSelect({
 	const { data } = useGetSuitesLightQuery();
 	const ids = selectIds((data?.suites ?? []).map((s) => s.id), value);
 	return (
-		<select
-			className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+		<NativeSelect
+			wrapperClassName="w-full sm:w-auto"
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
 			data-testid={testId}
@@ -246,7 +247,7 @@ function BuildSuiteSelect({
 					{id}
 				</option>
 			))}
-		</select>
+		</NativeSelect>
 	);
 }
 
@@ -261,8 +262,8 @@ function TaskSelect({ suite, value, onChange }: { suite: string; value: string; 
 	const { data } = useGetSuiteQuery(suite ? suite : skipToken);
 	const ids = selectIds((data?.tasks ?? []).map((x) => x.id), value);
 	return (
-		<select
-			className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+		<NativeSelect
+			wrapperClassName="w-full sm:w-auto"
 			value={value}
 			disabled={!suite}
 			onChange={(e) => onChange(e.target.value)}
@@ -274,7 +275,7 @@ function TaskSelect({ suite, value, onChange }: { suite: string; value: string; 
 					{id}
 				</option>
 			))}
-		</select>
+		</NativeSelect>
 	);
 }
 

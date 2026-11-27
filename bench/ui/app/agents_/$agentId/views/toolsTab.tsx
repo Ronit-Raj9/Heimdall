@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
@@ -284,12 +285,12 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 							data-testid="agent-skill-name"
 						/>
 					</Field>
-					<label className="flex items-center gap-2 pb-2 text-xs">
-						<input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
+					<label className="flex h-(--control-h) items-center gap-2 text-xs">
+						<input type="checkbox" className="accent-primary size-4" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
 						{t("tools.skills.replace")}
 					</label>
-					<span className="flex flex-col gap-1">
-						<Button disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
+					<span className="flex h-(--control-h) items-center gap-2">
+						<Button className="h-(--control-h)" disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
 							{uploading ? t("tools.skills.uploading") : t("tools.skills.upload")}
 						</Button>
 						{!file && (
@@ -367,8 +368,8 @@ function MCPSection({ id }: { id: string }) {
 				<>
 					<div className="grid gap-3 sm:grid-cols-2">
 						<Field label={t("tools.mcp.format")}>
-							<select
-								className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+							<NativeSelect
+								wrapperClassName="w-full"
 								value={form.format}
 								onChange={(e) => setForm({ ...form, format: e.target.value })}
 								data-testid="agent-mcp-format"
@@ -378,7 +379,7 @@ function MCPSection({ id }: { id: string }) {
 										{mcpFormatLabel(f, t("tools.mcp.adapterDefault"), (k) => tr(`tools.mcpFormat.${k}`))}
 									</option>
 								))}
-							</select>
+							</NativeSelect>
 						</Field>
 						<Field label={t("tools.mcp.path")}>
 							<Input

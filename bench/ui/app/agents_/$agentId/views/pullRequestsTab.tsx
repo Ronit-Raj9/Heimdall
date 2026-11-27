@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,6 @@ export function ciPanelParams(agentId: string, s: CIPanelState, url: string): CI
 	};
 }
 
-const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
 /**
  * "Test on every pull request": generates the GitHub Actions or GitLab CI file that registers each pull
@@ -82,24 +82,24 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 					{live ? t("ci.liveVersion", { version: live }) : t("ci.noLiveVersion")}
 				</p>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					<label className="flex flex-col gap-1 text-sm" htmlFor={`${formId}-provider`}>
+					<label className="flex flex-col gap-1.5 text-sm" htmlFor={`${formId}-provider`}>
 						{t("ci.provider")}
-						<select
+						<NativeSelect
 							id={`${formId}-provider`}
-							className={selectClass}
+							wrapperClassName="w-full"
 							value={state.provider}
 							onChange={(e) => set("provider", e.target.value as CIProvider)}
 							data-testid="agent-ci-provider"
 						>
 							<option value="github">GitHub Actions</option>
 							<option value="gitlab">GitLab CI</option>
-						</select>
+						</NativeSelect>
 					</label>
-					<label className="flex flex-col gap-1 text-sm" htmlFor={`${formId}-source`}>
+					<label className="flex flex-col gap-1.5 text-sm" htmlFor={`${formId}-source`}>
 						{t("ci.source")}
-						<select
+						<NativeSelect
 							id={`${formId}-source`}
-							className={selectClass}
+							wrapperClassName="w-full"
 							value={state.source}
 							onChange={(e) => set("source", e.target.value as CISource)}
 							data-testid="agent-ci-source"
@@ -107,23 +107,23 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 							<option value="config">{t("ci.sourceConfig")}</option>
 							<option value="image">{t("ci.sourceImage")}</option>
 							<option value="endpoint">{t("ci.sourceEndpoint")}</option>
-						</select>
+						</NativeSelect>
 					</label>
 					{state.source === "config" && (
-						<label className="flex flex-col gap-1 text-sm" htmlFor={`${formId}-config`}>
+						<label className="flex flex-col gap-1.5 text-sm" htmlFor={`${formId}-config`}>
 							{t("ci.configPath")}
 							<Input id={`${formId}-config`} value={state.config} onChange={(e) => set("config", e.target.value)} data-testid="agent-ci-config" />
 						</label>
 					)}
-					<label className="flex flex-col gap-1 text-sm" htmlFor={`${formId}-pack`}>
+					<label className="flex flex-col gap-1.5 text-sm" htmlFor={`${formId}-pack`}>
 						{t("ci.pack")}
-						<select id={`${formId}-pack`} className={selectClass} value={pack} onChange={(e) => set("pack", e.target.value)} data-testid="agent-ci-pack">
+						<NativeSelect id={`${formId}-pack`} wrapperClassName="w-full" value={pack} onChange={(e) => set("pack", e.target.value)} data-testid="agent-ci-pack">
 							{(packs.data ?? []).map((p) => (
 								<option key={p.id} value={p.id}>
 									{p.name}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 						{/* Which benchmarks the pack runs, so the pick is not blind (M2-66). */}
 						{packBenchmarks(packs.data, pack).length > 0 && (
 							<span className="text-muted-foreground text-xs" data-testid="agent-ci-pack-benchmarks">

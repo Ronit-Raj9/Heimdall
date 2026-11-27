@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/select";
 import { ReportCard } from "@/components/reportcard/reportCard";
 import { ReportFailures } from "@/components/reportcard/reportFailures";
 import { ReportPicks } from "@/components/reportcard/reportPicks";
@@ -89,8 +90,9 @@ function EvaluationSelect({ card, onPick }: { card: AgentCard; onPick: (id: stri
 	return (
 		<label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
 			{t("reportCard.evaluation")}
-			<select
-				className="border-input bg-background h-9 w-full max-w-md min-w-0 rounded-md border px-2 text-sm"
+			<NativeSelect
+				wrapperClassName="w-full max-w-md min-w-0"
+				className="w-full"
 				value={card.evaluation_id}
 				onChange={(e) => onPick(e.target.value === list[0].id ? "" : e.target.value)}
 				aria-label={t("reportCard.evaluation")}
@@ -102,7 +104,7 @@ function EvaluationSelect({ card, onPick }: { card: AgentCard; onPick: (id: stri
 						{ev.created_at ? ` · ${formatWhen(ev.created_at, locale) ?? ""}` : ""}
 					</option>
 				))}
-			</select>
+			</NativeSelect>
 		</label>
 	);
 }
@@ -151,7 +153,6 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 		if (preferred) setFilter({ evaluation: preferred });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [preferred]);
-	const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const empty = isEmptyReport(report.data, report.error);
 	const filterSummary = `${version ? `v${version}` : t("reportCard.latest")}, ${model || t("reportCard.anyModel")}`;
 	const picksSummary =
@@ -163,10 +164,9 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 		<div className="flex min-w-0 flex-col gap-5" data-testid="agent-report-card-tab">
 			{/* One "Showing: ... Change" line; the Version, Model and Evaluation selects open under Change (M2-34). */}
 			<ReportPicks summary={picksSummary} testId="agent-report-card-picks">
-				<label className="flex flex-col gap-1 text-xs font-medium">
+				<label className="flex flex-col gap-1.5 text-xs font-medium">
 					{t("reportCard.version")}
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={version}
 						onChange={(e) => setFilter({ version: Number(e.target.value) })}
 						aria-label={t("reportCard.version")}
@@ -179,12 +179,11 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 								{v.note ? ` - ${v.note}` : ""}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</label>
-				<label className="flex flex-col gap-1 text-xs font-medium">
+				<label className="flex flex-col gap-1.5 text-xs font-medium">
 					{t("reportCard.model")}
-					<select
-						className={selectClass}
+					<NativeSelect
 						value={model}
 						onChange={(e) => setFilter({ model: e.target.value })}
 						disabled={modelList.length === 0}
@@ -197,7 +196,7 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 								{id}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</label>
 				{report.data && !empty && <EvaluationSelect card={report.data} onPick={(id) => setFilter({ evaluation: id })} />}
 				{report.data && !empty && <CardSource card={report.data} />}
