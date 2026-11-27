@@ -2,7 +2,7 @@
 	"tabs": {
 		"findings": "Tracked"
 	},
-	"intro": "Reopens when a task fails again.",
+	"intro": "",
 	"loadError": "Could not load the tracked failures",
 	"search": "Search tracked failures",
 	"clearSearch": "Clear search",

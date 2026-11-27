@@ -280,7 +280,7 @@ function ExpPicker({
 				align="start"
 				items={[]}
 				testId={testId}
-				contentClassName="w-full min-w-56 sm:w-72"
+				contentClassName="w-[calc(100vw-2rem)] max-w-96 sm:w-96"
 				trigger={(p) => (
 					<button
 						{...p}
@@ -324,7 +324,7 @@ export function ExpPickerList({
 	return (
 		<fieldset aria-labelledby={labelledBy} className="flex max-h-72 flex-col gap-0.5 overflow-y-auto p-1">
 			{list.map((o) => (
-				<label key={o} className="hover:bg-muted flex min-h-(--control-h) cursor-pointer items-center gap-2 rounded-md px-1.5 font-mono text-sm break-all">
+				<label key={o} title={o} className="hover:bg-muted flex min-h-(--control-h) min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 font-mono text-sm">
 					<input
 						type="checkbox"
 						className="accent-primary size-4 shrink-0"
@@ -332,7 +332,7 @@ export function ExpPickerList({
 						onChange={() => onCommit(toggleExp(value, o, options))}
 						data-testid={`${testId}-option-${o}`}
 					/>
-					{o}
+					<span className="min-w-0 truncate">{o}</span>
 				</label>
 			))}
 			{picked.length > 0 && (
@@ -392,7 +392,7 @@ function SelectField({
 interface SegmentedProps<T extends string> {
 	label: string;
 	value: T;
-	options: readonly { value: T; label: string; hint: string }[];
+	options: readonly { value: T; label: string; hint?: string }[];
 	onChange: (value: T) => void;
 	disabled?: boolean;
 	testId: string;

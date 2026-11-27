@@ -147,7 +147,7 @@
 	},
 	"ft": {
 		"title": "Failure tests",
-		"subtitle": "Break things on purpose and see the score drop.",
+		"subtitle": "",
 		"newTitle": "New failure test",
 		"newHint": "Each task runs once clean and once per fault.",
 		"version": "Version",

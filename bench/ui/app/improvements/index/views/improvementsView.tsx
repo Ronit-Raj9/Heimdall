@@ -41,7 +41,6 @@ export default function ImprovementsView() {
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="improvements-screen">
 			<PageHeader
 				title={t("title")}
-				subtitle={t("subtitle")}
 				actions={
 					admin ? (
 						<Button size="sm" onClick={() => setCreating(true)} data-testid="improvements-new">

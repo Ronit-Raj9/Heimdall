@@ -1,7 +1,7 @@
 {
 	"failures": {
 		"title": "Failures",
-		"subtitle": "Grouped and tracked until a rerun shows them fixed.",
+		"subtitle": "",
 		"tabs": {
 			"label": "Ways to look at failures",
 			"production": "Production failures",

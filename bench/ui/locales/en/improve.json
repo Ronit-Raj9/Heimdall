@@ -1,6 +1,6 @@
 {
 	"title": "Auto-improve",
-	"subtitle": "Your agent rewrites itself. Kept only if it wins unseen tasks.",
+	"subtitle": "",
 	"loadError": "Could not load improvement runs",
 	"empty": {
 		"title": "No improvement runs yet",

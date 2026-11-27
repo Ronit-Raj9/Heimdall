@@ -42,7 +42,6 @@ export default function TriageTab() {
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="triage-screen">
-			<p className="text-muted-foreground max-w-3xl text-sm">{t("triage.subtitle")}</p>
 			<TriageBanner />
 			<div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto">
 				<ExperimentSelect

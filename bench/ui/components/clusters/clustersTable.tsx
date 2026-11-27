@@ -130,7 +130,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 									data-testid={`clusters-row-${cluster.signature}`}
 									data-state={open ? "selected" : undefined}
 								>
-									<TableCell className="max-w-sm min-w-64 align-top whitespace-normal">
+									<TableCell className="max-w-xs min-w-56 align-top whitespace-normal">
 										<div className="flex flex-col gap-0.5">
 											<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 												<ClusterKindBadge cluster={cluster} />
@@ -321,7 +321,7 @@ function CompactList({
 	return (
 		<ul className="flex flex-col gap-0.5" title={more > 0 ? (items ?? []).join("\n") : undefined}>
 			{shown.map((item) => (
-				<li key={item} className="max-w-48 truncate font-mono text-sm leading-6" title={item}>
+				<li key={item} className="max-w-40 truncate font-mono text-sm leading-6" title={item}>
 					{format ? format(item) : <CompactItem item={item} kind={kind} />}
 				</li>
 			))}

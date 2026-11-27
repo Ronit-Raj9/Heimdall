@@ -1662,7 +1662,7 @@
 		"empty": "No setup has a graded run here yet."
 	},
 	"triage": {
-		"subtitle": "Failure patterns for Setup A and B.",
+		"subtitle": "",
 		"banner": "Patterns show how runs failed, not why.",
 		"bannerHint": "",
 		"noExperiments": "No comparisons yet.",
@@ -1709,7 +1709,7 @@
 		"newExperiment": "Evaluate an agent"
 	},
 	"clusters": {
-		"subtitle": "Failed runs grouped by how they failed.",
+		"subtitle": "",
 		"banner": "Groups show how runs failed, not why.",
 		"bannerHint": "Read the logs before naming a cause.",
 		"loadError": "Could not load the failure groups.",
@@ -2280,7 +2280,7 @@
 		}
 	},
 	"inbox": {
-		"subtitle": "Failures seen in production.",
+		"subtitle": "",
 		"loadError": "Could not load Production failures.",
 		"regressionTasks_one": "{{count}} new test task made from the inbox",
 		"regressionTasks_other": "{{count}} new test tasks made from the inbox",
@@ -2391,7 +2391,7 @@
 			"suggestedNoSuite": "{{kind}} task, no benchmark suggested",
 			"flagged": "Why it was flagged",
 			"redacted": "Removed before saving: {{list}}. Keys, tokens, emails, phone numbers, long numbers and home folder names are removed. Names and street addresses are not.",
-			"preview": "What happened",
+			"preview": "What happened (secrets, emails and phones removed)",
 			"previewHint": "Plain text as saved, up to 16 KiB.",
 			"previewEmpty": "No log text was saved for this failure.",
 			"signature": "Failure fingerprint",

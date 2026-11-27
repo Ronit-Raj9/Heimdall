@@ -72,7 +72,6 @@ export function InboxTab() {
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">
 			<div className="flex flex-wrap items-center gap-3">
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
 				{data?.mode === "live" && <InboxPullButton check={ready?.inbox} />}
 				<Link to="/maxim" className="text-primary text-sm font-medium underline-offset-2 hover:underline" data-testid="inbox-maxim-link">
 					{m("showcaseLink")}
@@ -248,17 +247,18 @@ export function InboxBody({
 						}
 					>
 						<div className="flex flex-col gap-4">
-							<div className="flex flex-wrap items-center gap-3" data-testid="inbox-filter-row">
+							<div className="flex flex-wrap items-center gap-2" data-testid="inbox-filter-row">
 								<ToolbarSearch
 									value={q}
 									onChange={(next) => onQ(next || null)}
 									label={f("inbox.search")}
 									placeholder={f("inbox.searchPlaceholder")}
 									testId="inbox-search"
+									className="sm:w-48 2xl:w-64"
 								/>
-								<InboxStateFilter counts={data.counts} value={filter} onChange={onFilter} />
 								<SourceFilter names={sourceNames(sources, data.items)} value={source} onChange={onSource} />
 								<SinceFilter value={since} onChange={setSince} />
+								<InboxStateFilter counts={data.counts} value={filter} onChange={onFilter} />
 							</div>
 							{openedOnAll && (
 								<p className="text-muted-foreground text-sm" role="note" data-testid="inbox-opened-on-all">
@@ -341,7 +341,7 @@ function SinceFilter({ value, onChange }: { value: InboxSince; onChange: (next: 
 	const id = useId();
 	return (
 		<div className="flex items-center gap-2">
-			<label htmlFor={id} className="text-muted-foreground text-sm">
+			<label htmlFor={id} className="text-muted-foreground sr-only text-sm 2xl:not-sr-only">
 				{t("inbox.since")}
 			</label>
 			<NativeSelect
@@ -375,12 +375,12 @@ function SourceFilter({
 	const options = value && !names.includes(value) ? [...names, value] : names;
 	return (
 		<div className="flex items-center gap-2">
-			<label htmlFor={id} className="text-muted-foreground text-sm">
+			<label htmlFor={id} className="text-muted-foreground sr-only text-sm 2xl:not-sr-only">
 				{t("inbox.filters.source")}
 			</label>
 			<NativeSelect
 				id={id}
-				className="min-w-40"
+				className="min-w-36"
 				value={value ?? ""}
 				onChange={(e) => onChange(e.target.value || null)}
 				data-testid="inbox-source-filter"

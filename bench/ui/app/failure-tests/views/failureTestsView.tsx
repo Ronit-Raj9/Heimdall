@@ -462,7 +462,7 @@ export default function FailureTestsView() {
 	return (
 		// On phones the Run bar is fixed to the bottom of the screen (Q-296): the padding keeps the page's end above it.
 		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8 pb-40 sm:pb-0")} data-page-width="read" data-testid="failure-tests-screen">
-			<PageHeader title={t("ft.title")} subtitle={t("ft.subtitle")} />
+			<PageHeader title={t("ft.title")} />
 
 			{noAgents ? (
 				// Q-307: with no agent the form cannot start anything, so it shows the way forward instead.
@@ -477,7 +477,9 @@ export default function FailureTestsView() {
 				{/* No nested card inside the section (BD-13): the fields sit on the page. */}
 				<div className="flex min-w-0 flex-col gap-6">
 					<div className="flex min-w-0 flex-wrap items-start gap-4">
-						<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
+						<div className="w-full max-sm:[&_label]:w-full max-sm:[&_select]:w-full sm:w-auto">
+							<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
+						</div>
 						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
 						<label className="flex w-full flex-col gap-1.5 text-xs font-medium sm:w-auto">
 							{t("ft.version")}
