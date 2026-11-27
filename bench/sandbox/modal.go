@@ -49,9 +49,10 @@ const (
 func init() {
 	Register(Info{
 		Name: PlatformModal, Title: "Modal",
-		TokenHint:     "A Modal API token (Settings, API tokens), as token-id:token-secret (ak-...:as-...).",
-		EndpointLabel: "Environment (optional, the Modal environment name)",
-		DocsURL:       "https://modal.com/docs/reference/modal.config",
+		TokenHint:           "A Modal API token (Settings, API tokens), as token-id:token-secret (ak-...:as-...).",
+		EndpointLabel:       "Environment (optional, the Modal environment name)",
+		EndpointPlaceholder: "main",
+		DocsURL:             "https://modal.com/docs/reference/modal.config",
 	}, func(c Credentials) (Platform, error) { return NewModal(c, "") })
 }
 
