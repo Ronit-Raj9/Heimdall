@@ -217,6 +217,8 @@ export interface ConnectFirstLookResponse {
 	/** Optional second card: the agent against the bare model, same benchmark and size (H06). */
 	bare_model?: EvaluationSpec;
 	bare_model_reason?: string;
+	/** Asked with ?estimate=1: the cost range of the first look; known false when no price is known. */
+	estimate_usd?: { low: number; high: number; known: boolean; reason?: string };
 }
 
 export interface ConnectPlatform {
