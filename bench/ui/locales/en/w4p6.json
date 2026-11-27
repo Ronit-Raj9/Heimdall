@@ -1,9 +1,9 @@
 {
 	"page": {
 		"title": "Gateway report card",
-		"subtitle": "Every Bifrost feature you use, with its measured effect.",
+		"subtitle": "Every Bifrost feature, what it checks, and its measured effect.",
 		"gateway": "Bifrost {{version}} at {{host}}",
-		"gatewayNoVersion": "Bifrost at {{host}}",
+		"gatewayNoVersion": "Gateway: {{host}} (version not reported)",
 		"unreachable": "Heimdall could not reach your gateway: {{error}}",
 		"loadError": "Could not load the gateway report card",
 		"checked": "Checked {{at}}"
@@ -13,7 +13,7 @@
 		"change": "Change",
 		"connect": "Connect your Bifrost",
 		"address": "Bifrost address",
-		"secret": "Secret that holds the admin credential",
+		"secret": "Admin key (from your secrets)",
 		"pickSecret": "Pick a secret",
 		"save": "Connect",
 		"remove": "Disconnect",
@@ -37,8 +37,8 @@
 		"fromNoDate": "From: {{source}}",
 		"unknown": "Unknown: {{reason}}",
 		"notEnough": "Not enough data yet",
-		"open": "Open the test",
-		"start": "Start a test"
+		"open": "See the test result",
+		"start": "Test it"
 	},
 	"dialog": {
 		"title": "Bifrost feature test: {{name}}",
@@ -82,9 +82,9 @@
 		"costPerTask": "Cost per task",
 		"latency": "Latency",
 		"details": "Details",
-		"control": "setting as it is today",
-		"variant": "changed setting",
-		"judgeReused": "({{n}} votes reused)"
+		"control": "Today",
+		"variant": "With the change",
+		"judgeReused": "({{n}} grader answers reused)"
 	},
 	"use": {
 		"button": "Use this in Bifrost",
@@ -96,7 +96,7 @@
 	},
 	"watch": {
 		"title": "Watch for new models",
-		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} USD that Bifrost enforces.",
+		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} that Bifrost enforces.",
 		"firstCheck": "The first check only records the models that exist today. Nothing runs until a new one appears.",
 		"none": "No new model watch is set up.",
 		"model": "Model",
@@ -112,10 +112,10 @@
 		"lastError": "Last check failed: {{error}}"
 	},
 	"agents": {
-		"title": "Agents registered in your Bifrost",
+		"title": "Agents in your Bifrost",
 		"none": "Bifrost lists no registered agents.",
 		"disabled": "Switched off in Bifrost",
-		"benchmark": "Benchmark this agent",
+		"benchmark": "Create agent from this",
 		"model": "Model",
 		"provider": "Provider",
 		"go": "Import and open",

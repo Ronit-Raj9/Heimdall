@@ -149,3 +149,9 @@ export function providerKeyState(keys: readonly Pick<ModelKey, "status" | "over_
 	if (keys.some((k) => k.over_budget && k.status !== "invalid" && k.status !== "error")) return "over-budget";
 	return "failed";
 }
+/** Every Bifrost provider as a choice for a picker, by display name. Pure. */
+export function providerChoices(): { id: string; name: string }[] {
+	return Object.entries(BIFROST_PROVIDERS)
+		.map(([id, p]) => ({ id, name: p.name }))
+		.sort((a, b) => a.name.localeCompare(b.name));
+}

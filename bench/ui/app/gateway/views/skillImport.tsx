@@ -7,24 +7,27 @@ import {
 	type GwSkillImport,
 } from "@/lib/store/apis/gatewaySkillsApi";
 import { errorMessage } from "@/lib/store/apis/schedulesApi";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./uf7cI18n";
 import "./w4intI18n";
 
 /** What the import answered, in the page's words: the scan's outcome, or the server's refusal sentence as it is. Pure. */
 export function importOutcome(
 	result: { data?: GwSkillImport; error?: unknown },
 	t: (key: "skillImport.installed" | "skillImport.blocked" | "skillImport.failed", o?: { folder: string }) => string,
-): { text: string; ok: boolean } {
+): { text: string; ok: boolean; blocked?: boolean } {
 	if (result.data) return { text: t("skillImport.installed", { folder: result.data.folder }), ok: true };
 	const body = (result.error as { data?: unknown } | undefined)?.data as Partial<GwSkillImport> | undefined;
-	if (body && typeof body.folder === "string" && body.scan) return { text: t("skillImport.blocked", { folder: body.folder }), ok: false };
+	if (body && typeof body.folder === "string" && body.scan) return { text: t("skillImport.blocked", { folder: body.folder }), ok: false, blocked: true };
 	return { text: errorMessage(result.error, t("skillImport.failed")), ok: false };
 }
 
 /** The import form: agent, skill and version, then Import. Its hooks run only once it is opened. */
 function SkillImportForm({ onClose }: { onClose(): void }) {
 	const { t } = useTranslation("w4int");
+	const { t: u } = useTranslation("uf7c");
 	const agents = useGetAgentsQuery();
 	const skills = useGetGatewaySkillsQuery();
 	const [agent, setAgent] = useState("");
@@ -32,7 +35,7 @@ function SkillImportForm({ onClose }: { onClose(): void }) {
 	const [version, setVersion] = useState("");
 	const versions = useGetGatewaySkillVersionsQuery(skill, { skip: !skill });
 	const [run, running] = useImportSkillFromBifrostMutation();
-	const [outcome, setOutcome] = useState<{ text: string; ok: boolean } | null>(null);
+	const [outcome, setOutcome] = useState<{ text: string; ok: boolean; blocked?: boolean } | null>(null);
 	const onImport = async () => {
 		setOutcome(null);
 		setOutcome(importOutcome(await run({ agent, skill_id: skill, version }), (k, o) => String(t(k, o as never))));
@@ -110,6 +113,14 @@ function SkillImportForm({ onClose }: { onClose(): void }) {
 					data-testid="gateway-skill-import-outcome"
 				>
 					{outcome.text}
+					{outcome.blocked && agent && (
+						<>
+							{" "}
+							<Link to="/agents/$agentId" params={{ agentId: agent }} search={{ tab: "tools" } as never} className="text-primary hover:underline">
+								{u("skill.openTools")}
+							</Link>
+						</>
+					)}
 				</p>
 			)}
 		</div>
