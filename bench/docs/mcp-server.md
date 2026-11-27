@@ -4,7 +4,7 @@
 
 ```sh
 export HEIMDALL_URL=https://heimdall.example.com
-export HEIMDALL_TOKEN=hm_...          # Settings, API tokens; scope "Run evaluations" for run_evaluation
+export HEIMDALL_TOKEN=hm_...          # Settings > Access tokens; scope "Run evaluations" for run_evaluation
 bifrost-bench mcp serve
 ```
 

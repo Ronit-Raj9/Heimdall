@@ -2,7 +2,7 @@
 
 Heimdall never calls a model provider directly. Every model call an agent makes goes through the [Bifrost](https://github.com/maximhq/bifrost) gateway, which gives one endpoint for every provider and a request log the agent cannot edit. So the models you can evaluate are the models Bifrost can reach: closed models, open-weight models, and any server that speaks the OpenAI API.
 
-The model picker in the evaluation wizard and the "Models and keys" page both read `GET /api/bench/models`.
+The model picker in the evaluation wizard and the [Settings > Model keys](/settings?tab=keys) tab both read `GET /api/bench/models`.
 
 ## Every Bifrost provider
 
@@ -47,7 +47,7 @@ Bifrost core also knows a few more provider ids (for example `bedrock_mantle`, `
 
 ## Adding a key
 
-1. Open **Models and keys** (or, in the wizard, the "Add a key" link next to the model picker).
+1. Open [Settings > Model keys](/settings?tab=keys) (or, in the wizard, the "Add a key" link next to the model picker).
 2. Pick the provider. The form says where to get a key and what it usually starts with.
 3. Paste the key. For a custom or self-hosted provider, also give the base URL (ending in `/v1` for OpenAI-compatible servers).
 4. Optional: limit the key to some models, or give it a budget in dollars.

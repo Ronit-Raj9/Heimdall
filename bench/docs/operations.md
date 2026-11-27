@@ -149,7 +149,7 @@ Rotate in this order; the first three were exposed. For each: what, where it
 lives, how to rotate, how to check.
 
 1. Modal token pasted in a chat: in the Modal dashboard, revoke it and create
-   a new one; paste it in Settings > Workers > Modal. Check: the card says
+   a new one; paste it in [Settings > Workers](/settings?tab=runners), Modal. Check: the card says
    connected and an egress probe passes.
 2. Temporary SSH key `heimdall-fleet-temp`: remove its line from
    `~/.ssh/authorized_keys` on the VM and from the VM's SSH keys in Azure.
@@ -157,7 +157,7 @@ lives, how to rotate, how to check.
 3. GitHub token of the `Ronit-Raj9` account used on the laptop: regenerate it
    in GitHub settings with the same scopes and sign in again. Check: the
    GitHub tool reports the new login.
-4. Provider keys (OpenAI and others) in Settings > API keys of each
+4. Provider keys (OpenAI and others) in Settings > Model keys of each
    organization: create a new key at the provider, paste it, press Test,
    then delete the old key at the provider.
 5. `BIFROST_SETUP_TOKEN`, `BENCH_FAULTPROXY_TOKEN`,

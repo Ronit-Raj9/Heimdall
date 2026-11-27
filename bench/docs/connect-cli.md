@@ -10,7 +10,7 @@ heimdall connect                                   # inside the agent's reposito
 
 ## heimdall login
 
-Device login (RFC 8628). The CLI prints a short code and opens `https://<server>/device?code=...`; where you are signed in, check the code and approve. The server mints an org API token in your current organization (scope `evaluate` by default, `-scope read` or `-scope admin` on request, 90 days) and hands it to the terminal once. It is stored in `~/.config/heimdall/credentials.json` with mode 0600 (`$HEIMDALL_CONFIG_DIR` or `$XDG_CONFIG_HOME/heimdall` when set) and shows under Settings > API tokens as "CLI login: heimdall CLI on <host>", where you can revoke it.
+Device login (RFC 8628). The CLI prints a short code and opens `https://<server>/device?code=...`; where you are signed in, check the code and approve. The server mints an org API token in your current organization (scope `evaluate` by default, `-scope read` or `-scope admin` on request, 90 days) and hands it to the terminal once. It is stored in `~/.config/heimdall/credentials.json` with mode 0600 (`$HEIMDALL_CONFIG_DIR` or `$XDG_CONFIG_HOME/heimdall` when set) and shows under [Settings > Access tokens](/settings?tab=tokens) as "CLI login: heimdall CLI on <host>", where you can revoke it.
 
 - CI or a pasted token: `echo "$HEIMDALL_TOKEN" | heimdall login -with-token -url ...`.
 - A local server has no accounts: pass its write token with `-with-token`.

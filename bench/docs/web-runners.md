@@ -10,14 +10,14 @@ If the server owner runs a shared runner and has turned **Use the shared
 runner pool** on for your organization, experiments run there with the
 built-in agents and suites. Nothing to set up: the wizard and QuickRun just
 work. The org's pool status (limits, kill switch, shared pool on or off)
-is served at `GET /api/bench/pool`; **Operate > Runners** lists runners.
+is served at `GET /api/bench/pool`; [Settings > Workers](/settings?tab=runners) lists runners.
 
 No shared runner and no runner of your own? Pages that need one say so and
 link here. Start your own (below) or ask the server owner to enable the pool.
 
 ## Your own runner
 
-Admins only. **Settings > Runners**:
+Admins only. [Settings > Workers](/settings?tab=runners):
 
 1. **Create runner token**: pick a pool name (letters, digits, dots, dashes,
    underscores). The token shows once.

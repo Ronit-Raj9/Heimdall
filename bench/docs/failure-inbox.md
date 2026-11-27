@@ -460,8 +460,8 @@ actions. Actions need the write token and live mode. The API:
 
 ## Maxim failures in bulk
 
-The Maxim page (`/maxim`, linked from the Inbox and from Settings >
-Integrations) turns a Maxim log repository's production failures into
+The Maxim page (`/maxim`, linked from Production failures and from
+[Settings > Integrations](/settings?tab=integrations)) turns a Maxim log repository's production failures into
 regression tasks in one pass, on the org's own Maxim connection (the API
 key stays in the org key store):
 
@@ -581,7 +581,7 @@ The hosted server runs a pull in its own process (it only makes HTTP calls), fro
 - Every URL it reads (gateway, Langfuse or LangSmith host, judge) must be public https. Loopback, private and link-local addresses are refused, again at connect time, and redirects are not followed.
 - A `*_env` field names an org secret (Settings > Secrets), never a server variable.
 - One pull makes at most 2000 requests, reads at most 256 MiB and runs at most 5 minutes; pull again to continue from the cursor.
-- The paid live judge runs only when ticked for that pull, with the org's own provider key (Models & keys): a key labelled like `judge.key_env`, or one whose base URL has the judge URL's host. `otlp_dir` sources are local only.
+- The paid live judge runs only when ticked for that pull, with the org's own provider key ([Settings > Model keys](/settings?tab=keys)): a key labelled like `judge.key_env`, or one whose base URL has the judge URL's host. `otlp_dir` sources are local only.
 
 The page lists each missing step with a link (Settings > Secrets, or the setup form).
 

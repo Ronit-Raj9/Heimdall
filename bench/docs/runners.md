@@ -16,7 +16,7 @@ verifies and stores. An organization has two kinds:
   your own Docker images, private networks, GPUs or more slots.
 
 Either way, runs use **your organization's own provider keys**: the keys you
-added in Models & keys, stored encrypted on the server and handed to the
+added in [Settings > Model keys](/settings?tab=keys), stored encrypted on the server and handed to the
 runner per lease (below). There is no fallback to a key of the server or of
 the runner: a run on a provider your organization has no working key for is
 refused before it starts.

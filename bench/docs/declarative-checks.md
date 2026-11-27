@@ -84,7 +84,7 @@ each mutant to fail.
   tasks with a simulated customer, the account merged into the starting
   data, a `checks.yaml`, a reference that makes the expected calls and
   mutants that skip the key call or also make a forbidden one.
-- **Failure inbox** ("What should have happened?" on an item, or `guide` on
+- **Production failures** ("What should have happened?" on an item, or `guide` on
   `POST /api/bench/inbox/{id}/accept`): the recorded calls marked right or
   wrong, plus any missing call and a reply rubric, become the task's
   `checks.yaml`, reference and mutants. See docs/failure-inbox.md.

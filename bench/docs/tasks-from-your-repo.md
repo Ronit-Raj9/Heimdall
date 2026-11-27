@@ -427,7 +427,7 @@ separated host names, at most 32 in all) in `deploy/hosted/.env`, then runs
 ### Model key
 
 The server mints one Bifrost virtual key per build job on its own gateway,
-with the organization's own provider key from Models & keys. The worker gets
+with the organization's own provider key from [Settings > Model keys](/settings?tab=keys). The worker gets
 only that key and calls the gateway with it; the provider key never leaves
 the server. The server revokes the key when the job ends (also on cancel or
 failure) and adds the job's reported cost to that key's month spend. The

@@ -24,10 +24,11 @@ Runs use your organization's own provider keys. There is no free fallback:
 an evaluation on a provider you have no working key for is refused before
 anything runs.
 
-1. Left nav, **Models & keys**, then **Add a model key**.
-2. Pick the provider, paste the API key, optionally set **Allowed models**
-   and a **Monthly budget (USD)** (0 means no limit).
-3. Press **Save key**, then **Test** on its row. Status must read `works`.
+1. Open [Settings > Model keys](/settings?tab=keys) from the sidebar.
+2. Press **Add key** on your provider's card.
+3. Paste the API key; optionally set **Allowed models** and a monthly spending limit in USD (0 means no limit).
+4. Press **Save key**.
+5. Press **Test** on the saved key: it makes one cheap call to your provider, and the status must read `works`.
 
 The key is stored encrypted on the server. After saving, only its label is
 shown, and nobody can read the value back. A worker gets it only for the
@@ -36,7 +37,9 @@ length of a run it was handed, never for anything else. Details:
 
 ## 3. Register your agent
 
-Left nav, **Agents**, then **New agent**. Start from a template:
+1. Open [Agents](/agents) from the sidebar.
+2. Press **New agent** and start from a template (table below).
+3. Save it: saving makes no model call.
 
 | Your agent is | Template |
 |---|---|
@@ -52,7 +55,13 @@ built-in agent first. More: [web-agents.md](web-agents.md).
 
 ## 4. Evaluate your agent
 
-Press **Evaluate your agent** on Home (or open `/evaluate`). Five steps:
+1. Press **Evaluate an agent** at the top of the page, or **Evaluate your agent** on Home ([open](/evaluate)).
+2. Step **Your agent**: pick your agent and its version.
+3. Step **What to learn**: pick **How good is my agent?** for a first score.
+4. Step **Benchmarks**: pick a pack or single benchmarks; ones your agent cannot run are marked and left out.
+5. Step **Model and setup**: pick the model, the number of tasks and repeats, and a spending cap.
+6. Step **Launch**: read the estimate of runs, cost and time.
+7. Press **Launch evaluation**: this is the step that costs money, billed by your provider to the key from step 2.
 
 | Step | What you pick | Tip |
 |---|---|---|
@@ -71,12 +80,12 @@ how your agent copes, not just how it does on a good day.
 Runs execute in containers on a **worker**, never inside the web server.
 Every organization can use the server's shared worker with the built-in
 agents and benchmarks: nothing to set up. To run on your own machine or
-cloud account instead, connect your own worker on the **Workers** page
+cloud account instead, connect your own worker in [Settings > Workers](/settings?tab=runners)
 ([web-runners.md](web-runners.md)).
 
 ## 6. Read the report card
 
-**Evaluations** (`/evaluations`) lists every evaluation. Each one has a live
+Find your evaluation under [Evaluations](/evaluations) in the sidebar, which lists every evaluation. Each one has a live
 page that turns into its **report card** as benchmarks finish:
 
 - **Score** with a likely range per benchmark and per skill. Few runs give a
@@ -101,6 +110,11 @@ are never in a shared page, and prompts can be hidden too. From the same
 menu you can download the report card as HTML, Markdown or PDF, copy a
 badge for a README, or download a **reproduce bundle** with the exact
 evaluation spec, agent version, benchmark locks and commands. More: [sharing.md](sharing.md).
+
+## The same from the command line
+
+Prefer a terminal? The command line path is in [quickstart.md](quickstart.md),
+and every command's place on the website is in [CLI_WEB_PARITY.md](CLI_WEB_PARITY.md).
 
 ## Where next
 

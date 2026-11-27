@@ -153,7 +153,7 @@ Every number comes from the measurements Heimdall already records for each run (
 | `score` | Success rate: runs that passed the hidden checks (and every safety check) divided by counted runs. |
 | `ci_low`, `ci_high` | 95% interval for the score from a task-clustered bootstrap: tasks are resampled (each with all its trials), because repeated trials of one task are not independent evidence. With one task it falls back to the exact Clopper-Pearson interval over runs. With few tasks the interval is wide; that is the honest answer. |
 | `runs` | Counted runs for that arm. |
-| `cost_usd` | Sum of each run's cost, priced from the pinned price list using the token counts Bifrost recorded. `null` (shown as "Not known", never $0) when any run's cost is unknown; `cost_runs` counts the runs whose cost is known and `cost_note` says why the others are not. A model the price list does not have (a custom endpoint) is priced from the price set on its key in Models & keys (input, output and cached input per 1M tokens). |
+| `cost_usd` | Sum of each run's cost, priced from the pinned price list using the token counts Bifrost recorded. `null` (shown as "Not known", never $0) when any run's cost is unknown; `cost_runs` counts the runs whose cost is known and `cost_note` says why the others are not. A model the price list does not have (a custom endpoint) is priced from the price set on its key in [Settings > Model keys](/settings?tab=keys) (input, output and cached input per 1M tokens). |
 | `tokens` | Sum of input and output tokens Bifrost recorded for the arm's model calls; `null` when any run's count is unknown (`token_runs` counts the known ones). |
 | `tasks` | Distinct tasks with a counted run. |
 | `steps` | Median agent steps per run. |

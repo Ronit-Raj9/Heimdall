@@ -48,7 +48,7 @@ Every JSON answer is the payload plus a top-level `mode` (`live`, `recorded`, `s
 
 Local mode: writes need `Authorization: Bearer <BENCH_WRITE_TOKEN>`; reads need nothing beyond the loopback host check.
 
-Hosted mode: send an organization API token, `Authorization: Bearer hm_...`, made under Settings, API tokens. A token is limited twice: by its role (viewer, member, admin, owner; never above its creator's) and by its scope:
+Hosted mode: send an organization API token, `Authorization: Bearer hm_...`, made under [Settings > Access tokens](/settings?tab=tokens). A token is limited twice: by its role (viewer, member, admin, owner; never above its creator's) and by its scope:
 
 | Scope | Allows |
 |---|---|
