@@ -40,7 +40,6 @@ export default function MonitorsView() {
 		<section className="flex w-full flex-col gap-8" data-testid="monitors-screen">
 			<PageHeader
 				title={tu("monitors.title")}
-				subtitle={tu("monitors.subtitle")}
 				actions={
 					cert || listEmpty ? undefined : (
 						<Button

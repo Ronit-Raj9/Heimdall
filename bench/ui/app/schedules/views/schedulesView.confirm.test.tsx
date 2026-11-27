@@ -47,14 +47,14 @@ describe("Run now", () => {
 		const ok = await confirmRunNow(confirm, t, DATA.rows[0]);
 		expect(ok).toBe(false);
 		const [message, opts] = confirm.mock.calls[0] as unknown as [string, { confirmLabel: string }];
-		expect(message).toBe("Run nightly now? It starts ev_1 again and can spend up to $3.50 of this schedule's $5.00 limit.");
+		expect(message).toBe("Run nightly now? It restarts ev_1 and can spend up to $3.50 of the $5.00 limit.");
 		expect(opts.confirmLabel).toBe("Run now");
 	});
 
 	it("says there is no limit when the schedule has none", async () => {
 		const confirm = vi.fn(async (_message: string, _opts?: unknown) => true);
 		expect(await confirmRunNow(confirm, t, { ...DATA.rows[0], max_usd_per_day: undefined })).toBe(true);
-		expect(confirm.mock.calls[0][0]).toContain("no schedule limit");
+		expect(confirm.mock.calls[0][0]).toContain("no schedule spending limit");
 	});
 });
 

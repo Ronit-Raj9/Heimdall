@@ -1,6 +1,6 @@
 {
 	"title": "Live monitors",
-	"subtitle": "Scheduled tasks against your deployed agent.",
+	"subtitle": "",
 	"new": "New monitor",
 	"loadError": "Could not load live monitors",
 	"detailError": "Could not load this monitor",

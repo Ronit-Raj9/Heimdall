@@ -20,7 +20,7 @@ describe("ReviewForm", () => {
 	it("offers the four decisions and says the reviewer name is self-declared", () => {
 		const html = renderToStaticMarkup(<ReviewForm {...base} />);
 		for (const d of ["pass", "fail", "invalid", "flag_only"]) expect(html).toContain(`data-testid="review-decision-${d}"`);
-		expect(html).toContain("There is no login");
+		expect(html).toContain("No login. The name is self-declared");
 		expect(tag(html, "review-submit")).not.toContain('disabled=""');
 		expect(html).not.toContain('data-testid="review-form-read-only"');
 	});
@@ -45,7 +45,7 @@ describe("ReviewForm", () => {
 		it(`is read-only in ${mode} mode`, () => {
 			const html = renderToStaticMarkup(<ReviewForm {...base} mode={mode} />);
 			expect(html).toContain('data-testid="review-form-read-only"');
-			expect(html).toContain(`runs in ${mode} mode`);
+			expect(html).toContain(`is in ${mode} mode`);
 			expect(tag(html, "review-submit")).toContain('disabled=""');
 			expect(tag(html, "review-reason-input")).toContain('disabled=""');
 		});
@@ -62,7 +62,7 @@ describe("ReviewForm in hosted mode", () => {
 		const html = render(<ReviewForm {...base} />, hostedSession("member"));
 		expect(html).toContain('data-testid="review-form"');
 		expect(html).not.toContain("review-token-input");
-		expect(html).not.toContain("There is no login");
+		expect(html).not.toContain("No login. The name is self-declared");
 		expect(tag(html, "review-reviewer-input")).toContain('value="Ada Lovelace"');
 	});
 	it("keeps the token box in local mode", () => {

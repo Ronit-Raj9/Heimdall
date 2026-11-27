@@ -1,7 +1,7 @@
 {
 	"nav": "Human review",
 	"title": "Human review",
-	"subtitle": "Agreed labels tune the benchmark's judge.",
+	"subtitle": "",
 	"loadError": "Could not load human review queues",
 	"empty": "No queues yet. Create one, then add runs.",
 	"fromCalibration": "Let several people label answers and measure agreement.",
@@ -15,7 +15,7 @@
 		"namePlaceholder": "Refund answers, November",
 		"benchmark": "Benchmark",
 		"benchmarkNone": "None, labels stay in the queue",
-		"benchmarkHint": "Agreed labels are used to check this benchmark's grader.",
+		"benchmarkHint": "",
 		"kind": "What people label",
 		"kindRuns": "Agent answers: is the answer correct?",
 		"kindJudge": "Judge decisions: was the judge right?",
@@ -126,7 +126,7 @@
 	},
 	"add": {
 		"title": "Add items",
-		"description": "Adds finished runs of an evaluation's benchmark. Balance takes passed and failed runs evenly.",
+		"description": "",
 		"experiment": "Comparison id",
 		"experimentPlaceholder": "e_2026_11_20_support",
 		"sample": "Max runs, 0 for all",
@@ -145,7 +145,7 @@
 	},
 	"agreement": {
 		"title": "Agreement",
-		"description": "Chance-corrected labeller agreement, and the judge against final labels.",
+		"description": "",
 		"none": "Agreement needs items with at least two labels.",
 		"percent": "Raw agreement",
 		"fleiss": "Fleiss' kappa",

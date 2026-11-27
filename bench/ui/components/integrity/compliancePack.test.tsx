@@ -10,6 +10,6 @@ describe("CompliancePackLinks", () => {
 		expect(html).toContain("/experiments/e_pilot/compliance?format=md");
 		expect(html).toContain("/experiments/e_pilot/compliance?format=json");
 		expect(html).toContain('download="compliance-e_pilot.md"');
-		expect(html).toContain("not a certificate");
+		expect(html).toContain("Not a certificate");
 	});
 });

@@ -64,7 +64,6 @@ export default function CanariesView() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="canaries-screen">
 			<PageHeader
 				title={t("canaries.title")}
-				subtitle={t("canaries.subtitle")}
 				actions={
 					hasAny && !formOpen ? (
 						<Button size="sm" onClick={() => setFormOpen(true)} data-testid="canary-new-open">

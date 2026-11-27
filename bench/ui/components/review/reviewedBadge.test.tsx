@@ -15,7 +15,7 @@ describe("ReviewedBadge", () => {
 		expect(html).toContain('data-testid="b"');
 		expect(html).toContain("3 runs human-reviewed");
 		expect(html).toContain("2 changed");
-		expect(html).toContain("never verified");
+		expect(html).toContain("Never verified");
 		expect(html).not.toMatch(/>[^<]*\bverified\b[^<]*</i);
 	});
 
@@ -27,6 +27,6 @@ describe("ReviewedBadge", () => {
 
 	it("says when grade source reviewed applied no review", () => {
 		const html = renderToStaticMarkup(<ReviewedBadge gradeSource="reviewed" testId="b" />);
-		expect(html).toContain("no review applied");
+		expect(html).toContain("none applied");
 	});
 });

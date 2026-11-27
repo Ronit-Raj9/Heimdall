@@ -48,7 +48,7 @@ describe("MonitorCertifyForm", () => {
 		expect(html).not.toContain("monitor-certify-exp-e_debug");
 		expect(html).not.toContain('data-testid="monitor-certify-path"');
 		expect(html).not.toContain("local server only");
-		expect(html).toContain("Runs on your worker");
+		expect(html).toContain("No model calls.");
 	});
 
 	it("lists monitor files and finished, searchable comparisons", () => {

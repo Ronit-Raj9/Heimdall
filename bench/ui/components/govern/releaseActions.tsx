@@ -64,9 +64,6 @@ export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]
 						variant="outline"
 						onDone={() => void packs.refetch()}
 					/>
-					<p className="text-muted-foreground line-clamp-2 text-xs" title={t("releases.complianceHint")}>
-						{t("releases.complianceHint")}
-					</p>
 				</div>
 			)}
 			<div className="border-t pt-5">

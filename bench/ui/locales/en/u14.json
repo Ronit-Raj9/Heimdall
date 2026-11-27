@@ -89,13 +89,13 @@
 		}
 	},
 	"review": {
-		"subtitle": "Your review never changes the original evidence.",
+		"subtitle": "",
 		"all": "All",
 		"inbox": "Inbox",
 		"title": "Needs review"
 	},
 	"monitors": {
-		"subtitle": "Bad runs caught, good runs flagged.",
+		"subtitle": "",
 		"catchRate": "Bad runs caught",
 		"noAttacks": "No bad runs to test on",
 		"labelled": "{{honest}} good runs, {{attacks}} bad runs",

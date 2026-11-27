@@ -1,4 +1,5 @@
 import type { LeaderboardGradeSourceMode } from "@/lib/types/bench";
+import { fieldStackClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,14 +22,14 @@ export function GradeSourcePicker({ value, onChange, disabled, testId = "grade-s
 	const { t } = useTranslation("bench");
 	const id = useId();
 	return (
-		<div className="flex flex-col gap-1">
+		<div className={fieldStackClass}>
 			<span id={id} className="text-muted-foreground text-xs">
 				{t("review.gradeSource.label")}
 			</span>
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
+				className="bg-muted inline-flex h-(--control-h) w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid={testId}
 			>
 				{GRADE_SOURCE_MODES.map((mode) => {

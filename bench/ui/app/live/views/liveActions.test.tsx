@@ -61,7 +61,7 @@ describe("LiveSetup (N131)", () => {
 	it("keeps Replace unticked when settings exist, says so, and holds Save until it is ticked", () => {
 		const html = render(<LiveSetup existing />);
 		expect(tag(html, "live-setup-force")).not.toContain("checked");
-		expect(html).toContain("This organization already has live scoring settings. Tick Replace to overwrite them.");
+		expect(html).toContain("Live scoring settings exist. Tick Replace to overwrite them.");
 		expect(tag(html, "live-setup-submit")).toContain("disabled");
 		const later = liveInitParams("later", v, false);
 		expect(liveSetupCanSave(later, true, false)).toBe(false);

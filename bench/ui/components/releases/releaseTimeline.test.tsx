@@ -50,7 +50,7 @@ describe("ReleaseTimeline", () => {
 		tampered[1].prev_hash = "0".repeat(64);
 		const html = render(tampered, false);
 		expect(html).toContain('data-chain-ok="false"');
-		expect(html).toContain("Log was changed after it was written");
+		expect(html).toContain("Log changed after writing");
 		expect(html).toMatch(/data-testid="release-link-rel_syn0000002" data-linked="false"/);
 		expect(html).toMatch(/data-testid="release-link-rel_syn0000003" data-linked="true"/);
 	});

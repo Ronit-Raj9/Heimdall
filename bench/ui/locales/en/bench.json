@@ -2139,7 +2139,7 @@
 	},
 	"canaries": {
 		"title": "Drift monitors",
-		"subtitle": "Scheduled tests that warn when results drop.",
+		"subtitle": "",
 		"loadError": "Could not load the drift monitors.",
 		"detailError": "Could not load drift monitor {{name}}.",
 		"empty": "No drift monitors yet. Create one with the form below, then press Record baseline on it. (Terminal: heimdall canary init)",
@@ -3269,7 +3269,7 @@
 	},
 	"review": {
 		"title": "Needs review",
-		"subtitle": "Reviews never edit saved evidence.",
+		"subtitle": "",
 		"picker": {
 			"loadError": "Could not load the comparisons."
 		},
@@ -3286,7 +3286,7 @@
 			"empty": "Nothing to review in this comparison.",
 			"emptyFiltered": "No run has this reason.",
 			"problems": "Ignored reviews",
-			"problemsHint": "Tampered reviews and unverified runs. No effect.",
+			"problemsHint": "Tampered reviews and unverified runs are left out.",
 			"columns": {
 				"run": "Run",
 				"task": "Task",
@@ -3382,7 +3382,7 @@
 			"reviewerRequired": "A reviewer name is required.",
 			"decisionRequired": "Pick a decision.",
 			"readOnly": "This server is in {{mode}} mode and refuses reviews. Only live run folders accept them.",
-			"noAuth": "No login. The token is the only guard."
+			"noAuth": "No login. The name is self-declared. The token is the only guard."
 		},
 		"badge": {
 			"reviewed_one": "{{count}} run human-reviewed",

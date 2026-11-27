@@ -17,7 +17,7 @@ describe("CanaryList", () => {
 		expect(html).toMatch(/data-state="steady" data-testid="canary-state-smoke-toy"/);
 		expect(html).toContain("bedrock/claude-sonnet-4-5");
 		expect(html).toContain("e_canary_1");
-		expect(html).toMatch(/data-testid="canary-spend-smoke-toy"[^>]*>no limit \(practice mode\)</);
+		expect(html).toMatch(/data-testid="canary-spend-smoke-toy"[^>]*>no limit, practice mode</);
 		expect(html).toContain('data-testid="canary-smoke-smoke-toy"');
 	});
 

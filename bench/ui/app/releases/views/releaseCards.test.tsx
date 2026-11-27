@@ -39,7 +39,7 @@ describe("ReleaseCards", () => {
 		const r = { ...fixture.releases[0], prev_hash: "", summary: undefined };
 		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
 		expect(html).toContain("First record in the log");
-		expect(html).toContain("No numbers were recorded with this release.");
+		expect(html).toContain("No numbers recorded.");
 		expect(html).toContain(`data-testid="release-copy-link-${r.release_id}"`);
 		expect(releaseLink("https://h.io", "rel_1")).toBe("https://h.io/releases?release=rel_1");
 		expect(html).not.toContain("hover:shadow-md");

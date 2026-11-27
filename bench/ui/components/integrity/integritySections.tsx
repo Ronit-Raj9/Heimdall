@@ -57,7 +57,6 @@ export function ExperimentMonitorsSection({ expId }: { expId: string }) {
 						compact
 						icon={ShieldCheck}
 						title={tu("checks.monitorsEmptyTitle")}
-						body={tu("checks.monitorsEmptyBody")}
 						action={{ label: tu("checks.monitorsSetUp"), to: "/monitors" }}
 						testId="monitors-empty"
 					/>

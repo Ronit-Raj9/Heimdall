@@ -577,7 +577,7 @@ export function AddItems({ queue }: { queue: AnnotationQueue }) {
 	const experiment = options.some((e) => e.exp_id === picked) ? picked : (options[0]?.exp_id ?? "");
 	const benchmark = suiteName(queue.benchmark);
 	return (
-		<Section title={t("add.title")} description={t("add.description")} testId="annotation-add">
+		<Section title={t("add.title")} testId="annotation-add">
 			{list.isLoading ? (
 				<BlockSkeleton rows={2} testId="annotation-add-loading" />
 			) : list.error ? (
@@ -708,7 +708,7 @@ export function AgreementPanel({ data }: { data: AnnotationAgreement }) {
 		? ` (${t(`agreement.scale.${a.interpretation}` as "agreement.scale.poor", { defaultValue: a.interpretation })})`
 		: "";
 	return (
-		<Section title={t("agreement.title")} description={t("agreement.description")} testId="annotation-agreement">
+		<Section title={t("agreement.title")} testId="annotation-agreement">
 			{a.multi_labelled === 0 ? (
 				<EmptyNote testId="annotation-agreement-none">{t("agreement.none")}</EmptyNote>
 			) : (

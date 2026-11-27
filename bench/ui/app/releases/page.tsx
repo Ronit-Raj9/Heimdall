@@ -16,7 +16,7 @@ export default function ReleasesPage() {
 	const { t: tu } = useTranslation("u14");
 	return (
 		<div className={cn(pageWidthClass("wide"), "flex flex-col gap-4")} data-page-width="wide" data-testid="releases-page">
-			<PageHeader title={tu("releases.title")} subtitle={tu("releases.subtitle")} testId="releases-header" />
+			<PageHeader title={tu("releases.title")} testId="releases-header" />
 			<RouteTabs
 				tabs={[
 					{ id: "history", label: t("releases.history") },

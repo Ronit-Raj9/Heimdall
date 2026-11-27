@@ -31,7 +31,7 @@ describe("releaseAgent (Q-16)", () => {
 
 describe("compliance hint (Q-210, Q-225)", () => {
 	it("names no project folder", () => {
-		expect(i18n.getFixedT("en", "govern")("releases.complianceHint")).toBe("Makes a report you can download below.");
+		expect(i18n.getFixedT("en", "govern")("releases.complianceHint")).toBe("");
 	});
 });
 
