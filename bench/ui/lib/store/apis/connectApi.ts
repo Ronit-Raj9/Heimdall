@@ -32,7 +32,8 @@ export const connectApi = benchApi.injectEndpoints({
 			query: (id) => `/connect/verify/${encodeURIComponent(id)}`,
 		}),
 		planFirstLook: builder.mutation<ConnectFirstLookResponse, { agent: string; model?: string; provider?: string }>({
-			query: (body) => ({ url: "/connect/first-look", method: "POST", body }),
+			// estimate=1 adds the cost range of the first look (M2-85); an older server ignores it.
+			query: (body) => ({ url: "/connect/first-look?estimate=1", method: "POST", body }),
 		}),
 	}),
 });

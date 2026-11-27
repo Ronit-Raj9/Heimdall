@@ -88,6 +88,8 @@ export interface RouteTabsProps {
 	children: (active: string) => ReactNode;
 	className?: string;
 	testId?: string;
+	/** Shown at the end of the strip, after the scroller and outside its fade: a More menu (M4-14). */
+	trailing?: ReactNode;
 }
 
 /**
@@ -96,7 +98,7 @@ export interface RouteTabsProps {
  * On a narrow screen the strip scrolls sideways, fades at the edge that hides tabs, and keeps the
  * active tab in view.
  */
-export function RouteTabs({ tabs, defaultTab, param, history, label, children, className, testId }: RouteTabsProps) {
+export function RouteTabs({ tabs, defaultTab, param, history, label, children, className, testId, trailing }: RouteTabsProps) {
 	const { t } = useTranslation("gw20");
 	const [active, select, requested] = useRouteTab(tabs, { defaultTab, param, history });
 	const list = useRef<HTMLDivElement>(null);
@@ -113,6 +115,34 @@ export function RouteTabs({ tabs, defaultTab, param, history, label, children, c
 	const shownLabel = tabs.find((tab) => tab.id === active)?.label;
 	// An active addressable tab goes at the end of the strip; it leaves when another tab is chosen.
 	const visible = [...tabs.filter((tab) => !tab.hidden), ...tabs.filter((tab) => tab.hidden && tab.addressable && tab.id === active)];
+	const tabList = (
+		<TabsPrimitive.List
+			ref={list}
+			aria-label={label}
+			className={cn(
+				"-mx-1 flex min-w-0 items-end gap-1 overflow-x-auto px-1 [scrollbar-width:thin]",
+				trailing ? "-mb-px flex-1" : "border-border border-b",
+			)}
+		>
+			{visible.map((tab) => (
+				<TabsPrimitive.Trigger
+					key={tab.id}
+					value={tab.id}
+					data-testid={tab.testId ?? `tab-${tab.id}`}
+					className={cn(
+						"text-muted-foreground hover:text-foreground relative -mb-px inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+						"data-[state=active]:border-primary data-[state=active]:text-foreground",
+						"rounded-t-sm focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
+					)}
+				>
+					{tab.label}
+					{tab.badge !== undefined && tab.badge !== null && (
+						<span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] leading-4 tabular-nums">{tab.badge}</span>
+					)}
+				</TabsPrimitive.Trigger>
+			))}
+		</TabsPrimitive.List>
+	);
 	return (
 		<TabsPrimitive.Root
 			value={active}
@@ -121,35 +151,22 @@ export function RouteTabs({ tabs, defaultTab, param, history, label, children, c
 			data-testid={testId ?? "route-tabs"}
 			data-active={active}
 		>
-			<TabsPrimitive.List
-				ref={list}
-				aria-label={label}
-				className="border-border -mx-1 flex min-w-0 items-end gap-1 overflow-x-auto border-b px-1 [scrollbar-width:thin]"
-			>
-				{visible.map((tab) => (
-					<TabsPrimitive.Trigger
-						key={tab.id}
-						value={tab.id}
-						data-testid={tab.testId ?? `tab-${tab.id}`}
-						className={cn(
-							"text-muted-foreground hover:text-foreground relative -mb-px inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium whitespace-nowrap transition-colors",
-							"data-[state=active]:border-primary data-[state=active]:text-foreground",
-							"rounded-t-sm focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
-						)}
-					>
-						{tab.label}
-						{tab.badge !== undefined && tab.badge !== null && (
-							<span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] leading-4 tabular-nums">{tab.badge}</span>
-						)}
-					</TabsPrimitive.Trigger>
-				))}
-			</TabsPrimitive.List>
+			{trailing ? (
+				<div className="border-border flex min-w-0 items-end gap-2 border-b">
+					{tabList}
+					<div className="flex shrink-0 items-center pb-1" data-testid="route-tabs-trailing">
+						{trailing}
+					</div>
+				</div>
+			) : (
+				tabList
+			)}
 			{unknown && (
 				<p role="status" className="text-muted-foreground text-xs" data-testid="route-tabs-unknown">
 					{t("routeTabs.unknown", { tab: unknown, label: typeof shownLabel === "string" ? shownLabel : active })}
 				</p>
 			)}
-			<TabsPrimitive.Content value={active} className="focus-visible:ring-(--focus) min-w-0 rounded-sm outline-none focus-visible:ring-2">
+			<TabsPrimitive.Content value={active} className="min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-(--focus)">
 				{children(active)}
 			</TabsPrimitive.Content>
 		</TabsPrimitive.Root>
