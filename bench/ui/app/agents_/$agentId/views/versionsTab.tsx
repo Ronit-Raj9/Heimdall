@@ -104,7 +104,6 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid="agent-versions-tab">
 			<Section
 				title={t("versions.title")}
-				description={t("versions.description")}
 				testId="agent-versions-section"
 				actions={
 					noFile ? undefined : (

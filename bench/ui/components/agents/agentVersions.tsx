@@ -21,7 +21,6 @@ export function AgentVersions({ agentId, actions }: { agentId: string; actions?:
 	return (
 		<Section
 			title={t("agents.versions.title")}
-			description={t("agents.versions.description")}
 			testId="agents-versions"
 			actions={versions.length > 1 ? actions : undefined}
 		>

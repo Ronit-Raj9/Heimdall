@@ -162,10 +162,10 @@ describe("NewAgentView", () => {
 
 	it("blocks Create for a taken name, for every template", () => {
 		expect(nameProblem("my-plain-loop", new Set(["my-plain-loop"]))).toBe(
-			"An agent named my-plain-loop already exists. Pick another name.",
+			"my-plain-loop already exists. Pick another name.",
 		);
 		expect(nameProblem("my-plain-loop-2", new Set(["my-plain-loop"]))).toBe("");
-		expect(nameProblem("bad Name", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
+		expect(nameProblem("bad Name", new Set())).toBe("Use lowercase letters, digits, . _ or -. Start with a letter or digit.");
 	});
 
 	it("names each name problem in order, the 63 limit with the count", () => {
@@ -173,7 +173,7 @@ describe("NewAgentView", () => {
 		expect(nameProblem("a".repeat(120), new Set())).toBe("Use at most 63 characters (120 now).");
 		expect(nameProblem("-x", new Set())).toBe("Start with a lowercase letter or a digit.");
 		expect(nameProblem("Upper", new Set())).toBe("Start with a lowercase letter or a digit.");
-		expect(nameProblem("a b", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
+		expect(nameProblem("a b", new Set())).toBe("Use lowercase letters, digits, . _ or -. Start with a letter or digit.");
 		expect(nameProblem("a".repeat(63), new Set())).toBe("");
 	});
 
@@ -181,7 +181,7 @@ describe("NewAgentView", () => {
 		agentIds = [];
 		const html = render("?template=plain-loop");
 		// Fix wave M2-78: the help gives the rule; the id it is saved as has its own line.
-		expect(html).toContain("up to 63 characters.");
+		expect(html).toContain("Max 63.");
 		expect(html).toContain("Saved as my-plain-loop");
 		expect(html).not.toContain("agents/my-plain-loop.yaml");
 		agentIds = ["taken"];

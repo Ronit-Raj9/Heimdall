@@ -176,7 +176,7 @@ describe("request preview and test details", () => {
 	it("shows why the preview is empty", () => {
 		const html = renderToStaticMarkup(<EndpointPreviewView data={{ ok: false, error: "url is required", requests: [], reads: "" }} loading={false} />);
 		expect(html).toContain("url is required");
-		expect(renderToStaticMarkup(<EndpointPreviewView loading={false} />)).toContain("Fill in the required fields");
+		expect(renderToStaticMarkup(<EndpointPreviewView loading={false} />)).toContain("Fill the required fields");
 	});
 
 	it("shows requests sent, raw response and reads after a test", () => {
@@ -214,7 +214,7 @@ describe("pull mode", () => {
 	it("renders the options, the history choice only when Heimdall drives", () => {
 		const off = renderToStaticMarkup(<PullOptionsFields value={DEFAULT_PULL_OPTIONS} onChange={() => {}} />);
 		expect(off).toContain("Heimdall drives the chat");
-		expect(off).toContain("Coding tasks: send the repository, take a patch back");
+		expect(off).toContain("Coding tasks: repo in, patch out");
 		expect(off).not.toContain("pull-history");
 		const on = renderToStaticMarkup(<PullOptionsFields value={{ ...DEFAULT_PULL_OPTIONS, benchDrives: true }} onChange={() => {}} />);
 		// The shared Select renders its options only when open (M2-106).

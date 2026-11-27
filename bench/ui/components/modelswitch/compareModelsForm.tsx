@@ -146,7 +146,6 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 		<section className="flex flex-col gap-4" data-testid="compare-models-form">
 			<div className="flex flex-col gap-1">
 				<h2 className="text-base font-semibold">{t("form.title")}</h2>
-				<p className="text-muted-foreground max-w-prose text-sm">{t("form.description")}</p>
 			</div>
 			<VersionPicker agent={agentId} value={version} onChange={setVersion} testId="compare-models-version" />
 			<div className="flex flex-col gap-2">
@@ -182,7 +181,6 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			</div>
 			<fieldset className="flex flex-col gap-1 text-sm" data-testid="compare-models-benchmarks">
 				<legend className="font-medium">{t("form.benchmarks")}</legend>
-				<span className="text-muted-foreground text-xs">{t("form.benchmarksHint")}</span>
 				{!compat.isLoading && runnable.length === 0 && <span className="text-muted-foreground">{t("form.noBenchmarks")}</span>}
 				<div className="mt-1 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
 				{runnable.map((b) => (

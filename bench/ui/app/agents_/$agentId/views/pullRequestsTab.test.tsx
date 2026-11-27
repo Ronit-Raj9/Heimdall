@@ -80,6 +80,6 @@ describe("test on every pull request", () => {
 
 	it("says when the agent has no saved version", () => {
 		state.live = undefined;
-		expect(renderToStaticMarkup(<PullRequestsTab agentId="my-agent" />)).toContain("no saved version");
+		expect(renderToStaticMarkup(<PullRequestsTab agentId="my-agent" />)).toContain("No saved version yet");
 	});
 });

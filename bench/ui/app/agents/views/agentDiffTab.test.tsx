@@ -86,7 +86,7 @@ describe("AgentDiffTab", () => {
 		const html = render(`?b=${encodeURIComponent(HASH_NEW)}`);
 		expect(query.diffArgs).toContainEqual({ a: HASH_OLD, b: HASH_NEW } satisfies AgentDiffParams);
 		expect(html).toContain('data-testid="agentdiff-suggested-note"');
-		expect(html).toContain("A is the previous version of codex");
+		expect(html).toContain("A is the previous version");
 	});
 
 	it("passes the URL params to the server", () => {
@@ -120,7 +120,7 @@ describe("AgentDiffTab", () => {
 		expect(html).toContain('href="/runs?pair=p_synthprov03"');
 		expect(html).toContain('href="/runs?pair=p_synthcode03"');
 		expect(html).toContain("Show all 3 tasks");
-		expect(html).toContain("Only B ran 1 task, left out of the comparison: t04.");
+		expect(html).toContain("Only B ran 1 task, left out: t04.");
 		// Metrics read with direction; unknown stays unknown, never 0.
 		expect(html).toMatch(/data-testid="agentdiff-metric-cost_usd" data-direction="better"/);
 		expect(html).toMatch(/data-testid="agentdiff-metric-steps" data-direction="worse"/);

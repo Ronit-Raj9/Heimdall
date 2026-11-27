@@ -67,7 +67,7 @@ describe("ConfigTab save and check messages", () => {
 
 	it("says when a save kept the version", () => {
 		state.saved = { ...doc, version: 3, version_created: false };
-		expect(render()).toContain("Saved. Still version 3: model and provider changes do not make a new version.");
+		expect(render()).toContain("Saved. Still version 3. Model and provider changes do not make a version.");
 	});
 
 	it("shows no saved message before a save", () => {

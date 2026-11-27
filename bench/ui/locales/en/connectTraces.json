@@ -1,11 +1,11 @@
 {
 	"title": "Agent from traces",
-	"subtitle": "Point your OpenTelemetry exporter at Heimdall.",
+	"subtitle": "",
 	"crumbAgents": "Agents",
 	"crumbNew": "New agent",
 	"endpoint": {
 		"title": "Send traces",
-		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works.",
+		"description": "",
 		"privacy": "This endpoint keeps names, models, tools and routes, no prompts, answers or tool arguments. Production failures keep request, answer and tool calls, with keys, tokens, emails and phone numbers removed. Names and street addresses are kept.",
 		"url": "Traces endpoint",
 		"auth": "Ingest token goes in the Authorization header.",
@@ -59,7 +59,7 @@
 		"url": "Endpoint URL",
 		"urlCard": "Agent card URL",
 		"secret": "Auth token secret (optional)",
-		"secretHint": "A secret from Settings > Secrets.",
+		"secretHint": "A secret from Settings > Secrets. Traces carry no auth headers.",
 		"wrapHint": "No serving route found. Use Wrap my existing app.",
 		"openWrap": "Wrap my existing app",
 		"submit": "Connect this agent",

@@ -31,7 +31,6 @@ export default function AgentsView() {
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="agents-screen">
 			<PageHeader
 				title={t("agents.title")}
-				subtitle={tu("subtitle")}
 				actions={
 					<div className="flex items-center gap-2">
 						<Button asChild size="sm" variant="link" data-testid="agents-connect">

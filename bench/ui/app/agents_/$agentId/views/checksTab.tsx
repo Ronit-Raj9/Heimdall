@@ -79,10 +79,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 
 	return (
 		<div className="flex flex-col gap-4" data-testid="agent-checks-tab">
-			<div>
-				<h2 className="text-base font-semibold tracking-tight">{tu("checks.title")}</h2>
-				<p className="text-muted-foreground text-sm">{tu("checks.subtitle")}</p>
-			</div>
+			<h2 className="text-base font-semibold tracking-tight">{tu("checks.title")}</h2>
 			<ol className="divide-y border-y">
 				<CheckStep
 					n={1}
@@ -333,9 +330,11 @@ function CheckStep({
 				<Icon className={cn("mt-0.5 size-5 shrink-0", cls)} aria-hidden="true" />
 				<div className="flex min-w-0 basis-full flex-col gap-0.5 sm:flex-1 sm:basis-0">
 					<h3 className="text-sm font-semibold">{title}</h3>
-					<p className="text-muted-foreground text-sm" title={detail}>
-						{hint}
-					</p>
+					{hint && (
+						<p className="text-muted-foreground text-sm" title={detail}>
+							{hint}
+						</p>
+					)}
 					<span className={cn("flex min-h-8 items-center text-sm font-medium", cls.replace("animate-spin", ""))} data-testid={`${testId}-state`}>
 						{t(`checks.state.${state}`)}
 					</span>

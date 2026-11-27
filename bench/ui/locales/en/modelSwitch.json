@@ -1,9 +1,9 @@
 {
 	"form": {
 		"title": "Compare models for this agent",
-		"description": "Run this agent on each model, same benchmarks.",
+		"description": "",
 		"benchmarks": "Benchmarks",
-		"benchmarksHint": "Pick one or more.",
+		"benchmarksHint": "",
 		"noBenchmarks": "No benchmark fits this agent. Add one.",
 		"models": "Models",
 		"modelsHint": "The first is the current model. Add 1 to {{max}} more.",
@@ -118,7 +118,7 @@
 			"url": "Gateway URL",
 			"secret": "Admin credential (org secret)",
 			"secretNone": "No credential",
-			"secretHint": "Org secret with user:password or an API key.",
+			"secretHint": "Org secret with user:password or an API key, from Settings > Secrets.",
 			"enable": "Turn on rules the numbers support. Others are written off.",
 			"allowGlobal": "I understand global rules reach every request on the gateway",
 			"dryRun": "Preview changes",

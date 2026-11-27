@@ -362,31 +362,29 @@ export default function NewAgentView() {
 		<section className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="agents-new-screen">
 			<PageHeader
 				title={t("new.title")}
-				subtitle={t("new.subtitle")}
-			/>
-			<div className="bg-muted/40 flex min-w-0 flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center" data-testid="agents-new-band">
-				<h2 className="text-sm font-semibold">{tx("agent.bandTitle")}</h2>
-				<div className="flex flex-wrap gap-2 sm:ml-auto">
-					<Button asChild size="sm" variant="outline">
+				actions={
+				<div className="flex flex-wrap gap-2" role="group" aria-label={tx("agent.bandTitle")} data-testid="agents-new-band">
+					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
 						<Link to="/connect" data-testid="agents-new-connect">
 							<Plug className="size-4" aria-hidden="true" />
 							{tx("agent.bandEndpoint")}
 						</Link>
 					</Button>
-					<Button asChild size="sm" variant="outline">
+					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
 						<a href="#platform-import" data-testid="agents-new-import">
 							<CloudDownload className="size-4" aria-hidden="true" />
 							{tx("agent.bandImport")}
 						</a>
 					</Button>
-					<Button asChild size="sm" variant="outline">
+					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
 						<Link to="/agents/from-traces" data-testid="agents-new-from-traces">
 							<Radio className="size-4" aria-hidden="true" />
 							{tx("agent.bandTraces")}
 						</Link>
 					</Button>
 				</div>
-			</div>
+				}
+			/>
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="agents-new-loading" />
 			) : query.isError ? (

@@ -298,7 +298,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 
 			{view === "form" ? (
 				<div className="flex flex-col gap-6" data-testid="config-form">
-					<FormSection title={ta("setup.instructions")} hint={ta("setup.instructionsHint")} testId="setup-instructions">
+					<FormSection title={ta("setup.instructions")} testId="setup-instructions">
 						<label className="flex flex-col gap-1 text-sm md:col-span-2">
 							<span className="font-medium">{ta("setup.description")}</span>
 							<textarea
@@ -312,14 +312,12 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 							<>
 								<BehaviorText
 									label={ta("setup.notesProjectFile")}
-									help={ta("setup.notesProjectFileHelp")}
 									value={behavior.notes_project_file}
 									onChange={(v) => setBehavior("notes_project_file", v)}
 									testId="field-notes_project_file"
 								/>
 								<BehaviorText
 									label={ta("setup.notesUserFile")}
-									help={ta("setup.notesUserFileHelp")}
 									value={behavior.notes_user_file}
 									onChange={(v) => setBehavior("notes_user_file", v)}
 									testId="field-notes_user_file"
@@ -336,7 +334,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 							</>
 						)}
 					</FormSection>
-					<FormSection title={ta("setup.model")} hint={ta("setup.modelHint")} testId="setup-model">
+					<FormSection title={ta("setup.model")} testId="setup-model">
 						{/* The model list of /evaluate, not free text (M2-49); a model off the list stays as a custom id. */}
 						<div className="md:col-span-2">
 							<LabeledModelPicker
@@ -359,9 +357,8 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 							</label>
 						)}
 					</FormSection>
-					<FormSection title={ta("setup.tools")} hint={ta("setup.toolsHint")} testId="setup-tools">
+					<FormSection title={ta("setup.tools")} testId="setup-tools">
 						<div className="flex flex-wrap items-center gap-3 md:col-span-2">
-							<p className="text-muted-foreground text-sm">{ta("setup.toolsBody")}</p>
 							<Button asChild size="sm" variant="outline">
 								<Link to="/agents/$agentId" params={{ agentId: doc.id }} search={{ tab: "tools" } as never} data-testid="setup-open-tools">
 									<Wrench aria-hidden="true" />
@@ -371,7 +368,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 						</div>
 					</FormSection>
 					{behavior && (
-						<FormSection title={ta("setup.memory")} hint={ta("setup.memoryHint")} testId="setup-memory">
+						<FormSection title={ta("setup.memory")} testId="setup-memory">
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{ta("setup.memoryPaths")}</span>
 								<textarea
@@ -455,7 +452,6 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 						<summary className="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
 							<ChevronRight className="text-muted-foreground size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
 							{ta("setup.howItRuns")}
-							<span className="text-muted-foreground ml-2 hidden truncate font-normal sm:inline">{ta("setup.howItRunsHint")}</span>
 						</summary>
 						<div className="grid min-w-0 grid-cols-1 gap-4 px-3 py-2 md:grid-cols-2">
 							<label className="flex flex-col gap-1 text-sm">
@@ -567,7 +563,7 @@ function BehaviorText({
 	testId,
 }: {
 	label: string;
-	help: string;
+	help?: string;
 	value: string;
 	onChange: (v: string) => void;
 	testId: string;
@@ -576,7 +572,7 @@ function BehaviorText({
 		<label className="flex flex-col gap-1 text-sm">
 			<span className="font-medium">{label}</span>
 			<Input value={value} onChange={(e) => onChange(e.target.value)} className="font-mono" data-testid={testId} />
-			<span className="text-muted-foreground text-xs">{help}</span>
+			{help && <span className="text-muted-foreground text-xs">{help}</span>}
 		</label>
 	);
 }

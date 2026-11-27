@@ -67,9 +67,9 @@
 		},
 		"hint": {
 			"check": "Free practice run on one task, no model or key.",
-			"build": "Packages the agent into its own container.",
+			"build": "",
 			"buildNone": "Uses a ready-made container.",
-			"diff": "Changes between the two newest versions."
+			"diff": ""
 		},
 		"state": {
 			"passed": "Works",

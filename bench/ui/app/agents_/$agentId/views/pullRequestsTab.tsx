@@ -77,7 +77,7 @@ export default function PullRequestsTab({ agentId }: { agentId: string }) {
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="agent-ci-tab">
-			<Section title={t("ci.title")} description={t("ci.description")} testId="agent-ci-section">
+			<Section title={t("ci.title")} testId="agent-ci-section">
 				<p className="text-muted-foreground text-sm" data-testid="agent-ci-live">
 					{live ? t("ci.liveVersion", { version: live }) : t("ci.noLiveVersion")}
 				</p>

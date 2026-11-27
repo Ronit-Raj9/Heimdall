@@ -19,7 +19,7 @@ describe("CopyAgentDialog", () => {
 		const html = render(<CopyAgentDialog agentId="zz-test-loop" mode="duplicate" onClose={noop} onCopied={noop} />);
 		expect(html).toContain('data-testid="copy-agent-dialog"');
 		expect(html).toContain("Duplicate agent zz-test-loop");
-		expect(html).toContain("The copy starts at version 1.");
+		expect(html).toContain("Starts at version 1.");
 		expect(tagOf(html, "copy-agent-name")).toContain('value="zz-test-loop-copy-2"');
 		expect(html).toContain(">Duplicate</button>");
 		expect(html).toContain("Cancel");
@@ -28,7 +28,7 @@ describe("CopyAgentDialog", () => {
 	it("explains that a rename keeps past runs under the old name", () => {
 		const html = render(<CopyAgentDialog agentId="zz-test-loop" mode="rename" onClose={noop} onCopied={noop} />);
 		expect(html).toContain("Rename agent zz-test-loop");
-		expect(html).toContain("and removes zz-test-loop. Past runs, results and saved versions keep the name zz-test-loop.");
+		expect(html).toContain("and removes zz-test-loop. Past runs and versions keep zz-test-loop.");
 		expect(html).toContain(">Rename</button>");
 		// The box starts on the old name, which is not a new name: Rename waits.
 		expect(tagOf(html, "copy-agent-confirm")).toContain("disabled");
@@ -46,7 +46,7 @@ describe("CopyAgentDialog", () => {
 	it("checks the new name like the new agent page", () => {
 		const taken = new Set(["zz-test-loop", "codex"]);
 		expect(copyNameProblem("zz-test-loop", "zz-test-loop", taken)).toBe("Pick a different name.");
-		expect(copyNameProblem("codex", "zz-test-loop", taken)).toBe("An agent named codex already exists. Pick another name.");
+		expect(copyNameProblem("codex", "zz-test-loop", taken)).toBe("codex already exists. Pick another name.");
 		expect(copyNameProblem("a".repeat(120), "zz-test-loop", taken)).toBe("Use at most 63 characters (120 now).");
 		expect(copyNameProblem("zz-new", "zz-test-loop", taken)).toBe("");
 		expect(defaultCopyName("codex", new Set(["codex"]))).toBe("codex-copy");

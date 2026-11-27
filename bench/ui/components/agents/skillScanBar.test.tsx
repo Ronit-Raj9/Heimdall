@@ -35,7 +35,7 @@ describe("SkillScanBar (L5)", () => {
 		state.skills = [skill("good", "installed"), skill("evil", "not_scanned")];
 		const html = render(<SkillScanBar agentId="zz-test-loop" onOpenTools={noop} />);
 		expect(html).toContain('data-testid="skill-scan-bar"');
-		expect(html).toContain("1 skill has not passed a scan: runs of this agent are refused until it does.");
+		expect(html).toContain("1 skill has not passed a scan. Runs are refused until it does.");
 		expect(html).toContain("Scan now");
 		expect(html).toContain("Open the tools");
 	});
@@ -43,7 +43,7 @@ describe("SkillScanBar (L5)", () => {
 	it("counts blocked skills too, and offers Scan now only for unscanned ones", () => {
 		state.skills = [skill("evil", "not_scanned"), skill("bad", "blocked")];
 		const html = render(<SkillScanBar agentId="zz-test-loop" onOpenTools={noop} />);
-		expect(html).toContain("2 skills have not passed a scan: runs of this agent are refused until they do.");
+		expect(html).toContain("2 skills have not passed a scan. Runs are refused until they do.");
 		expect(html).toContain('data-testid="skill-scan-bar-scan"');
 		state.skills = [skill("bad", "blocked")];
 		const blocked = render(<SkillScanBar agentId="zz-test-loop" onOpenTools={noop} />);
