@@ -298,6 +298,7 @@ export function Step3BenchmarksView({
 	leftOut,
 }: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
+	const { t: te } = useTranslation("evaluate");
 	const compat = compatibilityMap(compatibility);
 	const known = entriesByBenchmark(reference ?? []);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
@@ -313,6 +314,7 @@ export function Step3BenchmarksView({
 	};
 
 	const readyTasks = selected.reduce((n, id) => n + (ready.get(id) ?? 0), 0);
+	const noPackReady = packs.length > 0 && packs.every((p) => p.benchmarks.every((id) => (ready.get(id) ?? 0) === 0));
 	const skipped = selected.filter((id) => incompatibleReason(compatFor(compat, id))).length;
 
 	// "Agents like codex score about 42% here": only from published reference runs, never a guess.
@@ -330,13 +332,17 @@ export function Step3BenchmarksView({
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="step3-benchmarks">
-			{ownTasks}
 			<section>
-				<h3 className="mb-2 text-sm font-medium">Start from a pack</h3>
+				<h2 className="mb-2 text-sm font-medium">{te("benchmarks.startPack")}</h2>
 				{packs.length === 0 ? (
-					<p className="text-muted-foreground text-sm">{loading ? "Loading packs..." : "No packs available."}</p>
+					<p className="text-muted-foreground text-sm">{loading ? "Loading packs..." : te("benchmarks.noPacks")}</p>
+				) : noPackReady ? (
+					// Every pack has 0 ready tasks: one line instead of a wall of greyed cards (X-114).
+					<p className="text-muted-foreground text-sm" data-testid="step3-no-pack-ready">
+						{te("benchmarks.noPackReady")}
+					</p>
 				) : (
-					<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					<div className="flex flex-wrap gap-2">
 						{packs.map((p) => {
 							const members = p.benchmarks.filter((id) => (ready.get(id) ?? 0) > 0);
 							const runnable = packSelection(p, suites, compat);
@@ -360,17 +366,19 @@ export function Step3BenchmarksView({
 									data-testid={`step3-pack-${p.id}`}
 									disabled={runnable.length === 0 || Boolean(checking)}
 									onClick={() => choosePack(p)}
+									title={PACK_DESCRIPTION[p.id] ?? `${CAPABILITY_LABEL[p.capability as BenchmarkCapability] ?? p.capability} benchmarks.`}
 									className={cn(
-										"rounded-md border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+										// Packs as chips (M3-32); a disabled chip stays readable (X-27).
+										"flex min-h-9 max-w-full flex-col justify-center rounded-2xl border px-3 py-1.5 text-left transition-colors disabled:cursor-not-allowed",
 										active ? "border-primary bg-primary/5" : "hover:bg-muted/50",
 									)}
 								>
-									<span className="block text-sm font-medium">{p.name}</span>
-									<span className="text-muted-foreground block truncate text-xs">
+									<span className={cn("block text-sm font-medium", runnable.length === 0 && "text-muted-foreground")}>{p.name}</span>
+									<span className="text-muted-foreground line-clamp-2 block text-sm">
 										{PACK_DESCRIPTION[p.id] ?? `${CAPABILITY_LABEL[p.capability as BenchmarkCapability] ?? p.capability} benchmarks.`}
 									</span>
-									<span className="text-muted-foreground mt-1.5 block text-xs tabular-nums" data-testid={`step3-pack-${p.id}-counts`}>
-										{countText}
+									<span className="text-foreground/70 block text-xs tabular-nums" data-testid={`step3-pack-${p.id}-counts`}>
+										{members.length === 0 ? te("benchmarks.packNotReady") : countText}
 									</span>
 								</button>
 							);
@@ -380,7 +388,7 @@ export function Step3BenchmarksView({
 			</section>
 
 			<section>
-				<h3 className="mb-2 text-sm font-medium">Or pick benchmarks</h3>
+				<h2 className="mb-2 text-sm font-medium">{te("benchmarks.orPick")}</h2>
 				<BenchmarkChecklist
 					suites={suites}
 					compatibility={compatibility}
@@ -393,6 +401,8 @@ export function Step3BenchmarksView({
 				/>
 			</section>
 
+			{/* Your own tasks come after the catalog, not first (M3-32). */}
+			{ownTasks}
 			{leftOut}
 			<div className="text-muted-foreground border-t pt-3 text-sm" data-testid="step3-summary" aria-live="polite">
 				{selected.length === 0 ? (
@@ -412,6 +422,7 @@ export function Step3BenchmarksView({
 /** Wizard step 3 on the shared wizard draft (useEvaluateDraft from ./evaluateDraft). */
 export function Step3Benchmarks() {
 	const { draft, update } = useEvaluateDraft();
+	const redTeam = Boolean(draft.redTeam);
 	const slice: EvaluateDraftBenchmarks = {
 		agent: draft.agent ?? "",
 		benchmarks: draft.benchmarks,
@@ -423,13 +434,18 @@ export function Step3Benchmarks() {
 			...(patch.benchmarks ? { benchmarks: patch.benchmarks } : {}),
 			...("pack" in patch ? { pack: patch.pack ?? null } : {}),
 		});
-	return <Step3BenchmarksWith draft={slice} onChange={onChange} />;
+	// The red-team writer shows only for the step 2 goal "Can it be attacked?", first on the step (M3-48).
+	return <Step3BenchmarksWith draft={slice} onChange={onChange} redTeam={redTeam ? "first" : "hidden"} />;
 }
 
 export default Step3Benchmarks;
 
 /** Step 3 with an explicit draft slice: loads suites, packs and the agent's compatibility, then renders the view. */
-export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, onChange }: Step3BenchmarksProps<D>) {
+export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({
+	draft,
+	onChange,
+	redTeam = "last",
+}: Step3BenchmarksProps<D> & { redTeam?: "first" | "last" | "hidden" }) {
 	const suites = useGetSuitesLightQuery();
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
@@ -472,8 +488,15 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 		void suites.refetch();
 		void packs.refetch();
 	};
+	const redTeamPanel = (
+		<RedTeamPanel
+			selected={draft.benchmarks}
+			onAdd={(id) => onChange({ benchmarks: [...new Set([...draft.benchmarks, id])], pack: undefined })}
+		/>
+	);
 	return (
 		<div className="flex flex-col gap-6">
+			{redTeam === "first" && redTeamPanel}
 			{failed.length > 0 && <SetupCheckFailed failed={failed} onRetry={retry} reason={setupCheckReason(compat.error)} />}
 			{lists === "error" ? (
 				<LoadError title={w4m2("listsFailed")} error={suites.error ?? packs.error} onRetry={retryLists} testId="step3-lists-error" />
@@ -502,10 +525,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 				<ArmCompatProbe key={o.agent} agent={o.agent} onAnswer={arms.report} retry={arms.retries} />
 			))}
 			{/* Z04: write the org's red-team benchmark and add it here. */}
-			<RedTeamPanel
-				selected={draft.benchmarks}
-				onAdd={(id) => onChange({ benchmarks: [...new Set([...draft.benchmarks, id])], pack: undefined })}
-			/>
+			{redTeam === "last" && redTeamPanel}
 		</div>
 	);
 }

@@ -8,7 +8,7 @@
 		"col": {
 			"name": "Name",
 			"agents": "Agent",
-			"mode": "What it tests",
+			"mode": "Type",
 			"benchmarks": "Benchmarks",
 			"status": "Status",
 			"created": "Started",
@@ -19,7 +19,19 @@
 		"sortResult": "Best result",
 		"openOne": "Open",
 		"benchmarkCount_one": "{{count}} benchmark",
-		"benchmarkCount_other": "{{count}} benchmarks"
+		"benchmarkCount_other": "{{count}} benchmarks",
+		"searchPlaceholder": "Search by name, agent or benchmark",
+		"count_one": "{{count}} evaluation",
+		"count_other": "{{count}} evaluations",
+		"caption": "Evaluations, newest first",
+		"nightly": "Nightly",
+		"selectRow": "Select {{name}}",
+		"selectAll": "Select all shown",
+		"deleteSelected": "Delete selected ({{count}})",
+		"deleteSelectedTitle": "Delete {{count}} evaluations?",
+		"deleteSelectedBody": "These evaluations, their report cards and their benchmark comparisons with runs and traces are deleted. This cannot be undone.",
+		"deleteSelectedOk": "Delete",
+		"deleteSelectedError": "Could not delete {{count}} of them: {{error}}"
 	},
 	"mode": {
 		"score": "Score one agent",
@@ -39,7 +51,13 @@
 		"failed": "Failed",
 		"cancelled": "Cancelled",
 		"skipped": "Skipped",
-		"unknown": "{{status}}"
+		"unknown": "{{status}}",
+		"notStarted": "Did not start",
+		"queuedReason": {
+			"noWorker": "Waiting for a worker. None is online.",
+			"image": "Preparing the task image (the first run of this benchmark takes a few minutes).",
+			"queue": "{{n}} runs ahead of yours."
+		}
 	},
 	"detail": {
 		"subtitle": "Progress on every benchmark in this evaluation. The report card appears when all of them finish.",
@@ -70,7 +88,7 @@
 		"skippedTitle": "Skipped benchmarks",
 		"skippedDescription": "These benchmarks were not run, and why.",
 		"cancel": "Cancel evaluation",
-		"cancelConfirm": "Stop every benchmark in this evaluation that is still running? Finished results are kept.",
+		"cancelConfirm": "Stop every benchmark still running? Finished results are kept. Spent so far: {{spent}}; nothing more is charged after the stop.",
 		"cancelConfirmTitle": "Cancel this evaluation?",
 		"cancelConfirmOk": "Cancel evaluation",
 		"cancelKeep": "Keep running",
@@ -90,7 +108,24 @@
 		"starting": "Starting benchmark {{n}} of {{m}}: {{name}}...",
 		"startingNoName": "Starting benchmark {{n}} of {{m}}...",
 		"scheduled": "Scheduled",
-		"scheduledLine": "Repeat of {{name}} by schedule {{schedule}}, {{date}}"
+		"scheduledLine": "Repeat of {{name}} by schedule {{schedule}}, {{date}}",
+		"subtitleRunning": "Progress on every benchmark in this evaluation. The report card appears when all of them finish.",
+		"subtitleDone": "Finished {{date}}, {{runs}} runs, {{spent}} of {{budget}}.",
+		"subtitleDoneNoBudget": "Finished {{date}}, {{runs}} runs.",
+		"subtitleFailed": "No run could start.",
+		"subtitleCancelled": "Cancelled {{date}}. Finished results are kept.",
+		"gateway": "How it ran (gateway)",
+		"notFound": "There is no evaluation {{id}}.",
+		"allEvaluations": "All evaluations",
+		"more": "More",
+		"runAgain": "Run again",
+		"technical": "Technical details",
+		"copy": "Copy",
+		"copied": "Copied",
+		"budgetStopLine": "Raise the budget and continue.",
+		"faultLabel": "Fault",
+		"setupLabel": "Tasks and tries",
+		"budgetLabel": "Budget"
 	},
 	"skill": {
 		"notScanned": "Skill {{skill}} of agent {{agent}} has not passed a safety scan, so runs of this agent are refused.",
@@ -107,5 +142,24 @@
 		"model-down": "model outage",
 		"broken-tool": "broken tool",
 		"misleading-instruction": "misleading instruction"
+	},
+	"failure": {
+		"imageMissing": "The task image for {{benchmark}} is not on the shared worker. Nothing was spent. An admin must sync the image; then run again.",
+		"workerRefused": "The worker refused the runs of {{benchmark}}. Nothing was spent. Open the technical details or ask an admin.",
+		"noWorker": "No worker was online to run {{benchmark}}. Nothing was spent. Run again when a worker is online.",
+		"infraTitle": "Could not run (not the agent's fault)"
+	},
+	"raise": {
+		"title_one": "The budget stopped {{count}} benchmark: {{notStarted}} runs not started.",
+		"title_other": "The budget stopped {{count}} benchmarks: {{notStarted}} runs not started.",
+		"body": "The report card only counts the runs that finished. Raise the budget to run the rest; finished runs are kept and never run again.",
+		"label": "New budget for the evaluation (now {{current}})",
+		"button": "Raise budget and continue",
+		"busy": "Continuing...",
+		"limit": "Type more than {{current}} and at most $1000.",
+		"confirmTitle": "Raise the budget?",
+		"confirm": "Add {{added}} and continue? The evaluation can spend up to {{total}}.",
+		"confirmOk": "Raise and continue",
+		"keep": "Keep the budget"
 	}
 }

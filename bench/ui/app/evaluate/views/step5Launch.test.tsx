@@ -136,7 +136,8 @@ describe("Step5Launch", () => {
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain("Score codex v2 on openai/gpt-4o-mini.");
 		expect(html).toContain('data-testid="step5-budget"');
-		expect(html).toContain('placeholder="$5 per benchmark"');
+		// The "$" is a leading adornment now (M3-47), so the placeholder has none.
+		expect(html).toContain('placeholder="5 per benchmark"');
 		expect(html).not.toContain("No limit");
 		expect(html).toContain("Empty means the default: each benchmark stops at $5.");
 		expect(tagOf(html, "step5-launch-button")).not.toContain('disabled=""');
@@ -150,7 +151,7 @@ describe("Step5Launch", () => {
 		expect(html).toContain("agent codex cannot run benchmark x: needs gpu");
 	});
 
-	it("links to Models & keys when the org has no key for the model's provider", () => {
+	it("links to Settings, Model keys, with the provider and a way back when the org has no key (M3-27)", () => {
 		q.create = mutation({
 			error: {
 				status: 409,
@@ -159,8 +160,9 @@ describe("Step5Launch", () => {
 		});
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain("this organization has no working openai key");
-		expect(tagOf(html, "step5-error-link")).toContain('href="/models"');
-		expect(html).toContain("Add a model key");
+		expect(tagOf(html, "step5-error-link")).toContain("/settings?tab=keys");
+		expect(tagOf(html, "step5-error-link")).toContain("return=");
+		expect(html).toMatch(/Add a (model key|key for )/);
 	});
 });
 

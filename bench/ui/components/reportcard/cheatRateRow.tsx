@@ -11,6 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReactReduxContext } from "react-redux";
+import "./reportCardI18n";
 
 /** One arm's result on the impossible twins. */
 export interface CheatArm {
@@ -48,6 +49,7 @@ export function CheatRateRow({ report }: { report: Report }) {
 
 function CheatRateSection({ report, cc }: { report: Report; cc: CheatCheck }) {
 	const { t } = useTranslation("w448");
+	const { t: tr } = useTranslation("reportCard");
 	const store = useContext(ReactReduxContext);
 	const arms = report.arms.filter((a) => cc.per_arm?.[a.label]);
 	const few = arms.some((a) => (cc.per_arm?.[a.label]?.runs ?? 0) < FEW_CHEAT_RUNS);
@@ -85,8 +87,9 @@ function CheatRateSection({ report, cc }: { report: Report; cc: CheatCheck }) {
 				{cc.state === "measured" && few && <p className="text-muted-foreground">{t("cheat.fewRuns")}</p>}
 				{cc.state === "running" && <p>{t("cheat.running")}</p>}
 				{cc.state === "not_measured" && <p>{t("cheat.notMeasured")}</p>}
-				{cc.state === "no_twins" && <p>{t("cheat.noTwins")}</p>}
-				{store && (cc.state === "not_measured" || cc.state === "no_twins") && <CheatActions report={report} cc={cc} />}
+				{/* A report never creates benchmark tasks: making twins lives on the benchmark page (M3-14, area 6). */}
+				{cc.state === "no_twins" && <p>{tr("cheat.notRun")}</p>}
+				{store && cc.state === "not_measured" && <CheatActions report={report} cc={cc} />}
 			</div>
 		</Section>
 	);

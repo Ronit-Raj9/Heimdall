@@ -8,8 +8,12 @@ import {
 	useEstimateEvaluationQuery,
 	useGetBenchFaultsQuery,
 } from "@/lib/store/apis/evaluationsApi";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { BudgetAdvice, perRunLowCost } from "./budgetAdvice";
 import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from "./evaluateDraft";
 import { fw05 } from "./fw05I18n";
@@ -109,10 +113,31 @@ export function errorLink(error: unknown): string | undefined {
 	return link?.startsWith("/") ? link : undefined;
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, fallback: string): string {
 	const data = (error as { data?: { error?: { message?: string } | string } } | undefined)?.data;
 	if (typeof data?.error === "string") return data.error;
-	return data?.error?.message ?? "Could not launch the evaluation.";
+	return data?.error?.message ?? (getBenchErrorMessage(error) || fallback);
+}
+
+/** Where a missing key is added: Settings, Model keys, with the provider set and a way back to step 5 (M3-27, M8-12). */
+export function addKeyHref(provider: string | undefined): string {
+	const q = new URLSearchParams({ tab: "keys" });
+	if (provider) q.set("add", provider);
+	q.set("return", "/evaluate?step=5");
+	return `/settings?${q.toString()}`;
+}
+
+/** The extra step 5 lines from the estimate (M3-28): runs and minutes, and what happens after Launch. */
+export function estimateLines(
+	t: (key: string, opts?: Record<string, unknown>) => string,
+	est: { runs: number; est_minutes?: { low: number; high: number } } | undefined,
+): string[] {
+	const out: string[] = [];
+	if (est && est.runs > 0 && est.est_minutes) {
+		out.push(t("launch.runsTime", { runs: est.runs, min: Math.max(1, Math.round(est.est_minutes.low)), max: Math.max(1, Math.round(est.est_minutes.high)) }));
+	}
+	out.push(t("launch.landing"));
+	return out;
 }
 
 /** Longest evaluation name the Name box takes. */
@@ -156,9 +181,13 @@ export function NameField({ value, placeholder, onName }: { value: string; place
 export interface Step5LaunchProps {
 	spec: EvaluationSpec;
 	onChange(spec: EvaluationSpec): void;
+	/** The wizard's sticky footer slot: the Launch button renders there when given (M3-26); inline otherwise. */
+	launchSlot?: HTMLElement | null;
 }
 
-export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
+export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
+	const { t } = useTranslation("evaluate");
+	const confirm = useConfirm();
 	const navigate = useNavigate();
 	const [create, state] = useCreateEvaluationMutation();
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
@@ -197,6 +226,13 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	}, [seeded, advice]);
 
 	const launch = async () => {
+		// Launch starts paid work, so it asks once with the most it can spend (lane rules: never on one click).
+		const runs = estimate.data?.runs ?? 0;
+		const ok = await confirm(
+			typedBudget ? t("launchConfirm", { runs, usd: `$${typedBudget}` }) : t("launchConfirmDefault", { runs }),
+			{ title: t("launchConfirmTitle"), confirmLabel: t("launchConfirmOk"), cancelLabel: t("launchKeep") },
+		);
+		if (!ok) return;
 		const typed = nameValue.trim();
 		const body: EvaluationSpec = { ...spec, name: typed || spec.name.trim() || summaryLines(spec, faultCatalog)[0].replace(/\.$/, "") };
 		const res = await create(body);
@@ -208,9 +244,9 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 			<NameField value={nameValue} placeholder={namePlaceholder} onName={onName} />
 
 			<section className="flex flex-col gap-2">
-				<h3 className="text-base font-semibold">What will happen</h3>
+				<h3 className="text-base font-semibold">{t("launch.whatHappens")}</h3>
 				<ul className="list-disc space-y-1 pl-5 text-sm" data-testid="step5-summary">
-					{summary.map((line) => (
+					{[...summary, ...estimateLines(t as never, estimate.data)].map((line) => (
 						<li key={line}>{line}</li>
 					))}
 				</ul>
@@ -218,16 +254,20 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 
 			<section className="flex flex-col gap-1.5">
 				<label htmlFor="step5-budget" className="text-sm font-medium">
-					Budget (USD)
+					{t("launch.budget")}
 				</label>
+				<span className="relative w-fit">
+				<span className="text-muted-foreground pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm" aria-hidden="true">
+					$
+				</span>
 				<input
 					id="step5-budget"
 					type="text"
 					inputMode="decimal"
 					aria-invalid={budgetIssue ? true : undefined}
 					aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
-					className="border-input bg-background h-8 w-32 rounded-md border px-2 text-sm"
-					placeholder={`$${DEFAULT_BENCHMARK_BUDGET} per benchmark`}
+					className="border-input bg-background h-10 w-40 rounded-md border pr-2 pl-6 text-sm"
+					placeholder={`${DEFAULT_BENCHMARK_BUDGET} per benchmark`}
 					value={budget}
 					onChange={(e) => {
 						setSeeded(true);
@@ -236,6 +276,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 					}}
 					data-testid="step5-budget"
 				/>
+				</span>
 				{budgetIssue && (
 					<span id="step5-budget-problem" className="text-destructive text-xs" role="alert" data-testid="step5-budget-problem">
 						{budgetIssue}
@@ -272,28 +313,45 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 
 			{state.error ? (
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="step5-error">
-					{errorMessage(state.error)}
+					{errorMessage(state.error, t("launch.error"))}
 					{errorLink(state.error) === "/models" ? (
 						<>
 							{" "}
-							<Link to="/models" className="underline underline-offset-2" data-testid="step5-error-link">
-								Add a model key
+							<Link to={addKeyHref(spec.arms[0]?.provider) as never} className="underline underline-offset-2" data-testid="step5-error-link">
+								{spec.arms[0]?.provider ? t("launch.addKey", { provider: spec.arms[0].provider }) : t("launch.addKeyPlain")}
 							</Link>
 						</>
 					) : null}
 				</p>
 			) : null}
 
-			<div>
-				<Button onClick={() => void launch()} disabled={!ready || budgetIssue !== "" || state.isLoading} data-testid="step5-launch-button">
-					{state.isLoading ? "Launching..." : "Launch evaluation"}
-				</Button>
-				{!ready && (
-					<p className="text-muted-foreground mt-1 text-xs" data-testid="step5-not-ready">
+			{(() => {
+				const button = (
+					<Button onClick={() => void launch()} disabled={!ready || budgetIssue !== "" || state.isLoading} data-testid="step5-launch-button">
+						{state.isLoading ? t("launching") : typedBudget ? t("launchPaid", { usd: `$${typedBudget}` }) : t("launchPlain")}
+					</Button>
+				);
+				const reason = !ready ? (
+					<p className="text-muted-foreground text-xs" data-testid="step5-not-ready">
 						{problem}
 					</p>
-				)}
-			</div>
+				) : null;
+				// In the wizard the button and its reason sit in the sticky footer (M3-26).
+				if (launchSlot)
+					return createPortal(
+						<span className="flex items-center gap-3">
+							{reason}
+							{button}
+						</span>,
+						launchSlot,
+					);
+				return (
+					<div className="flex flex-col gap-1">
+						{button}
+						{reason}
+					</div>
+				);
+			})()}
 		</div>
 	);
 }

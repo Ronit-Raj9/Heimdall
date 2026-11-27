@@ -43,7 +43,7 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 		<li data-testid={`home-evaluation-${ev.id}`}>
 			<Link
 				to={`/evaluations/${encodeURIComponent(ev.id)}` as never}
-				className="group hover:bg-accent/50 focus-visible:bg-accent/50 flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-none sm:px-5"
+				className="group hover:bg-muted focus-visible:outline-ring flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5"
 				title={ev.id}
 			>
 				<span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">

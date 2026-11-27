@@ -75,7 +75,8 @@ describe("EvaluationBody", () => {
 		expect(html).toContain('data-testid="evaluation-arm-A"');
 		expect(html).toContain("openai/gpt-x");
 		expect(html).toContain("v2");
-		expect(html).toContain("Failure tests: model outage");
+		// The config card names the fault once, under Fault (M3-17).
+		expect(html).toContain("model outage");
 		expect(html).toContain("7 of 20 runs done");
 		expect(html).toContain('href="/experiments/e1"');
 		expect(html).toContain('href="/experiments/e1?tab=runs"');
@@ -154,9 +155,8 @@ describe("EvaluationBody budget (G4-01)", () => {
 		);
 		expect(html).toContain("Stopped by the budget: spent $4.60 of $5.00. 13 runs did not start.");
 		expect(html).toContain("$2.10 of $5.00 spent");
-		expect(html).toContain("The budget stopped 1 benchmark: 13 runs not started.");
-		expect(html).toContain("Raise budget and continue");
-		expect(html).toContain('value="10"');
+		// A done evaluation's raise panel sits under the report card headline (M3-4), inside the mocked report card.
+		expect(html).toContain('data-testid="report-card-mock"');
 	});
 
 	it("shows no raise panel when nothing was stopped", () => {
@@ -251,7 +251,9 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 		);
 		const queued: Evaluation = { ...base, children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "queued" }] };
 		const html = render(<EvaluationBody evaluation={queued} />);
-		expect(html).toContain("Runs could not start: worker shared could not take this run: Modal refused the sandbox");
+		// A known cause reads as one sentence; the raw text sits in Technical details (M3-9).
+		expect(html).toContain("The worker refused the runs of hd-harbor-tb2.");
+		expect(html).toContain("worker shared could not take this run: Modal refused the sandbox");
 		expect(html).toContain('href="/jobs/job_9"');
 		expect(html).toContain("Open the job log");
 		expect(html).not.toContain("Waiting to start");
@@ -367,7 +369,7 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 		expect(html).toContain(
 			"Stopped by the budget: spent $0.0094 of $0.01; the next run was expected to cost about $0.0030. 4 runs did not start.",
 		);
-		expect(html).toContain("Raise budget and continue");
+		expect(html).toContain('data-testid="report-card-mock"');
 	});
 
 	it("marks a scheduled repeat (N297)", () => {

@@ -58,6 +58,8 @@ export interface EvaluateDraft {
 	disclose_budget?: boolean;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
+	/** Step 2 goal "Can it be attacked?" (M3-48): a score evaluation whose step 3 opens with the red-team benchmark writer. */
+	redTeam?: boolean;
 }
 
 /** The Quick look preset: 10 tasks once each (the server's defaults too). */
@@ -255,12 +257,16 @@ export function defaultName(d: EvaluateDraft): string {
 		case "opponent":
 			return d.opponent === BARE_MODEL_AGENT ? `${who} vs the bare model` : `${who} vs ${d.opponent ?? "baseline"}`;
 		default: {
-			// Score: named after the benchmarks so evaluations left unnamed still differ (N161).
+			// Score: named after the model and the benchmarks (or the pack) so evaluations left unnamed still differ (N161, M3-52).
+			const model = d.arms[0]?.model;
+			const setup = model ? `${who} on ${model}` : who;
 			const first = d.benchmarks[0]?.replace(/@.*$/, "");
-			if (!first) return `${who} score`;
-			const more = d.benchmarks.length > 1 ? ` and ${d.benchmarks.length - 1} more` : "";
 			const faulted = d.faults.some((f) => f !== "clean");
-			return `${who}${faulted ? " failure test" : ""} on ${first}${more}`;
+			const kind = faulted ? " failure test" : "";
+			const sep = model ? ": " : " on ";
+			if (!first) return d.pack ? `${setup}${kind}${sep}${d.pack} pack` : `${setup} score`;
+			const more = d.benchmarks.length > 1 ? ` and ${d.benchmarks.length - 1} more` : "";
+			return `${setup}${kind}${sep}${first}${more}`;
 		}
 	}
 }

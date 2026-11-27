@@ -10,6 +10,7 @@ import { useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/a
 import "@/components/agents/gw17I18n";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 /** True when the server had no completed evaluation for this agent, version and model. */
@@ -26,6 +27,24 @@ export function isEmptyReport(report: ReportCardResponse | undefined, error: unk
 export function modelOptions(models: readonly string[] | undefined, selected: string): string[] {
 	const list = [...(models ?? [])];
 	return selected && !list.includes(selected) ? [selected, ...list] : list;
+}
+
+/** True when an evaluation entry reads as a failure test (its saved name starts so; the list has no mode yet). */
+function looksLikeFailureTest(ev: { name?: string }): boolean {
+	return /^failure test/i.test(ev.name ?? "");
+}
+
+/**
+ * The evaluation the tab should open on when the address names none (M3-2): the server's newest pick, unless that is a
+ * failure test and a plain score evaluation exists, then the newest plain one. Undefined keeps the server's pick.
+ */
+export function preferredEvaluation(card: Pick<AgentCard, "evaluation_id" | "evaluations" | "reliability">): string | undefined {
+	const list = card.evaluations ?? [];
+	const shown = list.find((e) => e.id === card.evaluation_id);
+	const shownIsFault = (shown && looksLikeFailureTest(shown)) || (card.reliability ?? []).some((r) => r.fault !== "clean");
+	if (!shownIsFault) return undefined;
+	const plain = list.find((e) => e.id !== card.evaluation_id && !looksLikeFailureTest(e));
+	return plain?.id;
 }
 
 /** Runs the card counts: every shown arm's runs over every benchmark. */
@@ -116,6 +135,12 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 		evaluation: evaluation || undefined,
 	});
 	const modelList = modelOptions(report.data?.models, model);
+	// Open on a score evaluation, not a failure test, when the address names none (M3-2).
+	const preferred = !evaluation && report.data ? preferredEvaluation(report.data) : undefined;
+	useEffect(() => {
+		if (preferred) setFilter({ evaluation: preferred });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [preferred]);
 	const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const empty = isEmptyReport(report.data, report.error);
 

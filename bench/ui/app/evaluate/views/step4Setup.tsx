@@ -106,10 +106,10 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 
 /** The MCP routes step 4 offers, in order. */
 export const MCP_ROUTES: { id: EvaluationMCPRoute; label: string; help: string }[] = [
-	{ id: "direct", label: "Direct", help: "The agent calls the task's MCP servers through Heimdall's tool proxy." },
+	{ id: "direct", label: "Direct (default)", help: "The agent calls the task's MCP servers through Heimdall's tool proxy." },
 	{
 		id: "bifrost",
-		label: "Through Bifrost MCP gateway",
+		label: "Through the gateway (logs every tool call)",
 		help: "Each run gets its own Bifrost MCP clients and MCP key, so every tool call shows in Bifrost's MCP logs. Tool faults still apply: the tool proxy sits behind Bifrost.",
 	},
 	{
@@ -118,6 +118,28 @@ export const MCP_ROUTES: { id: EvaluationMCPRoute; label: string; help: string }
 		help: "As above, but the agent sees Bifrost's Code Mode tools and writes programs that call the servers.",
 	},
 ];
+
+/**
+ * The default for Runs at once (M3-31): the worker's slot count from the estimate, so the default never sits next to its
+ * own "only N at once" warning; 2 when the estimate does not say.
+ */
+export function defaultConcurrency(slots: { worker_slots?: number; concurrency?: number } | undefined): number {
+	if (slots?.worker_slots && slots.worker_slots > 0) return slots.worker_slots;
+	if (slots?.concurrency && slots.concurrency > 0) return slots.concurrency;
+	return 2;
+}
+
+/** Whether any setting under "More settings" differs from its default, or the goal is a failure test (M3-29). */
+export function advancedChanged(spec: EvaluationSpec): boolean {
+	return (
+		spec.faults.some((f) => f !== "clean") ||
+		Boolean(spec.bifrost_cache) ||
+		Boolean(spec.mcp_route && spec.mcp_route !== "direct") ||
+		Boolean(spec.failover?.enabled) ||
+		Boolean(spec.gate) ||
+		spec.concurrency != null
+	);
+}
 
 /** spec with route set; "direct" leaves mcp_route out so the spec is as before. */
 export function withMCPRoute(spec: EvaluationSpec, route: EvaluationMCPRoute): EvaluationSpec {
@@ -330,7 +352,8 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 	);
 }
 
-const chip = "rounded-md border px-3 py-1 text-sm";
+// Chips big enough to hit on a phone (M3-47).
+const chip = "inline-flex min-h-11 items-center rounded-md border px-3 text-sm sm:min-h-9";
 const chipOn = "border-primary bg-primary/10 text-primary";
 const chipOff = "border-input bg-background hover:bg-muted";
 
@@ -381,7 +404,15 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const problem = specProblem(spec, owns);
 	const ready = problem === "";
 	const { main: estimate, presets, pending } = useStep4Estimate(spec, !ready);
-	const concurrency = spec.concurrency ?? 4;
+	const concurrency = spec.concurrency ?? defaultConcurrency(estimate.data?.slots);
+	const { t: te } = useTranslation("evaluate");
+	const faultCount = spec.faults.filter((f) => f !== "clean").length;
+	const moreSummary = te("step4.moreSummary", {
+		tasks: spec.tasks_per_benchmark,
+		tries: spec.trials,
+		faults: faultCount ? te("step4.faultsN", { count: faultCount }) : te("step4.noFaults"),
+		gateway: spec.mcp_route && spec.mcp_route !== "direct" ? te("step4.gatewayOn") : te("step4.gatewayOff"),
+	});
 	const overWorker = concurrencyNote(estimate.data?.slots, concurrency);
 	const catalog = useGetBenchFaultsQuery();
 	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
@@ -431,7 +462,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									value={arm.model || arm.provider ? { provider: arm.provider ?? "", model: arm.model } : null}
 									onChange={(v) => setArm(i, v.provider, v.model)}
 									testId={`step4-model-${arm.label}`}
-									label={`Setup ${arm.label} (${arm.agent || "no agent"}) model`}
+									label={te("step4.modelFor", { agent: arm.agent || "your agent" })}
 								/>
 								{owns.has(arm.agent) && (
 									<button
@@ -462,16 +493,23 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				onPick={(p) => onChange({ ...spec, tasks_per_benchmark: p.tasks_per_benchmark, trials: p.trials, faults: p.faults, preset: p.id })}
 			/>
 
+			{/* Model and the size presets stay open; the rest folds into More settings with its values in the summary (M3-29). */}
+			<details className="rounded-lg border" open={advancedChanged(spec) || undefined} data-testid="step4-more">
+				<summary className="hover:bg-muted/50 flex min-h-11 cursor-pointer flex-wrap items-center gap-x-3 rounded-lg px-3 py-2 text-sm">
+					<span className="font-medium">{te("step4.more")}</span>
+					<span className="text-muted-foreground">{moreSummary}</span>
+				</summary>
+				<div className="flex flex-col gap-6 border-t px-3 py-4">
 			<section className="flex flex-wrap gap-8">
 				<Choices
-					label="Tasks per benchmark"
+					label={te("step4.tasks")}
 					value={spec.tasks_per_benchmark}
 					options={TASK_CHOICES}
 					onPick={(n) => onChange({ ...spec, tasks_per_benchmark: n, preset: undefined })}
 					testId="step4-tasks"
 				/>
 				<Choices
-					label="Trials per task"
+					label={te("step4.tries")}
 					value={spec.trials}
 					options={TRIAL_CHOICES}
 					onPick={(n) => onChange({ ...spec, trials: n, preset: undefined })}
@@ -479,7 +517,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				/>
 				<div className="flex flex-col gap-1.5">
 					<Choices
-						label="Runs at once per benchmark"
+						label={te("step4.parallel")}
 						value={concurrency}
 						options={CONCURRENCY_CHOICES}
 						onPick={(n) => onChange({ ...spec, concurrency: n })}
@@ -513,7 +551,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 							<label key={f.id} className="flex items-start gap-2 text-sm" data-testid={`step4-fault-${f.id}`}>
 								<input
 									type="checkbox"
-									className="mt-1"
+									className="mt-1 size-4"
 									checked={spec.faults.includes(f.id)}
 									onChange={(e) =>
 										onChange({
@@ -544,7 +582,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					<label className="flex items-start gap-2 text-sm" data-testid="step4-bifrost-cache">
 						<input
 							type="checkbox"
-							className="mt-1"
+							className="mt-1 size-4"
 							checked={Boolean(spec.bifrost_cache)}
 							onChange={(e) => {
 								const { bifrost_cache: _old, ...rest } = spec;
@@ -552,7 +590,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 							}}
 						/>
 						<span>
-							<span className="font-medium">Bifrost cache on vs off</span>
+							<span className="font-medium">{te("step4.cache")}</span>
 							<span className="text-muted-foreground block">
 								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the
 								cache hit rate, the latency and cost saved, and any change in success. Doubles the runs.
@@ -603,6 +641,8 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					onChange(gate ? { ...rest, gate } : rest);
 				}}
 			/>
+				</div>
+			</details>
 
 			<section className="bg-muted/40 rounded-md border p-3 text-sm" data-testid="step4-estimate" aria-live="polite">
 				{!ready ? (

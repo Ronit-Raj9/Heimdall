@@ -5,7 +5,7 @@ import type { Evaluation, EvaluationArm, EvaluationChild } from "@/lib/store/api
 export const EVALUATION_POLL_MS = 3000;
 
 const KNOWN_MODES = ["score", "versions", "models", "opponent", "model_switch"] as const;
-const KNOWN_STATUSES = ["queued", "created", "running", "analyzing", "done", "failed", "cancelled", "skipped"] as const;
+const KNOWN_STATUSES = ["queued", "created", "running", "analyzing", "done", "failed", "cancelled", "skipped", "notStarted"] as const;
 
 /** The i18n key (evaluations namespace) of a mode in plain words. */
 export function modeKey(mode: string): `mode.${(typeof KNOWN_MODES)[number]}` | null {
@@ -29,8 +29,11 @@ export function statusTone(status: string): StatusTone {
 		case "done":
 			return "ok";
 		case "failed":
+		case "notStarted":
 			return "bad";
+		// Cancelled is a stop the user chose, not a warning: neutral like everywhere else (M3-25).
 		case "cancelled":
+			return "neutral";
 		case "skipped":
 			return "warn";
 		case "running":
@@ -90,6 +93,36 @@ export function formatCreated(iso: string | undefined, locale?: string): string 
 /** The status to show: "paused" while a running evaluation has every running benchmark paused. */
 export function displayStatus(evaluation: Evaluation): string {
 	return evaluation.status === "running" && evaluation.paused ? "paused" : evaluation.status;
+}
+
+/**
+ * A failed evaluation where nothing started (M3-10): no stored result and no benchmark spent anything or ran, so the
+ * page and list say "Did not start" instead of "Failed".
+ */
+export function didNotStart(evaluation: Evaluation): boolean {
+	if (evaluation.status !== "failed" || evaluation.result) return false;
+	const kids = evaluation.children ?? [];
+	return kids.every((c) => !!c.skipped || !c.experiment_id || !((c.spent_usd ?? 0) > 0));
+}
+
+/** The status word for an evaluation's pill: "notStarted" for a failure where nothing ran, else its status. */
+export function evaluationStatusWord(evaluation: Evaluation): string {
+	return didNotStart(evaluation) ? "notStarted" : evaluation.status;
+}
+
+/** A known cause of a benchmark that could not run, from the worker's raw message (M3-9). */
+export type FailureCause = "imageMissing" | "workerRefused" | "noWorker";
+
+const FAILURE_CAUSES: { cause: FailureCause; test: RegExp }[] = [
+	{ cause: "imageMissing", test: /image[^.]{0,80}(missing|not found|not on|no such|never built|not built|pull)|registry-sync|manifest unknown/i },
+	{ cause: "noWorker", test: /no (online |available )?worker|worker[^.]{0,40}offline|no runner/i },
+	{ cause: "workerRefused", test: /refus|rejected|denied/i },
+];
+
+/** The cause of a raw run problem, or undefined when the text matches none of the known ones. */
+export function failureCause(raw: string | undefined | null): FailureCause | undefined {
+	if (!raw) return undefined;
+	return FAILURE_CAUSES.find((c) => c.test.test(raw))?.cause;
 }
 
 /** Why each benchmark did not run: its skip reason, else its status. */

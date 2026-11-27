@@ -34,7 +34,8 @@ describe("EvaluationTable", () => {
 		expect(html).toContain("Codex nightly");
 		expect(html).toContain("codex v2");
 		expect(html).toContain("Compare two models");
-		expect(html).toContain("2 benchmarks");
+		// No Benchmarks column (M3-51): the benchmarks are listed under the name.
+		expect(html).toContain('data-testid="evaluation-benchmarks-ev_1"');
 		expect(html).toContain("Running");
 		expect(html).toContain('href="/evaluations/ev_1"');
 	});
@@ -110,9 +111,8 @@ describe("EvaluationTable scheduled repeats (fix wave 3, N297)", () => {
 		const html = render(<EvaluationTable evaluations={[first, repeat, other]} />);
 		expect(html).toContain('data-testid="evaluation-scheduled-ev_b"');
 		expect(html).not.toContain('data-testid="evaluation-scheduled-ev_a"');
-		expect(html).toContain('data-testid="evaluation-name-date-ev_a"');
-		expect(html).toContain('data-testid="evaluation-name-date-ev_b"');
-		expect(html).not.toContain('data-testid="evaluation-name-date-ev_c"');
-		expect(html).toContain(">Scheduled<");
+		// No inline date in the name (M3-51): every row has Started; a repeat says Nightly there.
+		expect(html).not.toContain("evaluation-name-date-");
+		expect(html).toContain("Nightly");
 	});
 });

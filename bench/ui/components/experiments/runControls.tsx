@@ -33,6 +33,8 @@ import { ArrowRight, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert } from "lu
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/reportcard/reportCardI18n";
 
 /** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
 type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
@@ -45,9 +47,11 @@ type EvaluationWithFailures = Evaluation & { failed_runs?: number };
  * the field existed) a stored result whose score is below 100% on some arm.
  */
 export function hasFailedRuns(evaluation: Evaluation): boolean {
+	// Normal (clean) runs decide (M3-11): a 100% result does not offer a rerun of the injected outage's runs.
+	const arms = evaluation.result?.arms ?? [];
+	if (arms.length > 0) return arms.some((a) => a.runs > 0 && a.score < 1);
 	const n = (evaluation as EvaluationWithFailures).failed_runs;
-	if (typeof n === "number") return n > 0;
-	return (evaluation.result?.arms ?? []).some((a) => a.runs > 0 && a.score < 1);
+	return typeof n === "number" && n > 0;
 }
 
 type ControlSettings = { mode?: string; concurrency?: number; total_usd?: number; paused_models?: string[] };
@@ -407,6 +411,7 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
  */
 export function RunControlsPanel({ expId, state }: { expId: string; state: string }) {
 	const { t } = useTranslation("runControl");
+	const { t: tu } = useTranslation("uf3");
 	const controls = useGetRunControlsQuery(expId);
 	const c = controls.data;
 	if (!c) return null;
@@ -420,7 +425,11 @@ export function RunControlsPanel({ expId, state }: { expId: string; state: strin
 					{t("panel.exploratory", { parent: c.rerun_of })}
 				</p>
 			)}
-			<DetailsDisclosure label={t("panel.title")} meta={c.paused ? t("pausedBadge") : undefined} testId="run-controls-disclosure">
+			<DetailsDisclosure
+				label={t("panel.title")}
+				meta={c.paused ? t("pausedBadge") : tu("runControls.hint")}
+				testId="run-controls-disclosure"
+			>
 				<div className="flex min-w-0 flex-col gap-5 rounded-lg border p-4">
 					<p className="text-muted-foreground text-xs">{t("panel.intro")}</p>
 					{(live || c.paused) && <LiveSettings c={c} live={live} />}
@@ -570,6 +579,8 @@ export function EvaluationRerunNotice({ evalId }: { evalId: string }) {
 /** Pause, resume and "Rerun failures" for an evaluation, beside its Cancel. */
 export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation }) {
 	const { t } = useTranslation("runControl");
+	const { t: tu } = useTranslation("uf3");
+	const confirm = useConfirm();
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
 	const [rerun, rerunState] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
@@ -618,7 +629,16 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 						className="gap-1.5"
 						title={t("rerun.hint")}
 						isLoading={rerunState.isLoading}
-						onClick={() => void rerun({ evalId: evaluation.id })}
+						onClick={async () => {
+							// Rerunning costs money: one confirm first (M3-11, M4-41; the shared paid button replaces it in phase B).
+							const n = (evaluation as EvaluationWithFailures).failed_runs;
+							const ok = await confirm(typeof n === "number" ? tu("rerun.confirmN", { count: n }) : tu("rerun.confirm"), {
+								title: tu("rerun.title"),
+								confirmLabel: tu("rerun.ok"),
+								cancelLabel: tu("rerun.keep"),
+							});
+							if (ok) void rerun({ evalId: evaluation.id });
+						}}
 						dataTestId="evaluation-rerun-failures"
 					>
 						<RotateCcw className="size-3.5" aria-hidden="true" />

@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetRunBifrostQuery, type BifrostCall, type RunBifrost } from "@/lib/store/apis/runBifrostApi";
@@ -21,8 +22,9 @@ export function usd(v: number): string {
 	return formatUsd(v);
 }
 
-/** A latency in ms, shown in seconds from one second up. */
+/** A latency in ms, shown in seconds from one second up and in the shared duration format from a minute (M3-24). */
 export function ms(v: number): string {
+	if (v >= 60_000) return formatDuration(v / 1000);
 	return v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`;
 }
 

@@ -1,14 +1,17 @@
 import "@/app/evaluations_/$evalId/views/fw08I18n";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
+import { CalendarClock, Search } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	EVALUATION_POLL_MS,
 	EVALUATION_SORTS,
@@ -16,6 +19,7 @@ import {
 	FAILURE_TEST_MODE,
 	evaluationAgents,
 	evaluationBenchmarks,
+	evaluationStatusWord,
 	evaluationKind,
 	evaluationResultText,
 	evaluationSpend,
@@ -28,7 +32,7 @@ import {
 	type EvaluationFilters,
 } from "./evaluation.utils";
 import { EvaluationLivePill } from "./evaluationLivePill";
-import { EvaluationKindLabel } from "./evaluationWords";
+import { EvaluationKindLabel, EvaluationStatusPill } from "./evaluationWords";
 import { usd } from "@/components/reportcard/reportCard.utils";
 
 /** /evaluations: every evaluation with search, filters and sort kept in the URL; each row opens its progress and report card. */
@@ -45,20 +49,10 @@ export default function EvaluationListView() {
 		void navigate({ to: "/evaluations", search: evaluationFiltersSearch(next) as never, replace: true });
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluations-screen">
-			<PageHeader
-				title={t("list.title")}
-				subtitle={t("list.subtitle")}
-				actions={
-					<Button asChild size="sm">
-						<Link to={"/evaluate" as never} data-testid="evaluations-new">
-							<Plus className="size-4" aria-hidden="true" />
-							{t("list.new")}
-						</Link>
-					</Button>
-				}
-			/>
+			{/* No page action: the header's "Evaluate an agent" is the one way in (M3-54). */}
+			<PageHeader title={t("list.title")} subtitle={t("list.subtitle")} />
 			{list.isLoading ? (
-				<BlockSkeleton rows={4} testId="evaluations-loading" />
+				<BlockSkeleton rows={8} testId="evaluations-loading" />
 			) : list.error || !list.data ? (
 				<LoadError title={t("list.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="evaluations-error" />
 			) : (
@@ -97,7 +91,8 @@ function EvaluationToolbar({
 				<Input
 					type="search"
 					className="h-8 w-64 pl-7 text-xs"
-					placeholder={tf("list.searchPlaceholder")}
+					placeholder={t("list.searchPlaceholder")}
+					aria-label={t("list.searchPlaceholder")}
 					value={filters.q}
 					onChange={(e) => onChange({ ...filters, q: e.target.value })}
 					data-testid="evaluations-search"
@@ -189,60 +184,92 @@ export function EvaluationTable({
 }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
+	const [picked, setPicked] = useState<Set<string>>(() => new Set());
+	const [deleting, setDeleting] = useState(false);
+	const [bulkError, setBulkError] = useState<string | null>(null);
 	if (evaluations.length === 0) return <EmptyNote testId="evaluations-empty">{t("list.empty")}</EmptyNote>;
 	const rows = filterEvaluations(evaluations, filters);
 	const repeated = repeatedNames(rows);
+	const deletable = rows.filter((e) => !isActiveStatus(e.status));
+	const toggle = (id: string) =>
+		setPicked((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
 	return (
 		<div className="flex flex-col gap-3">
 			<EvaluationToolbar evaluations={evaluations} filters={filters} onChange={onFiltersChange} shown={rows.length} />
 			{rows.length === 0 ? (
 				<EmptyNote testId="evaluations-no-match">{tf("list.noMatch")}</EmptyNote>
 			) : (
+				<>
+				{picked.size > 0 && (
+					<div className="flex flex-wrap items-center gap-3" data-testid="evaluations-bulk">
+						<BulkDelete ids={[...picked]} busy={deleting} onBusy={setDeleting} onDone={(failed, error) => {
+							setPicked(new Set(failed));
+							setBulkError(failed.length ? t("list.deleteSelectedError", { count: failed.length, error }) : null);
+						}} />
+						{bulkError && (
+							<span className="text-chart-error-ink text-xs" role="alert">
+								{bulkError}
+							</span>
+						)}
+					</div>
+				)}
 				<Table data-testid="evaluations-table">
+					<caption className="sr-only">{t("list.caption")}</caption>
 					<TableHeader>
 						<TableRow>
+							<TableHead className="w-8">
+								<input
+									type="checkbox"
+									className="accent-primary relative z-10 size-4"
+									aria-label={t("list.selectAll")}
+									checked={deletable.length > 0 && deletable.every((e) => picked.has(e.id))}
+									onChange={(e) => setPicked(e.target.checked ? new Set(deletable.map((d) => d.id)) : new Set())}
+									data-testid="evaluations-select-all"
+								/>
+							</TableHead>
 							<TableHead>{t("list.col.name")}</TableHead>
-							<TableHead>{t("list.col.agents")}</TableHead>
-							<TableHead>{t("list.col.mode")}</TableHead>
-							<TableHead>{t("list.col.benchmarks")}</TableHead>
 							<TableHead>{t("list.col.status")}</TableHead>
-							<TableHead className="text-right">{t("list.col.result")}</TableHead>
-							<TableHead className="text-right">{t("list.col.spend")}</TableHead>
-							<TableHead>{t("list.col.created")}</TableHead>
-							<TableHead className="sr-only">{t("list.col.open")}</TableHead>
+							<TableHead className="hidden text-right sm:table-cell">{t("list.col.result")}</TableHead>
+							<TableHead className="hidden text-right sm:table-cell">{t("list.col.spend")}</TableHead>
+							<TableHead className="hidden sm:table-cell">{t("list.col.created")}</TableHead>
+							<TableHead className="hidden xl:table-cell">{t("list.col.agents")}</TableHead>
+							<TableHead className="hidden xl:table-cell">{t("list.col.mode")}</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{rows.map((ev) => {
 							const benches = evaluationBenchmarks(ev);
+							const status = evaluationStatusWord(ev);
+							const started = formatCreated(ev.created_at, i18n.language);
 							return (
-								<TableRow key={ev.id} data-testid={`evaluation-row-${ev.id}`}>
+								// The whole row opens the evaluation: the name link covers it (M3-51).
+								<TableRow key={ev.id} className="hover:bg-muted/50 relative" data-testid={`evaluation-row-${ev.id}`}>
+									<TableCell>
+										{!isActiveStatus(ev.status) && (
+											<input
+												type="checkbox"
+												className="accent-primary relative z-10 size-4"
+												aria-label={t("list.selectRow", { name: ev.spec.name || ev.id })}
+												checked={picked.has(ev.id)}
+												onChange={() => toggle(ev.id)}
+												data-testid={`evaluation-select-${ev.id}`}
+											/>
+										)}
+									</TableCell>
 									<TableCell className="font-medium">
-										<Link to="/evaluations/$evalId" params={{ evalId: ev.id }} className="hover:underline">
+										<Link
+											to="/evaluations/$evalId"
+											params={{ evalId: ev.id }}
+											className="after:absolute after:inset-0 hover:underline"
+											data-testid={`evaluation-open-${ev.id}`}
+										>
 											{ev.spec.name || ev.id}
 										</Link>
-										{repeated.has(ev.spec.name || ev.id) && (
-											<span
-												className="text-muted-foreground ml-2 text-xs font-normal tabular-nums"
-												data-testid={`evaluation-name-date-${ev.id}`}
-											>
-												{formatCreated(ev.created_at, i18n.language)}
-											</span>
-										)}
-										{ev.schedule && (
-											<Badge
-												variant="outline"
-												className="ml-2 text-xs font-normal"
-												title={t("detail.scheduledLine", {
-													name: ev.spec.name || ev.id,
-													schedule: ev.schedule,
-													date: formatCreated(ev.created_at, i18n.language),
-												})}
-												data-testid={`evaluation-scheduled-${ev.id}`}
-											>
-												{t("detail.scheduled")}
-											</Badge>
-										)}
 										<span
 											className="text-muted-foreground block max-w-80 truncate text-xs font-normal"
 											title={benches.join(", ")}
@@ -250,38 +277,93 @@ export function EvaluationTable({
 										>
 											{benches.join(", ")}
 										</span>
+										{/* Phones: result, spend and start on a muted second line. */}
+										<span className="text-muted-foreground block text-xs font-normal tabular-nums sm:hidden">
+											{[evaluationResultText(ev), usd(evaluationSpend(ev)), started]
+												.filter(Boolean)
+												.join(" \u00b7 ")}
+										</span>
 									</TableCell>
-									<TableCell>{evaluationAgents(ev).join(", ")}</TableCell>
 									<TableCell>
-										<EvaluationKindLabel evaluation={ev} />
+										{status === "notStarted" ? (
+											<EvaluationStatusPill status="notStarted" testId={`evaluation-status-${ev.id}`} />
+										) : (
+											<EvaluationLivePill evaluation={ev} testId={`evaluation-status-${ev.id}`} />
+										)}
 									</TableCell>
-									<TableCell className="tabular-nums">{t("list.benchmarkCount", { count: benches.length })}</TableCell>
-									<TableCell>
-										<EvaluationLivePill evaluation={ev} testId={`evaluation-status-${ev.id}`} />
-									</TableCell>
-									<TableCell className="text-right tabular-nums" data-testid={`evaluation-result-${ev.id}`}>
+									<TableCell className="hidden text-right tabular-nums sm:table-cell" data-testid={`evaluation-result-${ev.id}`}>
 										{evaluationResultText(ev)}
 									</TableCell>
-									<TableCell className="text-right tabular-nums" data-testid={`evaluation-spend-${ev.id}`}>
+									<TableCell className="hidden text-right tabular-nums sm:table-cell" data-testid={`evaluation-spend-${ev.id}`}>
 										{usd(evaluationSpend(ev))}
 									</TableCell>
-									<TableCell className="text-muted-foreground tabular-nums">{formatCreated(ev.created_at, i18n.language)}</TableCell>
-									<TableCell className="text-right">
-										<Link
-											to="/evaluations/$evalId"
-											params={{ evalId: ev.id }}
-											className="text-primary text-sm hover:underline"
-											data-testid={`evaluation-open-${ev.id}`}
-										>
-											{t("list.openOne")}
-										</Link>
+									<TableCell className="text-muted-foreground hidden tabular-nums sm:table-cell">
+										{started}
+										{ev.schedule && (
+											<span
+												className="ml-2 inline-flex items-center gap-1 text-xs"
+												title={t("detail.scheduledLine", { name: ev.spec.name || ev.id, schedule: ev.schedule, date: started })}
+												data-testid={`evaluation-scheduled-${ev.id}`}
+											>
+												<CalendarClock className="size-3.5" aria-hidden="true" />
+												{t("list.nightly")}
+											</span>
+										)}
+									</TableCell>
+									<TableCell className="hidden xl:table-cell">{evaluationAgents(ev).join(", ")}</TableCell>
+									<TableCell className="hidden xl:table-cell">
+										<EvaluationKindLabel evaluation={ev} />
 									</TableCell>
 								</TableRow>
 							);
 						})}
 					</TableBody>
 				</Table>
+				</>
 			)}
 		</div>
+	);
+}
+/** Bulk delete (X-75): one confirm, then each picked evaluation; the ones that failed stay picked. */
+function BulkDelete({
+	ids,
+	busy,
+	onBusy,
+	onDone,
+}: {
+	ids: string[];
+	busy: boolean;
+	onBusy(b: boolean): void;
+	onDone(failed: string[], error: string): void;
+}) {
+	const { t } = useTranslation("evaluations");
+	const confirm = useConfirm();
+	const [remove] = useDeleteEvaluationMutation();
+	const run = async () => {
+		const ok = await confirm(t("list.deleteSelectedBody"), {
+			title: t("list.deleteSelectedTitle", { count: ids.length }),
+			confirmLabel: t("list.deleteSelectedOk"),
+			cancelLabel: t("detail.deleteKeep"),
+			destructive: true,
+		});
+		if (!ok) return;
+		onBusy(true);
+		const failed: string[] = [];
+		let lastError = "";
+		for (const id of ids) {
+			try {
+				await remove(id).unwrap();
+			} catch (e) {
+				failed.push(id);
+				lastError = getBenchErrorMessage(e);
+			}
+		}
+		onBusy(false);
+		onDone(failed, lastError);
+	};
+	return (
+		<Button size="sm" variant="destructive" disabled={busy} onClick={() => void run()} data-testid="evaluations-delete-selected">
+			{t("list.deleteSelected", { count: ids.length })}
+		</Button>
 	);
 }

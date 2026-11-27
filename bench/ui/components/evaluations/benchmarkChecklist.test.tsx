@@ -35,7 +35,7 @@ describe("BenchmarkChecklist (N124)", () => {
 	it("greys out a benchmark the agent cannot run, with the reason", () => {
 		const html = render({ compatibility, selected: ["longmemeval-s"] });
 		expect(html).toMatch(/data-testid="t-benchmark-longmemeval-s" data-disabled="true"/);
-		expect(html).toContain("needs sessions");
+		expect(html).toContain("Needs an agent that can use sessions");
 		expect(html).not.toMatch(/data-testid="t-benchmark-hd-harbor-bfcl" data-disabled/);
 	});
 	it("waits while compatibility is checked", () => {

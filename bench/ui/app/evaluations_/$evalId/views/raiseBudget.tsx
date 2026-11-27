@@ -1,7 +1,23 @@
 import { formatCost } from "@/components/leaderboard/agentBoard.utils";
 import { Button } from "@/components/ui/button";
 import { type Evaluation, type EvaluationChild, useRaiseEvaluationBudgetMutation } from "@/lib/store/apis/evaluationsApi";
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
+/** The anchor the budget stop texts link to (M3-4). */
+export const RAISE_BUDGET_ANCHOR = "raise-budget";
+
+/**
+ * The budget stop of an evaluation for the report card headline (M3-4): the total cap, the runs that finished and the runs
+ * planned; undefined when no benchmark was stopped by its budget.
+ */
+export function budgetStopOf(ev: Evaluation, doneRuns: number): { budget: string; done: number; planned: number } | undefined {
+	const { stopped, notStarted } = raiseTargets(ev);
+	if (stopped.length === 0) return undefined;
+	const total = (ev.children ?? []).reduce((s, c) => s + (c.budget_usd ?? 0), 0);
+	return { budget: formatCost(ev.spec.budget_usd || total), done: doneRuns, planned: doneRuns + notStarted };
+}
 
 /**
  * Budget on the evaluation page (G4-01): each benchmark's spend against its cap, the benchmarks the
@@ -63,6 +79,8 @@ function errorText(e: unknown): string {
 }
 
 export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
+	const { t } = useTranslation("evaluations");
+	const confirm = useConfirm();
 	const { stopped, current, notStarted } = raiseTargets(evaluation);
 	const [text, setText] = useState(() => String(suggestedRaise(evaluation)));
 	const [raise, state] = useRaiseEvaluationBudgetMutation();
@@ -71,44 +89,50 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 	const valid = Number.isFinite(value) && value > current && value <= 1000;
 	return (
 		<section
-			className="border-chart-warning/40 bg-chart-warning/8 flex flex-col gap-3 rounded-xl border p-4 text-sm"
+			id={RAISE_BUDGET_ANCHOR}
+			className="border-chart-warning/40 bg-chart-warning/8 flex scroll-mt-24 flex-col gap-3 rounded-xl border p-4 text-sm"
 			data-testid="evaluation-budget-stopped"
 		>
 			<div className="flex flex-col gap-1">
-				<span className="font-medium">
-					The budget stopped {stopped.length} {stopped.length === 1 ? "benchmark" : "benchmarks"}: {notStarted}{" "}
-					{notStarted === 1 ? "run" : "runs"} not started.
-				</span>
-				<span className="text-muted-foreground">
-					The report card only counts the runs that finished. Raise the budget to run the rest; finished runs are kept and never run again.
-				</span>
+				<span className="font-medium">{t("raise.title", { count: stopped.length, notStarted })}</span>
+				<span className="text-muted-foreground">{t("raise.body")}</span>
 			</div>
 			<div className="flex flex-wrap items-end gap-3">
 				<label className="flex flex-col gap-1">
-					<span className="text-xs font-medium">New budget for the evaluation (USD, now {dollars(current)})</span>
-					<input
-						type="number"
-						min={0}
-						step="1"
-						inputMode="decimal"
-						className="border-input bg-background h-8 w-32 rounded-md border px-2 text-sm"
-						value={text}
-						onChange={(e) => setText(e.target.value)}
-						data-testid="evaluation-raise-budget-input"
-					/>
+					<span className="text-xs font-medium">{t("raise.label", { current: dollars(current) })}</span>
+					<span className="relative">
+						<span className="text-muted-foreground pointer-events-none absolute inset-y-0 left-2 flex items-center" aria-hidden="true">
+							$
+						</span>
+						<input
+							type="number"
+							min={0}
+							step="1"
+							inputMode="decimal"
+							className="border-input bg-background h-10 w-40 rounded-md border pr-2 pl-6 text-sm"
+							value={text}
+							onChange={(e) => setText(e.target.value)}
+							data-testid="evaluation-raise-budget-input"
+						/>
+					</span>
 				</label>
 				<Button
-					size="sm"
 					disabled={!valid || state.isLoading}
-					onClick={() => void raise({ id: evaluation.id, budget_usd: value })}
+					onClick={async () => {
+						// Paid action: raising commits more money, so it never runs on one click (M3-23).
+						const ok = await confirm(t("raise.confirm", { added: dollars(value - current), total: dollars(value) }), {
+							title: t("raise.confirmTitle"),
+							confirmLabel: t("raise.confirmOk"),
+							cancelLabel: t("raise.keep"),
+						});
+						if (ok) void raise({ id: evaluation.id, budget_usd: value });
+					}}
 					data-testid="evaluation-raise-budget"
 				>
-					{state.isLoading ? "Continuing..." : "Raise budget and continue"}
+					{state.isLoading ? t("raise.busy") : t("raise.button")}
 				</Button>
 			</div>
-			{!valid && text.trim() !== "" && (
-				<span className="text-muted-foreground text-xs">Type more than {dollars(current)} and at most $1000.</span>
-			)}
+			{!valid && text.trim() !== "" && <span className="text-muted-foreground text-xs">{t("raise.limit", { current: dollars(current) })}</span>}
 			{state.error ? (
 				<span className="text-chart-error-ink text-xs" role="alert" data-testid="evaluation-raise-budget-error">
 					{errorText(state.error)}

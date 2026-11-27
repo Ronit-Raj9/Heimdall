@@ -3,6 +3,7 @@ import { StatusBadge, suiteIdOf } from "@/components/shell";
 import { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage, useGetVerdictQuery } from "@/lib/store";
 import "@/lib/types/homeI18n";
+import "@/components/reportcard/reportCardI18n";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -17,12 +18,24 @@ export function RecentExperiments({
 	experiments: readonly ExperimentListItem[];
 	trackOf?: (suite: string | undefined) => string | undefined;
 }) {
+	const { t } = useTranslation("uf3");
 	return (
-		<ul className="divide-border/70 flex flex-col divide-y" data-testid="home-recent-list">
-			{experiments.map((exp) => (
-				<RecentRow key={exp.exp_id} exp={exp} trackOf={trackOf} />
-			))}
-		</ul>
+		<>
+			<ul className="divide-border/70 flex flex-col divide-y" data-testid="home-recent-list">
+				{experiments.map((exp) => (
+					<RecentRow key={exp.exp_id} exp={exp} trackOf={trackOf} />
+				))}
+			</ul>
+			{/* A path from Home to the runs that failed (M5-36). */}
+			<Link
+				to={"/runs" as never}
+				search={{ outcome: "fail" } as never}
+				className="text-primary block px-4 py-2 text-sm font-medium hover:underline sm:px-5"
+				data-testid="home-recent-failures"
+			>
+				{t("home.recentFailures")}
+			</Link>
+		</>
 	);
 }
 
@@ -41,7 +54,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 			<Link
 				to="/experiments/$expId"
 				params={{ expId: exp.exp_id }}
-				className="group hover:bg-accent/50 focus-visible:bg-accent/50 flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-none sm:px-5"
+				className="group hover:bg-muted focus-visible:outline-ring flex min-w-0 items-center gap-3 px-4 py-3 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5"
 				title={exp.exp_id}
 			>
 				<TrackBadge track={trackOf?.(suite)} />

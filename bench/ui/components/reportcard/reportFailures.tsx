@@ -15,6 +15,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { pct } from "./reportCard.utils";
+import "./reportCardI18n";
 
 /** Failure groups listed on the report card. */
 export const REPORT_CLUSTERS_SHOWN = 3;
@@ -49,11 +50,13 @@ export function ExampleRunLink({ example }: { example: FailureExample }) {
 /** One version's or arm's patterns: how often each showed up, and example runs. */
 export function PatternList({ group, testId }: { group: FailurePatternGroup; testId?: string }) {
 	const { t } = useTranslation("agentFirst");
+	const { t: tr } = useTranslation("reportCard");
 	const seen = seenPatterns(group);
 	if (seen.length === 0) {
+		// "No pattern" over a failed run would contradict the failures listed below it (M3-6).
 		return (
 			<p className="text-muted-foreground text-sm" data-testid={testId ? `${testId}-none` : undefined}>
-				{t("failures.noPatterns", { count: group.runs })}
+				{(group.failed ?? 0) > 0 ? tr("failures.noRepeated", { count: group.failed }) : t("failures.noPatterns", { count: group.runs })}
 			</p>
 		);
 	}
@@ -83,6 +86,7 @@ export function PatternList({ group, testId }: { group: FailurePatternGroup; tes
 /** The most common failures across the report's experiments (failure groups), with example runs. */
 function TopClusters({ clusters }: { clusters: readonly ClusterSummary[] }) {
 	const { t } = useTranslation("agentFirst");
+	const { t: tr } = useTranslation("reportCard");
 	return (
 		<ul className="flex flex-col divide-y rounded-lg border" data-testid="report-failure-clusters">
 			{clusters.map((c) => (
@@ -92,9 +96,16 @@ function TopClusters({ clusters }: { clusters: readonly ClusterSummary[] }) {
 						<span className="text-muted-foreground text-xs tabular-nums">{t("failures.clusterRuns", { count: c.count })}</span>
 					</span>
 					<span className="flex flex-wrap gap-x-3 gap-y-1">
-						{(c.examples ?? []).map((runId) => (
-							<Link key={runId} to="/runs/$runId" params={{ runId }} className="text-primary font-mono text-xs underline-offset-4 hover:underline">
-								{runId}
+						{/* Plain link text; the run id is in the title (X-25). The cluster payload has no task names yet. */}
+						{(c.examples ?? []).map((runId, i) => (
+							<Link
+								key={runId}
+								to="/runs/$runId"
+								params={{ runId }}
+								title={runId}
+								className="text-primary text-sm underline-offset-4 hover:underline"
+							>
+								{tr("failures.runN", { n: i + 1 })}
 							</Link>
 						))}
 					</span>

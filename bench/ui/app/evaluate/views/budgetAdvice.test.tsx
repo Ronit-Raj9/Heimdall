@@ -33,9 +33,9 @@ describe("budgetLine", () => {
 
 	it("says when the cost is not known", () => {
 		expect(budgetLine(budget({ fit: "unknown" }), { low: 0, high: 0, known: false }, false)).toBe(
-			"The cost is not known yet. Runs stop when the $1.00 budget is used up.",
+			"Price unknown: no past runs of this setup here. You will never spend more than $1.00.",
 		);
-		expect(budgetLine(budget(), undefined, false)).toBe("The cost is not known yet. Runs stop when the $1.00 budget is used up.");
+		expect(budgetLine(budget(), undefined, false)).toBe("Price unknown: no past runs of this setup here. You will never spend more than $1.00.");
 	});
 
 	it("names the per-benchmark cap when no budget is typed", () => {
@@ -93,10 +93,8 @@ describe("one run's cost (fix wave 3, N190)", () => {
 		expect(html).toContain("Set budget to");
 	});
 
-	it("says an unknown run cost splits the budget evenly across the runs, and nothing when a run fits", () => {
-		expect(runWarning(budget(), undefined, 1)).toBe(
-			"The cost of a run is not known yet, so the budget is split evenly across the runs. A run can cost more than its share, so the total can pass the budget a little before it stops.",
-		);
+	it("says an unknown price once, in the budget line, and nothing when a run fits (M3-28)", () => {
+		expect(runWarning(budget(), undefined, 1)).toBeUndefined();
 		expect(runWarning(budget(), 0.02, 1)).toBeUndefined();
 		expect(runWarning(budget({ default: true }), undefined, 1)).toBeUndefined();
 	});

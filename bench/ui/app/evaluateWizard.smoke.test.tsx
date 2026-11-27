@@ -298,7 +298,7 @@ describe.skipIf(!wizardFile)("evaluate wizard smoke", () => {
 		expect(pages[1]).toMatch(/v1|v2|version/i);
 		// Benchmarks: the compatible one offered, the incompatible one shown with its reason.
 		expect(pages[2]).toContain("team-coding");
-		expect(pages[2]).toMatch(/needs sessions/i);
+		expect(pages[2]).toMatch(/needs sessions|use sessions/i);
 		// No practice examples and no benchmark without a ready task.
 		expect(pages[2]).not.toContain('data-testid="step3-benchmark-coding-core"');
 		expect(pages[2]).not.toContain('data-testid="step3-benchmark-acme-payments"');

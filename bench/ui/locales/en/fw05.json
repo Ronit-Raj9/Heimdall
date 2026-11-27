@@ -2,7 +2,7 @@
 	"budget": {
 		"covers": "Your {{budget}} budget covers the expected cost ({{low}} to {{high}}).",
 		"mayExceed": "The expected cost ({{low}} to {{high}}) may go over your {{budget}} budget. Runs stop when the budget is used up.",
-		"unknown": "The cost is not known yet. Runs stop when the {{budget}} budget is used up.",
+		"unknown": "Price unknown: no past runs of this setup here. You will never spend more than {{budget}}.",
 		"noBudget": "No budget set: each benchmark may spend up to {{cap}}.",
 		"updating": "Updating...",
 		"belowOneRun": "This budget is less than one run costs (about {{run}} per run), so no run would start. Set at least {{min}}.",

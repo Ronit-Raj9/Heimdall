@@ -43,7 +43,9 @@ describe("CheatRateRow", () => {
 		expect(render(<CheatRateRow report={withCheat({ state: "not_measured" })} />)).toContain("Not measured yet.");
 		expect(render(<CheatRateRow report={withCheat({ state: "running" })} />)).toContain("Cheat check running.");
 		const none = render(<CheatRateRow report={withCheat({ state: "no_twins" })} />);
-		expect(none).toContain("This benchmark has no impossible twins yet.");
+		// The report names the missing check and offers no create button (M3-14).
+		expect(none).toContain("Cheating check: not run for this benchmark");
+		expect(none).not.toContain("cheat-make-twins");
 		expect(none).not.toContain("%");
 	});
 });

@@ -73,6 +73,48 @@ export function stepReady(
 	}
 }
 
+/** The evaluate locale key that says why Next is off on a step (M3-26); null when the step is ready. */
+export type NextReason = "needAgent" | "needVersion" | "needOpponent" | "needLearn" | "needBenchmark" | "needModel";
+
+export function nextReason(
+	step: EvaluateStep,
+	d: EvaluateDraft,
+	owns: ReadonlySet<string> = new Set(),
+	nothingRuns?: string | null,
+	ctx: StepContext = {},
+): NextReason | null {
+	if (step >= 5 || stepReady(step, d, owns, nothingRuns, ctx)) return null;
+	switch (step) {
+		case 1:
+			return "needAgent";
+		case 2:
+			return d.mode === "versions" ? "needVersion" : d.mode === "opponent" ? "needOpponent" : "needLearn";
+		case 3:
+			return "needBenchmark";
+		default:
+			// Step 4 has its own hints (nothing runs, failover); otherwise a setup lacks a model.
+			return nothingRuns || failoverNextProblem(d) ? null : "needModel";
+	}
+}
+
+/** "2 benchmarks, 20 runs, about $0.10 to $0.40, about 12 min" from the step 4 estimate, for the footer (M3-26). */
+export function footerSummary(
+	t: (key: string, opts?: Record<string, unknown>) => string,
+	benchmarks: number,
+	est: { runs: number; est_cost_usd?: { low: number; high: number; known?: boolean }; est_minutes?: { low: number; high: number } } | undefined,
+): string {
+	if (!est || !(est.runs > 0)) return "";
+	const usd = (n: number) => `$${n < 1 ? n.toFixed(2) : n.toFixed(0)}`;
+	if (!est.est_cost_usd?.known) return t("footerSummaryNoCost", { benchmarks, runs: est.runs });
+	return t("footerSummary", {
+		benchmarks,
+		runs: est.runs,
+		low: usd(est.est_cost_usd.low),
+		high: usd(est.est_cost_usd.high),
+		min: Math.max(1, Math.round(est.est_minutes?.high ?? 0)),
+	});
+}
+
 /** Highest step reachable from the draft: each earlier step must be ready. */
 export function maxReachable(
 	d: EvaluateDraft,
@@ -175,7 +217,7 @@ const LINK_PARSERS = {
 function Stepper({ step, reach, onGo }: { step: EvaluateStep; reach: EvaluateStep; onGo(s: EvaluateStep): void }) {
 	const { t } = useTranslation("evaluate");
 	return (
-		<ol className="flex flex-wrap items-center gap-2" data-testid="evaluate-stepper">
+		<ol className="hidden flex-wrap items-center gap-2 sm:flex" data-testid="evaluate-stepper">
 			{EVALUATE_STEPS.map((s) => {
 				const done = s < step;
 				const current = s === step;
@@ -189,7 +231,8 @@ function Stepper({ step, reach, onGo }: { step: EvaluateStep; reach: EvaluateSte
 							aria-current={current ? "step" : undefined}
 							data-testid={`evaluate-stepper-${s}`}
 							className={cn(
-								"flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+								// Unreachable steps stay readable: muted text at full opacity, not grey on grey (M3-45).
+								"disabled:text-muted-foreground flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed",
 								current ? "border-primary bg-primary/10 text-primary font-medium" : "border-border/70 hover:bg-accent",
 							)}
 						>
@@ -269,6 +312,17 @@ function EvaluateWizard() {
 	const reach = maxReachable(draft, owns, nothingRuns, ctx);
 	const step = (wanted > reach ? reach : wanted) as EvaluateStep;
 	const go = (s: EvaluateStep) => void setStepRaw(s === 1 ? null : s, { history: stepHistoryMode("user") });
+	// Resume (M3-44): opened without ?step= on a draft that has an agent, the wizard goes to the furthest step it can.
+	const resumed = useRef(false);
+	useEffect(() => {
+		if (resumed.current || linkPending || agentsQ.isLoading) return;
+		resumed.current = true;
+		if (stepRaw == null && draft.agent && reach > 1) void setStepRaw(reach, { history: stepHistoryMode("fix") });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [linkPending, agentsQ.isLoading]);
+	const [launchSlot, setLaunchSlot] = useState<HTMLElement | null>(null);
+	const reason = nextReason(step, draft, owns, nothingRuns, ctx);
+	const summaryText = step >= 4 ? footerSummary(t as never, spec.benchmarks.length, step4Estimate.main.data) : "";
 	const failoverHint = step === 4 && !nothingRuns ? failoverNextProblem(draft) : "";
 
 	// N85: once the link params are applied and the agents list (and, from step 4 on, the estimate) has settled, the
@@ -285,8 +339,9 @@ function EvaluateWizard() {
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
+				breadcrumbs={[{ label: t("crumbList"), to: "/evaluations" }, { label: t("crumbNew") }]}
 				actions={
-					<div className="flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						<Button
 							variant="ghost"
 							size="sm"
@@ -294,15 +349,6 @@ function EvaluateWizard() {
 							data-testid="evaluate-reset"
 						>
 							{t("startOver")}
-						</Button>
-						<Button
-							variant="link"
-							size="sm"
-							onClick={() => setQuickRun(true)}
-							title={tHubs("quickRun.hint")}
-							data-testid="evaluate-quick-run"
-						>
-							{tHubs("quickRun.link")}
 						</Button>
 					</div>
 				}
@@ -320,22 +366,52 @@ function EvaluateWizard() {
 					}}
 				/>
 			)}
-			<Stepper step={step} reach={reach} onGo={go} />
-			<p className="text-muted-foreground text-xs">{t("stepOf", { n: step })}</p>
+			<div className="flex flex-col gap-2">
+				<Stepper step={step} reach={reach} onGo={go} />
+				{/* One progress indicator: the stepper on wider screens, "Step n of 5: name" with a bar on phones (M3-45). */}
+				<div className="flex flex-col gap-1 sm:sr-only" data-testid="evaluate-step-of">
+					<p className="text-sm font-medium">{t("stepOfName", { n: step, name: t(`steps.${step}`) })}</p>
+					<div className="bg-muted h-1 w-full rounded-full" aria-hidden="true">
+						<div className="bg-primary h-1 rounded-full" style={{ width: `${(step / 5) * 100}%` }} />
+					</div>
+				</div>
+				<button
+					type="button"
+					onClick={() => setQuickRun(true)}
+					title={tHubs("quickRun.hint")}
+					className="text-muted-foreground hover:text-foreground w-fit text-xs underline-offset-2 hover:underline"
+					data-testid="evaluate-quick-run"
+				>
+					{tHubs("quickRun.link")}
+				</button>
+			</div>
 
 			<div className="min-w-0">
 				{step === 1 && <Step1Agent missingAgent={missingAgent} onPicked={() => setMissingAgent(null)} />}
 				{step === 2 && <Step2Learn />}
 				{step === 3 && <Step3Benchmarks />}
 				{step === 4 && <Step4Setup spec={spec} onChange={(s) => update(specToPatch(s, draft))} />}
-				{step === 5 && <Step5Launch spec={draftToSpec(draft)} onChange={(s) => update(specToPatch(s))} />}
+				{step === 5 && <Step5Launch spec={draftToSpec(draft)} onChange={(s) => update(specToPatch(s))} launchSlot={launchSlot} />}
 			</div>
 
-			<div className="flex items-center justify-between border-t pt-4">
+			{/* One sticky footer on every step: Back, the reason or summary, and the primary button (M3-26, M1-50). */}
+			<div
+				className="bg-background/95 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 backdrop-blur sm:mx-0 sm:px-0"
+				data-testid="evaluate-footer"
+			>
 				<Button variant="outline" disabled={step === 1} onClick={() => go((step - 1) as EvaluateStep)} data-testid="evaluate-back">
 					<ArrowLeft />
 					{t("back")}
 				</Button>
+				{(reason || summaryText) && (
+					<span
+						className="text-muted-foreground min-w-0 flex-1 text-xs sm:text-center"
+						data-testid={reason ? "evaluate-next-reason" : "evaluate-footer-summary"}
+					>
+						{reason ? t(`nextReason.${reason}`) : summaryText}
+					</span>
+				)}
+				{step === 5 && <span ref={setLaunchSlot} className="ml-auto flex items-center" data-testid="evaluate-launch-slot" />}
 				{step < 5 && (
 					<div className="flex items-center gap-3">
 						{step === 4 && nothingRuns && (
