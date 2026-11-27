@@ -48,9 +48,9 @@ export function CopyId({ value, display, title, className, testId }: CopyIdProps
 				onClick={copy}
 				aria-label={t("app.copyId", { id: value })}
 				title={t("app.copyId", { id: value })}
-				className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded opacity-40 transition-opacity duration-100 group-hover/copy:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+				className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md p-1 opacity-70 focus-visible:ring-(--focus) transition-opacity duration-100 group-hover/copy:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
 			>
-				{copied ? <Check className="text-chart-success-ink size-3" aria-hidden="true" /> : <Copy className="size-3" aria-hidden="true" />}
+				{copied ? <Check className="text-success-ink size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
 			</button>
 		</span>
 	);

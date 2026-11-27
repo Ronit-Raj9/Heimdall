@@ -7,9 +7,15 @@
 		<meta name="description" content="Heimdall: the release gate for AI agents, built on Bifrost." />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="color-scheme" content="light dark" />
+		<!-- Page colour before the app loads, so a cold load or dark mode never flashes white. -->
+		<style>
+			html{background:#f9f9fb;color:#2a2c33}
+			@media (prefers-color-scheme:dark){html{background:#1d1e22;color:#ececf0}}
+			.boot{display:flex;min-height:100dvh;align-items:center;justify-content:center;gap:10px;font:500 14px system-ui,sans-serif;opacity:.8}
+		</style>
 	</head>
 	<body class="font-sans antialiased">
-		<div id="root"></div>
+		<div id="root"><div class="boot" role="status"><img src="/favicon.svg" alt="" width="24" height="24" />Loading Heimdall</div></div>
 		<script type="module" src="/app/main.tsx"></script>
 	</body>
 </html>

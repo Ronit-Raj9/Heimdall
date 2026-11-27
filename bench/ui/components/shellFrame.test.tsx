@@ -30,12 +30,14 @@ afterEach(() => {
 });
 
 describe("BenchSidebar", () => {
-	it("renders Home on top, then six headed groups with toggles and labelled lists, all open", () => {
+	it("renders Home on top, then four headed groups with toggles and labelled lists, all open, then the bottom group", () => {
 		at("/");
 		const html = render(<BenchSidebar />);
 		expect(html).toContain('data-testid="nav-group-home"');
 		expect(html).not.toContain("nav-group-toggle-home");
-		for (const group of ["agents", "test", "tasks", "watch", "release", "settings"]) {
+		expect(html).toContain('data-testid="nav-group-bottom"');
+		expect(html).not.toContain("nav-group-toggle-bottom");
+		for (const group of ["test", "results", "benchmarks", "production"]) {
 			expect(html).toContain(`data-testid="nav-group-${group}"`);
 			const toggle = tagOf(html, `nav-group-toggle-${group}`) ?? "";
 			expect(toggle).toContain('aria-expanded="true"');
@@ -49,6 +51,25 @@ describe("BenchSidebar", () => {
 		expect(html).not.toContain("nav-link-new-experiment");
 		expect(html).not.toContain("nav-link-welcome");
 		expect(html).not.toContain("nav-drawer");
+		// Spec 1: the unlinked pages have entries; only the first group toggle is a tab stop.
+		for (const id of ["nav-link-inbox", "nav-link-gateway", "nav-link-docs"]) expect(html).toContain(id);
+		expect(tagOf(html, "nav-group-toggle-test")).toContain('tabindex="0"');
+		expect(tagOf(html, "nav-group-toggle-results")).toContain('tabindex="-1"');
+	});
+
+	it("shows Improvements to admins only", () => {
+		const has = (session: Parameters<typeof visibleNavGroups>[0]) =>
+			visibleNavGroups(session).some((group) => group.items.some((item) => item.to === "/improvements"));
+		expect(has(LOCAL_SESSION)).toBe(true);
+		expect(has(hostedSession("member"))).toBe(false);
+		expect(has(hostedSession("admin"))).toBe(true);
+	});
+
+	it("highlights Comparisons on /compare opened from a comparison", () => {
+		routerState.location = { pathname: "/compare", href: "/compare?exp=e_1", search: { exp: "e_1" } };
+		const html = render(<BenchSidebar />);
+		expect(tagOf(html, "nav-link-experiments")).toContain('aria-current="page"');
+		expect(tagOf(html, "nav-link-runs")).not.toContain("aria-current");
 	});
 
 	it("marks the object's entry current on a nested route, and only that one", () => {

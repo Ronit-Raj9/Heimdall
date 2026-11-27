@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import { LoadError } from "./screenStates";
+import { InlineError, LoadError, listState, slowStage } from "./screenStates";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -27,9 +27,41 @@ describe("LoadError", () => {
 		expect(html).not.toContain("Back to improvements");
 	});
 
-	it("renders a 404 like any error when notFound is not given", () => {
+	it("renders a 404 as the error pattern without Retry when notFound is not given (Spec 5: Retry only when it can help)", () => {
 		const html = render(<LoadError title="Could not load" error={notFound} onRetry={() => undefined} testId="x-error" />);
-		expect(html).toContain("x-error-retry");
+		expect(html).not.toContain("x-error-retry");
+		expect(html).toContain('data-error-kind="notFound"');
 		expect(html).toContain("improvement not found: zz-nope");
+	});
+
+	it("says why in plain words and keeps the server text in Details", () => {
+		const html = render(<LoadError title="Could not load" error={broken} testId="x-error" />);
+		expect(html).toContain("A server error; it was logged.");
+		expect(html).toContain("Details from the server");
+		expect(html).not.toContain("500");
+	});
+});
+describe("InlineError", () => {
+	it("renders nothing without an error", () => {
+		expect(render(<InlineError error={null} testId="a-error" />)).toBe("");
+	});
+	it("shows the network sentence and Retry", () => {
+		const html = render(<InlineError error={{ status: "FETCH_ERROR", error: "x" }} onRetry={() => undefined} testId="a-error" />);
+		expect(html).toContain("Could not reach Heimdall.");
+		expect(html).toContain("a-error-retry");
+	});
+});
+
+describe("listState and slowStage", () => {
+	it("never reports empty while loading or failed", () => {
+		expect(listState({ isLoading: true, data: [] })).toBe("loading");
+		expect(listState({ isError: true, data: [] })).toBe("error");
+		expect(listState({ data: [] })).toBe("empty");
+		expect(listState({ data: [1] })).toBe("ready");
+	});
+	it("names a slow load at 3 s and gives up at 15 s", () => {
+		expect(slowStage(1000)).toBe("none");
+		expect(slowStage(3000)).toBe("slow");
+		expect(slowStage(15000)).toBe("tooSlow");
 	});
 });

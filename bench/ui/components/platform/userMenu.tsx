@@ -1,3 +1,4 @@
+import { useMenuKeyboard } from "@/components/ui/dropdownMenu";
 import { RoleBadge } from "@/components/platform/badges";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
@@ -32,6 +33,9 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 	const [logout, logoutState] = useLogoutMutation();
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
+	// Focus moves into the menu on open; arrows, Home and End move between items (M1-39).
+	const menuRef = useRef<HTMLDivElement>(null);
+	const onMenuKey = useMenuKeyboard(open, menuRef, () => setOpen(false), triggerRef);
 	const menuId = useId();
 
 	useEffect(() => {
@@ -83,7 +87,7 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 				aria-controls={open ? menuId : undefined}
 				aria-label={t("header.account")}
 				title={session.user?.email ?? label}
-				className="bg-foreground text-background hover:ring-ring/40 flex size-8 cursor-pointer items-center justify-center rounded-full text-[11px] font-semibold tracking-wide transition-shadow hover:ring-2"
+				className="bg-foreground text-background hover:ring-(--focus)/40 flex size-8 cursor-pointer items-center justify-center rounded-full text-[11px] font-semibold tracking-wide transition-shadow hover:ring-2"
 				data-testid="user-menu-trigger"
 			>
 				{session.kind === "token" ? (
@@ -94,6 +98,8 @@ export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 			</button>
 			{open && (
 				<div
+					ref={menuRef}
+					onKeyDown={onMenuKey}
 					id={menuId}
 					role="menu"
 					aria-label={t("header.account")}
