@@ -183,7 +183,7 @@ func (h *InboxTokensHandler) revoke(ctx *fasthttp.RequestCtx) {
 func (h *InboxTokensHandler) unauthorized(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("WWW-Authenticate", `Bearer realm="heimdall-inbox"`)
 	lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized,
-		"the inbox ingest needs one of this org's ingest tokens: Authorization: Bearer hmi_... (Inbox page, Push failures in, Generate token)")
+		"the inbox ingest needs one of this org's inbox tokens: Authorization: Bearer hmi_... (Inbox page, Push failures in, Generate token)")
 }
 
 // ingest handles POST /orgs/{org}/inbox/ingest: token, body cap and rate
