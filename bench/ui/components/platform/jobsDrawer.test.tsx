@@ -10,6 +10,7 @@ import { JobsDrawer, JobsIndicator } from "./jobsDrawer";
 
 const api = vi.hoisted(() => ({ jobs: {} as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: undefined }) }));
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
 	useListJobsQuery: () => api.jobs,
