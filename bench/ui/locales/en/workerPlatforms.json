@@ -31,7 +31,7 @@
   "lastTested": "Tested",
   "error": "Could not update {{platform}}",
   "loadError": "Could not load worker platforms",
-  "defaultNote": "Tasks with services, teams, sessions or faults outside the model gateway stay on the shared worker's Docker and are refused on a platform, with the reason.",
+  "defaultNote": "Some tasks cannot run in a cloud sandbox (for example tasks that start their own services). Those stay on the shared worker; the run page says why.",
   "off": "Worker platforms need the hosted server with a keystore master key.",
   "registry": {
     "title": "Image registry",
@@ -55,6 +55,11 @@
   },
   "capability": {
     "runs": "Runs on Modal: repository tasks graded on the code change, with gateway faults.",
-    "notRuns": "Not on Modal: snapshot-graded benchmarks (for example BFCL), tasks with their own image, services or several sessions, teams, GPU tasks."
+    "notRuns": "Not on Modal: some tasks cannot run in a cloud sandbox (for example tasks that start their own services or need a GPU). Those stay on the shared worker; the run page says why."
+  },
+  "more": "More actions",
+  "endpointPlaceholder": {
+    "daytona": "https://daytona.example.com/api",
+    "e2b": "e2b.example.com"
   }
 }

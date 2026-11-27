@@ -5,7 +5,8 @@ import { encodeProjectPath, projectFilePath, saveProjectFileRequest } from "@/li
 import { syncCommands } from "@/components/projectfs/syncCard";
 import FilesView, { validNewName } from "./filesView";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+// useBlocker: the file editor warns before unsaved edits are lost (M8-44); a no-op in static renders.
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 
 const listState = { current: okQuery({ area: "agents", dir: "", entries: [] as unknown[] }) as unknown };
 

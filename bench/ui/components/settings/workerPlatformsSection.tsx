@@ -13,7 +13,9 @@ import {
 	type WorkerPlatform,
 } from "@/lib/store/apis/workerPlatformsApi";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Cloud, ExternalLink, PlugZap } from "lucide-react";
+import { ServeOpenModel } from "@/components/models/serveOpenModel";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { CheckCircle2, ExternalLink, MoreHorizontal, PlugZap } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
 import { useConfirmTarget } from "@/components/workers/whereRunsGo";
@@ -37,49 +39,55 @@ export interface PlatformCardProps {
 	busy?: boolean;
 	error?: string;
 	notice?: string;
-	onConnect: (token: string, endpoint: string) => void;
+	/** Resolves true once the token is kept; the token box clears only then, so a refused token can be fixed. */
+	onConnect: (token: string, endpoint: string) => Promise<boolean> | void;
 	onTest: () => void;
 	onDefault: () => void;
 	onDisconnect: () => void;
 }
 
-/** One platform: its state, the token form, and its actions. Pure, so it renders on the server in tests. */
-/** Why "Test and connect" is disabled (N14): the locale key of what to paste, or undefined once the fields are filled. */
+/** Why "Test and connect" cannot run yet (N14): the locale key of what to paste, or undefined once the fields are filled. */
 export function connectHint(token: string, endpoint: string, endpointRequired?: boolean): "needToken" | "needTokenAndEndpoint" | undefined {
 	if (endpointRequired && (!token.trim() || !endpoint.trim())) return "needTokenAndEndpoint";
 	if (!token.trim()) return "needToken";
 	return undefined;
 }
 
+/** The example address of a platform's self-hosted endpoint: the server's, else this catalog's per platform. */
+export function endpointPlaceholder(p: Pick<WorkerPlatform, "name" | "endpoint_placeholder">, fallback: (name: string) => string): string {
+	return p.endpoint_placeholder || fallback(p.name);
+}
+
+/** One platform: its state, the token form, and its actions. Pure, so it renders on the server in tests. */
 export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTest, onDefault, onDisconnect }: PlatformCardProps) {
 	const { t } = useTranslation("workerPlatforms");
 	const formId = useId();
 	const [editing, setEditing] = useState(!p.connected);
 	const [token, setToken] = useState("");
 	const [endpoint, setEndpoint] = useState(p.endpoint ?? "");
+	const [pressed, setPressed] = useState(false);
+	const [more, setMore] = useState(false);
 	const hint = connectHint(token, endpoint, p.endpoint_required);
 	const showForm = editing || !p.connected;
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
-		if (!token.trim() || (p.endpoint_required && !endpoint.trim())) return;
-		onConnect(token.trim(), endpoint.trim());
-		setToken("");
+		// The button stays enabled; pressing it early says what is missing.
+		setPressed(true);
+		if (hint) return;
+		const done = onConnect(token.trim(), endpoint.trim());
+		void Promise.resolve(done).then((ok) => {
+			if (ok !== false) setToken("");
+		});
 	};
 	const status = p.status ?? "untested";
 	return (
 		<article
-			className={cn(
-				"bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5 transition-shadow hover:shadow-md",
-				p.default && "border-primary/40",
-			)}
+			className={cn("bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5", p.default && "border-primary/40")}
 			data-testid={`platform-${p.name}`}
 			data-connected={p.connected}
 		>
 			<header className="flex items-start justify-between gap-3">
 				<div className="flex min-w-0 items-center gap-3">
-					<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-						<Cloud className="size-4" aria-hidden="true" />
-					</span>
 					<div className="min-w-0">
 						<p className="text-foreground truncate text-sm font-semibold">{p.title}</p>
 						<p className="text-muted-foreground truncate text-xs">
@@ -140,6 +148,9 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 								autoComplete="off"
 								value={endpoint}
 								onChange={(event) => setEndpoint(event.target.value)}
+								placeholder={endpointPlaceholder(p, (name) =>
+									t(`endpointPlaceholder.${name}` as "endpointPlaceholder.daytona", { defaultValue: "" }),
+								)}
 								className="font-mono"
 								data-testid={`platform-${p.name}-endpoint`}
 							/>
@@ -170,7 +181,6 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 								size="sm"
 								className="gap-1.5"
 								isLoading={busy}
-								disabled={hint !== undefined}
 								aria-describedby={hint ? `${formId}-connect-hint` : undefined}
 								dataTestId={`platform-${p.name}-connect`}
 							>
@@ -182,7 +192,8 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 					{hint && (
 						<p
 							id={`${formId}-connect-hint`}
-							className="text-muted-foreground text-right text-xs"
+							role={pressed ? "alert" : undefined}
+							className={cn("text-right text-xs", pressed ? "text-chart-error-ink" : "text-muted-foreground")}
 							data-testid={`platform-${p.name}-connect-hint`}
 						>
 							{t(hint)}
@@ -190,30 +201,52 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 					)}
 				</form>
 			) : (
-				<div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
-					<Button variant="ghost" size="sm" onClick={() => setEditing(true)} dataTestId={`platform-${p.name}-replace`}>
-						{t("replace")}
-					</Button>
-					<Button variant="outline" size="sm" onClick={onTest} isLoading={busy} dataTestId={`platform-${p.name}-test`}>
-						{t("test")}
-					</Button>
-					{!p.default && (
-						<Button variant="outline" size="sm" onClick={onDefault} disabled={busy} dataTestId={`platform-${p.name}-make-default`}>
-							{t("makeDefault")}
+				<div className="flex flex-col gap-2 border-t pt-3">
+					<div className="flex flex-wrap items-center justify-end gap-2">
+						<Button variant="outline" size="sm" onClick={onTest} isLoading={busy} dataTestId={`platform-${p.name}-test`}>
+							{t("test")}
 						</Button>
+						{!p.default && (
+							<Button size="sm" onClick={onDefault} disabled={busy} dataTestId={`platform-${p.name}-make-default`}>
+								{t("makeDefault")}
+							</Button>
+						)}
+						<Button
+							variant="ghost"
+							size="sm"
+							className="px-2"
+							aria-expanded={more}
+							aria-label={t("more")}
+							title={t("more")}
+							onClick={() => setMore((v) => !v)}
+							dataTestId={`platform-${p.name}-more`}
+						>
+							<MoreHorizontal className="size-4" aria-hidden="true" />
+						</Button>
+					</div>
+					{more && (
+						<div className="flex flex-wrap items-center justify-end gap-2" data-testid={`platform-${p.name}-more-actions`}>
+							<Button variant="ghost" size="sm" onClick={() => setEditing(true)} dataTestId={`platform-${p.name}-replace`}>
+								{t("replace")}
+							</Button>
+							<ConfirmButton
+								label={t("disconnect")}
+								question={t("confirmDisconnect", { platform: p.title })}
+								confirmLabel={t("disconnect")}
+								cancelLabel={t("cancel")}
+								onConfirm={onDisconnect}
+								disabled={busy}
+								testId={`platform-${p.name}-disconnect`}
+							/>
+						</div>
 					)}
-					<ConfirmButton
-						label={t("disconnect")}
-						question={t("confirmDisconnect", { platform: p.title })}
-						confirmLabel={t("disconnect")}
-						cancelLabel={t("cancel")}
-						onConfirm={onDisconnect}
-						disabled={busy}
-						testId={`platform-${p.name}-disconnect`}
-					/>
 				</div>
 			)}
-			{takesRegistry(p) && <PlatformRegistryBlock platform={p} />}
+			{takesRegistry(p) && (
+				<DetailsDisclosure label={t("registry.title")} defaultOpen={!p.registry} testId={`platform-${p.name}-registry-disclosure`}>
+					<PlatformRegistryBlock platform={p} />
+				</DetailsDisclosure>
+			)}
 			{notice && (
 				<p className="text-chart-success-ink flex items-center gap-1.5 text-xs" role="status" data-testid={`platform-${p.name}-notice`}>
 					<CheckCircle2 className="size-3.5" aria-hidden="true" />
@@ -242,15 +275,17 @@ export function WorkerPlatformsSection() {
 	const [busy, setBusy] = useState("");
 	const askTarget = useConfirmTarget();
 
-	const run = async (name: string, action: () => Promise<unknown>, notice?: string) => {
+	const run = async (name: string, action: () => Promise<unknown>, notice?: string): Promise<boolean> => {
 		setBusy(name);
 		setErrors((e) => ({ ...e, [name]: "" }));
 		setNotices((n) => ({ ...n, [name]: "" }));
 		try {
 			await action();
 			if (notice) setNotices((n) => ({ ...n, [name]: notice }));
+			return true;
 		} catch (error) {
 			setErrors((e) => ({ ...e, [name]: getBenchErrorMessage(error) }));
+			return false;
 		} finally {
 			setBusy("");
 		}
@@ -273,7 +308,7 @@ export function WorkerPlatformsSection() {
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="platforms-error" />
 			) : (
 				<>
-					<p className="text-muted-foreground text-xs" data-testid="platforms-default-note">
+					<p className="text-muted-foreground max-w-prose text-xs" data-testid="platforms-default-note">
 						{t("defaultNote")}
 					</p>
 					<div className="grid gap-3 md:grid-cols-3" data-testid="platforms-grid">
@@ -284,7 +319,7 @@ export function WorkerPlatformsSection() {
 								busy={busy === p.name}
 								error={errors[p.name] || undefined}
 								notice={notices[p.name] || undefined}
-								onConnect={(token, endpoint) => void run(p.name, () => connect({ platform: p.name, token, endpoint }).unwrap())}
+								onConnect={(token, endpoint) => run(p.name, () => connect({ platform: p.name, token, endpoint }).unwrap())}
 								onTest={() => void run(p.name, () => test(p.name).unwrap(), t("testOk"))}
 								onDefault={() =>
 									void (async () => {
@@ -296,6 +331,12 @@ export function WorkerPlatformsSection() {
 							/>
 						))}
 					</div>
+					{/* Serving an open model starts a paid GPU on the Modal account, so it sits with Modal, not with the model keys. */}
+					{data.platforms.some((p) => p.name === "modal") && (
+						<div data-testid="platforms-serve-open-model">
+							<ServeOpenModel />
+						</div>
+					)}
 				</>
 			)}
 		</SettingsSection>

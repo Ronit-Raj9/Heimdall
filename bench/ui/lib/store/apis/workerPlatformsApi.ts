@@ -10,6 +10,8 @@ export interface WorkerPlatform {
 	token_hint: string;
 	endpoint_label?: string;
 	endpoint_required?: boolean;
+	/** Example of the self-hosted address (e.g. "https://daytona.example.com/api"); optional, the UI has its own fallback. */
+	endpoint_placeholder?: string;
 	docs_url?: string;
 	connected: boolean;
 	default: boolean;

@@ -20,6 +20,7 @@ import type { GithubCIMode, GithubRepo } from "@/lib/types/github";
 import { ExternalLink, GitPullRequest, Github, Lock } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "./uf8aI18n";
 import { SettingsSection } from "./settingsBits";
 import "./w4m8I18n";
 
@@ -45,6 +46,14 @@ export function filterRepos(repos: GithubRepo[], filter: string): GithubRepo[] {
 /** Live mode needs a base agent config path like agents/x.yaml (mirrors the server check). */
 export function validBaseAgent(path: string): boolean {
 	return /^agents\/[A-Za-z0-9_.-]{1,100}\.ya?ml$/.test(path);
+}
+
+/** A server message without "in Settings > GitHub": the user is already there. */
+export function withoutHere(message: string): string {
+	return message
+		.replace(/\s*(?:in|under|from|on)\s+Settings\s*>\s*GitHub/gi, "")
+		.replace(/\s+([.,])/g, "$1")
+		.trim();
 }
 
 /** Settings > GitHub: connect a GitHub account (repo scope), browse repositories, open the CI-install PR. */
@@ -118,7 +127,7 @@ export function GithubTab() {
 				{notice && (
 					<p
 						role="status"
-						className={notice.ok ? "text-sm text-emerald-600" : "text-destructive text-sm"}
+						className={notice.ok ? "text-chart-success-ink text-sm" : "text-destructive text-sm"}
 						data-testid={notice.ok ? "github-notice-ok" : "github-notice-error"}
 					>
 						{notice.ok ? t("connectedOk") : t("connectFailed", { message: notice.message })}
@@ -143,14 +152,33 @@ export function GithubTab() {
 					</EmptyNote>
 				)}
 			</SettingsSection>
-			{st?.connected && isMember && <ReposSection picked={picked} onPick={setPicked} />}
+			{st?.connected && isMember && (
+				<ReposSection
+					picked={picked}
+					onPick={setPicked}
+					onReconnect={isAdmin ? () => void connect() : undefined}
+					reconnecting={startState.isLoading}
+				/>
+			)}
 			{st?.connected && isAdmin && <CIInstallSection repo={picked} />}
 		</div>
 	);
 }
 
-function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (r: GithubRepo) => void }) {
+function ReposSection({
+	picked,
+	onPick,
+	onReconnect,
+	reconnecting,
+}: {
+	picked: GithubRepo | null;
+	onPick: (r: GithubRepo) => void;
+	/** Admins: a failed listing usually means the grant expired, so the fix is to connect again. */
+	onReconnect?: () => void;
+	reconnecting?: boolean;
+}) {
 	const { t } = useTranslation("github");
+	const { t: tl } = useTranslation("uf8a");
 	const [page, setPage] = useState(1);
 	const [filter, setFilter] = useState("");
 	const repos = useListGithubReposQuery(page);
@@ -167,6 +195,19 @@ function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (
 			/>
 			{repos.isLoading ? (
 				<BlockSkeleton rows={4} testId="github-repos-loading" />
+			) : repos.isError && onReconnect ? (
+				<div
+					role="alert"
+					className="flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3.5 text-sm"
+					data-testid="github-repos-error"
+				>
+					<p className="text-foreground min-w-0 flex-1">
+						<span className="font-medium">{t("repos.loadError")}</span>: {withoutHere(getBenchErrorMessage(repos.error))}
+					</p>
+					<Button type="button" size="sm" isLoading={reconnecting} onClick={onReconnect} dataTestId="github-repos-reconnect">
+						{tl("github.reconnect")}
+					</Button>
+				</div>
 			) : repos.isError ? (
 				<LoadError title={t("repos.loadError")} error={repos.error} onRetry={() => void repos.refetch()} testId="github-repos-error" />
 			) : list.length === 0 ? (
@@ -185,7 +226,7 @@ function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (
 									<span className="text-foreground flex items-center gap-1.5 truncate text-sm font-medium">
 										{r.full_name}
 										{r.private && (
-											<Badge variant="outline" className="gap-1 text-[11px]">
+											<Badge variant="outline" className="gap-1 text-xs">
 												<Lock className="size-3" aria-hidden="true" />
 												{t("repos.private")}
 											</Badge>

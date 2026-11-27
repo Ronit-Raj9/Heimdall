@@ -1,5 +1,9 @@
 import { ForbiddenNote, RoleGate, isRoleRefusal } from "@/components/platform/accessNotes";
 import { ConfirmButton } from "@/components/platform/badges";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { CredentialKinds } from "./credentialKinds";
+import "./uf8aI18n";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +29,11 @@ function byteLength(v: string): number {
 	return new TextEncoder().encode(v).length;
 }
 
+/** Whether an agent can name this secret: older secrets may predate the name rule. */
+export function secretNameUsable(name: string): boolean {
+	return /^[A-Z0-9_]+$/.test(name);
+}
+
 /** The name rule, always shown under a secret name box: the box rewrites what is typed (p02-9). */
 export function SecretNameHint() {
 	const { t } = useTranslation("w4m1");
@@ -47,6 +56,8 @@ export interface SecretsTableProps {
 /** The secrets list: names, who added them and when. Never a value, not even a part of one. */
 export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId, rotatingId }: SecretsTableProps) {
 	const { t } = useTranslation("secrets");
+	const { t: tl } = useTranslation("uf8a");
+	const confirm = useConfirm();
 	const [editing, setEditing] = useState<string | null>(null);
 	const [value, setValue] = useState("");
 
@@ -68,7 +79,16 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 				<TableBody>
 					{secrets.map((s) => (
 						<TableRow key={s.id} data-testid={`secret-row-${s.id}`}>
-							<TableCell className="text-foreground font-mono text-xs font-medium">{s.name}</TableCell>
+							<TableCell className="text-foreground font-mono text-xs font-medium">
+								<span className="flex flex-wrap items-center gap-2">
+									{s.name}
+									{!secretNameUsable(s.name) && (
+										<Badge variant="warning" className="font-sans" data-testid={`secret-name-unusable-${s.id}`}>
+											{tl("secrets.nameUnusable")}
+										</Badge>
+									)}
+								</span>
+							</TableCell>
 							<TableCell>
 								<Badge variant="outline" className="gap-1">
 									<LockKeyhole className="size-3" aria-hidden="true" />
@@ -89,11 +109,18 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 											onSubmit={(event) => {
 												event.preventDefault();
 												if (!value || !onRotate) return;
-												void onRotate(s.id, value).then((ok) => {
-													if (ok) {
-														setEditing(null);
-														setValue("");
-													}
+												// The old value cannot be recovered, so a replace always asks first.
+												void confirm(tl("secrets.confirmRotate", { name: s.name }), {
+													confirmLabel: tl("secrets.confirmRotateLabel"),
+													destructive: true,
+												}).then((yes) => {
+													if (!yes) return;
+													void onRotate(s.id, value).then((ok) => {
+														if (ok) {
+															setEditing(null);
+															setValue("");
+														}
+													});
 												});
 											}}
 										>
@@ -103,7 +130,7 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 												autoComplete="new-password"
 												data-1p-ignore="true"
 												data-lpignore="true"
-												className="h-8 w-56"
+												className="h-8 w-full sm:w-56"
 												aria-label={t("rotateTitle", { name: s.name })}
 												placeholder={t("rotateTitle", { name: s.name })}
 												value={value}
@@ -152,7 +179,8 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 												cancelLabel={t("cancel")}
 												onConfirm={() => onDelete?.(s.id)}
 												isLoading={deletingId === s.id}
-												variant="destructive"
+												variant="ghost"
+												className="text-chart-error-ink"
 												testId={`secret-delete-${s.id}`}
 											/>
 										</div>
@@ -170,6 +198,7 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 /** Settings > Secrets: org-wide credentials for tools, write-only from the browser. */
 export function SecretsTab(_props: Record<string, unknown> = {}) {
 	const { t } = useTranslation("secrets");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const list = useListSecretsQuery();
 	const [rotate, rotateState] = useRotateSecretMutation();
@@ -180,16 +209,28 @@ export function SecretsTab(_props: Record<string, unknown> = {}) {
 
 	return (
 		<div className="flex flex-col gap-10" data-testid="settings-secrets">
+			<div className="flex flex-col gap-3">
+				<p className="text-muted-foreground max-w-prose text-sm" data-testid="secrets-intro">
+					{tl("kinds.secrets.what")}
+				</p>
+				<CredentialKinds current="secrets" />
+			</div>
 			<RoleGate min="admin">
 				<AddSecretSection taken={secrets.map((s) => s.name)} />
 			</RoleGate>
-			<SettingsSection title={t("title")} description={t("description")} testId="settings-secrets-list">
-				<p className="text-muted-foreground text-xs" data-testid="secrets-usage">
-					{t("usage")}
-				</p>
-				<p className="text-muted-foreground text-xs" data-testid="secrets-agent-usage">
-					{t("agentUsage", { ref: "{{secret.TAVILY_API_KEY}}" })}
-				</p>
+			<SettingsSection title={t("title")} description={tl("secrets.description")} testId="settings-secrets-list">
+				<DetailsDisclosure label={tl("secrets.howAgentsRead")} testId="secrets-how">
+					<div className="flex max-w-prose flex-col gap-2 text-xs">
+						<p className="text-muted-foreground" data-testid="secrets-usage">
+							{t("usage")}
+						</p>
+						<pre className="bg-muted overflow-x-auto rounded-md px-3 py-2 font-mono text-xs">auth_env: TAVILY_API_KEY</pre>
+						<p className="text-muted-foreground" data-testid="secrets-agent-usage">
+							{t("agentUsage", { ref: "{{secret.TAVILY_API_KEY}}" })}
+						</p>
+						<pre className="bg-muted overflow-x-auto rounded-md px-3 py-2 font-mono text-xs">{"{{secret.TAVILY_API_KEY}}"}</pre>
+					</div>
+				</DetailsDisclosure>
 				{list.isLoading ? (
 					<BlockSkeleton rows={3} testId="secrets-loading" />
 				) : list.isError || !list.data ? (
@@ -236,17 +277,19 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 	const [create, createState] = useCreateSecretMutation();
 
 	const problem = secretNameProblem(name);
-	const nameError = !touched
-		? undefined
-		: problem === "required"
-			? t("nameRequired")
-			: problem === "format"
-				? t("nameFormat")
-				: problem === "reserved"
-					? t("nameReserved")
-					: taken.includes(name)
-						? t("nameTaken")
-						: undefined;
+	// A badly formed name shows at once; "required" waits for the first save.
+	const nameError =
+		!touched && !(name && problem === "format")
+			? undefined
+			: problem === "required"
+				? t("nameRequired")
+				: problem === "format"
+					? t("nameFormat")
+					: problem === "reserved"
+						? t("nameReserved")
+						: taken.includes(name)
+							? t("nameTaken")
+							: undefined;
 	const valueError = !touched
 		? undefined
 		: !value

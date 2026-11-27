@@ -255,9 +255,9 @@ function JsonBlock({ title, value, testId }: { title: string; value: unknown; te
 }
 
 const LEVEL_CLASS: Record<string, string> = {
-	error: "text-red-400",
-	warn: "text-amber-300",
-	warning: "text-amber-300",
+	error: "text-chart-error",
+	warn: "text-chart-warning",
+	warning: "text-chart-warning",
 	debug: "text-zinc-500",
 };
 
@@ -294,12 +294,12 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 				</span>
 				<h2 className="text-xs font-medium text-zinc-300">{t("jobs.page.log")}</h2>
 				<span
-					className={cn("flex items-center gap-1.5 text-xs font-medium", live ? "text-emerald-400" : "text-zinc-500")}
+					className={cn("flex items-center gap-1.5 text-xs font-medium", live ? "text-chart-success" : "text-zinc-500")}
 					data-testid={live ? "job-log-live" : "job-log-done"}
 				>
 					<span className="relative inline-flex size-1.5" aria-hidden="true">
-						{live && <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />}
-						<span className={cn("relative inline-flex size-1.5 rounded-full", live ? "bg-emerald-400" : "bg-zinc-600")} />
+						{live && <span className="bg-chart-success absolute inline-flex size-full animate-ping rounded-full opacity-70" />}
+						<span className={cn("relative inline-flex size-1.5 rounded-full", live ? "bg-chart-success" : "bg-zinc-600")} />
 					</span>
 					{live ? t("jobs.page.logLive") : t("jobs.page.logDone")}
 				</span>
@@ -363,7 +363,7 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 				)}
 			</div>
 			{log.error !== undefined && log.lines.length === 0 && (
-				<p className="border-t border-zinc-800 px-3 py-2 text-xs text-red-400" role="alert">
+				<p className="text-chart-error border-t border-zinc-800 px-3 py-2 text-xs" role="alert">
 					{getBenchErrorMessage(log.error)}
 				</p>
 			)}

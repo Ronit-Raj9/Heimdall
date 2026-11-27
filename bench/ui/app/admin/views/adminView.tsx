@@ -6,7 +6,9 @@ import { useGetAdminOverviewQuery, useSetKillSwitchMutation } from "@/lib/store/
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { Activity, Building2, OctagonX, PlayCircle, ShieldAlert, Users } from "lucide-react";
 import { PageHeader } from "@/components/shell";
-import { StatCard, TonePill } from "@/app/operate/views/uxBits";
+import { StatCard } from "@/app/operate/views/uxBits";
+import { Button } from "@/components/ui/button";
+import "@/components/settings/uf8aI18n";
 import { cn } from "@/lib/utils";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect } from "react";
@@ -78,9 +80,22 @@ export default function AdminView({
 	);
 }
 
+/** What the emergency stop asks before it flips: stopping and allowing again both confirm. */
+export function killAsk(on: boolean): {
+	ns: "admin" | "uf8a";
+	question: "kill.confirmOn" | "kill.confirmOff";
+	label: "kill.stop" | "kill.allow";
+	destructive: boolean;
+} {
+	return on
+		? { ns: "uf8a", question: "kill.confirmOff", label: "kill.allow", destructive: false }
+		: { ns: "admin", question: "kill.confirmOn", label: "kill.stop", destructive: true };
+}
+
 /** Totals and the platform kill switch. */
 export function AdminOverviewPanel() {
 	const { t } = useTranslation("admin");
+	const { t: tl } = useTranslation("uf8a");
 	const confirm = useConfirm();
 	const { data, error, isLoading, refetch } = useGetAdminOverviewQuery();
 	const [setKill, killState] = useSetKillSwitchMutation();
@@ -103,13 +118,53 @@ export function AdminOverviewPanel() {
 			/>
 		);
 	}
-	const toggle = async () => {
-		if (!data.kill_switch && !(await confirm(t("kill.confirmOn")))) return;
-		void setKill(!data.kill_switch);
-	};
 	const on = data.kill_switch;
+	// Both directions ask: stopping blocks every organization, allowing again starts queued runs at once.
+	const toggle = async () => {
+		const ask = killAsk(on);
+		const ok = await confirm(on ? tl("kill.confirmOff") : t("kill.confirmOn"), {
+			confirmLabel: tl(ask.label),
+			destructive: ask.destructive,
+		});
+		if (!ok) return;
+		void setKill(!on);
+	};
 	return (
 		<div className="flex flex-col gap-6">
+			<section
+				className={cn(
+					"border-chart-error/40 flex flex-col gap-4 rounded-xl border p-6 sm:flex-row sm:items-center sm:justify-between",
+					on ? "bg-chart-error/5" : "bg-card",
+				)}
+				data-testid="admin-kill-switch"
+				data-on={on}
+			>
+				<div className="flex min-w-0 items-start gap-4">
+					<span className="bg-chart-error/15 text-chart-error-ink flex size-11 shrink-0 items-center justify-center rounded-xl">
+						{on ? <OctagonX className="size-5" aria-hidden="true" /> : <PlayCircle className="size-5" aria-hidden="true" />}
+					</span>
+					<div className="min-w-0">
+						<h2 className="text-foreground text-lg font-semibold tracking-tight">{t("kill.title")}</h2>
+						<p
+							className={cn("text-sm", on ? "text-chart-error-ink font-medium" : "text-muted-foreground")}
+							role="status"
+							data-testid="admin-kill-state"
+						>
+							{on ? tl("kill.stateOn") : tl("kill.stateOff")}
+						</p>
+						{killState.error && <p className="text-destructive mt-1 text-sm">{getBenchErrorMessage(killState.error)}</p>}
+					</div>
+				</div>
+				<Button
+					variant={on ? "outline" : "destructive"}
+					onClick={() => void toggle()}
+					isLoading={killState.isLoading}
+					className="shrink-0 self-start sm:self-center"
+					dataTestId="admin-kill-toggle"
+				>
+					{on ? tl("kill.allow") : tl("kill.stop")}
+				</Button>
+			</section>
 			{!data.quota_persisted && (
 				<p className="border-chart-warning/60 bg-chart-warning/10 rounded-lg border px-4 py-3 text-sm" data-testid="admin-quota-stub">
 					{t("overview.stubQuota")}
@@ -120,60 +175,6 @@ export function AdminOverviewPanel() {
 				<StatCard label={t("overview.orgs")} value={data.orgs} icon={Building2} testId="admin-stat-orgs" />
 				<StatCard label={t("overview.slots")} value={data.running_slots} icon={Activity} testId="admin-stat-slots" />
 			</div>
-			<section
-				className={cn(
-					"flex flex-col gap-4 rounded-xl border p-6 transition-colors sm:flex-row sm:items-center sm:justify-between",
-					on ? "border-chart-error/50 bg-chart-error/5" : "bg-card",
-				)}
-				data-testid="admin-kill-switch"
-				data-on={on}
-			>
-				<div className="flex min-w-0 items-start gap-4">
-					<span
-						className={cn(
-							"flex size-11 shrink-0 items-center justify-center rounded-xl",
-							on ? "bg-chart-error/15 text-chart-error-ink" : "bg-chart-success/10 text-chart-success-ink",
-						)}
-					>
-						{on ? <OctagonX className="size-5" aria-hidden="true" /> : <PlayCircle className="size-5" aria-hidden="true" />}
-					</span>
-					<div className="min-w-0">
-						<div className="flex flex-wrap items-center gap-2">
-							<h2 className="text-foreground text-lg font-semibold tracking-tight">{t("kill.title")}</h2>
-							<TonePill tone={on ? "bad" : "good"} pulse={on}>
-								{on ? t("kill.badgeOn") : t("kill.badgeOff")}
-							</TonePill>
-						</div>
-						<p className="text-muted-foreground text-sm">{on ? t("kill.on") : t("kill.off")}</p>
-						{killState.error && <p className="text-destructive mt-1 text-sm">{getBenchErrorMessage(killState.error)}</p>}
-					</div>
-				</div>
-				<button
-					type="button"
-					role="switch"
-					aria-checked={on}
-					aria-label={on ? t("kill.turnOff") : t("kill.turnOn")}
-					onClick={() => void toggle()}
-					disabled={killState.isLoading}
-					className="group flex shrink-0 items-center gap-3 self-start disabled:opacity-60 sm:self-center"
-					data-testid="admin-kill-toggle"
-				>
-					<span className="text-foreground text-sm font-medium">{on ? t("kill.turnOff") : t("kill.turnOn")}</span>
-					<span
-						className={cn(
-							"relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-							on ? "bg-chart-error" : "bg-muted-foreground/30 group-hover:bg-muted-foreground/40",
-						)}
-					>
-						<span
-							className={cn(
-								"bg-background inline-block size-5 rounded-full shadow transition-transform",
-								on ? "translate-x-6" : "translate-x-1",
-							)}
-						/>
-					</span>
-				</button>
-			</section>
 		</div>
 	);
 }

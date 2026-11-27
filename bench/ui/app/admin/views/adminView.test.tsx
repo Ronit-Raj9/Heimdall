@@ -66,7 +66,7 @@ describe("AdminView", () => {
 		const html = render(<AdminView />, admin());
 		expect(html).toContain('data-testid="admin-view"');
 		expect(html).toContain('data-testid="admin-kill-switch"');
-		expect(html).toContain("Resume runs");
+		expect(html).toContain("Allow new runs again"); // M8-57: a plain button, both directions confirm
 		expect(html).toContain('data-testid="admin-quota-stub"');
 		for (const key of ["users", "orgs", "images", "usage", "workers"]) expect(html).toContain(`data-testid="admin-tab-${key}"`);
 		expect(html).not.toContain('data-testid="admin-tab-containers"');

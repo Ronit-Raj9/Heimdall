@@ -95,3 +95,13 @@ describe("github helpers", () => {
 		expect(mutation()[1].isLoading).toBe(false);
 	});
 });
+
+describe("GitHub error copy (M8-43)", () => {
+	it("drops the pointer to the page the user is on", async () => {
+		const { withoutHere } = await import("./githubTab");
+		expect(withoutHere("GitHub refused the token; reconnect GitHub in Settings > GitHub.")).toBe(
+			"GitHub refused the token; reconnect GitHub.",
+		);
+		expect(withoutHere("rate limited")).toBe("rate limited");
+	});
+});

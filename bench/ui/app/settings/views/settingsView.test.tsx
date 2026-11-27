@@ -29,7 +29,8 @@ const api = vi.hoisted(() => ({
 	m: {} as Record<string, Record<string, unknown>>,
 	calls: [] as string[],
 }));
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+// useBlocker: the unsaved-changes guard of the Settings forms (M8-44); a no-op in static renders.
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 // X19a: Workers tab, connect a platform.
 vi.mock("@/lib/store/apis/workerPlatformsApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/workerPlatformsApi")>();
@@ -274,7 +275,9 @@ describe("ApiTokensTab", () => {
 		const html = render(<ApiTokensTab />, hostedSession("admin"));
 		expect(html).toContain("hm_a1b2c3d4…");
 		expect(html).not.toContain(API_TOKEN_CREATED.token);
-		expect(tagOf(html, "token-row-tok_old")).toContain('data-state="revoked"');
+		// Revoked tokens hide behind "Show revoked (n)" (M8-30).
+		expect(html).not.toContain('data-testid="token-row-tok_old"');
+		expect(html).toContain('data-testid="tokens-show-revoked"');
 		expect(html).toContain('data-testid="token-revoke-tok_ci"');
 		expect(tagOf(html, "token-scope-tok_ci")).toBeTruthy();
 		expect(html).toContain("Run evaluations");

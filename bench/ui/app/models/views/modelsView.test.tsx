@@ -126,7 +126,8 @@ describe("ModelsView", () => {
 		for (const p of ["openai", "deepseek", "openrouter", "bedrock", "vllm", "zhipu"])
 			expect(html).toContain(`data-testid="provider-add-${p}"`);
 		expect(html).toMatch(/data-testid="provider-status-openai"[^>]*>Over budget/);
-		expect(html).toMatch(/data-testid="provider-status-bedrock"[^>]*>No key/);
+		// A provider with no key shows "No keys yet" only, no second "No key" badge (M8-6).
+		expect(html).not.toContain('data-testid="provider-status-bedrock"');
 	});
 
 	it("lists open model families and who serves them", () => {

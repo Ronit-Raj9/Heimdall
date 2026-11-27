@@ -1,4 +1,5 @@
 import { ForbiddenNote, RoleNote, isRoleRefusal } from "@/components/platform/accessNotes";
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,17 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
 import "@/components/calibration/hw04I18n";
+import "./uf8aI18n";
+import { useUnsavedGuard } from "./useUnsavedGuard";
+
+/**
+ * True when a new retention deletes runs that the old one keeps: any limit after "forever" (0),
+ * or fewer days than before. Saving such a change asks first.
+ */
+export function retentionShrinks(oldDays: number, newDays: number): boolean {
+	if (newDays <= 0) return false;
+	return oldDays <= 0 || newDays < oldDays;
+}
 
 /** The preset retention choices in days; 0 keeps everything forever. */
 export const RETENTION_PRESETS = [0, 30, 90, 180, 365] as const;
@@ -69,7 +81,9 @@ export function RetentionSection() {
 export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	const { t } = useTranslation("platform");
 	const { t: tHw04 } = useTranslation("hw04");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
+	const confirm = useConfirm();
 	const formId = useId();
 	const canEdit = canUse(session, "admin");
 	const [choice, setChoice] = useState(retentionChoice(policy.run_days));
@@ -83,10 +97,17 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	}, [policy.run_days]);
 	const days = retentionDays(choice, custom, policy);
 	const changed = days !== null && days !== policy.run_days;
+	useUnsavedGuard(canEdit && changed && !saved);
 
 	const onSave = async (event: FormEvent) => {
 		event.preventDefault();
 		if (days === null || !changed) return;
+		// A shorter retention deletes old comparisons at the next sweep: say so and ask first.
+		if (
+			retentionShrinks(policy.run_days, days) &&
+			!(await confirm(tl("retention.confirm", { count: days }), { confirmLabel: tl("retention.confirmLabel"), destructive: true }))
+		)
+			return;
 		try {
 			await save(days).unwrap();
 			setSaved(true);

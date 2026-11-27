@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetBillingQuery, useGetInvoicesQuery, useOpenPortalMutation, useStartCheckoutMutation, useSyncSeatsMutation } from "@/lib/store/apis/billingApi";
+import {
+	useGetBillingQuery,
+	useGetInvoicesQuery,
+	useOpenPortalMutation,
+	useStartCheckoutMutation,
+	useSyncSeatsMutation,
+} from "@/lib/store/apis/billingApi";
 import type { BillingView, MeterView, Plan, SeatSync } from "@/lib/types/billing";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, ExternalLink, Info, Minus, RefreshCw } from "lucide-react";
@@ -93,7 +99,8 @@ export function BillingBody({ view }: { view: BillingView }) {
 				testId="billing-plan"
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
-						{view.plan.id === "free" && (
+						{/* With billing off there is nothing to buy, so no Upgrade (a disabled one only puzzled). */}
+						{view.enabled && view.plan.id === "free" && (
 							<Button
 								size="sm"
 								onClick={() => void go(checkout)}
@@ -107,13 +114,25 @@ export function BillingBody({ view }: { view: BillingView }) {
 							</Button>
 						)}
 						{view.portal_ready && isAdmin && (
-							<Button size="sm" variant="outline" onClick={() => void go(portal)} isLoading={portalState.isLoading} data-testid="billing-portal">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => void go(portal)}
+								isLoading={portalState.isLoading}
+								data-testid="billing-portal"
+							>
 								<ExternalLink className="size-4" aria-hidden="true" />
 								{t("actions.manage")}
 							</Button>
 						)}
 						{paid && isAdmin && view.checkout_ready && (
-							<Button size="sm" variant="outline" onClick={() => void onSync()} isLoading={syncState.isLoading} data-testid="billing-sync-seats">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => void onSync()}
+								isLoading={syncState.isLoading}
+								data-testid="billing-sync-seats"
+							>
 								<RefreshCw className="size-4" aria-hidden="true" />
 								{t("actions.syncSeats")}
 							</Button>
@@ -160,7 +179,11 @@ export function BillingBody({ view }: { view: BillingView }) {
 				)}
 			</SettingsSection>
 
-			<SettingsSection title={t("meters.title")} description={t("meters.description", { from: view.period_from, to: view.period_to })} testId="billing-meters">
+			<SettingsSection
+				title={t("meters.title")}
+				description={t("meters.description", { from: view.period_from, to: view.period_to })}
+				testId="billing-meters"
+			>
 				<ul className="grid gap-3 sm:grid-cols-2">
 					{view.meters.map((m) => (
 						<MeterCard key={m.id} meter={m} enabled={view.enabled} />
@@ -221,7 +244,11 @@ function MeterCard({ meter, enabled }: { meter: MeterView; enabled: boolean }) {
 					? t("meters.judgeHint")
 					: null;
 	return (
-		<li className="bg-card flex flex-col gap-2 rounded-xl border p-4" data-testid={`billing-meter-${meter.id}`} data-reached={meter.reached}>
+		<li
+			className="bg-card flex flex-col gap-2 rounded-xl border p-4"
+			data-testid={`billing-meter-${meter.id}`}
+			data-reached={meter.reached}
+		>
 			<div className="flex items-baseline justify-between gap-2">
 				<span className="text-muted-foreground text-[13px]">{t(`meters.${meter.id}`)}</span>
 				<span className="text-foreground text-sm font-medium tabular-nums">
@@ -244,7 +271,13 @@ function MeterCard({ meter, enabled }: { meter: MeterView; enabled: boolean }) {
 					<div
 						className={cn(
 							"h-full rounded-full transition-[width] duration-500",
-							tone === "full" ? "bg-chart-error" : tone === "warn" ? "bg-chart-warning" : "bg-primary",
+							!enabled
+								? "bg-muted-foreground/40"
+								: tone === "full"
+									? "bg-chart-error"
+									: tone === "warn"
+										? "bg-chart-warning"
+										: "bg-primary",
 						)}
 						style={{ width: `${meterPercent(meter)}%` }}
 					/>
@@ -285,16 +318,23 @@ function PlanCard({
 		>
 			<div className="flex items-center justify-between gap-2">
 				<span className="text-foreground font-semibold">{plan.name}</span>
-				{current && <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px] font-medium">{t("plans.current")}</span>}
+				{current && (
+					<span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px] font-medium">{t("plans.current")}</span>
+				)}
 			</div>
 			<span className="text-foreground text-sm">{priceLabel(plan, t)}</span>
 			<p className="text-muted-foreground text-[13px] leading-relaxed">{plan.summary}</p>
-			<ul className="text-[13px] flex flex-col gap-1.5">
-				<li>{plan.max_seats > 0 ? t("plans.seats", { count: plan.max_seats }) : t("plans.anySeats")}</li>
-				<li>{plan.shared_worker_minutes > 0 ? t("plans.minutes", { count: plan.shared_worker_minutes }) : t("plans.anyMinutes")}</li>
-				<li>{t("plans.ownKey")}</li>
-				{plan.features.map((f) => (
-					<li key={f}>{t(`features.${f}`)}</li>
+			<ul className="flex flex-col gap-1.5 text-[13px]">
+				{[
+					plan.max_seats > 0 ? t("plans.seats", { count: plan.max_seats }) : t("plans.anySeats"),
+					plan.shared_worker_minutes > 0 ? t("plans.minutes", { count: plan.shared_worker_minutes }) : t("plans.anyMinutes"),
+					t("plans.ownKey"),
+					...plan.features.map((f) => t(`features.${f}`)),
+				].map((line) => (
+					<li key={line} className="flex items-start gap-2">
+						<Check className="text-chart-success-ink mt-0.5 size-3.5 shrink-0" aria-label={t("features.included")} />
+						<span>{line}</span>
+					</li>
 				))}
 			</ul>
 			<div className="mt-auto pt-1">
@@ -348,7 +388,12 @@ function Invoices() {
 									<TableCell className="text-right">
 										<span className="inline-flex gap-3 text-xs">
 											{inv.hosted_url && (
-												<a href={inv.hosted_url} target="_blank" rel="noreferrer" className="text-primary underline-offset-2 hover:underline">
+												<a
+													href={inv.hosted_url}
+													target="_blank"
+													rel="noreferrer"
+													className="text-primary underline-offset-2 hover:underline"
+												>
 													{t("invoices.open")}
 												</a>
 											)}
