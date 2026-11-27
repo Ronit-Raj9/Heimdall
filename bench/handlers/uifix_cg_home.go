@@ -63,7 +63,7 @@ func (h *homeHandler) sub(ctx *fasthttp.RequestCtx, uri string, out any) bool {
 // checks apply) and decodes a 200 body into out.
 func subGet(r *router.Router, ctx *fasthttp.RequestCtx, uri string, out any) bool {
 	var s fasthttp.RequestCtx
-	ctx.Request.CopyTo(&s.Request)
+	s.Init(&ctx.Request, ctx.RemoteAddr(), nil) // a server-backed context: inner handlers use it as a context.Context
 	s.Request.Header.SetMethod(fasthttp.MethodGet)
 	s.Request.SetRequestURI(uri)
 	s.Request.SetBody(nil)
