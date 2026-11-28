@@ -11,10 +11,10 @@
 # No parser: gateway-level evidence. docs/frameworks.md is the guide.
 id: fw-langgraph
 adapter: command
-image: bench/agent-fw-langgraph:2
+image: bench/agent-fw-langgraph:3
 build:
   dockerfile: examples/frameworks/langgraph/Dockerfile
-  tag: bench/agent-fw-langgraph:2
+  tag: bench/agent-fw-langgraph:3
   base_arg: BASE_IMAGE
 argv:
   - fw-agent

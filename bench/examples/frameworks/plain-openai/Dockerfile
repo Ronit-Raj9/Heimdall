@@ -1,19 +1,35 @@
 # No-framework (OpenAI Python SDK only) coding agent (bench/examples/frameworks/plain-openai).
 # Built on the suite's base image (build.base_arg in
-# agents/fw-plain-openai.yaml). The framework lives in its own virtualenv,
+# agents/fw-plain-openai.yaml). The framework lives in its own Python runtime,
 # off the task's PATH. Versions are pinned in requirements.txt (compiled from
 # requirements.in with `uv pip compile`).
 ARG BASE_IMAGE=bench/coding-core-base:1
-FROM ${BASE_IMAGE}
 
+# The agent's runtime is built apart and copied in whole, so the agent never
+# uses the task image's Python (a terminal task image may have none, or no
+# venv, or a Python too old for the pins: PH1-1, PH4-1). The runtime is a
+# relocatable CPython from python-build-standalone (fetched by uv, both
+# pinned), which needs only glibc 2.17 or newer in the task image; an Alpine
+# (musl) task image cannot run it.
+FROM bench/coding-core-base:1 AS fwbuild
+ARG UV_VERSION=0.9.5
+ARG FW_PYTHON=3.12.11
 USER root
+RUN pip install --no-cache-dir --disable-pip-version-check "uv==${UV_VERSION}" \
+ && UV_PYTHON_INSTALL_DIR=/opt/fw-agent/pythons uv python install --no-bin "${FW_PYTHON}" \
+ && ln -s "$(dirname "$(dirname "$(UV_PYTHON_INSTALL_DIR=/opt/fw-agent/pythons uv python find --managed-python "${FW_PYTHON}")")")" /opt/fw-agent/python
 COPY requirements.txt /opt/fw-agent/requirements.txt
-RUN python3 -m venv /opt/fw-agent/venv \
- && /opt/fw-agent/venv/bin/pip install --no-cache-dir --disable-pip-version-check -r /opt/fw-agent/requirements.txt
+RUN uv pip install --no-cache --python /opt/fw-agent/python/bin/python3 --break-system-packages -r /opt/fw-agent/requirements.txt
 COPY agent.py /opt/fw-agent/agent.py
-RUN printf '#!/bin/sh\nexec /opt/fw-agent/venv/bin/python /opt/fw-agent/agent.py "$@"\n' > /usr/local/bin/fw-agent \
- && chmod 0755 /usr/local/bin/fw-agent \
- && /opt/fw-agent/venv/bin/python -c "import openai; print('openai', openai.__version__)"
+RUN printf '#!/bin/sh\nexec /opt/fw-agent/python/bin/python3 /opt/fw-agent/agent.py "$@"\n' > /opt/fw-agent/fw-agent \
+ && chmod -R a+rX /opt/fw-agent && chmod 0755 /opt/fw-agent/fw-agent \
+ && /opt/fw-agent/python/bin/python3 -c "import openai; print('openai', openai.__version__)"
+
+FROM ${BASE_IMAGE}
+USER root
+# --chown: the copied files belong to root whatever ids the build stage used.
+COPY --from=fwbuild --chown=0:0 /opt/fw-agent /opt/fw-agent
+COPY --from=fwbuild --chown=0:0 /opt/fw-agent/fw-agent /usr/local/bin/fw-agent
 
 # The OpenAI SDK sends nothing but the requests the agent makes.
 

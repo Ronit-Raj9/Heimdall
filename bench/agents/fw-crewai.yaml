@@ -13,10 +13,10 @@
 # No parser: gateway-level evidence. docs/frameworks.md is the guide.
 id: fw-crewai
 adapter: command
-image: bench/agent-fw-crewai:2
+image: bench/agent-fw-crewai:3
 build:
   dockerfile: examples/frameworks/crewai/Dockerfile
-  tag: bench/agent-fw-crewai:2
+  tag: bench/agent-fw-crewai:3
   base_arg: BASE_IMAGE
 argv:
   - fw-agent

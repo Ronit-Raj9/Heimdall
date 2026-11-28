@@ -12,10 +12,10 @@
 # No parser: gateway-level evidence. docs/frameworks.md is the guide.
 id: fw-plain-openai
 adapter: command
-image: bench/agent-fw-plain-openai:2
+image: bench/agent-fw-plain-openai:3
 build:
   dockerfile: examples/frameworks/plain-openai/Dockerfile
-  tag: bench/agent-fw-plain-openai:2
+  tag: bench/agent-fw-plain-openai:3
   base_arg: BASE_IMAGE
 argv:
   - fw-agent

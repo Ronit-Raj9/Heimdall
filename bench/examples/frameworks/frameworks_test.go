@@ -8,6 +8,7 @@ package frameworks
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -288,4 +289,86 @@ func TestMatrixExperimentListsEveryFramework(t *testing.T) {
 			t.Errorf("smoke lacks %s", ex.id)
 		}
 	}
+}
+
+// pythonFloor is the least Python of pinned packages that need a newer one
+// than the oldest task image may have, read from their Requires-Python
+// (httpcore2 2.16.2 refused Python 3.10 on BFCL: "No matching distribution
+// found", PH4-1). Add a row when a pin needs a newer Python.
+var pythonFloor = map[string]string{
+	"httpcore2": "3.11",
+	"httpx2":    "3.11",
+}
+
+// TestFrameworkExamplesOwnRuntime (PH1-1, PH4-1): a Python example is built
+// on each task's own image, and a task image may have no Python, no venv, or
+// one too old for the pins. So the example builds its runtime in a stage of
+// its own on a fixed image, with a pinned Python new enough for every pin,
+// and the task-image stage only copies it in: no RUN there, nothing that
+// uses the task image's Python, files owned by root.
+func TestFrameworkExamplesOwnRuntime(t *testing.T) {
+	fwPython := regexp.MustCompile(`(?m)^ARG FW_PYTHON=(\d+)\.(\d+)\.\d+$`)
+	for _, ex := range loadExamples(t) {
+		if _, err := os.Stat(filepath.Join(ex.dir, "requirements.in")); err != nil {
+			continue // Node example
+		}
+		t.Run(ex.dir, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(ex.dir, "Dockerfile"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			docker := string(raw)
+			build, final, ok := strings.Cut(docker, "\nFROM ${BASE_IMAGE}\n")
+			if !ok || !strings.Contains(build, "\nFROM bench/coding-core-base:1 AS fwbuild\n") {
+				t.Fatal("want a fwbuild stage on a fixed image, then FROM ${BASE_IMAGE}")
+			}
+			for _, line := range strings.Split(final, "\n") {
+				if f := strings.Fields(line); len(f) > 0 && (f[0] == "RUN" || f[0] == "FROM") {
+					t.Errorf("task-image stage runs %q: it must only copy the runtime in", line)
+				}
+			}
+			if !strings.Contains(final, "COPY --from=fwbuild --chown=0:0 /opt/fw-agent /opt/fw-agent") {
+				t.Error("task-image stage does not copy /opt/fw-agent from fwbuild owned by root")
+			}
+			m := fwPython.FindStringSubmatch(build)
+			if m == nil {
+				t.Fatal("no exact ARG FW_PYTHON=x.y.z in the build stage")
+			}
+			have := m[1] + "." + m[2]
+			pins := readLockPins(t, ex.dir)
+			for name, floor := range pythonFloor {
+				if _, ok := pins[name]; ok && !pyAtLeast(have, floor) {
+					t.Errorf("%s pins %s, which needs Python %s; the runtime is %s", ex.dir, name, floor, have)
+				}
+			}
+		})
+	}
+}
+
+// readLockPins reads every name==version of requirements.txt.
+func readLockPins(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(dir, "requirements.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins := map[string]string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if m := pinRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+			pins[strings.ToLower(m[1])] = m[3]
+		}
+	}
+	return pins
+}
+
+// pyAtLeast compares two "major.minor" versions.
+func pyAtLeast(have, want string) bool {
+	var hm, hn, wm, wn int
+	if _, err := fmt.Sscanf(have, "%d.%d", &hm, &hn); err != nil {
+		return false
+	}
+	if _, err := fmt.Sscanf(want, "%d.%d", &wm, &wn); err != nil {
+		return false
+	}
+	return hm > wm || (hm == wm && hn >= wn)
 }

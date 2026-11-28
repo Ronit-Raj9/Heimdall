@@ -11,10 +11,10 @@
 # No parser: gateway-level evidence. docs/frameworks.md is the guide.
 id: fw-pydantic-ai
 adapter: command
-image: bench/agent-fw-pydantic-ai:2
+image: bench/agent-fw-pydantic-ai:3
 build:
   dockerfile: examples/frameworks/pydantic-ai/Dockerfile
-  tag: bench/agent-fw-pydantic-ai:2
+  tag: bench/agent-fw-pydantic-ai:3
   base_arg: BASE_IMAGE
 argv:
   - fw-agent
