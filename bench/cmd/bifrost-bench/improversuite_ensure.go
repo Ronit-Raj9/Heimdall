@@ -19,7 +19,7 @@ const improverSuiteDir = "benchmarks/heimdall-improver"
 // errImproverNotAdmitted refuses an improvement run before any spend when
 // the shipped improver benchmark was never admitted (no suite.lock in the
 // build and none in the project).
-var errImproverNotAdmitted = errors.New("Improvement runs cannot start: the improver benchmark heimdall-improver has no lock file (benchmarks/heimdall-improver/suite.lock), so it was never admitted on this server. An admin runs `bifrost-bench suite lock heimdall-improver` and `bifrost-bench suite admit heimdall-improver` on a machine with Docker, then commits the lock file.")
+var errImproverNotAdmitted = errors.New("Improvement runs cannot start: the improver benchmark heimdall-improver has no lock file (benchmarks/heimdall-improver/suite.lock), so it was never admitted on this server. An admin runs `bifrost-bench suite lock heimdall-improver` and `bifrost-bench suite admit heimdall-improver` on a machine with Docker, then commits the lock file.") //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 
 // ensureImproverSuite copies the shipped improver suite into the project
 // root when the folder is missing or its suite.lock differs from the

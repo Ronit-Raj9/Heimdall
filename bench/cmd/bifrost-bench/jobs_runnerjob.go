@@ -267,7 +267,7 @@ func jobCoordinator(env jobEnv) *engine.Coordinator {
 // job (PQ2-3).
 func noJobRunnerError(c *engine.Coordinator, kind string) error {
 	if c != nil && c.HasJobRunnerFor(kindAgentBuild) {
-		return fmt.Errorf("The shared worker is online but does not run %s jobs: it runs agent builds and issue benchmarks only. "+
+		return fmt.Errorf("The shared worker is online but does not run %s jobs: it runs agent builds and issue benchmarks only. "+ //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 			"Add your own worker under Settings > Workers to run this job.", kind)
 	}
 	return errNoJobRunner

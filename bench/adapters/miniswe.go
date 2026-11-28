@@ -142,10 +142,9 @@ func (p *miniSWEParser) ParseReader(ctx context.Context, rc *schemas.RunContext,
 	block, declared, ended, total, readErr := readMiniBlock(ctx, raw, &d)
 	d.Bytes = total
 	st := newMiniState(rc)
-	switch {
-	case block == nil:
+	if block == nil {
 		d.Reason = "no trajectory block in agent stdout"
-	default:
+	} else {
 		whole := ended && declared >= 0 && int64(len(block)) == declared
 		if !whole {
 			d.Truncated = true

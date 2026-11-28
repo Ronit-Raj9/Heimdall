@@ -28,7 +28,7 @@ func init() {
 		Opts: []jobs.KindOption{jobs.WithMaxAttempts(1)},
 		Validate: func(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 			if env.Services.Index == nil || env.App == nil || env.App.reg == nil { // refused at start, not after (K4)
-				return nil, "", fmt.Errorf("%w: This server cannot read runs, so the scan cannot run.", jobs.ErrInvalidParams)
+				return nil, "", fmt.Errorf("%w: This server cannot read runs, so the scan cannot run.", jobs.ErrInvalidParams) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 			}
 			var p struct{}
 			if len(raw) > 0 && string(raw) != "null" {

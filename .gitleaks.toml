@@ -4,4 +4,4 @@
 useDefault = true
 
 [allowlist]
-paths = ['''bench/.*_test\.go''', '''bench/codescan/rules\.go''', '''bench/admitscan/sandbox\.go''', '''bench/testdata/.*''', '''plugins/heimdall/.*_test\.go''']
+paths = ['''bench/.*_test\.go''', '''bench/codescan/rules\.go''', '''bench/admitscan/sandbox\.go''', '''bench/testdata/.*''', '''plugins/heimdall/.*_test\.go''', '''bench/ui/.*\.mask\..*\.test\.tsx?''']

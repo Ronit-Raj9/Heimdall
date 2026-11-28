@@ -31,7 +31,7 @@ func FailureStreaks(stateDir string) (map[string]int, map[string]string, error) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("read schedule records: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	n, why := map[string]int{}, map[string]string{}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)

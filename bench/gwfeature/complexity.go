@@ -550,7 +550,7 @@ func computeRouter(ctx context.Context, in Input) Effect {
 // ended with 0 runs and no reason). Same states as the planner's check
 // (engine checkComplexityRouting).
 func routerReady(ctx context.Context, env DraftEnv) error {
-	notOn := errors.New("The router plugin is not enabled on this gateway: Bifrost's complexity analyzer has no classifier, so no request gets a tier. Set up a classifier in Bifrost's routing settings, then start again.")
+	notOn := errors.New("The router plugin is not enabled on this gateway: Bifrost's complexity analyzer has no classifier, so no request gets a tier. Set up a classifier in Bifrost's routing settings, then start again.") //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	if env.GatewayGet == nil {
 		return notOn
 	}

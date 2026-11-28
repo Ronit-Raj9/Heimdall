@@ -27,10 +27,10 @@ const (
 func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.DraftRequest) ([]string, int, error) {
 	notes := []string{}
 	if len([]rune(strings.TrimSpace(req.Name))) > gatewayDraftMaxName {
-		return nil, 0, fmt.Errorf("Keep the name to %d characters or fewer.", gatewayDraftMaxName)
+		return nil, 0, fmt.Errorf("Keep the name to %d characters or fewer.", gatewayDraftMaxName) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	if req.TaskCount < 0 || req.TaskCount > gatewayDraftMaxTasks {
-		return nil, 0, fmt.Errorf("The number of tasks must be between 1 and %d.", gatewayDraftMaxTasks)
+		return nil, 0, fmt.Errorf("The number of tasks must be between 1 and %d.", gatewayDraftMaxTasks) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	src := h.env.Services.Suites
 	if src == nil {
@@ -39,7 +39,7 @@ func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.Dra
 	id, _, _ := strings.Cut(strings.TrimSpace(req.Suite), "@")
 	s, err := src.LoadSuite(ctx, id)
 	if err != nil || s == nil {
-		return nil, 0, fmt.Errorf("The benchmark %s could not be read.", id)
+		return nil, 0, fmt.Errorf("The benchmark %s could not be read.", id) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	if cfg := (&evaluationsHandler{env: h.env}).agentConfigs(ctx)[strings.TrimSpace(req.Base)]; cfg != nil {
 		if ok, _, reason, _ := compat.Full(cfg, s); !ok {
@@ -50,7 +50,7 @@ func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.Dra
 			if !strings.HasPrefix(reason, "agent ") {
 				reason = fmt.Sprintf("agent %s cannot run this benchmark: %s", cfg.ID, reason)
 			}
-			return nil, 0, fmt.Errorf("The %s. Pick an agent that uses the benchmark's tools.", reason)
+			return nil, 0, fmt.Errorf("The %s. Pick an agent that uses the benchmark's tools.", reason) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 		}
 	}
 	if len(req.Tasks) > 0 {
@@ -58,7 +58,7 @@ func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.Dra
 	}
 	ready := readyTaskIDs(s)
 	if len(ready) == 0 {
-		return nil, 0, errors.New("No task of this benchmark is ready yet, so a test cannot start.")
+		return nil, 0, errors.New("No task of this benchmark is ready yet, so a test cannot start.") //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	total := len(s.TaskIDs)
 	pick := ready
