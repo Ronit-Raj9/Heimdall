@@ -2877,11 +2877,13 @@ class _CheatCheckRequired(TypedDict):
 
 
 class CheatCheck(_CheatCheckRequired, total=False):
+    est_runs: int
     evaluation: str
     per_arm: Dict[str, CheatArm]
 
 
 class CheatCheckRequest(TypedDict):
+    budget_usd: float
     yes: bool
 
 
@@ -4209,8 +4211,10 @@ class _DraftRequestRequired(TypedDict):
 
 class DraftRequest(_DraftRequestRequired, total=False):
     model: str
+    name: str
     options: Dict[str, str]
     provider: str
+    task_count: int
     tasks: List[str]
     trials: int
 
@@ -4646,6 +4650,7 @@ class _EstimateRequired(TypedDict):
 
 class Estimate(_EstimateRequired, total=False):
     loops: int
+    trial: bool
 
 
 class EstimateDetectable(TypedDict):
@@ -5681,6 +5686,7 @@ class _FindingRerunRequestRequired(TypedDict):
 
 
 class FindingRerunRequest(_FindingRerunRequestRequired, total=False):
+    budget_usd: float
     trials: int
 
 
@@ -5975,6 +5981,7 @@ class _GatewayCardLineRequired(TypedDict):
 
 
 class GatewayCardLine(_GatewayCardLineRequired, total=False):
+    blocked: str
     exp_id: str
     measured_at: Optional[str]
     result: str
@@ -9702,6 +9709,15 @@ class Proposal(TypedDict):
     reasons: List[ProposalReason]
 
 
+class ProposalEstimate(TypedDict):
+    input_tokens: int
+    max_usd: float
+    model: str
+    output_tokens: int
+    priced: bool
+    usd: float
+
+
 class ProposalReason(TypedDict):
     field: str
     quotes: List[Quote]
@@ -12244,6 +12260,7 @@ class Schedule(_ScheduleRequired, total=False):
     max_usd_per_day: float
     new_models: Optional[NewModelWatch]
     paused: bool
+    paused_reason: str
     policy: str
     timezone: str
 
@@ -12266,12 +12283,14 @@ class ScheduleRow(_ScheduleRowRequired, total=False):
     alerts: List[Config]
     evaluation: str
     fail_on: List[str]
+    failures_in_a_row: int
     job: str
     last: Optional[Record_schedule]
     max_usd_per_day: float
     new_models: Optional[NewModelWatch]
     next: str
     paused: bool
+    paused_reason: str
     policy: str
     problem: str
     timezone: str
@@ -12966,6 +12985,7 @@ class _SpecRequired(TypedDict):
 
 class Spec(_SpecRequired, total=False):
     bundle_source: Optional[BundleSource]
+    max_tasks: int
     preset: str
     tasks: List[str]
 
@@ -14140,6 +14160,9 @@ class Totals(_TotalsRequired, total=False):
     fault_cost_usd: Optional[float]
     fault_runs: int
     fault_survival: Optional[float]
+    judge_cost_runs: int
+    judge_cost_usd: Optional[float]
+    judge_runs: int
 
 
 class _TraceConnectInfoRequired(TypedDict):
@@ -16078,6 +16101,10 @@ class ProposalResponse(Proposal):
     mode: Mode
 
 
+class ProposalEstimateResponse(ProposalEstimate):
+    mode: Mode
+
+
 class PullAgentsResponseResponse(PullAgentsResponse):
     mode: Mode
 
@@ -17550,6 +17577,7 @@ __all__ = [
     'PromptLogsDeleted',
     'Proof',
     'Proposal',
+    'ProposalEstimate',
     'ProposalReason',
     'ProviderCredential',
     'ProviderField',
@@ -18242,6 +18270,7 @@ __all__ = [
     'PromptLoggingResponse',
     'PromptLogsDeletedResponse',
     'ProposalResponse',
+    'ProposalEstimateResponse',
     'PullAgentsResponseResponse',
     'PullReadinessResponse',
     'PullRepoCreatedResponse',
