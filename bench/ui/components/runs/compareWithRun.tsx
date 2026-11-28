@@ -1,4 +1,5 @@
 import "@/components/runs/a2a/ufl4I18n";
+import { StepsSideBySide } from "@/components/compare/stepsSideBySide";
 import { DivergenceView } from "@/components/runs/divergencePanel";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { NativeSelect } from "@/components/ui/select";
@@ -11,6 +12,7 @@ import { useTranslation } from "react-i18next";
 /** "Compare with another run": pick another run of the same task, see where the two first diverge. */
 export function CompareWithRun({ runId, task }: { runId: string; task: string }) {
 	const { t } = useTranslation("ufl4");
+	const { t: t2 } = useTranslation("ufk2");
 	const [other, setOther] = useState("");
 	const runs = useListRunsQuery({ task, limit: 50 });
 	const div = useGetRunDivergenceQuery(other ? { runId, other } : skipToken);
@@ -33,6 +35,7 @@ export function CompareWithRun({ runId, task }: { runId: string; task: string })
 			{other && div.isFetching ? <BlockSkeleton rows={3} testId="compare-run-div-loading" /> : null}
 			{other && div.error ? <LoadError title={t("compare.error")} error={div.error} onRetry={() => void div.refetch()} testId="compare-run-div-error" /> : null}
 			{other && div.data && !div.isFetching ? <DivergenceView data={div.data} /> : null}
+			{other && div.data && !div.isFetching ? <StepsSideBySide a={runId} b={other} labelA={t2("steps.thisRun")} labelB={t2("steps.otherRun")} /> : null}
 		</div>
 	);
 }

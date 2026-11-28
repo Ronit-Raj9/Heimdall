@@ -18,6 +18,12 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetRunQuery: (id: string) => okQuery(runs.byId[id]),
 }));
+vi.mock("@/lib/store/apis/runStepsApi", () => ({
+	useGetRunStepsQuery: (id: string) => okQuery({ run_id: id, available: true, observers: [], steps: [{ seq: 1, kind: "tool_request", summary: `step of ${id}` }] }),
+}));
+vi.mock("@/lib/store/apis/runDivergenceApi", () => ({
+	useGetRunDivergenceQuery: () => okQuery({ available: true, divergence: { found: true, seq_a: 1, seq_b: 1, after: [] } }),
+}));
 
 describe("sharedPair (p06-1)", () => {
 	it("is the pair id only when both runs share it", () => {
@@ -35,5 +41,9 @@ describe("TwoRuns (p06-1)", () => {
 		expect(html).toContain("Two runs, side by side");
 		expect(html).toContain('href="/runs/r1"');
 		expect(html).toContain('href="/runs/r2"');
+		// K2: the step by step view of both runs, divergence marked.
+		expect(html).toContain("step of r1");
+		expect(html).toContain("step of r2");
+		expect(html).toContain('data-testid="steps-sbs-diverge"');
 	});
 });

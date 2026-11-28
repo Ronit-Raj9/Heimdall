@@ -3,6 +3,7 @@ import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { runHasVoice } from "@/app/runs_/$runId/views/runTabs";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { AlignedLanes } from "@/components/runs/alignedLanes";
+import { StepsSideBySide } from "@/components/compare/stepsSideBySide";
 import { DivergencePanel } from "@/components/runs/divergencePanel"; // I28 first divergence
 import { ClaimVsResult, type ClaimRow } from "@/components/runs/claimVsResult";
 import { RunOutput } from "@/components/runs/runOutput";
@@ -231,6 +232,16 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					metrics: lane.pairRun.metrics,
 				}))}
 			/>
+
+			{/* K2: the two runs step by step, lined up to the first divergence. */}
+			{lanes.length >= 2 && (
+				<StepsSideBySide
+					a={lanes[0].pairRun.run.run_id}
+					b={lanes[1].pairRun.run.run_id}
+					labelA={lanes[0].pairRun.arm}
+					labelB={lanes[1].pairRun.arm}
+				/>
+			)}
 
 			<Section title={t("runs.metrics.title")} description={t("runs.metrics.description")} testId="runs-metrics-section">
 				<Card className="min-w-0 overflow-x-auto py-0 shadow-none">

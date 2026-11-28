@@ -6,6 +6,7 @@ import type { RunDetail } from "@/lib/types/bench";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RunDiff } from "./runDiff";
+import { StepsSideBySide } from "@/components/compare/stepsSideBySide";
 
 /** The pair both runs belong to, or null when they are of different pairs or either is unknown (p06-1). */
 export function sharedPair(a: RunDetail | undefined, b: RunDetail | undefined): string | null {
@@ -58,6 +59,7 @@ export function TwoRuns({ a, b, onPair }: { a: string; b: string; onPair: (pairI
 				))}
 			</div>
 			<RunDiff lanes={lanes.map((l) => ({ arm: l.label, run: l.d.run, metrics: l.d.metrics }))} />
+			{ra.data.slot?.task === rb.data.slot?.task && <StepsSideBySide a={a} b={b} />}
 		</Section>
 	);
 }
