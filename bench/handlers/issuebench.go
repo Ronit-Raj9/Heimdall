@@ -71,7 +71,13 @@ type IssueRunCreate struct {
 type IssueRunStart struct {
 	Consent bool `json:"consent"`
 	pipeline.ModelChoice
+	// BudgetUSD is the dollar cap of each issue's build; 0 keeps the
+	// server's default (BENCH_ISSUEBENCH_MAX_USD).
+	BudgetUSD float64 `json:"budget_usd,omitempty"`
 }
+
+// issueMaxBudgetUSD is the highest per-issue cap the start route takes.
+const issueMaxBudgetUSD = 50
 
 // IssueRetry is the body of POST /issuebench/runs/{id}/issues/{issue}/retry.
 type IssueRetry struct {
@@ -202,6 +208,10 @@ func (h *issueBenchHandler) start(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
+	if req.BudgetUSD < 0 || req.BudgetUSD > issueMaxBudgetUSD {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "The cap per issue must be between 0 and 50 USD.")
+		return
+	}
 	if h.env.Services.Hosted && req.Consent {
 		work, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		rd := issueReadiness(work, h.env)
@@ -212,6 +222,12 @@ func (h *issueBenchHandler) start(ctx *fasthttp.RequestCtx) {
 				msg = issueNoWorker
 			}
 			lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, msg)
+			return
+		}
+	}
+	if req.Consent && req.BudgetUSD > 0 {
+		if _, err := h.m.Limit(pathParam(ctx, "id"), 0, req.BudgetUSD); err != nil {
+			h.fail(ctx, err)
 			return
 		}
 	}
