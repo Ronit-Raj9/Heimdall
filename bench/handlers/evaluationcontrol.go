@@ -110,6 +110,12 @@ func (h *evaluationsHandler) control(ctx *fasthttp.RequestCtx, pause bool) {
 		h.fail(ctx, fasthttp.StatusConflict, "evaluation "+ev.ID+" has no running benchmark ("+ev.Status+")")
 		return
 	}
+	if !pause {
+		if msg := resumeCapProblem(ev, kids); msg != "" {
+			h.fail(ctx, fasthttp.StatusConflict, msg)
+			return
+		}
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	wctx := withPrincipal(work, ctx)
@@ -262,4 +268,27 @@ func principalOf(ctx *fasthttp.RequestCtx) string {
 		return p.Email
 	}
 	return p.UserID
+}
+
+// resumeCapProblem is why a resume must not start more paid runs (K5,
+// PQ1-5): no cap at all, or every running benchmark's cap used up. Resume
+// keeps each benchmark's own cap, which the scheduler enforces per run; a
+// spent cap is raised with "raise budget and continue", never by resuming.
+func resumeCapProblem(ev *schemas.Evaluation, kids []*schemas.EvaluationChild) string {
+	capped, left := false, false
+	for _, c := range kids {
+		if c.BudgetUSD > 0 {
+			capped = true
+			if c.SpentUSD < c.BudgetUSD {
+				left = true
+			}
+		}
+	}
+	if !capped && ev.Spec.BudgetUSD <= 0 {
+		return "This evaluation has no spend cap. Raise the budget to set one, then resume."
+	}
+	if capped && !left {
+		return "The spend cap is used up. Raise the budget to continue."
+	}
+	return ""
 }
