@@ -2584,6 +2584,17 @@ class CanaryInitResponse(TypedDict):
     path: str
 
 
+class _CanarySimulateRequestRequired(TypedDict):
+    tasks: int
+
+
+class CanarySimulateRequest(_CanarySimulateRequestRequired, total=False):
+    drop: float
+    latency_rise: float
+    sensitivity: str
+    trials: int
+
+
 class _CandidateRequired(TypedDict):
     agent_id: str
     effect: str
@@ -8843,6 +8854,18 @@ class OpenAIAgent(_OpenAIAgentRequired, total=False):
     tools: str
 
 
+class _OpenIncidentBodyRequired(TypedDict):
+    message: str
+    title: str
+
+
+class OpenIncidentBody(_OpenIncidentBodyRequired, total=False):
+    components: List[str]
+    impact: str
+    scheduled_for: Optional[str]
+    status: str
+
+
 class OpenModelApps(TypedDict):
     apps: List[AppInfo]
 
@@ -10716,6 +10739,7 @@ class _Report_failoverRequired(TypedDict):
     extra_latency_ms: float
     failover: ArmStats
     failover_worked: bool
+    fallback_reached: bool
     no_failover: ArmStats
     success_with_failover: bool
     success_without_failover: bool
@@ -12844,6 +12868,37 @@ class SignupRequest(_SignupRequestRequired, total=False):
     org_name: str
 
 
+class SimConfig(TypedDict):
+    DropPoints: float
+    Reps: int
+    RunNoise: float
+    Seed: int
+    Sensitivity: str
+    ShiftRel: float
+    Spread: bool
+    Tasks: int
+    Trials: int
+    Triggers: int
+
+
+class SimResult(TypedDict):
+    alarm_per_trigger: float
+    alarms: int
+    alpha: float
+    any_alarm_30: float
+    any_alarm_30_measured: bool
+    any_alarm_365: float
+    any_alarm_365_measured: bool
+    config: SimConfig
+    confirm_per_trigger: float
+    detect_by_3: float
+    detect_first_trigger: float
+    flag_per_look: float
+    flags: int
+    looks: int
+    triggers: int
+
+
 class SimulatorSpec(TypedDict, total=False):
     max_turns: int
     mode: str
@@ -14265,6 +14320,15 @@ class Turn(_TurnRequired, total=False):
 class Update(TypedDict):
     at: str
     message: str
+    status: str
+
+
+class _UpdateIncidentBodyRequired(TypedDict):
+    message: str
+
+
+class UpdateIncidentBody(_UpdateIncidentBodyRequired, total=False):
+    impact: str
     status: str
 
 
@@ -15821,6 +15885,10 @@ class InboxWebhookInfoResponse(InboxWebhookInfo):
     mode: Mode
 
 
+class Incident_statuspageResponse(Incident_statuspage):
+    mode: Mode
+
+
 class IntegrationExportListResponse(IntegrationExportList):
     mode: Mode
 
@@ -16445,6 +16513,10 @@ class SharedItemResponse(SharedItem):
     mode: Mode
 
 
+class SimResultResponse(SimResult):
+    mode: Mode
+
+
 class SkillScanResultResponse(SkillScanResult):
     mode: Mode
 
@@ -16927,6 +16999,7 @@ __all__ = [
     'CallRecord',
     'CanaryInitRequest',
     'CanaryInitResponse',
+    'CanarySimulateRequest',
     'Candidate',
     'CandidateView',
     'Candidate_connect',
@@ -17486,6 +17559,7 @@ __all__ = [
     'OnboardReadyRequest',
     'OnboardUploadResult',
     'OpenAIAgent',
+    'OpenIncidentBody',
     'OpenModelApps',
     'OpenModelsList',
     'OperateBackup',
@@ -17848,6 +17922,8 @@ __all__ = [
     'SignalResult',
     'Signals',
     'SignupRequest',
+    'SimConfig',
+    'SimResult',
     'SimulatorSpec',
     'SkillScanResult',
     'SkillScanSummary',
@@ -17967,6 +18043,7 @@ __all__ = [
     'TrialsPolicy',
     'Turn',
     'Update',
+    'UpdateIncidentBody',
     'UploadFilesReport',
     'UploadRunsReport',
     'UploadedFile',
@@ -18200,6 +18277,7 @@ __all__ = [
     'InboxItemDetailResponse',
     'InboxListResponse',
     'InboxWebhookInfoResponse',
+    'Incident_statuspageResponse',
     'IntegrationExportListResponse',
     'InventoryResponse',
     'InvestigationListResponse',
@@ -18357,6 +18435,7 @@ __all__ = [
     'ShareListResponse',
     'ShareViewResponse',
     'SharedItemResponse',
+    'SimResultResponse',
     'SkillScanResultResponse',
     'State_pipelineResponse',
     'StatusResponse',

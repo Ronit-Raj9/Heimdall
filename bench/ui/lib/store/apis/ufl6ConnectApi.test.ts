@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import bodies from "../../../../handlers/testdata/ufl6_web_bodies.json";
 import { githubAgentFilePath, verifyRequestBody } from "./ufl6ConnectApi";
+
+// Read, not imported: the hosted server image builds the UI without handlers/testdata (lib/serverImage.test.ts).
+const bodies = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../handlers/testdata/ufl6_web_bodies.json", import.meta.url)), "utf8"));
 
 // The same file is posted to the Go handlers in bench/handlers/ufl6_webbodies_test.go.
 describe("Connect verify body", () => {

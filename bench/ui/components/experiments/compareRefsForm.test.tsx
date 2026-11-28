@@ -20,6 +20,8 @@ vi.mock("@/lib/store/apis/suitesLightApi", () => ({
 	useGetSuitesLightQuery: () => ({ data: { suites: [{ id: "coding-core", version: "1.0.0" }, { id: "b" }] } }),
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useGetJobQuery: () => ({}) }));
+// Round 5: the job panel's priority control has its own API file; the form tests never use it.
+vi.mock("@/lib/store/apis/jobPriorityApi", () => ({ useSetJobPriorityMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: undefined }) }));
 vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: unknown }) => children }));
