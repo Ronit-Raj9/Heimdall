@@ -29,3 +29,23 @@ func ValidRef(ref string) bool {
 	}
 	return true
 }
+
+// ownRefRe is an organization's own image in the registry: its namespace
+// (org-<id>/), a plain name, and the host image ID as the tag. The runner
+// computes it from the org's policy; no org names it.
+var ownRefRe = regexp.MustCompile(`^org-[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*:[0-9a-f]{64}$`)
+
+// ValidOwnRef reports whether ref is an org's own image the publisher may
+// copy to the registry (never into the manifest).
+func ValidOwnRef(ref string) bool {
+	if !ownRefRe.MatchString(ref) {
+		return false
+	}
+	repo := ref[:strings.LastIndex(ref, ":")]
+	for _, part := range strings.Split(repo, "/") {
+		if strings.Trim(part, ".") == "" {
+			return false
+		}
+	}
+	return true
+}

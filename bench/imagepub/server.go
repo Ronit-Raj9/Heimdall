@@ -81,19 +81,25 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ref := r.URL.Query().Get("ref")
-	if !ValidRef(ref) {
-		errJSON(w, http.StatusForbidden, ErrNotPlatform.Error())
-		return
-	}
-	set, err := s.Set()
-	if err != nil {
-		slog.Error("image publisher: platform images", "err", err)
-		errJSON(w, http.StatusInternalServerError, "platform image list unavailable")
-		return
-	}
-	if _, ok := set[ref]; !ok {
-		errJSON(w, http.StatusForbidden, ErrNotPlatform.Error())
-		return
+	// An org's own image (org-<id>/<name>:<image ID>) goes to its own
+	// namespace in the registry and never into the manifest, which pins
+	// only platform images.
+	own := ValidOwnRef(ref)
+	if !own {
+		if !ValidRef(ref) {
+			errJSON(w, http.StatusForbidden, ErrNotPlatform.Error())
+			return
+		}
+		set, err := s.Set()
+		if err != nil {
+			slog.Error("image publisher: platform images", "err", err)
+			errJSON(w, http.StatusInternalServerError, "platform image list unavailable")
+			return
+		}
+		if _, ok := set[ref]; !ok {
+			errJSON(w, http.StatusForbidden, ErrNotPlatform.Error())
+			return
+		}
 	}
 
 	l, _ := s.locks.LoadOrStore(ref, &sync.Mutex{})
@@ -136,7 +142,9 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadGateway, "the registry did not take the image")
 		return
 	}
-	if err := SetPin(s.Manifest, ref, digest); err != nil {
+	if own {
+		// nothing to pin: the runner keeps the digest of its own push
+	} else if err := SetPin(s.Manifest, ref, digest); err != nil {
 		slog.Error("image publisher: manifest", "ref", ref, "err", err)
 		errJSON(w, http.StatusInternalServerError, "the manifest could not be written")
 		return

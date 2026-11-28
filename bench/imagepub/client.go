@@ -103,6 +103,33 @@ func (c *Client) publish(ctx context.Context, ref string) (string, error) {
 	if err := Qualify(ctx, c.Docker, ref, set, c.Platform); err != nil {
 		return "", err
 	}
+	return c.send(ctx, ref, ref)
+}
+
+// PublishOwn copies an organization's own host image hostRef
+// (org-<id>/<name>:<tag>) to the registry as pushRef, the same repository
+// with the host image ID as its tag, and returns the pushed digest. It
+// matches utils.PublishOwnFunc. Nothing is written to the manifest.
+func (c *Client) PublishOwn(ctx context.Context, hostRef, pushRef string) (string, error) {
+	if !ValidOwnRef(pushRef) {
+		return "", fmt.Errorf("%s: not an organization image name", pushRef)
+	}
+	repo := pushRef[:strings.LastIndex(pushRef, ":")]
+	if i := strings.LastIndex(hostRef, ":"); i <= strings.LastIndex(hostRef, "/") || hostRef[:i] != repo {
+		return "", fmt.Errorf("%s: not the host image of %s", hostRef, pushRef)
+	}
+	timeout := c.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return c.send(ctx, hostRef, pushRef)
+}
+
+// send streams a `docker save` of saveRef to the publisher, which pushes it
+// as ref, and returns the pushed digest.
+func (c *Client) send(ctx context.Context, saveRef, ref string) (string, error) {
 	raw, err := os.ReadFile(c.TokenFile)
 	if err != nil {
 		return "", fmt.Errorf("image publisher token: %w", err)
@@ -110,17 +137,17 @@ func (c *Client) publish(ctx context.Context, ref string) (string, error) {
 	token := strings.TrimSpace(string(raw))
 
 	pr, pw := io.Pipe()
-	save := c.Docker.Command(ctx, "save", ref)
+	save := c.Docker.Command(ctx, "save", saveRef)
 	save.Stdout = pw
 	var stderr strings.Builder
 	save.Stderr = &stderr
 	if err := save.Start(); err != nil {
-		return "", fmt.Errorf("docker save %s: %w", ref, err)
+		return "", fmt.Errorf("docker save %s: %w", saveRef, err)
 	}
 	go func() {
 		err := save.Wait()
 		if err != nil {
-			err = fmt.Errorf("docker save %s: %w: %s", ref, err, strings.TrimSpace(stderr.String()))
+			err = fmt.Errorf("docker save %s: %w: %s", saveRef, err, strings.TrimSpace(stderr.String()))
 		}
 		pw.CloseWithError(err)
 	}()
