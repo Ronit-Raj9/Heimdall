@@ -79,7 +79,7 @@ func TestRefundFalseClaim(t *testing.T) {
 	if res.Shape != traceimport.KindMCP || res.ShapeReason == "" {
 		t.Fatalf("shape %q", res.Shape)
 	}
-	if len(res.Mutants) != 2 || res.Mutants[0].Control != traceimport.ObservedMutant || res.Mutants[1].Control == "" || res.Standin != nil {
+	if len(res.Mutants) != 2 || res.Mutants[0].Control != "variant_claims_success" || res.Mutants[1].Control != "variant_no_call" || res.Standin != nil {
 		t.Fatalf("mutants %+v standin %+v", res.Mutants, res.Standin)
 	}
 	if res.ModelCalls != 2 || res.SpentUSD < 0.019 || !res.Offerable {
@@ -94,6 +94,9 @@ func TestRefundFalseClaim(t *testing.T) {
 			t.Errorf("%s holds an approval field", f.Path)
 		}
 		got[f.Path] = f.Content
+	}
+	if !strings.Contains(got["task.yaml"], "variants:") || !strings.Contains(got["task.yaml"], "file: "+traceimport.ObservedMutant) {
+		t.Errorf("task.yaml lacks the variants:\n%s", got["task.yaml"])
 	}
 	if !strings.Contains(got["instruction.md"], "order 1042") {
 		t.Errorf("instruction %q", got["instruction.md"])
@@ -147,7 +150,7 @@ func TestQuestionFalseClaimStaysQA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Shape != traceimport.KindQA || res.Mutants[0].Control != "wrong_answer_1" {
+	if res.Shape != traceimport.KindQA || res.Mutants[0].Control != "variant_ninety" {
 		t.Fatalf("shape %q mutants %+v", res.Shape, res.Mutants)
 	}
 }

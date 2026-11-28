@@ -25,8 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/maximhq/bifrost/bench/investigator"
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tracedraft"
 	"github.com/maximhq/bifrost/bench/traceimport"
 )
@@ -76,8 +79,15 @@ type Input struct {
 	Suite   string // target suite id; the draft is written in a scratch suite of that id
 	TaskID  string // new task id; empty derives one from the item
 	WorkDir string // scratch folder Build may write in; empty uses a temp folder
-	Model   investigator.Caller
-	Limits  Limits
+	// BenchRoot, when set, is the benchmarks folder the draft suite is
+	// written in (the org's project store on the hosted site, so a worker
+	// can admit it); empty uses WorkDir/benchmarks. Suite must then be a
+	// new draft suite id.
+	BenchRoot string
+	// Progress, when set, hears each step: "diagnose", "write".
+	Progress func(step string)
+	Model    investigator.Caller
+	Limits   Limits
 	// Feedback is the failing control of an earlier attempt, for the one
 	// retry the website offers ("Try again"). Empty on a first build.
 	Feedback string
@@ -114,22 +124,34 @@ type Standin struct {
 
 // Result is what Build returns and what the job stores.
 type Result struct {
-	Failure     Failure  `json:"failure"`
-	Shape       string   `json:"shape"`
-	ShapeReason string   `json:"shape_reason"`
-	TaskID      string   `json:"task_id"`
-	Files       []File   `json:"files"`
-	Mutants     []Mutant `json:"mutants"`
-	Standin     *Standin `json:"standin"`
-	SpentUSD    float64  `json:"spent_usd"`
-	ModelCalls  int      `json:"model_calls"`
-	Notes       []string `json:"notes"`
+	Failure     Failure `json:"failure"`
+	Shape       string  `json:"shape"`
+	ShapeReason string  `json:"shape_reason"`
+	TaskID      string  `json:"task_id"`
+	Task        TaskRef `json:"task"`
+	// Unsure is the opposite of Offerable: true when the draft must not be
+	// offered for approval.
+	Unsure     bool     `json:"unsure"`
+	Files      []File   `json:"files"`
+	Mutants    []Mutant `json:"mutants"`
+	Standin    *Standin `json:"standin"`
+	SpentUSD   float64  `json:"spent_usd"`
+	ModelCalls int      `json:"model_calls"`
+	Notes      []string `json:"notes"`
 	// Offerable is false when the draft is not finished (an EDIT ME marker
 	// left, or the model said it was unsure): it is then not offered for
 	// approval.
 	Offerable bool `json:"offerable"`
 	// Dir is the written task folder on disk (not stored in JSON).
 	Dir string `json:"-"`
+}
+
+// TaskRef names the written task; Path is relative to the benchmarks
+// folder (<suite>/tasks/<id>).
+type TaskRef struct {
+	Suite string `json:"suite"`
+	ID    string `json:"id"`
+	Path  string `json:"path"`
 }
 
 // loop counts calls and enforces the limits.
@@ -171,10 +193,17 @@ func Build(ctx context.Context, in Input) (*Result, error) {
 		return nil, err
 	}
 	l := &loop{in: in, sess: sess, src: tracedraft.SessionSource(in.Item, sess), res: &Result{TaskID: in.TaskID, Mutants: []Mutant{}, Files: []File{}, Notes: []string{}}}
+	step := func(s string) {
+		if in.Progress != nil {
+			in.Progress(s)
+		}
+	}
+	step("diagnose")
 	if err := l.diagnose(ctx); err != nil {
 		return l.res, err
 	}
 	l.chooseShape()
+	step("write")
 	w, err := l.write(ctx)
 	if err != nil {
 		return l.res, err
@@ -456,14 +485,24 @@ func (l *loop) materialize(w *writing) error {
 		work = d
 	}
 	root := filepath.Join(work, "benchmarks")
+	if l.in.BenchRoot != "" {
+		root = l.in.BenchRoot
+	}
 	suiteDir := filepath.Join(root, l.in.Suite)
-	files, err := scaffold.Suite(scaffold.SuiteOptions{ID: l.in.Suite, Template: r.Shape})
-	if err != nil {
-		return err
+	_, statErr := os.Stat(filepath.Join(suiteDir, "suite.yaml"))
+	existing := statErr == nil
+	if !existing {
+		files, err := scaffold.Suite(scaffold.SuiteOptions{ID: l.in.Suite, Template: r.Shape})
+		if err != nil {
+			return err
+		}
+		if err := scaffold.WriteFiles(suiteDir, files, false); err != nil {
+			return err
+		}
 	}
-	if err := scaffold.WriteFiles(suiteDir, files, false); err != nil {
-		return err
-	}
+	// In an existing suite the suite's grader is never changed: a tool task
+	// is then graded by checks.py (verify.py), like an answer-checked one.
+	pyChecks := existing || answerChecked(r.Failure.Kind)
 	g := &traceimport.Guide{Instruction: w.Instruction}
 	sess := l.sess
 	switch r.Shape {
@@ -481,7 +520,7 @@ func (l *loop) materialize(w *writing) error {
 			g.WrongAnswers = append(g.WrongAnswers, v.Answer)
 		}
 	default:
-		if !answerChecked(r.Failure.Kind) {
+		if !pyChecks {
 			if err := checksGrader(suiteDir); err != nil {
 				return err
 			}
@@ -503,7 +542,7 @@ func (l *loop) materialize(w *writing) error {
 		return fmt.Errorf("write the task: %w", err)
 	}
 	r.Dir = res.Dir
-	if answerChecked(r.Failure.Kind) && r.Shape != traceimport.KindQA {
+	if pyChecks && r.Shape != traceimport.KindQA && r.Shape != traceimport.KindMemory {
 		if err := answerChecks(res, g, w); err != nil {
 			return err
 		}
@@ -513,6 +552,12 @@ func (l *loop) materialize(w *writing) error {
 		return err
 	}
 	r.Mutants = mutantsOf(r.Shape, w.Variants, g, res)
+	if err := writeVariants(res.Dir, r.Shape, w.Variants, r.Mutants); err != nil {
+		return err
+	}
+	if r.Files, err = readTree(res.Dir); err != nil {
+		return err
+	}
 	if len(w.Standin) > 0 && r.Shape != traceimport.KindQA {
 		why := strings.TrimSpace(w.StandinWhy)
 		if why == "" {
@@ -537,6 +582,8 @@ func (l *loop) materialize(w *writing) error {
 		r.Offerable = false
 		r.Notes = append(r.Notes, "The builder model is unsure: "+oneLine(u, 400))
 	}
+	r.Unsure = !r.Offerable
+	r.Task = TaskRef{Suite: l.in.Suite, ID: l.in.TaskID, Path: l.in.Suite + "/tasks/" + l.in.TaskID}
 	return nil
 }
 
@@ -566,6 +613,13 @@ func answerChecks(res *traceimport.DraftResult, g *traceimport.Guide, w *writing
 		}
 		seen[c.Tool] = true
 		fmt.Fprintf(&b, "    {\"name\": %s, \"path\": \"calls\", \"where\": {\"tool\": %s}, \"length\": 1},\n", pyStr("calls_"+slug(c.Tool)), pyStr(c.Tool))
+	}
+	for _, c := range g.Forbidden {
+		args, err := json.Marshal(c.Args)
+		if err != nil || c.Args == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "    {\"name\": %s, \"path\": \"calls\", \"where\": {\"tool\": %s, \"arguments\": %s}, \"length\": 0},\n", pyStr("never_"+slug(c.Tool)+"_"+fmt.Sprint(len(seen))), pyStr(c.Tool), args)
 	}
 	for i, m := range w.MustNotSay {
 		fmt.Fprintf(&b, "    {\"name\": %s, \"answer\": True, \"not_contains\": %s},\n", pyStr(fmt.Sprintf("no_false_claim_%d", i+1)), pyStr(strings.TrimSpace(m)))
@@ -606,6 +660,74 @@ func slug(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// writeVariants declares each wrong agent as a named variant in task.yaml
+// (controls.variants, lane T2's format), so admission reports it as
+// variant_<name>, and points the mutant's control at it. A qa variant's
+// file is its wrong answer; a tool variant reuses the mutant script that
+// carries it. A variant with no script is left as it was (control empty).
+func writeVariants(dir, shape string, vs []variant, ms []Mutant) error {
+	var list []schemas.TaskVariant
+	used := map[string]bool{}
+	for i, v := range vs {
+		name := strings.Trim(slug(v.Name), "_")
+		if name == "" || used[name] {
+			name = fmt.Sprintf("variant%d", i+1)
+		}
+		var file string
+		switch shape {
+		case traceimport.KindQA, traceimport.KindMemory:
+			file = "controls/variant-" + name + ".txt"
+			if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(file)), []byte(strings.TrimSpace(v.Answer)+"\n"), 0o644); err != nil {
+				return err
+			}
+		default:
+			if !strings.HasPrefix(ms[i].Control, "controls/") {
+				continue
+			}
+			file = ms[i].Control
+		}
+		used[name] = true
+		list = append(list, schemas.TaskVariant{Name: name, File: file, WhatItDoesWrong: oneLine(v.What, 300)})
+		ms[i].Control = "variant_" + name
+	}
+	if len(list) == 0 {
+		return nil
+	}
+	p := filepath.Join(dir, "task.yaml")
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		return err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return errors.New("task.yaml is not a mapping")
+	}
+	var seq yaml.Node
+	if err := seq.Encode(list); err != nil {
+		return err
+	}
+	top := doc.Content[0]
+	var controls *yaml.Node
+	for i := 0; i+1 < len(top.Content); i += 2 {
+		if top.Content[i].Value == "controls" {
+			controls = top.Content[i+1]
+		}
+	}
+	if controls == nil || controls.Kind != yaml.MappingNode {
+		controls = &yaml.Node{Kind: yaml.MappingNode}
+		top.Content = append(top.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "controls"}, controls)
+	}
+	controls.Content = append(controls.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "variants"}, &seq)
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(p, out, 0o644)
 }
 
 // mutantsOf names each variant with the control that carries it.

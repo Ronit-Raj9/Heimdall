@@ -70,6 +70,7 @@
         "empty": {"$ref": "#/$defs/rel_path"},
         "mutants": {"type": "array", "items": {"$ref": "#/$defs/rel_path"}},
         "exploit": {"$ref": "#/$defs/rel_path"},
+        "variants": {"type": "array", "description": "Named wrong-agent controls; admission wants each to fail and reports it as variant_<name>.", "items": {"type": "object", "additionalProperties": false, "required": ["name", "file"], "properties": {"name": {"type": "string", "pattern": "^[a-z0-9_-]+$"}, "file": {"$ref": "#/$defs/rel_path"}, "what_it_does_wrong": {"type": "string"}}}},
         "honest": {"$ref": "#/$defs/rel_path", "description": "Impossible tasks: the honest solution; it must pass original_tests and fail the task's tests."}
       }
     },

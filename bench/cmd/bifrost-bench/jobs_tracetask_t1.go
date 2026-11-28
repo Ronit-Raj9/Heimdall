@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/jobs"
@@ -16,6 +17,7 @@ import (
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tracebuild"
 	"github.com/maximhq/bifrost/bench/traceinbox"
+	"gopkg.in/yaml.v3"
 )
 
 // Round 7 (T1): tracetask.build asks a builder model to turn one inbox
@@ -45,6 +47,11 @@ type traceTaskParams struct {
 	InboxID  string `json:"inbox_id"`
 	Suite    string `json:"suite"`
 	Feedback string `json:"feedback,omitempty"` // the failing control of an earlier attempt ("Try again")
+	RetryOf  string `json:"retry_of,omitempty"` // the earlier job id of a "Try again"
+	// Mode "finalize" (with TaskID): no model call; admission again after a
+	// person approved, and the lock entry when every check holds.
+	Mode   string `json:"mode,omitempty"`
+	TaskID string `json:"task_id,omitempty"`
 	modelParams
 }
 
@@ -54,6 +61,7 @@ type traceTaskParams struct {
 type traceTaskAdmission struct {
 	Status   string           `json:"status"`
 	Reason   string           `json:"reason,omitempty"`
+	ExpID    string           `json:"exp_id,omitempty"` // the worker experiment that ran the controls
 	Admitted bool             `json:"admitted"`
 	Controls []traceTaskCheck `json:"controls"`
 	Guards   []traceTaskCheck `json:"guards"`
@@ -69,19 +77,35 @@ type traceTaskCheck struct {
 type traceTaskResult struct {
 	*tracebuild.Result
 	Admission traceTaskAdmission `json:"admission"`
-	Attempt   int                `json:"attempt"` // 1, or 2 after the one retry with admission's feedback
+	Attempt   int                `json:"attempt"`
+	// DraftSuite is the suite the draft sits in: on the hosted site a draft
+	// suite of its own in the org's project (<suite>-draft-...), locally the
+	// same id in the job's scratch folder.
+	DraftSuite string `json:"draft_suite"` // 1, or 2 after the one retry with admission's feedback
 }
 
-// errAdmitNeedsWorker: the hosted server process has no Docker.
-var errAdmitNeedsWorker = errors.New("admission of a built draft is not dispatched to a worker yet; run it with heimdall task admit")
+// traceTaskAdmit runs admission for the one drafted task; tests replace it
+// at this interface (the same as repoTaskAdmit). Hosted: admitOnWorker
+// with record false (the readiness controls on a worker runner, the
+// tasks.mine bridge; the server process has no Docker). Local: suite.Admit
+// in process on benchRoot.
+var traceTaskAdmit = func(ctx context.Context, env jobEnv, j *jobs.Job, benchRoot, suiteID, id string, log jobs.Logger) (hostedAdmitTask, string, error) {
+	if env.Hosted {
+		return admitOnWorker(ctx, env, j, suiteID, id, log, false)
+	}
+	rec, err := traceTaskAdmitLocal(ctx, env, benchRoot, suiteID, id)
+	if err != nil {
+		return hostedAdmitTask{Task: id}, "", err
+	}
+	return hostedAdmitTask{Task: id, Checks: rec.Checks}, "", nil
+}
 
-// traceTaskAdmit runs admission for the one drafted task under benchRoot.
-// Tests replace it. The default runs suite.Admit in process where this
-// process has Docker (the local server); on the hosted site it returns
-// errAdmitNeedsWorker.
-var traceTaskAdmit = func(ctx context.Context, env jobEnv, benchRoot, suiteID, taskID string) (*schemas.AdmissionRecord, error) {
-	if env.Hosted || env.App == nil || env.App.reg == nil {
-		return nil, errAdmitNeedsWorker
+// traceTaskNoWorker is the reason shown when no worker can take admission.
+const traceTaskNoWorker = "No worker online"
+
+func traceTaskAdmitLocal(ctx context.Context, env jobEnv, benchRoot, suiteID, taskID string) (*schemas.AdmissionRecord, error) {
+	if env.App == nil || env.App.reg == nil {
+		return nil, errors.New(traceTaskNoWorker)
 	}
 	a := env.App
 	s, err := loadSuite(ctx, benchRoot, suiteID)
@@ -121,9 +145,9 @@ var traceTaskAdmit = func(ctx context.Context, env jobEnv, benchRoot, suiteID, t
 
 // admissionOf splits a record into controls and guards; admitted stays
 // false (a person approves).
-func admissionOf(rec *schemas.AdmissionRecord) traceTaskAdmission {
+func admissionOf(checks []schemas.AdmissionCheck) traceTaskAdmission {
 	out := traceTaskAdmission{Status: "ran", Controls: []traceTaskCheck{}, Guards: []traceTaskCheck{}}
-	for _, c := range rec.Checks {
+	for _, c := range checks {
 		tc := traceTaskCheck{Name: c.Name, Want: c.Want, Got: c.Got, Detail: c.Detail}
 		if strings.HasPrefix(c.Name, "guard_") {
 			out.Guards = append(out.Guards, tc)
@@ -157,6 +181,18 @@ func validateTraceTask(_ context.Context, env jobEnv, raw json.RawMessage) (any,
 }
 
 func checkTraceTask(env jobEnv, p *traceTaskParams) error {
+	if p.Mode == traceTaskFinalize {
+		switch {
+		case !traceinbox.ValidItemID(p.InboxID):
+			return liveInvalid("item %q is not an inbox item id", p.InboxID)
+		case !scaffold.ValidID(p.Suite) || !scaffold.ValidID(p.TaskID):
+			return liveInvalid("Name the benchmark and the task.")
+		}
+		return nil
+	}
+	if p.Mode != "" {
+		return liveInvalid("mode %q: want finalize or nothing", p.Mode)
+	}
 	switch {
 	case !traceinbox.ValidItemID(p.InboxID):
 		return liveInvalid("item %q is not an inbox item id", p.InboxID)
@@ -178,13 +214,21 @@ func checkTraceTask(env jobEnv, p *traceTaskParams) error {
 	return nil
 }
 
-func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
+func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 	var p traceTaskParams
 	if err := liveDecode(j.Params, &p); err != nil {
 		return nil, err
 	}
 	if err := checkTraceTask(env, &p); err != nil {
 		return nil, err
+	}
+	if p.Mode == traceTaskFinalize {
+		return finalizeTraceTask(ctx, env, j, p, log)
+	}
+	step := func(s string) {
+		if progress != nil {
+			progress(map[string]string{"step": s})
+		}
 	}
 	store := traceinbox.NewFileStore(traceDraftInboxDir(env))
 	sess, err := store.Session(p.InboxID)
@@ -210,8 +254,23 @@ func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 		if err := os.MkdirAll(work, 0o755); err != nil {
 			return nil, err
 		}
-		res, err := tracebuild.Build(ctx, tracebuild.Input{Item: p.InboxID, Session: sess, Suite: p.Suite, WorkDir: work,
-			Model: c, Limits: tracebuild.Limits{BudgetUSD: p.BudgetUSD}, Feedback: feedback})
+		if attempt == 2 {
+			step("retry")
+		}
+		in := tracebuild.Input{Item: p.InboxID, Session: sess, Suite: p.Suite, WorkDir: work, Progress: step,
+			Model: c, Limits: tracebuild.Limits{BudgetUSD: p.BudgetUSD}, Feedback: feedback}
+		benchRoot := filepath.Join(work, "benchmarks")
+		if root := traceTaskBenchRoot(env); root != "" {
+			// the draft is a task of the target benchmark in the org's
+			// project (added to suite.yaml, not admitted), so the worker can
+			// admit it and the approve route finds it at task.path
+			benchRoot, in.BenchRoot = root, root
+			in.TaskID = traceTaskID(p.InboxID, attempt)
+			if err := os.RemoveAll(filepath.Join(root, p.Suite, "tasks", in.TaskID)); err != nil {
+				return nil, err
+			}
+		}
+		res, err := tracebuild.Build(ctx, in)
 		if err != nil {
 			if attempt == 2 && out.Result != nil {
 				out.Notes = append(out.Notes, "The retry with admission's feedback failed: "+err.Error())
@@ -220,12 +279,21 @@ func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 			return nil, err
 		}
 		out = traceTaskResult{Result: res, Attempt: attempt, Admission: traceTaskAdmission{Status: "not_run", Controls: []traceTaskCheck{}, Guards: []traceTaskCheck{}}}
-		rec, err := traceTaskAdmit(ctx, env, filepath.Join(work, "benchmarks"), p.Suite, res.TaskID)
+		step("admit")
+		verdict, expID, err := traceTaskAdmit(ctx, env, j, benchRoot, in.Suite, res.TaskID, log)
 		if err != nil {
 			out.Admission.Reason = err.Error()
+			if errors.Is(err, errNoRunner) || strings.Contains(err.Error(), "no launcher") || strings.Contains(err.Error(), "runner") {
+				out.Admission.Reason = traceTaskNoWorker
+			}
 			break
 		}
-		out.Admission = admissionOf(rec)
+		out.Admission = admissionOf(verdict.Checks)
+		out.Admission.ExpID = expID
+		if len(verdict.Checks) == 0 && verdict.Reason != "" {
+			out.Admission.Status, out.Admission.Reason = "not_run", verdict.Reason
+			break
+		}
 		feedback = failedControl(out.Admission)
 		if feedback == "" || p.Feedback != "" {
 			break // every control holds, or this job already is the retry
@@ -244,6 +312,94 @@ func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 	}
 	if log != nil {
 		log.Printf("built %s for %s: %s, shape %s, %d calls, $%.4f", res.TaskID, p.InboxID, res.Failure.Kind, res.Shape, res.ModelCalls, res.SpentUSD)
+	}
+	return out, nil
+}
+
+// traceTaskFinalize is the mode of the run after a person's approval.
+const traceTaskFinalize = "finalize"
+
+// traceTaskBenchRoot is the org project's benchmarks folder, or "" when the
+// job has no app (tests write in the job's scratch folder).
+var traceTaskBenchRoot = func(env jobEnv) string {
+	if env.App == nil || env.App.cfg == nil {
+		return ""
+	}
+	return env.App.cfg.Path(env.App.cfg.BenchmarksRoot)
+}
+
+// traceTaskID is the id of the built task of an inbox item.
+func traceTaskID(item string, attempt int) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(item) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	short := b.String()
+	if len(short) > 16 {
+		short = short[:16]
+	}
+	return fmt.Sprintf("built-%s-%d", short, attempt)
+}
+
+// traceTaskFinal is the result of a finalize run.
+type traceTaskFinal struct {
+	Task      tracebuild.TaskRef `json:"task"`
+	Admission traceTaskAdmission `json:"admission"`
+	Failing   string             `json:"failing,omitempty"`
+}
+
+// traceTaskFinalAdmit admits one approved task and writes its lock entry
+// when every check holds; tests replace it. Hosted: admitOnWorker with
+// record true. Local: the CLI's task admit, which writes suite.lock.
+var traceTaskFinalAdmit = func(ctx context.Context, env jobEnv, j *jobs.Job, suiteID, id string, log jobs.Logger) (hostedAdmitTask, string, error) {
+	if env.Hosted {
+		return admitOnWorker(ctx, env, j, suiteID, id, log, true)
+	}
+	_, err := runCLI(ctx, env, []string{"task", "admit", "-config", cliConfig, suiteID + "/" + id}, log)
+	t := hostedAdmitTask{Task: id, Admitted: err == nil}
+	if err != nil {
+		t.Reason = err.Error()
+	}
+	return t, "", nil
+}
+
+// finalizeTraceTask runs admission again for an approved draft. It refuses
+// when the approval record is absent: it never writes that record.
+func finalizeTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, p traceTaskParams, log jobs.Logger) (any, error) {
+	root := traceTaskBenchRoot(env)
+	if root == "" {
+		return nil, errors.New("this server has no benchmarks folder")
+	}
+	raw, err := os.ReadFile(filepath.Join(root, p.Suite, "tasks", p.TaskID, "task.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	var t schemas.Task
+	if err := yaml.Unmarshal(raw, &t); err != nil {
+		return nil, err
+	}
+	if t.Provenance == nil || t.Provenance.InstructionReviewed == nil || !*t.Provenance.InstructionReviewed {
+		return nil, liveInvalid("A person must approve the instruction first: open the draft and press Approve.")
+	}
+	verdict, expID, err := traceTaskFinalAdmit(ctx, env, j, p.Suite, p.TaskID, log)
+	if err != nil {
+		if errors.Is(err, errNoRunner) {
+			return nil, errors.New(traceTaskNoWorker)
+		}
+		return nil, err
+	}
+	out := traceTaskFinal{Task: tracebuild.TaskRef{Suite: p.Suite, ID: p.TaskID, Path: p.Suite + "/tasks/" + p.TaskID}, Admission: admissionOf(verdict.Checks)}
+	out.Admission.ExpID = expID
+	out.Admission.Admitted = verdict.Admitted
+	if !verdict.Admitted {
+		out.Failing = verdict.Reason
+		for _, c := range append(slices.Clone(out.Admission.Controls), out.Admission.Guards...) {
+			if c.Want != "" && c.Want != c.Got && out.Failing == "" {
+				out.Failing = fmt.Sprintf("%s: want %s, got %s", c.Name, c.Want, c.Got)
+			}
+		}
 	}
 	return out, nil
 }
