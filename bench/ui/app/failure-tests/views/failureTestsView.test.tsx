@@ -112,6 +112,19 @@ function view(search = "") {
 	);
 }
 
+it("shows one benchmark search alongside the runnable filter", () => {
+	const previous = fx.suites;
+	try {
+		fx.suites = { suites: [{ id: "hd-harbor-bfcl", description: "Function calling", admitted_count: 1 }] };
+		const html = view("?agent=codex");
+		expect(html.match(/type="search"/g)).toHaveLength(1);
+		expect(html).toContain('data-testid="ft-benchmark-search"');
+		expect(html).toContain('data-testid="ft-only-runnable"');
+	} finally {
+		fx.suites = previous;
+	}
+});
+
 describe("failure test budget", () => {
 	it("sends budget_usd when set and leaves it to the server when empty", () => {
 		expect(failureTestSpec({ ...form, model: "m", budgetText: "0.5" }).budget_usd).toBe(0.5);
