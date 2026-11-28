@@ -119,13 +119,14 @@ export function setupLine(t: (key: string, opts?: Record<string, unknown>) => st
 }
 
 /** Queue facts the server may add to a queued evaluation (M3-21); absent on the current server. */
-type QueueFacts = { queue?: { workers_online?: number; image_preparing?: boolean; ahead?: number } };
+type QueueFacts = { queue?: { worker_online?: boolean; workers_online?: number; image_preparing?: boolean; ahead?: number } };
 
 /** Why a queued evaluation waits, from the server's queue facts, or null when it does not say (M3-21). */
 export function queuedReason(evaluation: Evaluation): { key: "noWorker" | "image" | "queue"; opts?: Record<string, unknown> } | null {
 	const q = (evaluation as Evaluation & QueueFacts).queue;
 	if (!q) return null;
-	if (q.workers_online === 0) return { key: "noWorker" };
+	// The server sends worker_online (uifix_cg_queue.go); workers_online was never sent, so "no worker" was never shown (N2).
+	if (q.worker_online === false || q.workers_online === 0) return { key: "noWorker" };
 	if (q.image_preparing) return { key: "image" };
 	if (typeof q.ahead === "number" && q.ahead > 0) return { key: "queue", opts: { n: q.ahead } };
 	return null;
@@ -328,7 +329,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					<ProblemText raw={problem} benchmark={spec.benchmarks?.[0] ?? name} />
 				</p>
 			)}
-			{evaluation.status === "queued" && queuedReason(evaluation) && (
+			{(evaluation.status === "queued" || evaluation.status === "running") && queuedReason(evaluation) && (
 				<p className="text-muted-foreground text-sm" role="status" data-testid="evaluation-queued-reason">
 					{t(`status.queuedReason.${queuedReason(evaluation)!.key}` as never, queuedReason(evaluation)!.opts)}
 				</p>

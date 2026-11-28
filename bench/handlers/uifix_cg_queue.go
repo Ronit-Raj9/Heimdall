@@ -32,7 +32,7 @@ type evaluationWithQueue struct {
 }
 
 func (h *evaluationsHandler) withQueue(ctx *fasthttp.RequestCtx, ev *schemas.Evaluation) any {
-	if ev == nil || ev.Status != schemas.EvaluationQueued {
+	if ev == nil || !waitsForWorker(ev) {
 		return ev
 	}
 	q := &EvaluationQueue{}
@@ -43,12 +43,33 @@ func (h *evaluationsHandler) withQueue(ctx *fasthttp.RequestCtx, ev *schemas.Eva
 		work, cancel := workContext(ctx, readTimeout)
 		ws, err := f(work, workerTargetOf(ev))
 		cancel()
-		if err == nil && ws.Known {
-			online := ws.Online
+		// No runner row at all is "no worker connected" too (N2: an hour of
+		// silence on the live site came from an org whose worker never
+		// connected, so Known was false and nothing was said).
+		if err == nil {
+			online := ws.Known && ws.Online
 			q.WorkerOnline, q.WorkerLastSeen = &online, ws.LastSeen
 		}
 	}
 	return evaluationWithQueue{Evaluation: ev, Queue: q}
+}
+
+// waitsForWorker: queued, or running with no benchmark that has spent
+// anything yet (no run reached the model, so it may still wait for a worker
+// slot). The page shows the queue facts only in that state (N2).
+func waitsForWorker(ev *schemas.Evaluation) bool {
+	switch ev.Status {
+	case schemas.EvaluationQueued:
+		return true
+	case schemas.EvaluationRunning:
+		for _, c := range ev.Children {
+			if c.SpentUSD > 0 {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // queuedAhead counts the org's queued evaluations created before ev.
