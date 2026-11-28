@@ -65,11 +65,19 @@ export function raiseTargets(ev: Evaluation): { stopped: EvaluationChild[]; curr
 	};
 }
 
-/** A first suggestion for the new total: each stopped benchmark's cap doubled, whole dollars. */
+/**
+ * A first suggestion for the new total, from the estimate of what is left (N2): for each stopped benchmark, its runs not
+ * started times the expected cost of its next run (next_run_usd), with a quarter more for spread. Without that estimate
+ * the benchmark's own cap is added once. Rounded up to the cent, never below the current total plus one cent.
+ */
 export function suggestedRaise(ev: Evaluation): number {
 	const { stopped, current } = raiseTargets(ev);
-	const extra = stopped.reduce((s, c) => s + Math.max(c.budget_usd ?? 0, 1), 0);
-	return Math.ceil(current + extra);
+	const extra = stopped.reduce((s, c) => {
+		const next = (c as ChildWithNextRun).next_run_usd ?? 0;
+		const left = c.not_started ?? 0;
+		return s + (next > 0 && left > 0 ? next * left * 1.25 : (c.budget_usd ?? 0));
+	}, 0);
+	return Math.max(Math.ceil((current + extra) * 100) / 100, Math.round(current * 100 + 1) / 100);
 }
 
 function errorText(e: unknown): string {
@@ -106,7 +114,7 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 						<input
 							type="number"
 							min={0}
-							step="1"
+							step="0.01"
 							inputMode="decimal"
 							className="border-input bg-background h-10 w-40 rounded-md border pr-2 pl-6 text-sm"
 							value={text}

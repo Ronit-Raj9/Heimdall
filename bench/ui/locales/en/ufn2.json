@@ -1,0 +1,7 @@
+{
+	"cap": {
+		"confirm": "Change the spend cap of this running comparison from {{from}} to {{to}}?",
+		"yes": "Change the cap",
+		"keep": "Keep {{from}}"
+	}
+}

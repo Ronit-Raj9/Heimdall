@@ -62,9 +62,9 @@
 		"unknown": "{{status}}",
 		"notStarted": "Did not start",
 		"queuedReason": {
-			"noWorker": "Waiting for a worker. None is online.",
+			"noWorker": "No worker is connected: runs start when one connects.",
 			"image": "Preparing task image. First run takes a few minutes.",
-			"queue": "{{n}} runs ahead of yours."
+			"queue": "Waiting for a free worker: {{n}} runs ahead."
 		}
 	},
 	"detail": {

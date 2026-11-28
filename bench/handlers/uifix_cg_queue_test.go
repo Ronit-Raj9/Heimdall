@@ -41,9 +41,17 @@ func TestEvaluationQueue(t *testing.T) {
 	if json.Unmarshal(b, &out) != nil || out.ID != "ev_3" || out.Queue.WorkerOnline == nil || !*out.Queue.WorkerOnline || target != "shared" {
 		t.Fatalf("%s target=%q", b, target)
 	}
-	running := &schemas.Evaluation{ID: "ev_2", Status: schemas.EvaluationRunning}
+	running := &schemas.Evaluation{ID: "ev_2", Status: schemas.EvaluationRunning, Children: []schemas.EvaluationChild{{SpentUSD: 0.01}}}
 	if got := h.withQueue(&ctx, running); got != running {
-		t.Fatal("running evaluation got a queue")
+		t.Fatal("running evaluation that spent got a queue")
+	}
+	// N2: running with nothing spent and no runner row at all says "no worker".
+	h.env.Services.WorkerStatus = func(context.Context, string) (WorkerStatus, error) { return WorkerStatus{}, nil }
+	waiting := &schemas.Evaluation{ID: "ev_5", Status: schemas.EvaluationRunning, Children: []schemas.EvaluationChild{{}}}
+	b, _ = json.Marshal(h.withQueue(&ctx, waiting))
+	out.Queue = EvaluationQueue{}
+	if json.Unmarshal(b, &out) != nil || out.Queue.WorkerOnline == nil || *out.Queue.WorkerOnline {
+		t.Fatalf("no worker not said: %s", b)
 	}
 	shared := withoutNewSharedFields("evaluation", map[string]any{"id": "ev_3", "queue": map[string]any{"ahead": 1.0}}).(map[string]any)
 	if _, ok := shared["queue"]; ok {

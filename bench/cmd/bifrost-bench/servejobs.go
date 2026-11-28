@@ -810,6 +810,9 @@ func (h *jobsHub) registerExperimentRun() {
 			if err := validateExp(ctx, l, p.ExpID); err != nil {
 				return nil, "", err
 			}
+			if err := expRunCapProblem(ctx, l, p.ExpID); err != nil {
+				return nil, "", err
+			}
 			if l.a.cfg.Auth.IsHosted() && l.coord == nil { // rule 4: hosted experiments run on runners only
 				return nil, "", invalid(errors.New("hosted experiments run on runners; this server has no runner coordinator"))
 			}
@@ -1267,4 +1270,26 @@ func (h hostedJobsAPI) Logs(ctx context.Context, orgID, id string, since int64, 
 }
 func (h hostedJobsAPI) Cancel(ctx context.Context, orgID, id string) (*jobs.Job, error) {
 	return hostedHub(h.env).runner.Cancel(ctx, orgID, id)
+}
+
+// expRunCapProblem refuses an experiment run sent to POST /jobs (a Jobs
+// Retry) when the comparison has no spend cap, frozen or live: the server
+// refuses, not only the button (N2). Runs the server queues itself (launch,
+// resume) are not checked here; resume has its own check in the handler.
+func expRunCapProblem(ctx context.Context, l *launcher, expID string) error {
+	if !handlers.FromJobsAPI(ctx) {
+		return nil
+	}
+	m, err := l.a.store.LoadManifest(ctx, expID)
+	if err != nil {
+		return fmt.Errorf("%w: experiment %s: %v", jobs.ErrNotFound, expID, err)
+	}
+	capUSD := m.Experiment.Budget.TotalUSD
+	if st, _, err := l.Controls(ctx, expID); err == nil && st != nil {
+		capUSD = max(capUSD, st.TotalUSD)
+	}
+	if capUSD <= 0 {
+		return invalid(errors.New("this comparison has no spend cap. Set one in its run controls, then retry"))
+	}
+	return nil
 }

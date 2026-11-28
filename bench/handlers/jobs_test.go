@@ -287,6 +287,12 @@ func TestExperimentCancelResumeRegradeRoutes(t *testing.T) {
 	if json.Unmarshal(resp.Body(), &st) != nil || st.State != schemas.ExperimentCancelled {
 		t.Fatalf("status after cancel %s", resp.Body())
 	}
+	// N2: the server refuses a resume of a comparison with no spend cap.
+	idx.manifests[testExp].Experiment.Budget.TotalUSD = 0
+	if resp := jobsRequest(t, reg, nil, "POST", base+"/resume", ""); resp.StatusCode() != fasthttp.StatusConflict || !strings.Contains(string(resp.Body()), "no spend cap") {
+		t.Fatalf("resume without a cap: %d %s", resp.StatusCode(), resp.Body())
+	}
+	idx.manifests[testExp].Experiment.Budget.TotalUSD = 5
 	resp = jobsRequest(t, reg, nil, "POST", base+"/resume", "")
 	if resp.StatusCode() != fasthttp.StatusAccepted || json.Unmarshal(resp.Body(), &st) != nil || st.State != schemas.ExperimentRunning {
 		t.Fatalf("resume: %d %s", resp.StatusCode(), resp.Body())
