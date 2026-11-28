@@ -34,6 +34,13 @@ and one test:
               then apply "length", or "sum" (a field to add up) with
               "equals", "gte" or "lte"
 
+A check with "answer": true tests the agent's final answer instead of the
+state (no "path"): the text at /grader/answer.txt, which the bench writes
+from the agent's answer file or final message. A run without one has an
+empty answer. Use it when the failure is in what the agent said, for
+example {"name": "no_false_refund", "answer": true,
+"not_contains": "refund has been issued"}.
+
 Run it by hand against an exported state:
   GRADER_STATE=<folder holding service/export> GRADER_OUT=<folder> python3 verify.py
 """
@@ -47,6 +54,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_ROOT = os.environ.get("GRADER_STATE", "/grader/state")
 OUT_DIR = os.environ.get("GRADER_OUT", "/grader/out")
+ANSWER_PATH = os.environ.get("GRADER_ANSWER", "/grader/answer.txt")
 MISSING = object()
 
 
@@ -81,8 +89,19 @@ def same(a, b):
     return a == b
 
 
+def load_answer():
+    try:
+        with open(ANSWER_PATH, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 def run_check(state, check):
-    value = resolve(state, check["path"])
+    if check.get("answer") is True:
+        value = load_answer()
+    else:
+        value = resolve(state, check["path"])
     if "exists" in check:
         return (value is not MISSING) == bool(check["exists"])
     if value is MISSING:
