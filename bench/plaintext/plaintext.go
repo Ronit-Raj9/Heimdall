@@ -38,6 +38,9 @@ var (
 	// absPathRe is an absolute path under a usual server folder, after the
 	// start of the text, a space, a quote, a bracket, "=" or ":".
 	absPathRe = regexp.MustCompile(`(^|[\s"'(=:])(/(?:var|tmp|home|opt|srv|data|run|usr|etc|root)/[^\s"'),;]*)`)
+	// buildHostPathRe is a path in build output that can only be a server
+	// folder; /opt, /usr, /etc, /tmp and the like are paths in the image.
+	buildHostPathRe = regexp.MustCompile(`(^|[\s"'(=:])(/(?:home|srv|data|root|mnt|var/lib/docker)/[^\s"'),;]*)`)
 	// orgFolderRe finds an organization folder inside a path.
 	orgFolderRe = regexp.MustCompile(`(?:^|/)(?:projects|orgs)/[^/]+/`)
 
@@ -58,6 +61,10 @@ var (
 	notExistRe = regexp.MustCompile(`\b(?:open|stat|lstat) (\S+): no such file or directory`)
 )
 
+// buildOutputMark starts the last lines of a failed image build in an error
+// (engine.DockerAgentImages, the shared worker's agent build).
+const buildOutputMark = "last build output:"
+
 // Clean applies, in order: known roots, other absolute paths, organization
 // ids and slot names, command line words, repeated prefixes, and the
 // operating system's file error words.
@@ -66,10 +73,21 @@ func Clean(s string, roots ...string) string {
 		return s
 	}
 	s = cutRoots(s, roots)
-	s = absPathRe.ReplaceAllStringFunc(s, func(m string) string {
-		sub := absPathRe.FindStringSubmatch(m)
-		return sub[1] + shortPath(sub[2])
-	})
+	// A build's own lines (after "last build output:") name paths inside the
+	// image (COPY requirements.txt /opt/fw-agent/..., /usr/local/bin): those
+	// are kept so the error stays readable (PH4-3); only paths that can only
+	// be the server's own folders are cut there.
+	head, build, isBuild := strings.Cut(s, buildOutputMark)
+	short := func(re *regexp.Regexp) func(string) string {
+		return func(m string) string {
+			sub := re.FindStringSubmatch(m)
+			return sub[1] + shortPath(sub[2])
+		}
+	}
+	s = absPathRe.ReplaceAllStringFunc(head, short(absPathRe))
+	if isBuild {
+		s += buildOutputMark + buildHostPathRe.ReplaceAllStringFunc(build, short(buildHostPathRe))
+	}
 	s = slotRe.ReplaceAllString(s, "provider slot $1 $2")
 	s = orgIDRe.ReplaceAllString(s, "your organization")
 	s = flagHintRe.ReplaceAllStringFunc(s, func(m string) string {

@@ -109,3 +109,21 @@ func TestHostedOnlyWhenRootsSet(t *testing.T) {
 		t.Fatalf("CleanErr differs from Clean")
 	}
 }
+
+// PH4-3: a build error keeps the Dockerfile's own paths readable; a server
+// folder in the same text is still cut.
+func TestCleanKeepsBuildOutputPaths(t *testing.T) {
+	in := "build agent image x: docker build /srv/heimdall/projects/p1/agents: exit status 1; last build output:\n" +
+		"#7 [3/6] COPY requirements.txt /opt/fw-agent/requirements.txt\n" +
+		"#8 RUN python3 -m venv /opt/fw-agent/venv && /opt/fw-agent/venv/bin/pip install -r /opt/fw-agent/requirements.txt\n" +
+		"ERROR: context /home/worker/cache/abc failed"
+	got := Clean(in)
+	for _, want := range []string{"COPY requirements.txt /opt/fw-agent/requirements.txt", "/opt/fw-agent/venv/bin/pip install"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("lost %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "/home/worker") || strings.Contains(got, "/srv/heimdall") {
+		t.Errorf("server path left:\n%s", got)
+	}
+}
