@@ -1,0 +1,28 @@
+{
+	"sessions": {
+		"title": "Scored sessions",
+		"version": "Version",
+		"flag": "Flag",
+		"all": "All",
+		"flaggedOnly": "Flagged only",
+		"empty": "No scored session matches.",
+		"loadError": "Could not load the scored sessions",
+		"shown": "{{shown}} of {{total}}",
+		"columns": {
+			"session": "Session",
+			"version": "Version",
+			"ended": "Ended",
+			"model": "Model",
+			"flags": "Flags",
+			"requests": "Requests"
+		}
+	},
+	"release": {
+		"open": "Open",
+		"loadError": "Could not load this release",
+		"notFound": "No release with this id."
+	},
+	"finding": {
+		"loadError": "Could not load this finding"
+	}
+}

@@ -19,6 +19,7 @@ import {
 } from "./live.utils";
 import type { LiveComparison, LiveSessionRecord, LiveSignalDef, LiveStatus, LiveVersionView } from "./livescore.types";
 import "./fw15I18n";
+import { SessionsSection } from "./sessionsSection";
 import "@/components/improvements/gw16I18n";
 
 /** The job kind that compares two live versions; with simulate it runs on made-up sessions. */
@@ -94,6 +95,7 @@ export function LiveBody({ status, actions, hosted }: LiveBodyProps) {
 			)}
 			<SeriesSection versions={status.versions} signals={status.signals} />
 			<WorstSection worst={status.worst} />
+			<SessionsSection versions={status.versions} />
 		</div>
 	);
 }

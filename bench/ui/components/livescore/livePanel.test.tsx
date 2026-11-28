@@ -14,6 +14,9 @@ vi.mock("@/components/jobs/jobRunButton", () => ({
 	),
 }));
 
+// The sessions list reads the store; sessionsSection.test.tsx covers it.
+vi.mock("./sessionsSection", () => ({ SessionsSection: () => <div data-testid="live-sessions" /> }));
+
 const signalRows = (html: string) => [...html.matchAll(/data-testid="live-signal-([^"]+)"/g)].map((m) => m[1]);
 
 describe("LiveBody", () => {
