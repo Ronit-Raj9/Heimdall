@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { decisionTone, TONE_TEXT } from "@/components/verdict/verdict.utils";
+import { plainJobError } from "@/components/findings/jobModel";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import { useListExperimentsQuery } from "@/lib/store";
@@ -122,6 +124,14 @@ function StaleList({ stale, names }: { stale: ValidityStale[]; names: Map<string
 	);
 }
 
+/**
+ * K4: a failed scan as LoadError reads it: an object with the server's sentence as a string
+ * `error`, without the job prefixes. A plain Error was read as "Unexpected error".
+ */
+export function scanFailure(message: string): { error: string } {
+	return { error: plainJobError(message) };
+}
+
 /** W4-49: "Changed results", the validity ledger of the org. */
 export default function ValidityView() {
 	const { t } = useTranslation("w449");
@@ -144,7 +154,7 @@ export default function ValidityView() {
 	const { refetch } = validity;
 	useEffect(() => {
 		if (!ended) return;
-		if (status !== "succeeded") setScanError(new Error(job.data?.error || t("page.scanFailed")));
+		if (status !== "succeeded") setScanError(scanFailure(job.data?.error || t("page.scanFailed")));
 		else notify({ text: t("page.scanDone") });
 		setJobId(null);
 		void refetch();
@@ -156,7 +166,7 @@ export default function ValidityView() {
 		try {
 			setJobId((await createJob({ kind: "validity.scan" }).unwrap()).id);
 		} catch (error) {
-			setScanError(error);
+			setScanError(scanFailure(getBenchErrorMessage(error)));
 		}
 	};
 	const last = lastScanAt(data?.stale ?? []);

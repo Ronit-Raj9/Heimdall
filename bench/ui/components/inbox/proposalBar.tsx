@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { guideFormErrors, guideFrom, isToolKind, type GuideCallRow, type GuideFormValues } from "./inboxGuide.utils";
 import "./w445I18n";
 import "@/app/inbox/views/uf7aI18n";
+import "./ufk4I18n";
 
 /**
  * Enter in a field of the paid draft panel does nothing: the panel sits inside the accept form, and Enter
@@ -136,6 +137,7 @@ export interface ProposalBarProps {
 export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: ProposalBarProps) {
 	const { t } = useTranslation("w445");
 	const { t: f } = useTranslation("uf7a");
+	const { t: k4 } = useTranslation("ufk4");
 	const [confirming, setConfirming] = useState(false);
 	const barRef = useRef<HTMLDivElement>(null);
 	const [budget, setBudget] = useState(String(DEFAULT_DRAFT_BUDGET));
@@ -187,6 +189,11 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 		setError(null);
 		try {
 			const job = await createJob(traceDraftJob(itemId, suite, kind, chosen, Number(budget))).unwrap();
+			// K4: no job id is a start that did not happen; say so instead of showing nothing.
+			if (!job?.id) {
+				setError(k4("draft.noJob"));
+				return;
+			}
 			setConfirming(false);
 			setDraftJob(job.id);
 		} catch (e) {
@@ -268,6 +275,11 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 					onCancel={() => setConfirming(false)}
 				/>
 			)}
+			{confirming && error && (
+				<p className="text-danger-ink text-xs" role="alert" data-testid="proposal-start-error">
+					{error}
+				</p>
+			)}
 			{draftJob && (
 				<p className="text-muted-foreground text-xs" role="status" data-testid="proposal-drafting">
 					{t("proposal.drafting")}
@@ -319,7 +331,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 					{done}
 				</p>
 			)}
-			{error && (
+			{error && !confirming && (
 				<p className="text-danger-ink text-xs" role="alert" data-testid="proposal-error">
 					{error}
 				</p>
