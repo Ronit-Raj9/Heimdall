@@ -67,5 +67,6 @@
 	"finalFailed": "The check failed: {{error}}",
 	"quoteSeq": "Call {{seq}}",
 	"quoteAnswer": "Turns",
-	"quoteOpen": "Show in the session"
+	"quoteOpen": "Show in the session",
+	"notRun": "Admission did not run: {{reason}}"
 }

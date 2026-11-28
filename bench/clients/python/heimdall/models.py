@@ -14338,10 +14338,15 @@ class TraceSetup(_TraceSetupRequired, total=False):
     install: str
 
 
-class TraceTaskAdmission(TypedDict):
+class _TraceTaskAdmissionRequired(TypedDict):
     admitted: bool
     controls: List[TraceTaskCheck]
     guards: List[TraceTaskCheck]
+
+
+class TraceTaskAdmission(_TraceTaskAdmissionRequired, total=False):
+    reason: str
+    status: str
 
 
 class TraceTaskApproveRequest(TypedDict):
@@ -14361,6 +14366,7 @@ class _TraceTaskBuildRequestRequired(TypedDict):
 
 
 class TraceTaskBuildRequest(_TraceTaskBuildRequestRequired, total=False):
+    provider: str
     retry: bool
 
 
@@ -14412,9 +14418,13 @@ class TraceTaskFinalize(_TraceTaskFinalizeRequired, total=False):
     step: str
 
 
-class TraceTaskMutant(TypedDict):
+class _TraceTaskMutantRequired(TypedDict):
     name: str
     what_it_does_wrong: str
+
+
+class TraceTaskMutant(_TraceTaskMutantRequired, total=False):
+    control: str
 
 
 class TraceTaskRef(TypedDict):

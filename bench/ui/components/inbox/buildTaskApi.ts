@@ -32,14 +32,15 @@ export interface BuildTaskResult {
 	shape: string;
 	shape_reason: string;
 	files: BuildTaskFile[];
-	mutants: { name: string; what_it_does_wrong: string }[];
+	/** control: the admission control that carries the variant (variant_<name>), empty when none. */
+	mutants: { name: string; what_it_does_wrong: string; control?: string }[];
 	standin: { why: string; files: BuildTaskFile[] } | null;
 	spent_usd: number;
 	model_calls: number;
 	notes?: string[];
 	unsure?: boolean;
 	task?: { suite: string; id: string; path: string };
-	admission?: { admitted: boolean; controls: BuildTaskCheck[]; guards: BuildTaskCheck[] };
+	admission?: { status?: string; reason?: string; admitted: boolean; controls: BuildTaskCheck[]; guards: BuildTaskCheck[] };
 }
 export interface BuildTaskDecision {
 	job_id: string;
@@ -64,14 +65,15 @@ export interface BuildTaskState {
 }
 export interface BuildTaskBody {
 	suite: string;
+	provider?: string;
 	model: string;
 	budget_usd: number;
 	retry?: boolean;
 }
 
 /** The body POST /inbox/{id}/build-task takes from the form. */
-export function buildTaskBody(suite: string, model: string, cap: number): BuildTaskBody {
-	return { suite, model, budget_usd: cap };
+export function buildTaskBody(suite: string, model: string, cap: number, provider = ""): BuildTaskBody {
+	return provider ? { suite, provider, model, budget_usd: cap } : { suite, model, budget_usd: cap };
 }
 
 const path = (item: string) => `/inbox/${encodeURIComponent(item)}/build-task`;

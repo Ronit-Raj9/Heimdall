@@ -29,6 +29,7 @@ export function BuildTaskBulk({ items, suites }: { items: readonly InboxItem[]; 
 	const fallback = useMemo(() => defaultJobModel(models.data), [models.data]);
 	const [picked, setPicked] = useState<PickedModel | null>(null);
 	const model = (picked ?? fallback)?.model ?? "";
+	const provider = (picked ?? fallback)?.provider ?? "";
 	const [suite, setSuite] = useState(suites[0]?.id ?? "");
 	const [cap, setCap] = useState(String(BUILD_TASK_DEFAULT_CAP));
 	const [chosen, setChosen] = useState<string[]>([]);
@@ -46,7 +47,7 @@ export function BuildTaskBulk({ items, suites }: { items: readonly InboxItem[]; 
 		let ok = 0;
 		for (const id of chosen) {
 			try {
-				await start({ item: id, body: buildTaskBody(suite, model, capN) }).unwrap();
+				await start({ item: id, body: buildTaskBody(suite, model, capN, provider) }).unwrap();
 				ok++;
 			} catch (e) {
 				errors.push(t("bulkFailed", { id, error: plainJobError(getBenchErrorMessage(e)) }));
@@ -85,7 +86,7 @@ export function BuildTaskBulk({ items, suites }: { items: readonly InboxItem[]; 
 				<GroupedModelPicker value={picked ?? fallback} onChange={setPicked} label={t("model")} testId="build-task-bulk-model" />
 				<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-cap`}>
 					{t("cap")}
-					<Input id={`${ids}-cap`} className="h-8 w-24" type="number" min="0.01" max="10" step="0.01" value={cap} onChange={(e) => setCap(e.target.value)} />
+					<Input id={`${ids}-cap`} className="h-8 w-24" type="number" min="0.01" max="5" step="0.01" value={cap} onChange={(e) => setCap(e.target.value)} />
 				</label>
 				<PaidButton
 					size="sm"

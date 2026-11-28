@@ -130,7 +130,7 @@ function BuildTaskForm({ itemId, suites, onCancel, onStarted }: { itemId: string
 						className="h-8 w-24"
 						type="number"
 						min="0.01"
-						max="10"
+						max="5"
 						step="0.01"
 						value={cap}
 						onChange={(e) => setCap(e.target.value)}
@@ -148,7 +148,7 @@ function BuildTaskForm({ itemId, suites, onCancel, onStarted }: { itemId: string
 					onConfirm={async () => {
 						setError("");
 						try {
-							await start({ item: itemId, body: buildTaskBody(suite, model, capN) }).unwrap();
+							await start({ item: itemId, body: buildTaskBody(suite, model, capN, chosen?.provider ?? "") }).unwrap();
 							onStarted();
 						} catch (e) {
 							setError(plainJobError(getBenchErrorMessage(e)));
@@ -167,6 +167,12 @@ function BuildTaskForm({ itemId, suites, onCancel, onStarted }: { itemId: string
 			)}
 		</div>
 	);
+}
+
+/** Admission's result for the control that carries a variant, or "". */
+function variantGot(r: { admission?: { controls: { name: string; got: string }[] } }, control?: string): string {
+	if (!control) return "";
+	return r.admission?.controls.find((c) => c.name === control)?.got ?? "";
 }
 
 const isInstruction = (f: BuildTaskFile) => /(^|\/)instruction\.md$/.test(f.path);
@@ -253,13 +259,23 @@ export function BuildTaskView({ state, onQuote }: { state: BuildTaskState; onQuo
 						{r.mutants.map((m) => (
 							<li key={m.name}>
 								<span className="font-mono text-xs">{m.name}</span>: {m.what_it_does_wrong}
+								{variantGot(r, m.control) && (
+									<span className="text-muted-foreground ml-1 text-xs" data-testid={`build-task-variant-${m.name}`}>
+										({t("got")} {variantGot(r, m.control)})
+									</span>
+								)}
 							</li>
 						))}
 					</ul>
 				</div>
 			)}
 			{r.standin && <p className="text-sm">{t("standin", { why: r.standin.why })}</p>}
-			{r.admission && (
+			{r.admission?.status === "not_run" && (
+				<p className="text-muted-foreground text-sm" data-testid="build-task-not-run">
+					{t("notRun", { reason: r.admission.reason ?? "" })}
+				</p>
+			)}
+			{r.admission && r.admission.status !== "not_run" && (
 				<div className="flex flex-col gap-1">
 					<h4 className="text-sm font-medium">{t("admission")}</h4>
 					<table className="w-full max-w-lg text-sm" data-testid="build-task-admission">

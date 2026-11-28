@@ -92,7 +92,7 @@ func TestTraceTaskWebFlow(t *testing.T) {
 	if st := readState(t, c); st.JobID != "" {
 		t.Fatalf("no job yet: %+v", st)
 	}
-	resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"support-evals","model":"gpt-6-luna","budget_usd":0.5}`), nil)
+	resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"support","model":"gpt-6-luna","budget_usd":0.5}`), nil)
 	if resp.StatusCode() != 202 {
 		t.Fatalf("start: %d %s", resp.StatusCode(), resp.Body())
 	}
@@ -111,12 +111,12 @@ func TestTraceTaskWebFlow(t *testing.T) {
 	if err := json.Unmarshal(fixture, &res); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Write(context.Background(), projectfs.AreaBenchmarks, "support-evals/tasks/refund-timeout/task.yaml", []byte(res.Files[0].Content), projectfs.WriteOpts{}); err != nil {
+	if _, err := store.Write(context.Background(), projectfs.AreaBenchmarks, "support/tasks/from-inbox-1-built/task.yaml", taskYAML(res), projectfs.WriteOpts{}); err != nil {
 		t.Fatal(err)
 	}
 	fj.finish(0, fixture)
 	st := readState(t, c)
-	if !st.CanApprove || st.Result == nil || st.Result.Failure.Kind != "false_claim" || len(st.Result.Admission.Controls) != 6 {
+	if !st.CanApprove || st.Result == nil || st.Result.Failure.Kind != "false_claim" || len(st.Result.Admission.Controls) != 7 || st.Result.Mutants[0].Control != "variant_claims_success" {
 		t.Fatalf("done: %+v", st)
 	}
 	resp = c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task/approve", []byte(`{"job_id":"`+st.JobID+`"}`), nil)
@@ -124,7 +124,7 @@ func TestTraceTaskWebFlow(t *testing.T) {
 	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &ap) != nil || ap.FinalizeJobID != "job_b" || ap.Decision.By != "ada@example.com" {
 		t.Fatalf("approve: %d %s", resp.StatusCode(), resp.Body())
 	}
-	raw, _, err := store.Read(context.Background(), projectfs.AreaBenchmarks, "support-evals/tasks/refund-timeout/task.yaml")
+	raw, _, err := store.Read(context.Background(), projectfs.AreaBenchmarks, "support/tasks/from-inbox-1-built/task.yaml")
 	if err != nil || !strings.Contains(string(raw), "instruction_reviewed: true") {
 		t.Fatalf("task.yaml %s %v", raw, err)
 	}
@@ -133,14 +133,14 @@ func TestTraceTaskWebFlow(t *testing.T) {
 		t.Fatalf("decision %s %v", dec, err)
 	}
 	var fp TraceTaskParams
-	if err := json.Unmarshal(fj.list[1].Params, &fp); err != nil || fp.Mode != "finalize" || fp.InboxID != "inc-1" || fp.Suite != "support-evals" || fp.TaskID != "refund-timeout" || fp.Model != "" || fp.BudgetUSD != 0 {
+	if err := json.Unmarshal(fj.list[1].Params, &fp); err != nil || fp.Mode != "finalize" || fp.InboxID != "inc-1" || fp.Suite != "support" || fp.TaskID != "from-inbox-1-built" || fp.Model != "" || fp.BudgetUSD != 0 {
 		t.Fatalf("finalize params %s", fj.list[1].Params)
 	}
 	if st := readState(t, c); st.CanApprove || st.Decision == nil || st.Finalize == nil || st.Finalize.Status != "queued" || st.JobID != "job_a" {
 		t.Fatalf("after approve: %+v", st)
 	}
 	// A finalize that admitted the task: ready.
-	fj.finish(1, []byte(`{"admitted":true,"admission":{"admitted":true,"controls":[{"name":"reference","want":"pass","got":"pass"}],"guards":[{"name":"guard_instruction_clear","got":"pass"}]}}`))
+	fj.finish(1, []byte(`{"task":{"suite":"support","id":"from-inbox-1-built","path":"support/tasks/from-inbox-1-built"},"admission":{"status":"ran","admitted":true,"controls":[{"name":"reference","want":"pass","got":"pass"}],"guards":[{"name":"guard_instruction_clear","got":"pass"}]}}`))
 	if st := readState(t, c); st.Finalize == nil || !st.Finalize.Admitted || st.CanRetry {
 		t.Fatalf("admitted: %+v", st.Finalize)
 	}
@@ -149,20 +149,20 @@ func TestTraceTaskWebFlow(t *testing.T) {
 // A finalize that failed leaves the task a draft with the failing control and Try again.
 func TestTraceTaskFinalizeRefused(t *testing.T) {
 	c, fj, store := traceTaskServer(t, auth.RoleMember)
-	c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"support-evals","model":"m","budget_usd":0.5}`), nil)
+	c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"support","model":"m","budget_usd":0.5}`), nil)
 	fixture, _ := os.ReadFile("testdata/tracetask_result_t3.json")
 	var res TraceTaskResult
 	_ = json.Unmarshal(fixture, &res)
-	if _, err := store.Write(context.Background(), projectfs.AreaBenchmarks, "support-evals/tasks/refund-timeout/task.yaml", []byte(res.Files[0].Content), projectfs.WriteOpts{}); err != nil {
+	if _, err := store.Write(context.Background(), projectfs.AreaBenchmarks, "support/tasks/from-inbox-1-built/task.yaml", taskYAML(res), projectfs.WriteOpts{}); err != nil {
 		t.Fatal(err)
 	}
 	fj.finish(0, fixture)
 	if resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task/approve", []byte(`{"job_id":"job_a"}`), nil); resp.StatusCode() != 200 {
 		t.Fatalf("approve: %d %s", resp.StatusCode(), resp.Body())
 	}
-	fj.finish(1, []byte(`{"admitted":false,"admission":{"admitted":false,"controls":[{"name":"wrong_order_id","want":"fail","got":"pass"}],"guards":[]}}`))
+	fj.finish(1, []byte(`{"task":{"suite":"support","id":"from-inbox-1-built"},"admission":{"status":"ran","admitted":false,"controls":[{"name":"variant_no_call","want":"fail","got":"pass"}],"guards":[]},"failing":"variant_no_call: want fail got pass"}`))
 	st := readState(t, c)
-	if st.Finalize == nil || st.Finalize.Admitted || len(st.Failing) != 1 || !strings.Contains(st.Failing[0], "wrong_order_id") || !st.CanRetry || st.CanApprove {
+	if st.Finalize == nil || st.Finalize.Admitted || len(st.Failing) != 2 || !strings.Contains(st.Failing[0], "variant_no_call") || !st.CanRetry || st.CanApprove {
 		t.Fatalf("refused finalize: %+v %+v", st, st.Finalize)
 	}
 	if resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"","model":"","budget_usd":0,"retry":true}`), nil); resp.StatusCode() != 202 {
@@ -180,11 +180,11 @@ func TestTraceTaskRefusedRetryOnce(t *testing.T) {
 	if err := json.Unmarshal(fixture, &res); err != nil {
 		t.Fatal(err)
 	}
-	res.Admission.Controls[5].Got = "pass" // wrong_order_id passes: admission refuses
+	res.Admission.Controls[6].Got = "pass" // variant_no_call passes: admission refuses
 	refused, _ := json.Marshal(res)
 	fj.finish(0, refused)
 	st := readState(t, c)
-	if st.CanApprove || !st.CanRetry || len(st.Failing) != 1 || !strings.Contains(st.Failing[0], "wrong_order_id") {
+	if st.CanApprove || !st.CanRetry || len(st.Failing) != 1 || !strings.Contains(st.Failing[0], "variant_no_call") {
 		t.Fatalf("refused: %+v", st)
 	}
 	if resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task/approve", []byte(`{"job_id":"`+st.JobID+`"}`), nil); resp.StatusCode() != 409 {
@@ -195,7 +195,7 @@ func TestTraceTaskRefusedRetryOnce(t *testing.T) {
 	}
 	var p TraceTaskParams
 	_ = json.Unmarshal(fj.list[1].Params, &p)
-	if p.RetryOf != "job_a" || p.BudgetUSD < 0.379 || p.BudgetUSD > 0.381 || !strings.Contains(p.Feedback, "wrong_order_id") {
+	if p.RetryOf != "job_a" || p.BudgetUSD < 0.479 || p.BudgetUSD > 0.481 || !strings.Contains(p.Feedback, "variant_no_call") {
 		t.Fatalf("retry params %+v", p)
 	}
 	fj.finish(1, refused)
@@ -232,4 +232,13 @@ func TestTraceTaskRefusesWithoutModelOrCap(t *testing.T) {
 	if len(fj.list) != 0 {
 		t.Fatal("a job started")
 	}
+}
+
+func taskYAML(res TraceTaskResult) []byte {
+	for _, f := range res.Files {
+		if f.Path == "task.yaml" {
+			return []byte(f.Content)
+		}
+	}
+	return nil
 }

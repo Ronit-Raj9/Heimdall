@@ -44,7 +44,7 @@ const (
 const TraceTaskDefaultCapUSD = 0.50
 
 // TraceTaskMaxCapUSD refuses a cap above this per failure.
-const TraceTaskMaxCapUSD = 10.0
+const TraceTaskMaxCapUSD = 5.0 // the job clamps to the same (cmd/bifrost-bench traceTaskMaxUSD)
 
 // traceTaskGuardReviewed is the guard that waits for the person's approval.
 const traceTaskGuardReviewed = "guard_instruction_clear"
@@ -54,6 +54,7 @@ const traceTaskGuardReviewed = "guard_instruction_clear"
 // feedback; it spends what is left of the latest job's cap.
 type TraceTaskBuildRequest struct {
 	Suite     string  `json:"suite"`
+	Provider  string  `json:"provider,omitempty"`
 	Model     string  `json:"model"`
 	BudgetUSD float64 `json:"budget_usd"`
 	Retry     bool    `json:"retry,omitempty"`
@@ -64,8 +65,10 @@ type TraceTaskBuildRequest struct {
 type TraceTaskParams struct {
 	InboxID   string  `json:"inbox_id"`
 	Suite     string  `json:"suite"`
+	Provider  string  `json:"provider,omitempty"`
 	Model     string  `json:"model"`
 	BudgetUSD float64 `json:"budget_usd"`
+	Yes       bool    `json:"yes,omitempty"` // the person confirmed the cost
 	RetryOf   string  `json:"retry_of,omitempty"`
 	// Mode "finalize" (lane T1): rerun admission of the approved draft and
 	// admit it through the path that writes the lock; no model, no cap.
@@ -97,6 +100,7 @@ type TraceTaskFile struct {
 type TraceTaskMutant struct {
 	Name            string `json:"name"`
 	WhatItDoesWrong string `json:"what_it_does_wrong"`
+	Control         string `json:"control,omitempty"` // the admission control that carries it, e.g. variant_<name>
 }
 
 // TraceTaskStandin is the stand-in service, when replay was not enough.
@@ -115,6 +119,8 @@ type TraceTaskCheck struct {
 
 // TraceTaskAdmission is admission's verdict on the draft.
 type TraceTaskAdmission struct {
+	Status   string           `json:"status,omitempty"` // ran, or not_run with Reason
+	Reason   string           `json:"reason,omitempty"`
 	Admitted bool             `json:"admitted"`
 	Controls []TraceTaskCheck `json:"controls"`
 	Guards   []TraceTaskCheck `json:"guards"`
@@ -165,8 +171,8 @@ type TraceTaskFinalize struct {
 
 // traceTaskFinalizeResult is what this lane reads of a finalize job's result.
 type traceTaskFinalizeResult struct {
-	Admitted  bool                `json:"admitted"`
 	Admission *TraceTaskAdmission `json:"admission,omitempty"`
+	Failing   string              `json:"failing,omitempty"`
 }
 
 // TraceTaskState answers GET /inbox/{id}/build-task.
@@ -303,9 +309,12 @@ func finalizeView(build, fin *jobs.Job, dec *TraceTaskDecision) *TraceTaskFinali
 			f.Error = "The check's result cannot be read: " + err.Error()
 			return f
 		}
-		f.Admitted = r.Admitted
 		if r.Admission != nil {
+			f.Admitted = r.Admission.Admitted
 			f.Failing = traceTaskFailing(&TraceTaskResult{Admission: r.Admission}, true)
+		}
+		if r.Failing != "" && !f.Admitted {
+			f.Failing = append([]string{r.Failing}, f.Failing...)
 		}
 		if !f.Admitted && len(f.Failing) == 0 {
 			f.Failing = []string{"admission did not admit the task"}
@@ -345,7 +354,7 @@ func (h *traceTaskHandler) start(ctx *fasthttp.RequestCtx) {
 	req.Suite, req.Model = strings.TrimSpace(req.Suite), strings.TrimSpace(req.Model)
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	params := TraceTaskParams{InboxID: item, Suite: req.Suite, Model: req.Model, BudgetUSD: req.BudgetUSD}
+	params := TraceTaskParams{InboxID: item, Suite: req.Suite, Provider: strings.TrimSpace(req.Provider), Model: req.Model, BudgetUSD: req.BudgetUSD, Yes: true}
 	if req.Retry {
 		prev, st, err := h.load(work, org, item, true)
 		if err != nil {
@@ -363,7 +372,7 @@ func (h *traceTaskHandler) start(ctx *fasthttp.RequestCtx) {
 			lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "The cap is spent. Start a new build with a new cap.")
 			return
 		}
-		params = TraceTaskParams{InboxID: item, Suite: pp.Suite, Model: pp.Model, BudgetUSD: left, RetryOf: prev.ID,
+		params = TraceTaskParams{InboxID: item, Suite: pp.Suite, Provider: pp.Provider, Model: pp.Model, BudgetUSD: left, Yes: true, RetryOf: prev.ID,
 			Feedback: "Admission refused the last draft: " + strings.Join(st.Failing, "; ")}
 	}
 	switch {
@@ -472,6 +481,8 @@ func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, fin *jobs.
 		st.Blocked = "A person already decided on this draft."
 	case res.Admission == nil:
 		st.Blocked = "Admission has not run on this draft."
+	case res.Admission.Status == "not_run":
+		st.Blocked = "Admission did not run: " + res.Admission.Reason
 	case len(st.Failing) > 0:
 		st.Blocked = "Admission refused this draft."
 		st.CanRetry = !retried && member && res.SpentUSD < pp.BudgetUSD
@@ -500,7 +511,11 @@ func traceTaskFailing(res *TraceTaskResult, withReviewed bool) []string {
 		}
 	}
 	for _, g := range res.Admission.Guards {
-		if (withReviewed || g.Name != traceTaskGuardReviewed) && g.Got != "pass" {
+		want := g.Want
+		if want == "" {
+			want = "pass"
+		}
+		if (withReviewed || g.Name != traceTaskGuardReviewed) && g.Got != want {
 			out = append(out, g.Name+" "+g.Got)
 		}
 	}
@@ -587,7 +602,7 @@ func (h *traceTaskHandler) approve(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "The draft's task.yaml is gone: "+err.Error())
 		return
 	}
-	out, changed, err := scaffold.SetInstructionReviewed(raw)
+	out, changed, err := setReviewed(raw)
 	if err != nil {
 		lib.SendError(ctx, mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
 		return
@@ -681,4 +696,29 @@ func (h *traceTaskHandler) reject(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	lib.SendJSON(ctx, mode, fasthttp.StatusOK, d)
+}
+
+// setReviewed is scaffold.SetInstructionReviewed with the provenance block's
+// own indentation: tracetask drafts indent by four spaces, and the two-space
+// line scaffold adds would not parse there.
+func setReviewed(taskYAML []byte) ([]byte, bool, error) {
+	if bytes.Contains(taskYAML, []byte("instruction_reviewed:")) {
+		return scaffold.SetInstructionReviewed(taskYAML)
+	}
+	head := []byte("\nprovenance:\n")
+	idx := bytes.Index(taskYAML, head)
+	if idx < 0 {
+		return scaffold.SetInstructionReviewed(taskYAML)
+	}
+	at := idx + len(head)
+	rest := taskYAML[at:]
+	indent := len(rest) - len(bytes.TrimLeft(rest, " "))
+	if indent == 0 {
+		indent = 2
+	}
+	out := make([]byte, 0, len(taskYAML)+40)
+	out = append(out, taskYAML[:at]...)
+	out = append(out, strings.Repeat(" ", indent)+"instruction_reviewed: true\n"...)
+	out = append(out, rest...)
+	return out, true, nil
 }
