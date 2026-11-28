@@ -245,10 +245,14 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 	};
 }
 
-/** The bare-model baseline always runs on arm A's model: that is the comparison it stands for. */
+/**
+ * The bare-model baseline always runs on arm A's model: that is the comparison it stands for. When arm A is the
+ * bare model itself ("Two models", "Find the best model" on the model only agent) every arm is its own model, so
+ * nothing follows A (PQ2-9).
+ */
 export function withBareModel(arms: EvaluationArm[]): EvaluationArm[] {
 	const a = arms[0];
-	if (!a) return arms;
+	if (!a || a.agent === BARE_MODEL_AGENT) return arms;
 	return arms.map((x, i) => {
 		if (i === 0 || x.agent !== BARE_MODEL_AGENT) return x;
 		const { provider: _p, ...rest } = x;

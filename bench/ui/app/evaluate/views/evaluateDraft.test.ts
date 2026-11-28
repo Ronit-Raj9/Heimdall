@@ -40,6 +40,14 @@ describe("draftToSpec", () => {
 		];
 		expect(withBareModel(plain)).toEqual(plain);
 	});
+
+	it("keeps model B its own when both arms are the model only agent (PQ2-9)", () => {
+		const two = [
+			{ label: "A", agent: BARE_MODEL_AGENT, model: "gpt-5", provider: "openai" },
+			{ label: "B", agent: BARE_MODEL_AGENT, model: "claude-x", provider: "anthropic" },
+		];
+		expect(withBareModel(two)).toEqual(two);
+	});
 });
 
 describe("draft round trip (F26)", () => {

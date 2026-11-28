@@ -70,8 +70,12 @@ func TestAgentVersionsOnEverySave(t *testing.T) {
 	if n := len(versionsOf(t, r, "my-codex").Versions); n != 1 {
 		t.Fatalf("comment-only edit made a version: %d", n)
 	}
+	// A model change alone is no version (agentversions.Record). This passed
+	// before only because the form save dropped the template's empty
+	// OPENAI_API_KEY; a budget change is a real agent change.
 	f := doc.Fields
 	f.Model = "gpt-5-mini"
+	f.WallS = 1234
 	if code, body := abCall(r, "PUT", APIPrefix+"/agents/my-codex/config", AgentConfigPut{Fields: &f}); code != 200 {
 		t.Fatalf("put fields: %d %s", code, body)
 	}

@@ -657,6 +657,27 @@ describe("Step4Setup fix wave F26", () => {
 describe("Step4Setup fix wave 2 (G10)", () => {
 	const estimateSection = (html: string) => html.slice(html.indexOf('data-testid="step4-estimate"'));
 
+	it("Two models on the model only agent sends B's own model and refuses the same model twice (PQ2-9)", () => {
+		const d = { ...EMPTY_DRAFT, agent: "bare-model", mode: "models" as const, benchmarks: ["b"] };
+		const two = draftToSpec({
+			...d,
+			arms: [
+				{ label: "A", agent: "bare-model", model: "gpt-5", provider: "openai" },
+				{ label: "B", agent: "bare-model", model: "claude-x", provider: "anthropic" },
+			],
+		});
+		expect(two.arms[1].model).toBe("claude-x");
+		expect(specProblem(two)).toBe("");
+		const same = draftToSpec({
+			...d,
+			arms: [
+				{ label: "A", agent: "bare-model", model: "gpt-5", provider: "openai" },
+				{ label: "B", agent: "bare-model", model: "gpt-5", provider: "openai" },
+			],
+		});
+		expect(specProblem(same)).toBe("Pick a different model for B. Both sides use the same model.");
+	});
+
 	it("names the real reason the spec is not ready", () => {
 		expect(specProblem(spec({ benchmarks: [] }))).toBe("Pick at least one benchmark.");
 		expect(specProblem(spec({ pack: "memory", benchmarks: [] }))).toBe("");
