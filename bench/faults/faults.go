@@ -10,13 +10,15 @@
 //   - "broken-tool" is an error injected on tool calls. The suite's own
 //     broken_tool probe when it has one (tool proxy, tool shim or adapter
 //     hook), else the generic tool proxy probe schemas.GenericProbeBrokenTool
-//     when the benchmark routes tool calls through the tool proxy, else
-//     skipped.
+//     when the benchmark routes tool calls through the tool proxy, else the
+//     generic pytest crash shim on a repository coding benchmark
+//     (RepoCoding), else skipped.
 //   - "misleading-instruction" is the suite's misleading_instruction probe
-//     (stale notes and the like) when it has one, else skipped. An attack
+//     (stale notes and the like) when it has one, else the generic misleading
+//     notes probe on a repository coding benchmark (RepoCoding), else
+//     skipped. An attack
 //     probe (axis safety, or a hostile tool result) is never taken for it:
 //     a prompt injection is an attack, scored under safety, not a fault.
-//     (stale notes and the like) when it has one, else skipped.
 //   - the resilience faults of Catalog (lane X22): model brownout, slow and
 //     flaky windows from generic gateway probes; tool rate limit, slow,
 //     flaky, partial, removed and duplicate faults from the suite's own
@@ -227,6 +229,9 @@ func brokenTool(s *schemas.Suite) (string, string) {
 	if HasToolProxy(s) {
 		return schemas.GenericProbeBrokenTool, ""
 	}
+	if RepoCoding(s) {
+		return schemas.GenericProbeTestCrash, ""
+	}
 	return "", fmt.Sprintf("benchmark %s has no broken-tool probe and no tool service or external API behind the tool proxy, so there is no tool call to break", suiteID(s))
 }
 
@@ -244,7 +249,34 @@ func misleading(s *schemas.Suite) string {
 			cp.Probes = append(cp.Probes, p)
 		}
 	}
-	return pick(&cp, schemas.FamilyMisleadingInstruction, "stale-notes", schemas.LayerFixture)
+	if id := pick(&cp, schemas.FamilyMisleadingInstruction, "stale-notes", schemas.LayerFixture); id != "" {
+		return id
+	}
+	if RepoCoding(s) {
+		return schemas.GenericProbeMisleadingNotes
+	}
+	return ""
+}
+
+// RepoCoding reports whether s is a repository coding benchmark: its runs
+// use the docker workspace (so the tool shim folder is first on PATH and the
+// workspace can take a planted notes file) and at least one task is a coding
+// task (bugfix, feature, refactor, performance). Such a suite takes the
+// generic test crash and misleading notes probes when it ships none.
+func RepoCoding(s *schemas.Suite) bool {
+	if s == nil || s.Environment != "docker_workspace" {
+		return false
+	}
+	for _, t := range s.Tasks {
+		if t == nil {
+			continue
+		}
+		switch t.Kind {
+		case schemas.TaskBugfix, schemas.TaskFeature, schemas.TaskRefactor, schemas.TaskPerformance:
+			return true
+		}
+	}
+	return false
 }
 
 // Attack marks a condition that is an attack probe in Map: its runs count

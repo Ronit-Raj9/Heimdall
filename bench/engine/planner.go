@@ -1425,6 +1425,23 @@ func workspaceFiles(suite *schemas.Suite, task *schemas.Task, probe *schemas.Pro
 	appends := 0
 	for i, spec := range specs {
 		n := i + 1
+		if spec.From == schemas.GenericNotesFrom { // round 6 K1: a fixture built into the bench
+			to, err := utils.Render(spec.To, map[string]string{"agent.notes.project_file": cfg.Notes.ProjectFile})
+			if err != nil {
+				return nil, fmt.Errorf("probe %s overlay %d: to: %w", probe.ID, n, err)
+			}
+			content, to, _ := schemas.BuiltinOverlay(spec, strings.TrimSpace(to))
+			key, err := containerPath(workdir, to)
+			if err != nil {
+				return nil, fmt.Errorf("probe %s overlay %d: %w", probe.ID, n, err)
+			}
+			if prev, dup := written[key]; dup {
+				return nil, fmt.Errorf("probe %s: overlays %d and %d both write %s; only the last would reach the agent", probe.ID, prev, n, key)
+			}
+			written[key] = n
+			out[key] = utils.SHA256Bytes(content)
+			continue
+		}
 		key, src, err := overlayFile(suite, task, cfg, workdir, spec)
 		if err != nil {
 			return nil, fmt.Errorf("probe %s overlay %d: %w", probe.ID, n, err)

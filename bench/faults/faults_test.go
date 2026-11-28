@@ -162,3 +162,51 @@ func TestConditionsResilience(t *testing.T) {
 		t.Fatalf("plain: %v %v", conds, skipped)
 	}
 }
+
+// sweVerifiedShaped is a suite as the swebench importer writes
+// hd-swe-verified: docker workspace, hidden tests, bugfix tasks in their own
+// image, no probes and no tool service.
+func sweVerifiedShaped() *schemas.Suite {
+	return &schemas.Suite{ID: "hd-swe-verified", Environment: "docker_workspace", Grader: "verifier_command",
+		Workdir: "/testbed", Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierCleanRoom},
+		Tasks: []*schemas.Task{{ID: "astropy__astropy-12907", Kind: schemas.TaskBugfix, RepoDir: "repo",
+			Environment: &schemas.TaskEnvironment{Image: "swebench/sweb.eval.x86_64.astropy_1776_astropy-12907:latest", WorkspacePath: "/testbed"}}}}
+}
+
+func TestRepoCodingTakesBothGenericFaults(t *testing.T) {
+	s := sweVerifiedShaped()
+	conds, skipped := Conditions([]string{ModelDown, BrokenTool, MisleadingInstruction}, s)
+	want := []string{"clean", schemas.GenericProbeModelDown, schemas.GenericProbeTestCrash, schemas.GenericProbeMisleadingNotes}
+	if !slices.Equal(conds, want) || len(skipped) != 0 {
+		t.Fatalf("got %v skipped %v, want %v", conds, skipped, want)
+	}
+	m := Map([]string{BrokenTool, MisleadingInstruction}, s)
+	if m[schemas.GenericProbeTestCrash] != BrokenTool || m[schemas.GenericProbeMisleadingNotes] != MisleadingInstruction {
+		t.Fatalf("map %v", m)
+	}
+	crash := s.ProbeByID(schemas.GenericProbeTestCrash)
+	if crash == nil || crash.Layer != schemas.LayerToolShim || crash.Apply.Shim == nil || crash.Apply.Shim.Tool != "pytest" || crash.Apply.Shim.Calls != 2 {
+		t.Fatalf("test crash probe %+v", crash)
+	}
+	notes := s.ProbeByID(schemas.GenericProbeMisleadingNotes)
+	if notes == nil || notes.Layer != schemas.LayerFixture || notes.Apply.Overlay == nil || notes.Apply.Overlay.From != schemas.GenericNotesFrom || IsAttack(notes) {
+		t.Fatalf("misleading notes probe %+v", notes)
+	}
+	// A suite's own probe still wins, and a non-coding or non-workspace suite
+	// still skips.
+	own := sweVerifiedShaped()
+	own.Probes = []*schemas.ProbeSpec{probe("stale-notes", schemas.FamilyMisleadingInstruction, schemas.LayerFixture)}
+	if c, _ := Conditions([]string{MisleadingInstruction}, own); !slices.Equal(c, []string{"clean", "stale-notes"}) {
+		t.Fatalf("own probe lost: %v", c)
+	}
+	qa := sweVerifiedShaped()
+	qa.Tasks[0].Kind = "qa"
+	if _, sk := Conditions([]string{BrokenTool, MisleadingInstruction}, qa); len(sk) != 2 {
+		t.Fatalf("non-coding suite must skip both, got %v", sk)
+	}
+	other := sweVerifiedShaped()
+	other.Environment = "process"
+	if RepoCoding(other) {
+		t.Fatal("only the docker workspace plants notes and puts the shim on PATH")
+	}
+}
