@@ -14338,6 +14338,132 @@ class TraceSetup(_TraceSetupRequired, total=False):
     install: str
 
 
+class TraceTaskAdmission(TypedDict):
+    admitted: bool
+    controls: List[TraceTaskCheck]
+    guards: List[TraceTaskCheck]
+
+
+class TraceTaskApproveRequest(TypedDict):
+    job_id: str
+
+
+class TraceTaskApproved(TypedDict):
+    decision: TraceTaskDecision
+    guards: List[TraceTaskCheck]
+    ready: bool
+
+
+class _TraceTaskBuildRequestRequired(TypedDict):
+    budget_usd: float
+    model: str
+    suite: str
+
+
+class TraceTaskBuildRequest(_TraceTaskBuildRequestRequired, total=False):
+    retry: bool
+
+
+class _TraceTaskCheckRequired(TypedDict):
+    got: str
+    name: str
+
+
+class TraceTaskCheck(_TraceTaskCheckRequired, total=False):
+    detail: str
+    want: str
+
+
+class _TraceTaskDecisionRequired(TypedDict):
+    at: str
+    by: str
+    decision: str
+    job_id: str
+
+
+class TraceTaskDecision(_TraceTaskDecisionRequired, total=False):
+    task: str
+
+
+class _TraceTaskFailureRequired(TypedDict):
+    kind: str
+    quotes: List[TraceTaskQuote]
+    summary: str
+
+
+class TraceTaskFailure(_TraceTaskFailureRequired, total=False):
+    dropped_quotes: int
+
+
+class TraceTaskFile(TypedDict):
+    content: str
+    path: str
+
+
+class TraceTaskMutant(TypedDict):
+    name: str
+    what_it_does_wrong: str
+
+
+class _TraceTaskQuoteRequired(TypedDict):
+    text: str
+
+
+class TraceTaskQuote(_TraceTaskQuoteRequired, total=False):
+    role: str
+    turn: int
+
+
+class TraceTaskRef(TypedDict):
+    id: str
+    path: str
+    suite: str
+
+
+class _TraceTaskResultRequired(TypedDict):
+    failure: TraceTaskFailure
+    files: List[TraceTaskFile]
+    model_calls: int
+    mutants: List[TraceTaskMutant]
+    shape: str
+    shape_reason: str
+    spent_usd: float
+    standin: Optional[TraceTaskStandin]
+
+
+class TraceTaskResult(_TraceTaskResultRequired, total=False):
+    admission: Optional[TraceTaskAdmission]
+    notes: List[str]
+    task: Optional[TraceTaskRef]
+    unsure: bool
+
+
+class TraceTaskStandin(TypedDict):
+    files: List[TraceTaskFile]
+    why: str
+
+
+class TraceTaskStarted(TypedDict):
+    job_id: str
+
+
+class _TraceTaskStateRequired(TypedDict):
+    can_approve: bool
+    can_retry: bool
+
+
+class TraceTaskState(_TraceTaskStateRequired, total=False):
+    blocked: str
+    budget_usd: float
+    decision: Optional[TraceTaskDecision]
+    error: str
+    failing: List[str]
+    job_id: str
+    result: Optional[TraceTaskResult]
+    status: str
+    step: str
+
+
 class TracesForgotten(TypedDict):
     forgotten: bool
 
@@ -16709,6 +16835,22 @@ class TraceInferResultResponse(TraceInferResult):
     mode: Mode
 
 
+class TraceTaskApprovedResponse(TraceTaskApproved):
+    mode: Mode
+
+
+class TraceTaskDecisionResponse(TraceTaskDecision):
+    mode: Mode
+
+
+class TraceTaskStartedResponse(TraceTaskStarted):
+    mode: Mode
+
+
+class TraceTaskStateResponse(TraceTaskState):
+    mode: Mode
+
+
 class TracesForgottenResponse(TracesForgotten):
     mode: Mode
 
@@ -18123,6 +18265,21 @@ __all__ = [
     'TraceConnectInfo',
     'TraceInferResult',
     'TraceSetup',
+    'TraceTaskAdmission',
+    'TraceTaskApproveRequest',
+    'TraceTaskApproved',
+    'TraceTaskBuildRequest',
+    'TraceTaskCheck',
+    'TraceTaskDecision',
+    'TraceTaskFailure',
+    'TraceTaskFile',
+    'TraceTaskMutant',
+    'TraceTaskQuote',
+    'TraceTaskRef',
+    'TraceTaskResult',
+    'TraceTaskStandin',
+    'TraceTaskStarted',
+    'TraceTaskState',
     'TracesForgotten',
     'TransferSpec',
     'Triage',
@@ -18552,6 +18709,10 @@ __all__ = [
     'TokenListResponse',
     'TraceConnectInfoResponse',
     'TraceInferResultResponse',
+    'TraceTaskApprovedResponse',
+    'TraceTaskDecisionResponse',
+    'TraceTaskStartedResponse',
+    'TraceTaskStateResponse',
     'TracesForgottenResponse',
     'TriageResponse',
     'UploadFilesReportResponse',

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { BuildTaskPanel } from "./buildTask";
 import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { Input } from "@/components/ui/input";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
@@ -441,6 +442,8 @@ export function InboxActions(props: InboxActionsProps) {
 							/>
 						</Field>
 					)}
+					{/* Round 7 lane T3: a builder model turns this failure into a task (buildTask.tsx). */}
+					<BuildTaskPanel itemId={item.id} suites={props.suites} disabled={!writable} />
 					{action === "accept" && (
 						<AcceptForm
 							key={`accept-${item.id}`}

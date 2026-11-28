@@ -13,6 +13,8 @@ vi.mock("@/lib/store/apis/traceDraftApi", async (importOriginal) => ({
 	useGetInboxProposalQuery: () => ({ data: undefined, refetch: () => undefined }),
 	useImportInboxSessionMutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
+// Round 7 lane T3: the Build a task panel has its own tests (buildTask.uft3.test.tsx).
+vi.mock("./buildTask", () => ({ BuildTaskPanel: () => null }));
 vi.mock("@/lib/store/apis/inboxApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/inboxApi")>()),
 	useAcceptInboxItemMutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
