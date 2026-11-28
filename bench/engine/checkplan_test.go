@@ -17,7 +17,9 @@ import (
 // without build.base_arg must keep hashing the same, or every existing
 // experiment would stop comparing with new ones.
 const (
-	pinnedCodexHash        = "42116f1c0e89811700a4bb213281b1b219b9b78242a428a8eca35fac82946586"
+	// Re-pinned in round 4: the codex config itself changed (login shells
+	// allowed, ~/.profile keeps the shims on PATH; PAID-5).
+	pinnedCodexHash        = "fca6574f5fc8ac66302ca4a7c632bc42821657b2ccb873e74fb24bc61fdcfbb2"
 	pinnedCustomPythonHash = "b2d0bb59d32cb657269f4652e809d3e9ba588cac5c51b9dd1fad9311dea846c4"
 )
 

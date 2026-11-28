@@ -64,3 +64,14 @@ func TestRetryBusyStart(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildFailurePermanent(t *testing.T) {
+	pip := "plan the experiment locally: build agent image bench/agent-x:1: docker build bench/agent-x:1: exit status 1; last build output:\nERROR: No matching distribution found for httpcore2==2.16.2"
+	net := "build agent image bench/agent-x:1: docker build bench/agent-x:1: exit status 1; last build output:\nERROR: Could not fetch: i/o timeout"
+	if !BuildFailurePermanent(pip) || BuildFailurePermanent(net) || BuildFailurePermanent("load suite x: not found") {
+		t.Fatal("classification")
+	}
+	if got := PlainRefusal(pip); !strings.Contains(got, "no version for the Python") || !strings.Contains(got, "httpcore2==2.16.2") {
+		t.Errorf("plain = %q", got)
+	}
+}

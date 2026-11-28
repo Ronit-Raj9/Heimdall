@@ -55,6 +55,15 @@ func (c *Coordinator) noteRefusalLocked(l *remoteLease, reason string) string {
 	f.reason, f.at = reason, c.now()
 	f.n++
 	plain := PlainRefusal(reason)
+	if BuildFailurePermanent(reason) {
+		// PH4-2: a build that failed for its own reason fails the same way on
+		// every try and every worker; the run ends now with the build's lines.
+		f.n = maxRefusals
+		return fmt.Sprintf("worker %s could not build the agent image: %s. This fails the same way on every try, so the run stops.", l.worker, plain)
+	}
+	if buildFailure(reason) {
+		return fmt.Sprintf("worker %s could not take this run: %s. Retrying the image build (%d of %d) in 1 minute.", l.worker, plain, f.n+1, maxRefusals)
+	}
 	if f.n >= maxRefusals {
 		return fmt.Sprintf("worker %s could not take this run: %s. It refused it %d times, so Heimdall stops offering it to this worker.", l.worker, plain, f.n)
 	}
@@ -88,6 +97,9 @@ func (c *Coordinator) everyWorkerRefusedLocked(r *schedRun) bool {
 // failRefused ends every queued slot of r with the last refusal reason.
 func (r *schedRun) failRefused(reason string) {
 	err := fmt.Errorf("every worker refused this run %d times: %s", maxRefusals, PlainRefusal(reason))
+	if BuildFailurePermanent(reason) {
+		err = fmt.Errorf("the agent image cannot be built, and trying again would fail the same way: %s", PlainRefusal(reason))
+	}
 	for _, slot := range r.queue.takeAll() {
 		r.slotError(slot, err)
 	}
@@ -107,6 +119,12 @@ func PlainRefusal(reason string) string {
 		plain = "The benchmark changed after this run was planned: start it again."
 	case strings.Contains(reason, "part versions differ"):
 		plain = "The worker runs a different Heimdall version than the server."
+	case strings.Contains(reason, "Lchown") || strings.Contains(reason, "subordinate"):
+		plain = "The task image has files owned by a user id the worker's Docker cannot map. The server's subordinate id range must be made larger."
+	case strings.Contains(reason, "No matching distribution found") || strings.Contains(reason, "requires a different Python"):
+		plain = "A pinned Python package has no version for the Python in this image."
+	case strings.Contains(reason, "python3: not found") || strings.Contains(reason, "python3-venv"):
+		plain = "The agent's Dockerfile needs Python in the task image, and this task image has none."
 	default:
 		return reason
 	}
@@ -117,4 +135,36 @@ func PlainRefusal(reason string) string {
 // reused; after refuseRetry the experiment is checked again.
 func (w *Worker) refusalFresh(e *workerExp) bool {
 	return w.now().Sub(e.refusedAt) < refuseRetry
+}
+
+// buildFailure reports whether a refusal reason is a failed docker build of
+// an image the run needs.
+func buildFailure(reason string) bool {
+	return strings.Contains(reason, "docker build") || strings.Contains(reason, "build agent image")
+}
+
+// transientBuildMarks are build errors that may pass on the next try: the
+// network, a registry, a busy host.
+var transientBuildMarks = []string{
+	"resource temporarily unavailable", "i/o timeout", "TLS handshake timeout", "connection reset by peer",
+	"connection refused", "temporary failure in name resolution", "Temporary failure in name resolution",
+	"502 Bad Gateway", "503 Service Unavailable", "504 Gateway Timeout", "429 Too Many Requests",
+	"toomanyrequests", "context deadline exceeded", "unexpected EOF", "signal: killed",
+}
+
+// BuildFailurePermanent reports whether a refusal reason is an image build
+// that failed for its own reason (a pip install with no matching version, a
+// missing file, a Dockerfile error, a file owner the host cannot map): it
+// fails the same way again, so retrying only keeps the run waiting (PH4-2).
+// A build that failed on the network or a busy host is not permanent.
+func BuildFailurePermanent(reason string) bool {
+	if !buildFailure(reason) {
+		return false
+	}
+	for _, m := range transientBuildMarks {
+		if strings.Contains(reason, m) {
+			return false
+		}
+	}
+	return true
 }
