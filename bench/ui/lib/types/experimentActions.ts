@@ -21,6 +21,8 @@ export interface ProbeJobParams {
 	/** Fault catalog names (GET /faults), such as model-brownout; mapped to conditions on the benchmark (fix wave 2, N65). */
 	faults?: string[];
 	trials?: number;
+	/** The fault test's spend cap in USD, required by the server (K5). */
+	budget_usd?: number;
 }
 
 export interface MigrateJobParams {

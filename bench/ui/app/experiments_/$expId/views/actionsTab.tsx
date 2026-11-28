@@ -15,6 +15,8 @@ import type { ExperimentStatus, MoreEvidence } from "@/lib/types/bench";
 import { formatUsd } from "@/lib/money";
 import "@/components/experiments/ufrcI18n";
 import "@/components/verdict/uf4aI18n";
+import { parseDebugCap } from "@/components/runs/debug/debugDialogs";
+import "@/components/experiments/ufk5I18n";
 import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJobParams } from "@/lib/types/experimentActions";
 import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
@@ -391,6 +393,9 @@ function ProbeBody({ expId, suite }: { expId: string; suite?: string }) {
 	const [faults, setFaults] = useState<string[]>([]);
 	const [picked, setPicked] = useState<string[]>([]);
 	const [trials, setTrials] = useState(1);
+	const { t: tk } = useTranslation("ufk5");
+	const [capText, setCapText] = useState("0.5");
+	const cap = parseDebugCap(capText);
 	const entry = suites.data;
 	const probes = entry?.probes ?? [];
 	// N281: a partial entry (the server is still loading the benchmark) has no probes yet: say so and read again.
@@ -399,9 +404,10 @@ function ProbeBody({ expId, suite }: { expId: string; suite?: string }) {
 	const groups = groupFaults(catalog.data ?? []);
 	const flip = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 	const params: ProbeJobParams | null =
-		faults.length + picked.length > 0
+		faults.length + picked.length > 0 && cap !== null
 			? {
 					exp_id: expId,
+					budget_usd: cap,
 					trials: clamp(trials, EXTEND_MAX_TRIALS),
 					...(faults.length ? { faults } : {}),
 					...(picked.length ? { probes: picked } : {}),
@@ -481,13 +487,31 @@ function ProbeBody({ expId, suite }: { expId: string; suite?: string }) {
 					</label>
 				</>
 			)}
+			<label className="flex max-w-40 flex-col gap-1 text-sm" htmlFor={`${uid}-budget`}>
+				{tk("probe.budget")}
+				<Input
+					id={`${uid}-budget`}
+					type="number"
+					inputMode="decimal"
+					min={0.01}
+					max={100}
+					step={0.01}
+					value={capText}
+					onChange={(e) => setCapText(e.target.value)}
+					aria-invalid={cap === null}
+					data-testid="actions-probe-budget"
+				/>
+				<span className={cap === null ? "text-chart-error-ink text-xs" : "text-muted-foreground text-xs"}>
+					{cap === null ? tk("probe.budgetBad") : tk("probe.budgetHelp")}
+				</span>
+			</label>
 			<FollowUpJob
 				kind="probe.run"
 				params={params}
 				label={t("probe.run")}
 				confirm={t("probe.confirm", { expId })}
 				missing={t("probe.tickOne")}
-				paid={{}}
+				paid={{ capUsd: cap }}
 				testId="actions-probe-job"
 			/>
 		</div>

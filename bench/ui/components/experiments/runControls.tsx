@@ -35,6 +35,8 @@ import type { TFunction } from "i18next";
 import { PaidButton } from "@/components/ui/paidButton";
 import "@/components/reportcard/reportCardI18n";
 import "./ufc2I18n";
+import "./ufk5I18n";
+import { capLeft, evaluationResumeCap } from "./resumeCap";
 import { notify } from "@/lib/notify";
 import { CappedPaidAction } from "@/components/evaluations/cappedPaidAction";
 import { estimateOf, evaluationCostPerRun, useRerunEvaluationFailuresCappedMutation } from "@/components/evaluations/paidCaps";
@@ -112,14 +114,18 @@ function ErrorLine({ error, title, testId }: { error: unknown; title: string; te
  * Pause and resume beside Cancel on a running experiment. Pause drains: runs already going finish
  * and nothing new starts. While paused, a chip says how many runs are still going.
  */
-export function PauseControls({ expId }: { expId: string }) {
+export function PauseControls({ expId, spentUsd }: { expId: string; spentUsd?: number | null }) {
 	const { t } = useTranslation("runControl");
 	const { t: tc } = useTranslation("ufc2");
 	const controls = useGetRunControlsQuery(expId, { pollingInterval: 5000, skipPollingIfUnfocused: true });
 	const [pause, pauseState] = usePauseExperimentMutation();
+	const { t: tk } = useTranslation("ufk5");
 	const [resume, resumeState] = useUnpauseExperimentMutation();
 	const c = controls.data;
 	if (!c) return null;
+	// K5 (PQ1-5): the button states what is left of the cap in effect, the cap the scheduler enforces.
+	const cap = effectiveCap(c);
+	const left = capLeft(cap, spentUsd);
 	return (
 		<>
 			{c.paused ? (
@@ -139,11 +145,11 @@ export function PauseControls({ expId }: { expId: string }) {
 						size="sm"
 						className="h-7 px-2.5 text-xs"
 						verb={t("resume")}
-						capUsd={null}
-						confirm="auto"
+						capUsd={left}
+						confirm="always"
 						kind="form"
 						estimateAt="title"
-						confirmText={tc("resume.confirm")}
+						confirmText={[tc("resume.confirm"), left !== null ? tk("resume.left", { left: formatCost(left), cap: formatCost(cap) }) : ""].filter(Boolean).join(" ")}
 						isLoading={resumeState.isLoading}
 						onConfirm={async () => {
 							try {
@@ -636,6 +642,8 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
 	const [rerun, rerunState] = useRerunEvaluationFailuresCappedMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
+	const { t: tk } = useTranslation("ufk5");
+	const resumeCap = evaluationResumeCap(evaluation);
 	const failedRuns = (evaluation as EvaluationWithFailures).failed_runs;
 	const running = evaluation.status === "running";
 	const finished = evaluation.status === "done" || evaluation.status === "failed" || evaluation.status === "cancelled";
@@ -667,11 +675,16 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 							variant="outline"
 							size="sm"
 							verb={t("resume")}
-							capUsd={null}
-							confirm="auto"
+							capUsd={resumeCap?.left ?? null}
+							confirm="always"
 							kind="form"
 							estimateAt="title"
-							confirmText={tc("resume.confirm")}
+							confirmText={[
+								tc("resume.confirm"),
+								resumeCap ? tk("resume.left", { left: formatCost(resumeCap.left), cap: formatCost(resumeCap.cap) }) : "",
+							]
+								.filter(Boolean)
+								.join(" ")}
 							isLoading={resumeState.isLoading}
 							onConfirm={async () => {
 								try {

@@ -1,4 +1,8 @@
 import { PauseControls } from "@/components/experiments/runControls";
+import { capLeft } from "@/components/experiments/resumeCap";
+import "@/components/experiments/ufk5I18n";
+import { effectiveCap, useGetRunControlsQuery } from "@/lib/store/apis/runControlApi";
+import { formatUsd } from "@/lib/money";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { ConfirmButton } from "@/components/platform/badges";
@@ -44,6 +48,8 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 	const [resume, resumeState] = useResumeExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
 	const health = useGetHealthQuery();
+	const { t: tk } = useTranslation("ufk5");
+	const controls = useGetRunControlsQuery(status.exp_id, { skip: !(status.state === "cancelled" || status.state === "failed") });
 	const running = status.state === "running";
 	const resumable = status.state === "cancelled" || status.state === "failed";
 	// Frozen but never started (for example a create-and-start whose start failed): start it again
@@ -51,10 +57,13 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 	// (QC2-27-03).
 	const startable = status.state === "created" && launchAvailable(health.data);
 	if (!running && !resumable && !startable) return null;
+	// K5 (PQ1-5): Resume names what is left of the comparison's cap (live override, else frozen), which the scheduler enforces.
+	const resumeCapUsd = controls.data ? effectiveCap(controls.data) || null : null;
+	const resumeLeft = capLeft(resumeCapUsd, status.spent_usd?.v ?? null);
 	return (
 		<RoleGate min="member">
 			<div className="flex flex-wrap items-center gap-2" data-testid="experiment-run-actions">
-				{running && <PauseControls expId={status.exp_id} />}
+				{running && <PauseControls expId={status.exp_id} spentUsd={status.spent_usd?.v ?? null} />}
 				{running && (
 					<ConfirmButton
 						label={t("experimentActions.cancel")}
@@ -73,8 +82,13 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 						variant="outline"
 						size="sm"
 						verb={t("experimentActions.resume")}
-						capUsd={null}
-						confirm="auto"
+						capUsd={resumeLeft}
+						confirm="always"
+						confirmText={
+							resumeLeft !== null && resumeCapUsd !== null
+								? tk("resume.left", { left: formatUsd(resumeLeft), cap: formatUsd(resumeCapUsd) })
+								: undefined
+						}
 						kind="form"
 						isLoading={resumeState.isLoading}
 						onConfirm={async () => {

@@ -76,6 +76,8 @@ export interface DebugRunRequest {
 	message?: string;
 	on_divergence?: DivergencePolicy;
 	breakpoints?: Breakpoints;
+	/** Spend cap of a fork or step run in USD (required there); a replay takes none. */
+	budget_usd?: number;
 }
 
 export interface DebugRunResponse {

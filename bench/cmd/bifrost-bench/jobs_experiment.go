@@ -67,8 +67,15 @@ type (
 		Faults  []string `json:"faults,omitempty"`
 		Trials  int      `json:"trials,omitempty"` // default: the clean condition's trials
 		NoStart bool     `json:"no_start,omitempty"`
+		// BudgetUSD is the fault test's own spend cap (K5, PQ2-15):
+		// required, 0.01 to maxProbeBudgetUSD; it replaces the parent's
+		// budget in the new experiment, whose scheduler stops at it.
+		BudgetUSD float64 `json:"budget_usd,omitempty"`
 	}
 )
+
+// maxProbeBudgetUSD is the largest cap a fault test may take.
+const maxProbeBudgetUSD = 100
 
 // followUpResult is what each of the three kinds returns.
 type followUpResult struct {
@@ -185,6 +192,12 @@ func validateProbeJob(ctx context.Context, env jobEnv, raw json.RawMessage) (any
 	}
 	if p.Trials < 0 || p.Trials > maxFollowUpTrials {
 		return nil, "", invalid(fmt.Errorf("trials must be between 1 and %d", maxFollowUpTrials))
+	}
+	if p.BudgetUSD <= 0 {
+		return nil, "", invalid(errors.New("set a spend cap (budget_usd) for the fault test; it calls models and costs money"))
+	}
+	if p.BudgetUSD < 0.01 || p.BudgetUSD > maxProbeBudgetUSD {
+		return nil, "", invalid(fmt.Errorf("set a spend cap from $0.01 to $%d", maxProbeBudgetUSD))
 	}
 	for _, id := range p.Probes {
 		if err := ops.ValidID("probe", id); err != nil {
@@ -316,6 +329,11 @@ func runProbeJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, 
 	e, notes, err := probeExperiment(m, allowed, want, p.Trials)
 	if err != nil {
 		return nil, err
+	}
+	if p.BudgetUSD > 0 {
+		e.Budget.TotalUSD = p.BudgetUSD
+		e.Budget.ReserveUSD = 0
+		notes = append(notes, fmt.Sprintf("spend cap: $%.2f", p.BudgetUSD))
 	}
 	for _, sk := range skipped {
 		notes = append(notes, fmt.Sprintf("fault %s does not apply to %s: %s", sk.Fault, s.ID, sk.Reason))

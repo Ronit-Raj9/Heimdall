@@ -9,6 +9,42 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { parseCallList, parseNames } from "./debug.utils";
+import { PaidButton } from "@/components/ui/paidButton";
+import "@/components/experiments/ufk5I18n";
+
+/** Default cap of a live debug run (fork or step) in USD: one run of one task. */
+export const DEBUG_DEFAULT_CAP_USD = 0.5;
+
+/** A typed debug run cap: a number from 0.01 to 100, else null (K5, PQ1-18). */
+export function parseDebugCap(raw: string): number | null {
+	const v = Number(raw.trim());
+	return raw.trim() !== "" && Number.isFinite(v) && v >= 0.01 && v <= 100 ? v : null;
+}
+
+/** The spend cap field of a live debug run: the server refuses the run without it. */
+function DebugCapField({ value, onChange, testId }: { value: string; onChange(v: string): void; testId: string }) {
+	const { t } = useTranslation("ufk5");
+	const bad = parseDebugCap(value) === null;
+	return (
+		<label className="flex flex-col gap-1.5 text-xs font-medium">
+			{t("fork.budget")}
+			<Input
+				type="number"
+				inputMode="decimal"
+				min={0.01}
+				max={100}
+				step={0.01}
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				aria-invalid={bad}
+				data-testid={testId}
+			/>
+			<span className={cn("font-normal", bad ? "text-chart-error-ink" : "text-muted-foreground")}>
+				{bad ? t("fork.budgetBad") : t("fork.budgetHelp")}
+			</span>
+		</label>
+	);
+}
 
 const textareaClass =
 	"border-input bg-background focus-visible:ring-ring/50 min-h-24 w-full rounded-lg border px-3 py-2 text-sm focus-visible:ring-[3px] focus-visible:outline-none";
@@ -117,10 +153,14 @@ export function ForkDialog({
 	const [text, setText] = useState("");
 	const [divergence, setDivergence] = useState<DivergencePolicy>("live");
 	const [start, state] = useStartDebugRunMutation();
+	const [capText, setCapText] = useState(String(DEBUG_DEFAULT_CAP_USD));
+	const cap = parseDebugCap(capText);
 	const needsText = change !== "none" && text.trim() === "";
 	const submit = async () => {
+		if (cap === null) return;
 		const body = {
 			call,
+			budget_usd: cap,
 			on_divergence: divergence,
 			...(change === "response" ? { response: text } : change === "message" ? { message: text } : {}),
 		};
@@ -172,6 +212,7 @@ export function ForkDialog({
 						</label>
 					))}
 				</fieldset>
+				<DebugCapField value={capText} onChange={setCapText} testId="fork-budget" />
 				{state.error ? (
 					<p className="text-chart-error-ink text-sm" role="alert" data-testid="fork-error">
 						{errorText(state.error) ?? t("actions.failed")}
@@ -181,14 +222,16 @@ export function ForkDialog({
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button
-						onClick={() => void submit()}
-						disabled={needsText || state.isLoading}
+					<PaidButton
+						verb={t("fork.submit")}
+						capUsd={cap}
+						confirm="auto"
+						kind="form"
+						onConfirm={submit}
+						disabled={needsText || cap === null || state.isLoading}
 						isLoading={state.isLoading}
-						dataTestId="fork-submit"
-					>
-						{t("fork.submit")}
-					</Button>
+						testId="fork-submit"
+					/>
 				</div>
 			</div>
 		</GovDialog>
@@ -218,14 +261,16 @@ export function BreakpointDialog({
 	const names = parseNames(tools);
 	const invalid = parsed === null;
 	const empty = !invalid && !every && parsed.length === 0 && names.length === 0;
+	const [capText, setCapText] = useState(String(DEBUG_DEFAULT_CAP_USD));
+	const cap = parseDebugCap(capText);
 	const submit = async () => {
-		if (invalid || empty) return;
+		if (invalid || empty || cap === null) return;
 		const breakpoints = {
 			...(parsed.length ? { calls: parsed } : {}),
 			...(every ? { every: true } : {}),
 			...(names.length ? { after_tools: names } : {}),
 		};
-		await startDebugRun(() => start({ runId, mode: "step", body: { breakpoints } }), onStarted, onClose);
+		await startDebugRun(() => start({ runId, mode: "step", body: { breakpoints, budget_usd: cap } }), onStarted, onClose);
 	};
 	return (
 		<GovDialog
@@ -270,18 +315,21 @@ export function BreakpointDialog({
 						{errorText(state.error) ?? t("actions.failed")}
 					</p>
 				) : null}
+				<DebugCapField value={capText} onChange={setCapText} testId="breakpoint-budget" />
 				<div className="flex justify-end gap-2">
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button
-						onClick={() => void submit()}
-						disabled={invalid || empty || state.isLoading}
+					<PaidButton
+						verb={t("debugDialog.submit")}
+						capUsd={cap}
+						confirm="auto"
+						kind="form"
+						onConfirm={submit}
+						disabled={invalid || empty || cap === null || state.isLoading}
 						isLoading={state.isLoading}
-						dataTestId="breakpoint-submit"
-					>
-						{t("debugDialog.submit")}
-					</Button>
+						testId="breakpoint-submit"
+					/>
 				</div>
 			</div>
 		</GovDialog>

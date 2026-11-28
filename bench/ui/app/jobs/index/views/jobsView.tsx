@@ -13,6 +13,9 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Dialog } from "@/components/ui/dialog";
 import { PaidButton } from "@/components/ui/paidButton";
 import { canRetryFree } from "@/components/jobs/jobRetryCost";
+import "@/components/experiments/ufk5I18n";
+import { effectiveCap, useGetRunControlsQuery } from "@/lib/store/apis/runControlApi";
+import { formatUsd } from "@/lib/money";
 import "@/components/settings/ufrkI18n";
 import { ShowTestsChip } from "@/components/ui/toolbar";
 import { notify } from "@/lib/notify";
@@ -30,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ListTodo, SquareTerminal } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { canRetryJob, firstErrorLine, isTestJob, jobBudgetUsd, jobsPollMs, parseJobStatus } from "./jobsView.utils";
 import "@/components/platform/ufintI18n";
@@ -486,12 +489,10 @@ function JobActions({
 						{tr("jobs.retryFree")}
 					</Button>
 				) : canRetryJob(job) ? (
-					<PaidButton
+					<RetryPaidButton
+						job={job}
 						verb={t("retry")}
-						capUsd={jobBudgetUsd(job)}
-						confirm="auto"
-						kind="retry"
-						confirmText={t("retryConfirmNoBudget", { kind: title })}
+						noBudgetText={t("retryConfirmNoBudget", { kind: title })}
 						estimateAt="title"
 						variant="outline"
 						size="sm"
@@ -503,5 +504,39 @@ function JobActions({
 				) : null}
 			</RoleGate>
 		</>
+	);
+}
+
+/** The experiment a comparison run job runs, from its params or target; "" for other kinds. */
+export function retryExpId(job: Pick<Job, "kind" | "params" | "target">): string {
+	if (job.kind !== "experiment.run") return "";
+	const raw = typeof job.params?.exp_id === "string" ? job.params.exp_id : (job.target ?? "");
+	return raw.replace(/^experiment:/, "");
+}
+
+/**
+ * Retry of a paid job (K5, PQ1-7): the job's own budget, else for a comparison run job the
+ * comparison's cap in effect (the live override, else the frozen one), which the scheduler enforces
+ * on the rerun because it runs the same frozen manifest.
+ */
+function RetryPaidButton({
+	job,
+	verb,
+	noBudgetText,
+	...rest
+}: { job: Job; verb: string; noBudgetText: string } & Omit<ComponentProps<typeof PaidButton>, "verb" | "capUsd" | "kind" | "confirm">) {
+	const { t: tk } = useTranslation("ufk5");
+	const expId = retryExpId(job);
+	const controls = useGetRunControlsQuery(expId, { skip: expId === "" || jobBudgetUsd(job) !== null });
+	const cap = jobBudgetUsd(job) ?? (controls.data ? effectiveCap(controls.data) || null : null);
+	return (
+		<PaidButton
+			{...rest}
+			verb={verb}
+			capUsd={cap}
+			confirm="always"
+			kind="retry"
+			confirmText={cap !== null ? tk("retry.capHelp", { cap: formatUsd(cap) }) : noBudgetText}
+		/>
 	);
 }

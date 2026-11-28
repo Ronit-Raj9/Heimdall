@@ -100,6 +100,30 @@ type DebugRunRequest struct {
 	Message      string               `json:"message,omitempty"`       // fork: a user message added at call
 	OnDivergence string               `json:"on_divergence,omitempty"` // stop | live | serve
 	Breakpoints  *schemas.Breakpoints `json:"breakpoints,omitempty"`
+	// BudgetUSD is the spend cap of a fork or step run, which call models
+	// live (K5, PQ1-18): required, from 0.01 to DebugMaxBudgetUSD; the run
+	// stops at it. A replay calls no model and takes none.
+	BudgetUSD float64 `json:"budget_usd,omitempty"`
+}
+
+// DebugMaxBudgetUSD is the largest cap a fork or step run may take.
+const DebugMaxBudgetUSD = 100
+
+// debugBudgetProblem is why a debug run's cap is refused, "" when it is fine.
+func debugBudgetProblem(mode string, usd float64) string {
+	if mode == schemas.DebugReplay {
+		if usd != 0 {
+			return "A replay calls no model, so it takes no budget_usd."
+		}
+		return ""
+	}
+	if usd <= 0 {
+		return "Set a spend cap (budget_usd) for this run. It calls the model live and costs money."
+	}
+	if usd < 0.01 || usd > DebugMaxBudgetUSD {
+		return "Set a spend cap from $0.01 to $100."
+	}
+	return ""
 }
 
 // DebugRunResponse is the answer of the three debug run routes.
@@ -298,6 +322,10 @@ func (h *runDebugHandler) start(ctx *fasthttp.RequestCtx, mode string) {
 			return
 		}
 	}
+	if msg := debugBudgetProblem(mode, req.BudgetUSD); msg != "" {
+		h.fail(ctx, fasthttp.StatusBadRequest, msg)
+		return
+	}
 	if !req.Breakpoints.Empty() && s.Holds == nil {
 		h.fail(ctx, fasthttp.StatusConflict, "breakpoints need a worker this server controls; this server cannot hold model calls")
 		return
@@ -410,12 +438,18 @@ func (h *runDebugHandler) debugExperiment(ctx context.Context, rv *RunView, m *s
 	if mode == schemas.DebugFork {
 		name += " at call " + strconv.Itoa(req.Call)
 	}
+	budget := e.Budget
+	if mode != schemas.DebugReplay {
+		// The person's cap for this live run replaces the parent's whole budget (K5, PQ1-18).
+		budget.TotalUSD = req.BudgetUSD
+		budget.ReserveUSD = 0
+	}
 	return &schemas.Experiment{
 		Name: name, Suite: e.Suite, Base: e.Base,
 		Arms:             map[string]schemas.ArmSpec{rv.Slot.Arm: arm},
 		Primary:          schemas.Endpoint{Condition: schemas.ConditionClean, Metric: e.Primary.Metric},
 		Conditions:       []schemas.ConditionSpec{{ID: schemas.ConditionClean, Tasks: schemas.TaskSelector{IDs: []string{rv.Slot.Task}}, Trials: 1}},
-		Budget:           e.Budget,
+		Budget:           budget,
 		Verdict:          e.Verdict,
 		ExtraGates:       e.ExtraGates,
 		Seed:             e.Seed,
