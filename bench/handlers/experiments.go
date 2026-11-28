@@ -649,10 +649,36 @@ func costsOf(runs []RunView, metrics map[string]runMetricsRead) map[string]schem
 			if !ok {
 				c = schemas.Unknown("cost_not_measured", schemas.EvidenceGateway)
 			}
-			out[id] = c
+			out[id] = withJudgeSpend(c, mr.values[judgeCostMetric])
 		}
 	}
 	return out
+}
+
+// judgeCostMetric is the judge spend of a judged run (metrics.JudgeCostUSD).
+const judgeCostMetric = "judge_cost_usd"
+
+// withJudgeSpend adds an observed judge spend to a run's cost for "Spent so
+// far" (N2, PQ1-11). The rule: the scheduler already counts the judge and
+// auditor calls against the cap (engine runBill.addJudge), so the spend the
+// page shows against that cap counts them too. cost_usd itself stays the
+// agent's cost: the report card keeps the judge on its own line. A judge
+// spend not observed leaves the cost as it is (the scheduler counts it at
+// its estimate).
+func withJudgeSpend(c, judge schemas.Value) schemas.Value {
+	j, ok := judge.Float()
+	if !ok || j <= 0 {
+		return c
+	}
+	if v, observed := c.Float(); observed {
+		return schemas.Observed(v+j, c.Evidence)
+	}
+	if c.Bounds != nil {
+		out := c
+		out.Bounds = &[2]float64{c.Bounds[0] + j, c.Bounds[1] + j}
+		return out
+	}
+	return c
 }
 
 // DecodeExperiment reads an experiment from a request body: JSON for
