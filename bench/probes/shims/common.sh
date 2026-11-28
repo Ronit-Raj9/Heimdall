@@ -116,6 +116,22 @@ bench_next_call() {
 	{ printf '%s\n' "$bench_call" >"$bench_count_file"; } 2>/dev/null
 }
 
+# bench_take_slot: claim one of the broken-call slots 1..calls by an atomic
+# mkdir of log/<tool>.broken.<n>. Exactly calls invocations win, however many
+# start at once and even if the counter lock was lost or broken; a call that
+# wins no slot (or cannot write the log folder) runs the real tool.
+bench_take_slot() {
+	[ -d "$bench_log_dir" ] && [ -w "$bench_log_dir" ] || return 1
+	bench_slot=1
+	while [ "$bench_slot" -le "$bench_calls" ]; do
+		if mkdir "$bench_log_dir/$bench_tool.broken.$bench_slot" 2>/dev/null; then
+			return 0
+		fi
+		bench_slot=$((bench_slot + 1))
+	done
+	return 1
+}
+
 # bench_log ENTRY ARGS...: append one JSON line to log/shim.jsonl. Control
 # characters in argv become spaces; quotes and backslashes are escaped.
 bench_log() {
@@ -143,9 +159,10 @@ bench_intercept() {
 	bench_action=pass
 	bench_call=0
 	if bench_lock; then
-		if bench_next_call && [ -n "$bench_mode" ] && [ "$bench_call" -le "$bench_calls" ]; then
-			bench_action=$bench_mode
-		fi
+		bench_next_call
+	fi
+	if [ -n "$bench_mode" ] && bench_take_slot; then
+		bench_action=$bench_mode
 	fi
 	bench_log "$bench_entry" "$@"
 	bench_unlock
