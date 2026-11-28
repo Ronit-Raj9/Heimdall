@@ -142,6 +142,40 @@ func TestEnsureAgentImagesBuildsPerSuiteOnce(t *testing.T) {
 	}
 }
 
+// An agent made in the web agent builder (its own Dockerfile in the org's
+// project, no base_arg) has its image built on the shared worker; before,
+// nothing built it and every run failed with "No such image". A built-in
+// agent, whose Dockerfile is not in the project, is left alone.
+func TestEnsureAgentImagesBuildsOrgOwnImage(t *testing.T) {
+	bin, calls := fakeDockerBin(t, "")
+	project, df := orgAgentProject(t)
+	pol := &utils.DockerPolicy{OrgID: "org_a", Builder: "heimdall-org-builder", TagPrefix: utils.OrgImagePrefix("org_a"),
+		Trusted: []string{t.TempDir()}, Untrusted: []string{project}}
+	x := newSharedAgentImages(utils.Docker{Binary: bin, Policy: pol})
+	m := &schemas.Manifest{Arms: map[string]schemas.ArmManifest{
+		"A": {ConfigHash: "h1", Config: schemas.AgentConfig{ID: "loop", Image: "bench/agent-loop:1",
+			Build: &schemas.ImageSpec{Dockerfile: "agents/images/loop/Dockerfile", Tag: "bench/agent-loop:1"}}},
+		"B": {ConfigHash: "h2", Config: schemas.AgentConfig{ID: "codex", Image: "bench/agent-codex:1",
+			Build: &schemas.ImageSpec{Dockerfile: "agents/images/codex/Dockerfile", Tag: "bench/agent-codex:1"}}},
+	}, Slots: []schemas.Slot{{Arm: "A", Task: "t1"}, {Arm: "B", Task: "t1"}}}
+	s := &schemas.Suite{ID: "s"}
+	for i := 0; i < 2; i++ {
+		if err := x.ensure(context.Background(), m, s, project); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := readTestFile(t, calls)
+	if n := countCalls(t, calls, "buildx build --builder heimdall-org-builder"); n != 1 {
+		t.Fatalf("%d builds, want 1: %s", n, got)
+	}
+	if !strings.Contains(got, "-t org-org-a/bench/agent-loop:1") || !strings.Contains(got, filepath.Dir(df)) {
+		t.Fatalf("org agent image not built from its project Dockerfile under the org namespace: %s", got)
+	}
+	if strings.Contains(got, "agent-codex") {
+		t.Fatalf("built-in agent image built: %s", got)
+	}
+}
+
 // A failed build refuses the lease with the agent, the benchmark and the
 // last build lines, so the slots end with that reason instead of waiting.
 func TestEnsureAgentImagesFailureRefusesLeaseWithReason(t *testing.T) {

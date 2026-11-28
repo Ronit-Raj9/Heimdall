@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/engine"
@@ -68,7 +70,28 @@ func (x *sharedAgentImages) ensure(ctx context.Context, m *schemas.Manifest, s *
 	var needs []need
 	seen := map[string]bool{}
 	add := func(slotArm string, am *schemas.ArmManifest) {
-		if am == nil || am.Config.Build == nil || am.Config.Build.BaseArg == "" || !armRunsSuiteImage(m, slotArm, am) {
+		if am == nil || am.Config.Build == nil {
+			return
+		}
+		if am.Config.Build.BaseArg == "" {
+			// The agent's own image (an agent made in the web agent builder:
+			// its Dockerfile is in the org's project). Nothing else builds it
+			// on a hosted setup, so every run failed with "No such image".
+			// Built-in agents keep their Dockerfile outside the project and
+			// their images are built when the worker is installed.
+			if !armHasSlot(m, slotArm) {
+				return
+			}
+			cfg := am.Config
+			img, err := engine.ResolveAgentImage(&cfg, s, root)
+			if err != nil || img.Tag == "" || img.Dockerfile == "" || seen[img.Tag] || !orgOwnedFile(root, img.Dockerfile) {
+				return
+			}
+			seen[img.Tag] = true
+			needs = append(needs, need{key: am.ConfigHash + "|own|" + img.Tag + "|" + fileDigest(img.Dockerfile), img: img})
+			return
+		}
+		if !armRunsSuiteImage(m, slotArm, am) {
 			return
 		}
 		cfg := am.Config
@@ -138,6 +161,31 @@ func armRunsSuiteImage(m *schemas.Manifest, slotArm string, am *schemas.ArmManif
 		}
 	}
 	return false
+}
+
+// armHasSlot reports whether the manifest has a slot of the arm (slotArm:
+// the arm id, or "compat").
+func armHasSlot(m *schemas.Manifest, slotArm string) bool {
+	for _, sl := range m.Slots {
+		if sl.Arm == slotArm {
+			return true
+		}
+	}
+	return false
+}
+
+// orgOwnedFile reports whether path is a regular file inside the org's
+// project folder root.
+func orgOwnedFile(root, path string) bool {
+	if root == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return false
+	}
+	fi, err := os.Lstat(path)
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // fileDigest is the sha256 of a file's bytes, or "" when it cannot be read:
