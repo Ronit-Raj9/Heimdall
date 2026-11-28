@@ -22,6 +22,7 @@ import { costRangeText, isRoughEstimate } from "./evaluate.utils";
 import { KeyLines, useArmKeys } from "./armKeys";
 import "@/lib/types/evaluateI18n";
 import { MODEL_SWITCH_MAX, MODEL_SWITCH_MIN, MODEL_SWITCH_MODE } from "./evaluateDraft";
+import { ufk6 } from "./ufk6I18n";
 import { ufl3 } from "./ufl3I18n";
 
 /**
@@ -180,6 +181,10 @@ export function specProblem(spec: EvaluationSpec, owns: ReadonlySet<string> = ne
 		if (spec.arms.length < MODEL_SWITCH_MIN) return ufl3("models.needMore", { min: MODEL_SWITCH_MIN });
 		const seen = new Set(spec.arms.map((a) => `${a.provider ?? ""}/${a.model}`));
 		if (seen.size < spec.arms.length) return ufl3("models.same");
+	}
+	if (spec.mode === "models" && spec.arms.length === 2) {
+		const [a, b] = spec.arms;
+		if (a.model && a.model === b.model && (a.provider ?? "") === (b.provider ?? "")) return ufk6("twoModels.same");
 	}
 	return failoverProblem(spec.arms[0], spec.failover);
 }
