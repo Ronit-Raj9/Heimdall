@@ -11,6 +11,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
 
@@ -79,6 +80,10 @@ func (h *ExperimentsHandler) resumeExperiment(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
+	if msg := experimentCapProblem(m, h.liveCapOf(m.ExpID), h.status(m, runs, false).SpentUSD); msg != "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, msg) // N2: the server refuses, not only the button
+		return
+	}
 	if h.resumePaused(ctx, m, runs) { // run control: a pause is lifted first; an active run needs nothing more (runcontrol.go)
 		return
 	}
@@ -139,4 +144,34 @@ func (h *ExperimentsHandler) cancelledFact(expID string) bool {
 		return rc.Cancelled(expID)
 	}
 	return false
+}
+
+// experimentCapProblem is why a comparison may not spend again (resume, a
+// Jobs retry of its run): no spend cap at all, frozen or live, or a cap its
+// spend already reached. Empty when it may (N2, K5's leftover).
+func experimentCapProblem(m *schemas.Manifest, liveCap float64, spent schemas.Value) string {
+	capUSD := max(m.Experiment.Budget.TotalUSD, liveCap)
+	if capUSD <= 0 {
+		return "This comparison has no spend cap. Set one in its run controls, then resume."
+	}
+	if v, ok := spent.Float(); ok && v >= capUSD {
+		return "The spend cap is used up. Raise it in the run controls to continue."
+	}
+	return ""
+}
+
+// liveCapOf is the live spend cap of the comparison's run controls (PATCH
+// /experiments/{id}/controls), 0 when none is set or it cannot be read.
+func (h *ExperimentsHandler) liveCapOf(expID string) float64 {
+	op, ok := h.launcher.(RunOperator)
+	if !ok || op == nil {
+		return 0
+	}
+	work, cancel := workContext(nil, readTimeout)
+	defer cancel()
+	st, _, err := op.Controls(work, expID)
+	if err != nil || st == nil {
+		return 0
+	}
+	return st.TotalUSD
 }

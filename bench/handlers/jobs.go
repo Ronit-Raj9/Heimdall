@@ -225,7 +225,7 @@ func (h *JobsHandler) create(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	j, err := h.api.Create(work, jobs.NewJob{OrgID: org, Kind: body.Kind, Params: body.Params, CreatedBy: createdBy(p)})
+	j, err := h.api.Create(context.WithValue(work, apiJobCreateKey{}, true), jobs.NewJob{OrgID: org, Kind: body.Kind, Params: body.Params, CreatedBy: createdBy(p)})
 	if err != nil {
 		h.sendError(ctx, "create job", err)
 		return
@@ -425,4 +425,15 @@ func createdBy(p *auth.Principal) string {
 		return id
 	}
 	return "system"
+}
+
+type apiJobCreateKey struct{}
+
+// FromJobsAPI reports whether ctx is a job create sent to POST /jobs (a
+// person's Retry or a script), not one the server queues itself. A kind's
+// validator uses it to refuse paid work without a cap only there (N2: a
+// Jobs Retry of a comparison run with no spend cap).
+func FromJobsAPI(ctx context.Context) bool {
+	v, _ := ctx.Value(apiJobCreateKey{}).(bool)
+	return v
 }
