@@ -13,7 +13,7 @@ import (
 )
 
 func TestOrgBuildSlotsSetting(t *testing.T) {
-	for v, want := range map[string]int{"": 2, "x": 2, "1": 1, "0": 1, "-3": 1, " 3 ": 3, "99": maxOrgBuilds} {
+	for v, want := range map[string]int{"": defaultOrgBuilds, "x": defaultOrgBuilds, "2": 2, "1": 1, "0": 1, "-3": 1, " 3 ": 3, "99": maxOrgBuilds} {
 		if got := orgBuildSlots(v); got != want {
 			t.Errorf("orgBuildSlots(%q) = %d, want %d", v, got, want)
 		}

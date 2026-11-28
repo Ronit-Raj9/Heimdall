@@ -212,7 +212,10 @@ func newSlotSessionNames(org, id string, slot int) sessionNames {
 }
 
 const (
-	defaultOrgBuilds = 2
+	// One build at a time until two at once is proven on the shared
+	// worker's memory (each build runs its own BuildKit); set
+	// HEIMDALL_ORG_BUILDS=2 to turn it on.
+	defaultOrgBuilds = 1
 	maxOrgBuilds     = 8
 )
 

@@ -399,7 +399,7 @@ Isolation between orgs on the shared host:
 - Every org Dockerfile builds in a build session of its own: a fresh
   rootless BuildKit started for that build and removed afterwards (no Docker
   socket, no shared daemon, process table or cache with another org's
-  build), up to `HEIMDALL_ORG_BUILDS` builds at once per org (default 2;
+  build), up to `HEIMDALL_ORG_BUILDS` builds at once per org (default 1;
   1 means one at a time), each build slot with its own lock and the org's
   own cache volume `heimdall-buildcache-<org id>` (slot 0) or
   `heimdall-buildcache-<org id>-<k>`. BuildKit runs inside the network namespace
