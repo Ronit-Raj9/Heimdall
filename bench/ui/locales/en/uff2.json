@@ -1,0 +1,22 @@
+{
+	"canary": {
+		"hiddenTasks_one": "1 task that is not ready yet is hidden.",
+		"hiddenTasks_other": "{{count}} tasks that are not ready yet are hidden.",
+		"noReadyTasks": "No task of this benchmark has passed the readiness check yet. Run it on the benchmark page first.",
+		"confirmManual": "It runs only when you press Check now. The baseline and each check cost up to {{perRun}}, at most {{perDay}} a day.",
+		"confirmManualLabel": "Create drift monitor",
+		"noCheckYet": "No check yet",
+		"tooFew": "Too few runs to tell."
+	},
+	"schedules": {
+		"confirmTitle": "Add repeat run {{name}}?",
+		"confirmKnown": "It repeats on its own. One run costs about {{perRun}}. It spends at most {{day}} a day, {{month}} a month.",
+		"confirmUnknown": "It repeats on its own and spends at most {{day}} a day, {{month}} a month.",
+		"confirmLabel": "Add repeat run, up to {{day}} a day",
+		"runNowWatch": "Check the model catalog for {{name}} now? A new model it finds runs {{evaluation}} once, up to {{left}} of the {{limit}} daily limit.",
+		"failures_one": "1 firing in a row did not start.",
+		"failures_other": "{{count}} firings in a row did not start. It pauses itself at 3.",
+		"pausedBySelf": "Paused by itself",
+		"lastReason": "Why: {{reason}}"
+	}
+}

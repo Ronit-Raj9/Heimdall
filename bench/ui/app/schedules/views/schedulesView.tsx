@@ -25,7 +25,9 @@ import {
 import type { AlertConfig, Schedule, ScheduleRow, SchedulesFile, SchedulesResponse } from "@/lib/types/schedules";
 import { type Evaluation, useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import { ConfirmButton } from "@/components/platform/badges";
-import type { ConfirmFn } from "@/components/platform/confirmDialog";
+import { type ConfirmFn, useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/canaries/uff2I18n";
+import i18n from "@/lib/i18n";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
@@ -45,9 +47,22 @@ export function confirmRunNow(confirm: ConfirmFn, t: TFunction<"schedules">, r: 
 export function runNowMessage(t: TFunction<"schedules">, r: ScheduleRow): string {
 	const what = r.evaluation || r.experiment || r.job || r.name;
 	const limit = r.max_usd_per_day ?? 0;
+	// Lane F2 (PT-4): a model watch only checks the catalog; it restarts nothing.
+	if ((r as RowF2).new_models && limit > 0)
+		return i18n.t("schedules.runNowWatch", { ns: "uff2", name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) });
 	return limit > 0
 		? t("runNowAsk", { name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) })
 		: t("runNowAskNoLimit", { name: r.name, evaluation: what });
+}
+
+/** Row fields the lane F2 server adds (paused_reason, failures_in_a_row) and the model watch block; see notes F2 "For the lead". */
+export type RowF2 = ScheduleRow & { paused_reason?: string; failures_in_a_row?: number; new_models?: unknown };
+
+/** The confirm text of a new repeat run: it repeats and spends every day (lane F2). Exported for tests. */
+export function repeatConfirmText(c: ReturnType<typeof repeatCost>): string {
+	return c.perRun
+		? i18n.t("schedules.confirmKnown", { ns: "uff2", perRun: c.perRun, day: c.dailyLimit ?? "", month: c.monthMax ?? "" })
+		: i18n.t("schedules.confirmUnknown", { ns: "uff2", day: c.dailyLimit ?? "", month: c.monthMax ?? "" });
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -453,11 +468,16 @@ function ScheduleTable({
 											{r.name}
 										</span>
 										{isPaused(r) && (
-											<Pill tone="muted" testId={`schedule-paused-${r.name}`}>
-												{t("paused")}
+											<Pill tone={(r as RowF2).paused_reason ? "warn" : "muted"} testId={`schedule-paused-${r.name}`} title={(r as RowF2).paused_reason}>
+												{(r as RowF2).paused_reason ? i18n.t("schedules.pausedBySelf", { ns: "uff2" }) : t("paused")}
 											</Pill>
 										)}
 									</div>
+									{(r as RowF2).paused_reason && (
+										<div className="text-chart-error-ink text-xs break-words whitespace-normal" data-testid={`schedule-paused-reason-${r.name}`}>
+											{(r as RowF2).paused_reason}
+										</div>
+									)}
 									<div className="text-muted-foreground truncate text-xs" title={r.job || r.evaluation || r.experiment}>
 										{t(`kind.${r.kind}` as never, { defaultValue: r.kind })}
 										{r.job || r.evaluation || r.experiment ? ` · ${r.job || r.evaluation || r.experiment}` : ""}
@@ -478,9 +498,21 @@ function ScheduleTable({
 											{u("schedules.pillProblem")}
 										</Pill>
 									) : r.last ? (
-										<Pill tone={lastTone(r.last.status)} title={r.last.reason}>
-											{r.last.status}
-										</Pill>
+										<div className="flex max-w-72 flex-col gap-1">
+											<Pill tone={lastTone(r.last.status)} title={r.last.reason}>
+												{r.last.status}
+											</Pill>
+											{r.last.reason && (r.last.status === "error" || r.last.status === "refused") && (
+												<span className="text-muted-foreground line-clamp-3 text-xs break-words" data-testid={`schedule-reason-${r.name}`}>
+													{i18n.t("schedules.lastReason", { ns: "uff2", reason: r.last.reason })}
+												</span>
+											)}
+											{((r as RowF2).failures_in_a_row ?? 0) > 1 && !isPaused(r) && (
+												<span className="text-chart-error-ink text-xs" data-testid={`schedule-failures-${r.name}`}>
+													{i18n.t("schedules.failures", { ns: "uff2", count: (r as RowF2).failures_in_a_row })}
+												</span>
+											)}
+										</div>
 									) : (
 										<Pill tone="muted">{t("never")}</Pill>
 									)}
@@ -592,6 +624,7 @@ function AddScheduleForm({
 	const { t: u } = useTranslation("ux13");
 	const { t: m } = useTranslation("uf7b");
 	const { t: rj } = useTranslation("ufrj");
+	const confirm = useConfirm();
 	const evaluations = useListEvaluationsQuery();
 	const groups = finishedEvaluationGroups(evaluations.data ?? []);
 	const allOptions = groups.flatMap((g) => g.options);
@@ -620,10 +653,21 @@ function AddScheduleForm({
 	return (
 		<form
 			className="flex flex-col"
-			onSubmit={(e) => {
+			onSubmit={async (e) => {
 				e.preventDefault();
 				if (!ok) return;
 				const max = Number(s.max);
+				// Lane F2 (PH5-10): a new repeat run spends every day, so it always asks first.
+				if (
+					!initial &&
+					max > 0 &&
+					!(await confirm(repeatConfirmText(cost), {
+						title: i18n.t("schedules.confirmTitle", { ns: "uff2", name: s.name.trim() }),
+						confirmLabel: i18n.t("schedules.confirmLabel", { ns: "uff2", day: cost.dailyLimit ?? "" }),
+						costUsd: max,
+					}))
+				)
+					return;
 				void onAdd(
 					mergeScheduleEdit(initial, {
 						name: s.name.trim(),

@@ -25,6 +25,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import "@/components/platform/ufintI18n";
+import "@/components/canaries/uff2I18n";
 import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 
@@ -253,9 +254,19 @@ export function suiteRefs(suites: readonly Pick<SuiteSummary, "id" | "version">[
 
 /** The task ids of the picked benchmark ("id" or "id@version") in a list of full entries. Exported for tests. */
 export function suiteTaskIds(suites: readonly SuiteSummary[] | undefined, ref: string): string[] {
+	return suiteTaskPick(suites, ref).ready;
+}
+
+/**
+ * The tasks a drift monitor can watch: only the ones that passed the readiness check (lane F2,
+ * PH5-2), and how many others are hidden. Exported for tests.
+ */
+export function suiteTaskPick(suites: readonly SuiteSummary[] | undefined, ref: string): { ready: string[]; hidden: number } {
 	const [id, version] = ref.split("@");
 	const s = (suites ?? []).find((x) => x.id === id && (!version || x.version === version));
-	return (s?.tasks ?? []).map((tk) => tk.id);
+	const tasks = s?.tasks ?? [];
+	const ready = tasks.filter((tk) => tk.admitted !== false).map((tk) => tk.id);
+	return { ready, hidden: tasks.length - ready.length };
 }
 
 /** The schedules keys of the form's own problems. */
@@ -333,6 +344,7 @@ export function NewCanaryForm({
 	const { t: u } = useTranslation("ux13");
 	const { t: c } = useTranslation("uf7b");
 	const { t: d } = useTranslation("ufc6");
+	const { t: f2 } = useTranslation("uff2");
 	const [create, createState] = useCreateCanaryMutation();
 	const confirm = useConfirm();
 	// The org's alert channels (the hooks of the Repeat runs tab) for "Tell me when".
@@ -391,6 +403,20 @@ export function NewCanaryForm({
 		// A drift monitor is paid and lasting work: it asks first, with its cost (never on one click).
 		const cronNow = canaryCron(f);
 		const costNow = f.smoke ? null : checkCost(cronNow ? runsPerDay(cronNow) : 0, Number(f.perRun), Number(f.perDay));
+		// Lane F2 (PH5-1): one that only runs on Check now still asks, naming what a check costs.
+		const perRun = Number(f.perRun);
+		const perDay = Number(f.perDay);
+		if (
+			!costNow &&
+			!f.smoke &&
+			perRun > 0 &&
+			!(await confirm(f2("canary.confirmManual", { perRun: formatUsd(perRun), perDay: formatUsd(perDay) }), {
+				title: i18n.t("canary.confirmTitle", { ns: "ufint", name: f.name }),
+				confirmLabel: f2("canary.confirmManualLabel"),
+				costUsd: perRun,
+			}))
+		)
+			return;
 		if (
 			costNow &&
 			!(await confirm(i18n.t("canary.confirmBody", { ns: "ufint" }), {
@@ -428,7 +454,8 @@ export function NewCanaryForm({
 	if (f.suite && !refs.includes(f.suite)) refs.unshift(f.suite);
 	const agentList = agents.data?.agents ?? [];
 	const agentPaths = agentList.map((a) => a.path);
-	const allTaskIds = suiteTaskIds(full.currentData ? [full.currentData] : undefined, f.suite);
+	const taskPick = suiteTaskPick(full.currentData ? [full.currentData] : undefined, f.suite);
+	const allTaskIds = taskPick.ready;
 	for (const id of f.taskIds) if (!allTaskIds.includes(id)) allTaskIds.unshift(id);
 	const filter = taskFilter.trim().toLowerCase();
 	const matching = filter ? allTaskIds.filter((id) => id.toLowerCase().includes(filter)) : allTaskIds;
@@ -501,7 +528,9 @@ export function NewCanaryForm({
 				) : full.isLoading || (full.isFetching && !full.currentData) ? (
 					<span className="text-muted-foreground">{t("canary.tasksLoading")}</span>
 				) : allTaskIds.length === 0 ? (
-					<span className="text-muted-foreground">{t("canary.tasksNone")}</span>
+					<span className="text-muted-foreground" data-testid="canary-new-tasks-none-ready">
+						{taskPick.hidden > 0 ? f2("canary.noReadyTasks") : t("canary.tasksNone")}
+					</span>
 				) : (
 					<div className="flex flex-col gap-1" data-testid="canary-new-task-list">
 						{allTaskIds.length > 10 && (
@@ -524,6 +553,11 @@ export function NewCanaryForm({
 								</label>
 							))}
 						</div>
+						{taskPick.hidden > 0 && (
+							<span className="text-muted-foreground" data-testid="canary-new-tasks-hidden">
+								{f2("canary.hiddenTasks", { count: taskPick.hidden })}
+							</span>
+						)}
 						<span className="text-muted-foreground">
 							{t("canary.tasksPicked", { count: f.taskIds.length })}
 							{matching.length > shown.length && ` ${t("canary.tasksMore", { shown: shown.length, total: matching.length })}`}

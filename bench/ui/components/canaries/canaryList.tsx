@@ -6,14 +6,32 @@ import { getLocale } from "@/lib/i18n";
 import type { CanarySummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import "./uff2I18n";
 import { formatUSD, isCanaryState, sortCanaries, stateVariant, targetLabel } from "./canary.utils";
 
+/** Runs a look needs before "No change" means anything (canary.MinRunsToTell on the server). */
+export const MIN_RUNS_TO_TELL = 10;
+
+/**
+ * What a steady monitor can honestly say (lane F2): "No check yet" before its first check (PH5-5),
+ * "Too few runs to tell." when its last check had under 10 runs (PH5-7), else null (plain "No change").
+ * Exported for tests.
+ */
+export function steadyWords(s: Pick<CanarySummary, "state" | "looks" | "last_look"> | undefined): "noCheckYet" | "tooFew" | null {
+	if (!s || s.state !== "steady") return null;
+	if (!s.looks) return "noCheckYet";
+	if (s.last_look && s.last_look.kind !== "baseline" && s.last_look.runs < MIN_RUNS_TO_TELL) return "tooFew";
+	return null;
+}
+
 /** One canary state as a badge; a state this UI does not know shows as the server sent it. */
-export function CanaryStateBadge({ state, testId }: { state: string; testId?: string }) {
+export function CanaryStateBadge({ state, testId, summary }: { state: string; testId?: string; summary?: CanarySummary }) {
 	const { t } = useTranslation("bench");
+	const { t: f2 } = useTranslation("uff2");
+	const words = steadyWords(summary);
 	return (
-		<Badge variant={stateVariant(state)} data-state={state} data-testid={testId}>
-			{isCanaryState(state) ? t(`canaries.state.${state}`) : state}
+		<Badge variant={words ? "neutral" : stateVariant(state)} data-state={state} data-testid={testId}>
+			{words ? f2(`canary.${words}`) : isCanaryState(state) ? t(`canaries.state.${state}`) : state}
 		</Badge>
 	);
 }
@@ -83,7 +101,7 @@ export function CanaryList({ canaries, selected, onSelect, paused }: CanaryListP
 								)}
 							</TableCell>
 							<TableCell className="max-w-80">
-								<CanaryStateBadge state={c.state} testId={`canary-state-${c.name}`} />
+								<CanaryStateBadge state={c.state} summary={c} testId={`canary-state-${c.name}`} />
 								<p className="text-muted-foreground mt-1 line-clamp-3 text-xs" title={c.reason}>
 									{c.reason}
 								</p>

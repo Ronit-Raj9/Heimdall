@@ -25,7 +25,7 @@ export interface HowOftenValue {
 
 /** Every day at 06:00 in the browser's zone. */
 export function newHowOften(p: Partial<HowOftenValue> = {}): HowOftenValue {
-	return { when: "daily", time: "06:00", weekday: 1, cron: "", timezone: browserZone(), ...p };
+	return { when: "daily", time: "06:00", weekday: 1, cron: "", timezone: myZone(), ...p };
 }
 
 function hm(time: string): [number, number] {
@@ -52,8 +52,8 @@ export function howOftenCron(v: Pick<HowOftenValue, "when" | "time" | "weekday" 
 }
 
 /** The block's fields for a saved cron line and zone: a preset when the line matches one, else custom. */
-export function howOftenOf(cron: string | undefined, timezone: string | undefined, fallbackZone = browserZone()): HowOftenValue {
-	const tz = timezone?.trim() || (cron ? "UTC" : fallbackZone);
+export function howOftenOf(cron: string | undefined, timezone: string | undefined, fallbackZone = myZone()): HowOftenValue {
+	const tz = currentZone(timezone?.trim() || (cron ? "UTC" : fallbackZone));
 	const line = (cron ?? "").trim().replace(/\s+/g, " ");
 	if (!cron) return newHowOften({ when: "manual", timezone: tz });
 	if (line === "0 * * * *") return newHowOften({ when: "hourly", timezone: tz });
@@ -74,6 +74,37 @@ export function howOftenProblem(v: HowOftenValue): "empty" | "invalid" | null {
 }
 
 /** The zones offered: the browser's list when it has one, always with UTC, the browser zone and the current one. */
+/**
+ * Old zone names browsers still report (Chrome gives Asia/Calcutta) mapped to the current name the
+ * server stores (lane F2, PT-3). The server maps the same names; this keeps the form and the saved
+ * schedule in one spelling. Exported for tests.
+ */
+export const OLD_ZONE_NAMES: Readonly<Record<string, string>> = {
+	"Asia/Calcutta": "Asia/Kolkata",
+	"Asia/Saigon": "Asia/Ho_Chi_Minh",
+	"Asia/Katmandu": "Asia/Kathmandu",
+	"Asia/Rangoon": "Asia/Yangon",
+	"Asia/Dacca": "Asia/Dhaka",
+	"Europe/Kiev": "Europe/Kyiv",
+	"America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+	"America/Indianapolis": "America/Indiana/Indianapolis",
+	"America/Godthab": "America/Nuuk",
+	"Pacific/Enderbury": "Pacific/Kanton",
+	"Etc/UTC": "UTC",
+	"Etc/GMT": "UTC",
+};
+
+/** The current name of a zone (old names mapped), trimmed. */
+export function currentZone(name: string): string {
+	const z = name.trim();
+	return OLD_ZONE_NAMES[z] ?? z;
+}
+
+/** The browser's zone under its current name. */
+export function myZone(): string {
+	return currentZone(browserZone());
+}
+
 export function zoneOptions(current: string): string[] {
 	let all: string[] = [];
 	try {
@@ -82,7 +113,8 @@ export function zoneOptions(current: string): string[] {
 	} catch {
 		all = [];
 	}
-	const set = new Set(["UTC", browserZone(), current, ...all].filter(Boolean));
+	// The raw current name stays listed so a form that holds an old name still shows it as picked.
+	const set = new Set(["UTC", myZone(), current, ...all.map(currentZone)].filter(Boolean));
 	return [...set];
 }
 
@@ -138,7 +170,7 @@ export function HowOften({
 						>
 							{zoneOptions(value.timezone).map((z) => (
 								<option key={z} value={z}>
-									{z === browserZone() ? t("howOften.yourZone", { zone: z }) : z}
+									{z === myZone() ? t("howOften.yourZone", { zone: z }) : z}
 								</option>
 							))}
 						</NativeSelect>

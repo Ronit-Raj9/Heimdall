@@ -1,3 +1,4 @@
+import { currentZone } from "@/components/canaries/howOften";
 import "@/lib/i18n";
 
 import { benchApi } from "@/lib/store/apis/benchApi";
@@ -43,7 +44,7 @@ const filled = () => ({
 describe("how often (N80)", () => {
 	it("starts on every day at 06:00 in the browser zone and sends that zone (M7-48)", () => {
 		expect(newCanaryFields().when).toBe("daily");
-		expect(newCanaryFields().timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+		expect(newCanaryFields().timezone).toBe(currentZone(Intl.DateTimeFormat().resolvedOptions().timeZone) || "UTC");
 		expect(buildCanaryRequest({ ...filled(), timezone: "UTC" }).schedule).toEqual({ cron: "0 6 * * *", timezone: "UTC" });
 		expect(buildCanaryRequest({ ...filled(), time: "02:30", timezone: "Europe/Berlin" }).schedule).toEqual({
 			cron: "30 2 * * *",

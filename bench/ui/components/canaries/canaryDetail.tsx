@@ -49,7 +49,7 @@ export function CanaryDetailBody({ detail, actions }: CanaryDetailBodyProps) {
 			<header className="flex flex-col gap-2">
 				<div className="flex flex-wrap items-center gap-3">
 					<h2 className="text-foreground text-lg font-semibold tracking-tight">{s.name}</h2>
-					<CanaryStateBadge state={s.state} testId="canary-detail-state" />
+					<CanaryStateBadge state={s.state} summary={s} testId="canary-detail-state" />
 					{s.smoke && <Badge variant="outline">{t("canaries.smoke")}</Badge>}
 					{actions}
 				</div>

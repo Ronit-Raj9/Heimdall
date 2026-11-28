@@ -41,7 +41,7 @@ describe("CanaryDetailBody", () => {
 
 	it("says when nothing moved on a steady canary without a provider pair", () => {
 		const steady = renderToStaticMarkup(<CanaryDetailBody detail={CANARY_STEADY_FIXTURE} />);
-		expect(steady).toMatch(/data-testid="canary-detail-state"[^>]*>No change</);
+		expect(steady).toMatch(/data-testid="canary-detail-state"[^>]*>(Too few runs to tell\.|No check yet)</); // lane F2: a steady look on under 10 runs, or none, is not a clean "No change"
 		expect(steady).not.toContain('data-testid="canary-equivalence"');
 		expect(steady).toContain('data-testid="canary-tests-table"');
 	});
