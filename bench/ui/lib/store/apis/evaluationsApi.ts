@@ -384,6 +384,9 @@ export interface Estimate {
 	presets?: EstimatePreset[] | null;
 	/** Where the cost came from; "list_price" for an arm with no run history (server wiring). */
 	estimate_basis?: string;
+	/** Factors of runs besides each benchmark's tasks and conditions: arms (with the ones the launch adds, like the failover arm) and trials. */
+	arms?: number;
+	trials?: number;
 }
 
 export type BudgetFit = "fits" | "may_exceed" | "exceeds" | "unknown";

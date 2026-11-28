@@ -17,6 +17,7 @@ import { AgentPicker } from "@/components/agents/agentPicker";
 import { NativeSelect } from "@/components/ui/select";
 import { StickyFooter } from "@/components/ui/stickyFooter";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import { armProvider, failoverProblem } from "@/components/evaluations/failoverSettings";
 import { faultChange } from "@/components/reportcard/reportCard.utils";
 import "@/app/evaluations/views/gw08I18n";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
@@ -37,6 +38,7 @@ import {
 	useListEvaluationsQuery,
 	type AgentCompatibility,
 	type Estimate,
+	type EstimateBenchmark,
 	type Evaluation,
 	type EvaluationSpec,
 } from "@/lib/store/apis/evaluationsApi";
@@ -72,6 +74,18 @@ export interface FailureTestForm {
 	budgetText?: string;
 	/** The model picker was used: choosing an agent then keeps model and provider. */
 	modelTouched?: boolean;
+	/** Fallback model for a provider failover test (the wizard's "Provider failover"); used only with a model fault. */
+	fallback?: { provider: string; model: string };
+}
+
+type FaultInfo = { id: string; layer?: string; group?: string };
+
+/** Faults that take the model or its provider down: only these offer a fallback model. */
+export function takesModelDown(faults: readonly string[], catalog: readonly FaultInfo[] = FAULTS): boolean {
+	return faults.some((id) => {
+		const c = catalog.find((x) => x.id === id);
+		return c ? c.layer === "model" || c.layer === "provider" || c.group === "Model" : id.startsWith("model-") || id === "primary-outage";
+	});
 }
 
 /** The model a failure test runs: the one picked, else the agent's default (fromDefault). */
@@ -90,9 +104,15 @@ export function pickAgentForm(f: FailureTestForm, id: string): FailureTestForm {
 }
 
 /** The evaluation a failure test launches: one arm, a clean baseline plus the chosen faults. */
-export function failureTestSpec(f: FailureTestForm, agent?: Pick<AgentSummary, "model" | "gateway"> | null): EvaluationSpec {
+export function failureTestSpec(
+	f: FailureTestForm,
+	agent?: Pick<AgentSummary, "model" | "gateway"> | null,
+	catalog: readonly FaultInfo[] = FAULTS,
+): EvaluationSpec {
 	const { model, provider } = resolvedModel(f, agent);
 	const budget = parseBudget(f.budgetText ?? "");
+	// Sent as the wizard sends it (EvaluationSpec.failover): the server adds the fallback arm and the primary outage.
+	const fb = f.fallback?.model && takesModelDown(f.faults, catalog) ? f.fallback : undefined;
 	return {
 		name: `Failure test: ${f.agent}${f.version ? ` v${f.version}` : ""}`,
 		mode: "score",
@@ -110,20 +130,53 @@ export function failureTestSpec(f: FailureTestForm, agent?: Pick<AgentSummary, "
 		trials: f.trials,
 		faults: ["clean", ...new Set(f.faults.filter((x) => x !== "clean"))],
 		...(budget !== undefined ? { budget_usd: budget } : {}),
+		...(fb ? { failover: { enabled: true, fallbacks: [{ ...(fb.provider ? { provider: fb.provider } : {}), model: fb.model }] } } : {}),
 	};
+}
+
+/**
+ * The estimate's own run count as one line to check: tasks x tries x conditions (x setups when the
+ * launch adds arms, like the failover arm) = runs. Plain "N runs" when the parts do not multiply out.
+ */
+export function runsBreakdown(e: Pick<Estimate, "runs" | "per_benchmark" | "arms" | "trials"> | undefined): string | null {
+	if (!e) return null;
+	const runs = Number(e.runs) || 0;
+	const total = `${runs} ${runs === 1 ? "run" : "runs"}`;
+	const per: EstimateBenchmark[] = (e.per_benchmark ?? []).filter((b) => !b.skipped);
+	const arms = e.arms ?? 0;
+	const trials = e.trials ?? 0;
+	if (per.length === 0 || arms < 1 || trials < 1) return total;
+	const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+	const part = (tasks: number, conds: number) =>
+		[n(tasks, "task", "tasks"), n(trials, "try", "tries"), n(conds, "condition", "conditions"), ...(arms > 1 ? [n(arms, "setup", "setups")] : [])].join(" x ");
+	const sum = per.reduce((k, b) => k + b.tasks * b.conditions.length * trials * arms, 0);
+	if (sum !== runs) return total;
+	const sameConds = new Set(per.map((b) => b.conditions.length)).size === 1;
+	const line = sameConds
+		? part(per.reduce((k, b) => k + b.tasks, 0), per[0].conditions.length)
+		: per.map((b) => part(b.tasks, b.conditions.length)).join(" + ");
+	return `${line} = ${total}`;
 }
 
 /** Why Launch is off, or null when the form is complete. */
 export function formProblem(
 	f: FailureTestForm,
 	agent?: Pick<AgentSummary, "model" | "gateway"> | null,
-): "agent" | "model" | "benchmarks" | "faults" | "budget" | null {
+	catalog: readonly FaultInfo[] = FAULTS,
+): "agent" | "model" | "benchmarks" | "faults" | "budget" | "fallback" | null {
 	if (!f.agent) return "agent";
 	if (!resolvedModel(f, agent).model) return "model";
 	if (f.benchmarks.length === 0) return "benchmarks";
 	if (f.faults.length === 0) return "faults";
 	if ((f.budgetText ?? "").trim() !== "" && parseBudget(f.budgetText ?? "") === undefined) return "budget";
+	if (fallbackProblem(f, agent, catalog)) return "fallback";
 	return null;
+}
+
+/** Why the fallback model cannot run as set (the wizard's own check); "" when none is set or it can. */
+export function fallbackProblem(f: FailureTestForm, agent?: Pick<AgentSummary, "model" | "gateway"> | null, catalog: readonly FaultInfo[] = FAULTS): string {
+	const spec = failureTestSpec(f, agent, catalog);
+	return spec.failover ? failoverProblem(spec.arms[0], spec.failover) : "";
 }
 
 /** The most runs the form can start: every task once clean and once per fault, times repeats, per benchmark. */
@@ -397,8 +450,11 @@ export default function FailureTestsView() {
 	const summary = (agents.data?.agents ?? []).find((a) => a.id === form.agent);
 	// The agent's default model applies only while the user has not picked one, and the form says so.
 	const chosen = resolvedModel(form, summary);
-	const problem = formProblem(form, summary);
-	const spec = failureTestSpec(form, summary);
+	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
+	const problem = formProblem(form, summary, faultList);
+	const spec = failureTestSpec(form, summary, faultList);
+	const offerFallback = takesModelDown(form.faults, faultList);
+	const fbProblem = fallbackProblem(form, summary, faultList);
 	// The estimate waits until the form has been still for a moment, like the wizard's step 4.
 	const settled = useDebounced(spec, ESTIMATE_DEBOUNCE_MS);
 	const pending = JSON.stringify(settled) !== JSON.stringify(spec);
@@ -580,6 +636,23 @@ export default function FailureTestsView() {
 							})}
 						</div>
 						<p className="text-muted-foreground text-xs">{t("ft.cleanNote")}</p>
+						{offerFallback && (
+							<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:max-w-sm" data-testid="ft-fallback">
+								Fallback model (optional)
+								<GroupedModelPicker
+									value={form.fallback?.model ? form.fallback : null}
+									onChange={(v) => setForm((f) => ({ ...f, fallback: { provider: v.provider, model: v.model } }))}
+									testId="ft-fallback-model"
+									providers={armProvider(spec.arms[0]) ? [armProvider(spec.arms[0])] : []}
+								/>
+								<span className="text-muted-foreground font-normal">Adds a run of the agent with this fallback in Bifrost.</span>
+								{fbProblem && (
+									<span className="text-destructive font-normal" data-testid="ft-fallback-problem">
+										{fbProblem}
+									</span>
+								)}
+							</div>
+						)}
 					</fieldset>
 
 					<fieldset className="flex min-w-0 flex-col gap-2">
@@ -665,9 +738,10 @@ export default function FailureTestsView() {
 							onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
 							testId="ft-trials"
 						/>
-						{planned > 0 && (
+						{/* The server's own count (the estimate), as one line to check; never a count made here. */}
+						{problem === null && runsBreakdown(estimate.currentData) && (
 							<span className="flex h-(--control-h) items-center self-end text-sm font-medium tabular-nums sm:mt-[1.375rem] sm:self-start" data-testid="ft-runs-planned" aria-live="polite">
-								{tu("ft.runsPlanned", { count: planned })}
+								{runsBreakdown(estimate.currentData)}
 							</span>
 						)}
 						<label className="flex max-w-56 min-w-0 flex-col gap-1.5 text-xs font-medium">

@@ -170,7 +170,8 @@
 			"model": "Choose a model.",
 			"benchmarks": "Choose at least one benchmark.",
 			"faults": "Choose at least one fault.",
-			"budget": "Enter a budget above $0, or leave empty."
+			"budget": "Enter a budget above $0, or leave empty.",
+			"fallback": "Fix the fallback model."
 		},
 		"estimate": "{{runs}} runs, about {{cost}}",
 		"costUnknown": "cost unknown",
