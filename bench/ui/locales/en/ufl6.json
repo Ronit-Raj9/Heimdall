@@ -1,0 +1,31 @@
+{
+	"verify": {
+		"on": "Verify on",
+		"suiteAuto": "Quickest benchmark",
+		"task": "Task",
+		"taskAuto": "First task",
+		"connectionOnly": "Connection only",
+		"connectionOnlyHint": "Free: no task runs, no model calls."
+	},
+	"explain": {
+		"title": "Explain an error",
+		"label": "Error text",
+		"placeholder": "Paste the error from a run or a check",
+		"button": "Explain",
+		"notFound": "No known cause for this error. Check the agent's own logs."
+	},
+	"file": {
+		"title": "Check an agent file",
+		"label": ".heimdall/agent.yaml",
+		"button": "Check file",
+		"ok": "The file is valid.",
+		"config": "Agent config",
+		"repo": "Repository",
+		"fromGithub": "Read from GitHub",
+		"githubOff": "Connect GitHub in Settings, GitHub to read a repository.",
+		"githubNone": "This repository has no .heimdall/agent.yaml."
+	},
+	"test": {
+		"free": "Free on Heimdall. Sends one sample task, up to 2 minutes."
+	}
+}

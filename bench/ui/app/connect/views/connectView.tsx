@@ -59,6 +59,9 @@ import { FirstLookLauncher } from "./firstLookLauncher";
 import { MappingPreview } from "./mappingPreview";
 import { SecretCapture } from "./secretCapture";
 import { VerifyRows } from "./verifyRows";
+import { VerifyOptionsFields } from "./verifyOptions";
+import { AgentFileCheck, ExplainError } from "@/components/connect/connectTools";
+import { type VerifyOptions, verifyRequestBody } from "@/lib/store/apis/ufl6ConnectApi";
 
 const NO_PLATFORM = "none";
 
@@ -162,6 +165,9 @@ export default function ConnectView() {
 	const [save, saveState] = useSaveConnectedAgentMutation();
 	const [saved, setSaved] = useState<ConnectSaveResponse | undefined>();
 	const [startVerify, startState] = useStartVerifyMutation();
+	const [verifyOpts, setVerifyOpts] = useState<VerifyOptions>({ suite: "", task: "", connectionOnly: false });
+	const { t: t6 } = useTranslation("ufl6");
+	const member = canUse(useSession(), "member");
 	const [inline, setInline] = useState<ConnectVerifyStatus | undefined>();
 	const [jobId, setJobId] = useState<string | undefined>();
 	const [polling, setPolling] = useState(false);
@@ -236,7 +242,7 @@ export default function ConnectView() {
 		if (!saved) return;
 		setInline(undefined);
 		setJobId(undefined);
-		const res = await startVerify({ agent: saved.id });
+		const res = await startVerify(verifyRequestBody(saved.id, verifyOpts));
 		if ("data" in res && res.data) {
 			if (res.data.job_id) {
 				setInline(res.data);
@@ -543,6 +549,7 @@ export default function ConnectView() {
 			{saved && (
 				<Section title={t("verify.title")} description={t("verify.description")} testId="connect-verify">
 					<div className="flex flex-col gap-4">
+						<VerifyOptionsFields value={verifyOpts} onChange={setVerifyOpts} />
 						<div>
 							{/* One real task runs the agent, which calls its own model: paid, so it asks first. */}
 							<PaidButton
@@ -576,6 +583,19 @@ export default function ConnectView() {
 					<FirstLookLauncher agent={saved.id} />
 				</Section>
 			)}
+
+			<details className="group rounded-lg border p-4" data-testid="connect-explain-fold">
+				<summary className="cursor-pointer text-sm font-medium">{t6("explain.title")}</summary>
+				<div className="pt-3">
+					<ExplainError disabled={!member} />
+				</div>
+			</details>
+			<details className="group rounded-lg border p-4" data-testid="connect-agent-file-fold">
+				<summary className="cursor-pointer text-sm font-medium">{t6("file.title")}</summary>
+				<div className="pt-3">
+					<AgentFileCheck disabled={!member} />
+				</div>
+			</details>
 		</div>
 	);
 }

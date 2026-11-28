@@ -1,0 +1,20 @@
+{
+	"verify_own_task": {
+		"agent": "ask-bot",
+		"suite": "smoke",
+		"task": "t1"
+	},
+	"verify_connection_only": {
+		"agent": "ask-bot",
+		"skip_real_task": true
+	},
+	"verify_default": {
+		"agent": "ask-bot"
+	},
+	"explain": {
+		"text": "the agent answered HTTP 429"
+	},
+	"agent_file": {
+		"yaml": "id: bot\nconnect: {template: http-url, url: 'https://bot.example.com/run', auth_secret: BOT_TOKEN}\n"
+	}
+}

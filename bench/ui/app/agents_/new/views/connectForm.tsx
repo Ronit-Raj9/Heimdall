@@ -1,3 +1,4 @@
+import "@/components/connect/ufl6I18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -569,6 +570,7 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 /** "Test my endpoint" for a saved HTTP or OpenAI-compatible agent (agent page). */
 export function SavedEndpointTest({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: t6 } = useTranslation("ufl6");
 	const [run, state] = useTestEndpointMutation();
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid="saved-endpoint-test">
@@ -583,7 +585,7 @@ export function SavedEndpointTest({ agentId }: { agentId: string }) {
 				>
 					{t("new.test.button")}
 				</Button>
-				<span className="text-muted-foreground text-xs">{t("new.test.help")}</span>
+				<span className="text-muted-foreground text-xs">{t6("test.free")}</span>
 			</div>
 			<EndpointTestPanel result={state.data} error={state.error} loading={state.isLoading} />
 		</div>
