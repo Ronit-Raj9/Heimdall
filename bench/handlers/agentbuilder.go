@@ -603,14 +603,11 @@ func abSetPath(m *yaml.Node, value string, keys ...string) {
 				return
 			}
 			if child == nil {
-				m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, &yaml.Node{Kind: yaml.ScalarNode, Value: value})
+				m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, &yaml.Node{Kind: yaml.ScalarNode, Value: value, Style: abStringStyle(value)})
 				return
 			}
 			if child.Kind == yaml.ScalarNode {
-				child.Value, child.Tag, child.Style = value, "", 0
-				if value == "true" || value == "false" || value == "null" || abLooksNumeric(value) {
-					child.Style = yaml.DoubleQuotedStyle
-				}
+				child.Value, child.Tag, child.Style = value, "", abStringStyle(value)
 			}
 			return
 		}
@@ -648,9 +645,19 @@ func abLookupPath(m *yaml.Node, keys ...string) *yaml.Node {
 	return m
 }
 
-var abNumericRe = regexp.MustCompile(`^-?[0-9.]+([eE][-+]?[0-9]+)?$`)
-
-func abLooksNumeric(s string) bool { return abNumericRe.MatchString(s) }
+// abStringStyle is the style that keeps value a string when read back.
+// A plain scalar YAML would retype (True, NO, 1e3, ~, 2026-01-02, or text
+// starting with a special character) is double quoted; anything else stays
+// plain. Callers that want a number set the tag afterwards (abSetNumber).
+func abStringStyle(value string) yaml.Style {
+	var got any
+	if err := yaml.Unmarshal([]byte(value), &got); err == nil {
+		if s, ok := got.(string); ok && s == value {
+			return 0
+		}
+	}
+	return yaml.DoubleQuotedStyle
+}
 
 // abYAMLScalar reads one scalar of a YAML document.
 func abYAMLScalar(doc []byte, keys ...string) (string, error) {
@@ -808,7 +815,19 @@ func abApplyFields(doc []byte, f AgentConfigFields) ([]byte, error) {
 				}
 				slices.Sort(keys)
 				for _, k := range keys {
-					abSetPath(env, f.Env[k], k)
+					if f.Env[k] != "" {
+						abSetPath(env, f.Env[k], k)
+						continue
+					}
+					// An empty env value is a value (it blanks a variable),
+					// not a removal: abSetPath would drop the key.
+					if n := abMapGet(env, k); n != nil {
+						if n.Kind == yaml.ScalarNode {
+							n.Value, n.Tag, n.Style = "", "", yaml.DoubleQuotedStyle
+						}
+					} else {
+						env.Content = append(env.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, &yaml.Node{Kind: yaml.ScalarNode, Style: yaml.DoubleQuotedStyle})
+					}
 				}
 			}
 		}
