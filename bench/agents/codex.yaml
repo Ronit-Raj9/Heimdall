@@ -18,9 +18,12 @@
 # - session headers: the provider's http_headers table (verified on the wire).
 # - the run key is excluded from the environment of commands the agent runs;
 #   Codex itself still reads it through env_key.
-# - allow_login_shell = false: Codex runs commands with `/bin/sh -lc` by
-#   default, and the login profile resets PATH, which would drop the bench's
-#   tool-shim folder.
+# - login shells stay allowed: Codex runs commands with `/bin/sh -lc` by
+#   default and the model may ask for a login shell itself; with
+#   allow_login_shell = false that call fails the turn with "login shell is
+#   disabled by config" (PAID-5). The login profile resets PATH, which would
+#   drop the bench's tool-shim folder, so ~/.profile (read after /etc/profile,
+#   by sh and by bash when there is no ~/.bash_profile) puts it back first.
 # - web_search = "disabled": the hosted search tool runs at the provider and
 #   would reach the internet past the evaluation network.
 # - retries: Codex's own stay at their defaults (request_max_retries 4,
@@ -55,7 +58,7 @@ files:
   /home/agent/.codex/config.toml: |
     model = "{{model}}"
     model_provider = "bifrost"
-    allow_login_shell = false
+    allow_login_shell = true
     check_for_update_on_startup = false
     web_search = "disabled"
 
@@ -89,6 +92,14 @@ files:
     [model_providers.bifrost.http_headers]
     x-bf-session-id = "{{run.session}}"
     x-bf-session-affinity = "off"
+  /home/agent/.profile: |
+    # Written by the bench: a login shell keeps the tool-shim folder first.
+    for d in /opt/tools/shim /opt/bench/shim; do
+      if [ -d "$d" ]; then
+        case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH" ;; esac
+      fi
+    done
+    export PATH
 # Placeholder: every experiment sets the model (an arm may vary it).
 model: gpt-5.6-terra
 notes:

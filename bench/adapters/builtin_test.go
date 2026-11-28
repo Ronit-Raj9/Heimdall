@@ -214,7 +214,7 @@ func TestCodexConfigPlan(t *testing.T) {
 	for _, want := range []string{
 		"model = \"gpt-5.6-sol\"\n",
 		"model_provider = \"bifrost\"\n",
-		"allow_login_shell = false\n",
+		"allow_login_shell = true\n",
 		"web_search = \"disabled\"\n",
 		"[model_providers.bifrost]\n",
 		"base_url = \"" + testGateway + "/openai/v1\"\n",
@@ -232,6 +232,11 @@ func TestCodexConfigPlan(t *testing.T) {
 	}
 	if strings.Contains(toml, testKey) {
 		t.Error("config.toml contains the run key")
+	}
+	// PAID-5: a login shell the model asks for must run, not fail with
+	// "login shell is disabled by config"; the profile keeps the shim first.
+	if prof := plan.Files["/home/agent/.profile"]; !strings.Contains(prof, "/opt/bench/shim") || !strings.Contains(prof, "export PATH") {
+		t.Errorf(".profile = %q, want the shim folder put back on PATH", prof)
 	}
 	if plan.Files["/home/agent/.codex/AGENTS.md"] != testUserNotes || plan.Files[InstructionFile] != testInstruction {
 		t.Errorf("files = %v", plan.Files)
