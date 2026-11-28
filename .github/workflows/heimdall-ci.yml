@@ -133,7 +133,9 @@ jobs:
       - name: oxfmt on changed UI files
         run: |
           cd bench/ui && npm ci
-          files=$(git diff --name-only --diff-filter=AM ${{ github.event.before || 'HEAD~1' }} -- 'app/**' 'components/**' 'lib/**' | sed 's#^bench/ui/##')
+          # Generated test data is not formatted (.oxfmtrc.json ignores it); a list
+          # of only ignored files would make oxfmt exit with "no target file".
+          files=$(git diff --name-only --diff-filter=AM ${{ github.event.before || 'HEAD~1' }} -- 'app/**' 'components/**' 'lib/**' | sed 's#^bench/ui/##' | grep -v '/testdata/' || true)
           if [ -n "$files" ]; then npx oxfmt --check $files; fi
 
   docker:
