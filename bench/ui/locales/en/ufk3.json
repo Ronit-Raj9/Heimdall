@@ -10,5 +10,9 @@
 	},
 	"runs": {
 		"wholeRun": "Whole run"
+	},
+	"verdict": {
+		"stopped": "Stopped",
+		"stoppedHint": "You stopped this before enough runs were graded. Finished runs are kept."
 	}
 }
