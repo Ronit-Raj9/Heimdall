@@ -206,3 +206,32 @@ func orgSlotsAndCap(ctx context.Context, s Services) (int, float64) {
 	}
 	return l.MaxConcurrentRuns, l.MaxSpendUSDPerDay
 }
+
+// samePresetAsRequest gives the preset of the request's own size (tasks,
+// trials and faults) the request's runs, cost and time, so the card and the
+// estimate never show two numbers for one setup.
+func samePresetAsRequest(est *EvalEstimate, req *EvalEstimateRequest) {
+	for i := range est.Presets {
+		p := &est.Presets[i]
+		if p.TasksPerBenchmark != req.TasksPerBenchmark || p.Trials != req.Trials || !sameFaults(p.Faults, req.Faults) {
+			continue
+		}
+		p.Runs, p.EstCostUSD, p.EstMinutes, p.FromLibrary = est.Runs, est.EstCostUSD, est.EstMinutes, est.FromLibrary
+	}
+}
+
+// sameFaults is whether a and b name the same faults, clean counted as
+// always there.
+func sameFaults(a, b []string) bool {
+	norm := func(x []string) []string {
+		out := []string{faults.Clean}
+		for _, f := range x {
+			if !slices.Contains(out, f) {
+				out = append(out, f)
+			}
+		}
+		slices.Sort(out)
+		return out
+	}
+	return slices.Equal(norm(a), norm(b))
+}

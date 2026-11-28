@@ -473,6 +473,7 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 	out.Budget = estimateBudget(out, req.BudgetUSD, req.dailyCap)
 	if req.Presets {
 		out.Presets = estimatePresets(ctx, suites, src, req, agents, root, cache)
+		samePresetAsRequest(out, req)
 	}
 	if !ran {
 		out.Notes = append(out.Notes, "no benchmark of this evaluation can run")
@@ -724,7 +725,9 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		Primary:      schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:       []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:   cs,
-		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD},
+		// No budget: the cost forecast does not depend on it (estimateBudget
+		// compares the cap after), so every budget shares one forecast and the
+		// wizard's steps show one range for the same setup.
 		Verdict:      schemas.VerdictSpec{Policy: "paired_signflip"},
 		Concurrency:  evalConcurrency(schemas.EvaluationSpec{Concurrency: req.Concurrency}),
 		ManifestMode: "agent_exposure",
