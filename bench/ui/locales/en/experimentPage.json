@@ -79,7 +79,7 @@
 		"cheaper": "Cheaper",
 		"headlineDetail": "{{setup}} solved {{num}} of {{den}} at {{cost}} a run.",
 		"headlineDetailNoCost": "{{setup}} solved {{num}} of {{den}}, cost not known.",
-		"tokens": "Tokens per run",
+		"tokens": "Median tokens per run",
 		"unknown": "Not known",
 		"next": {
 			"ship": "Use {{arm}}. Export the report to share it.",

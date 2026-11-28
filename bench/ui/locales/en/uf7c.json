@@ -2,7 +2,7 @@
 	"page": {
 		"howTitle": "What a feature test is",
 		"howDef": "Same agent and benchmark, Bifrost feature off then on. Compares score, cost and time.",
-		"how1": "Connect your Bifrost below.",
+		"how1": "Most tests run on the built-in gateway. Connecting your own Bifrost is optional: only prompt and skill versions need it.",
 		"how2": "Pick a feature and press Test it. Choose a benchmark and an agent; the estimate shows before anything runs.",
 		"how3": "Open the result. Turn the setting on in Bifrost if it helped.",
 		"builtIn": "Built-in gateway: {{host}}, version {{version}}",
