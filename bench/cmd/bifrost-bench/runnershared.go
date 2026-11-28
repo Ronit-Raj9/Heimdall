@@ -848,6 +848,9 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 			HostSlot: h.orgHostSlot(org, slots),
 			Prefetch: runnerPrefetch(oa.logger, docker), // Z13 in the shared runner: under the org's Docker policy
 			Sync:     proj.refresh,                      // a benchmark emitted after the last download loads (ETag: cheap when unchanged)
+			// K7: each task's agent image is built right before its first slot
+			// runs, under the org's Docker policy (runneragentimages.go).
+			SlotAgentImages: newSlotAgentImages(engine.DockerAgentImages{Docker: docker}, planRoot, suite.LibraryDir()).ensure,
 			// Only issuebench.work and agent.build (N181) run here, in process,
 			// under the org's Docker policy; every other job kind goes to the
 			// org's own workers.

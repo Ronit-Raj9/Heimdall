@@ -236,7 +236,7 @@ func (p *Planner) buildTaskAgents(ctx context.Context, suite *schemas.Suite, con
 			am.TaskImages = map[string]string{}
 		}
 		am.TaskImages[id] = img.Tag
-		if p.deferGateway { // hosted plan: the runner builds the tag and records its id (audit 8-B-06)
+		if p.deferGateway || taskAgentBuildsDeferred(ctx) { // hosted plan, or a worker that builds per slot: the runner builds the tag and records its id (audit 8-B-06, K7)
 			continue
 		}
 		if b == nil {
@@ -255,6 +255,25 @@ func (p *Planner) buildTaskAgents(ctx context.Context, suite *schemas.Suite, con
 		}
 	}
 	return nil
+}
+
+// deferTaskAgentBuildsKey marks a plan context whose per-task agent images
+// are built later, one slot at a time (K7).
+type deferTaskAgentBuildsKey struct{}
+
+// WithDeferredTaskAgentBuilds returns ctx for a plan that resolves and
+// records each per-task agent image tag but builds none: the shared worker
+// replans a hosted manifest (whose per-task image ids come from the
+// coordinator's plan, which has none) and builds each task's image right
+// before that task's slot runs (WorkerOptions.SlotAgentImages). The tags,
+// and so the manifest hash, are the same as a plan that builds.
+func WithDeferredTaskAgentBuilds(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deferTaskAgentBuildsKey{}, true)
+}
+
+func taskAgentBuildsDeferred(ctx context.Context) bool {
+	v, _ := ctx.Value(deferTaskAgentBuildsKey{}).(bool)
+	return v
 }
 
 // taskAgentImage is the agent image a slot's run starts, and the id it was

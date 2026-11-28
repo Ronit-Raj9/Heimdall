@@ -15,6 +15,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -149,4 +150,146 @@ func fileDigest(path string) string {
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
+}
+
+// slotAgentImages builds, on the shared worker, the per-task agent image
+// (build.base_arg on a task's own image) of one leased slot right before
+// that slot runs (K7, engine.WorkerOptions.SlotAgentImages). Before, the
+// replan built every task's image of the experiment, one after another,
+// before the first slot ran (24 images, 29 minutes on the live worker).
+//
+// Isolation is unchanged: every build goes through builder, the org's own
+// policy docker (one slotAgentImages per org worker), so each build still
+// runs in a build session of that org (org lock, egress guard, the org's
+// own cache volume). Builds of one key run once; a concurrent slot of the
+// same task waits for that build. A failed build is remembered for
+// failedBuildTTL, so its retries of the same slot fail at once.
+type slotAgentImages struct {
+	builder engine.AgentImageBuilder
+	root    string
+	library string
+	now     func() time.Time
+
+	mu    sync.Mutex
+	keys  map[string]*slotBuild
+	built map[string]int // experiment id -> its builds started here, for the progress line
+}
+
+type slotBuild struct {
+	done   chan struct{}
+	err    error
+	failed time.Time
+}
+
+// failedBuildTTL is how long a failed per-task build is not tried again.
+const failedBuildTTL = 10 * time.Minute
+
+func newSlotAgentImages(b engine.AgentImageBuilder, root, library string) *slotAgentImages {
+	return &slotAgentImages{builder: b, root: root, library: library, now: time.Now, keys: map[string]*slotBuild{}, built: map[string]int{}}
+}
+
+// slotArm is the arm manifest a slot runs: the arm, or the compatibility
+// agent for "compat".
+func slotArm(m *schemas.Manifest, slot *schemas.Slot) *schemas.ArmManifest {
+	if am, ok := m.Arms[slot.Arm]; ok {
+		return &am
+	}
+	if slot.Arm == "compat" {
+		return m.Compatibility
+	}
+	return nil
+}
+
+// perTaskImageCount is the number of distinct per-task agent images m's
+// arms record, for "image n of N".
+func perTaskImageCount(m *schemas.Manifest) int {
+	tags := map[string]bool{}
+	add := func(am *schemas.ArmManifest) {
+		if am == nil || am.Config.Adapter == "scripted" {
+			return
+		}
+		for _, t := range am.TaskImages {
+			tags[t] = true
+		}
+	}
+	for _, am := range m.Arms {
+		add(&am)
+	}
+	add(m.Compatibility)
+	return len(tags)
+}
+
+// ensure implements engine.WorkerOptions.SlotAgentImages.
+func (x *slotAgentImages) ensure(ctx context.Context, m *schemas.Manifest, s *schemas.Suite, slot *schemas.Slot) error {
+	if m == nil || s == nil || slot == nil {
+		return nil
+	}
+	am := slotArm(m, slot)
+	if am == nil || am.Config.Adapter == "scripted" || am.Config.Build == nil || am.Config.Build.BaseArg == "" || am.TaskImages[slot.Task] == "" {
+		return nil
+	}
+	task := s.TaskByID(slot.Task)
+	if task == nil {
+		return nil
+	}
+	taskImg, ok, err := utils.TaskImage(s.ID, task)
+	if err != nil || !ok {
+		return err
+	}
+	cfg := am.Config
+	cfg.Image = cfg.Build.Tag // as the planner resolves it (engine.buildTaskAgents)
+	img, err := engine.ResolveTaskAgentImage(&cfg, s, task, taskImg.Tag, x.root, x.library)
+	if err != nil {
+		return fmt.Errorf("prepare the agent container for task %s: %w", slot.Task, err)
+	}
+	if !img.PerTask {
+		return nil
+	}
+	if img.Tag != am.TaskImages[slot.Task] {
+		return fmt.Errorf("prepare the agent container for task %s: it resolves to %s here but the plan recorded %s", slot.Task, img.Tag, am.TaskImages[slot.Task])
+	}
+	key := am.ConfigHash + "|" + s.ID + "|" + img.Tag + "|" + fileDigest(img.Dockerfile)
+	if err := x.build(ctx, key, img, m.ExpID, slot.Task, perTaskImageCount(m)); err != nil {
+		return fmt.Errorf("prepare the agent container %s for task %s: %w", img.Tag, slot.Task, err)
+	}
+	return nil
+}
+
+func (x *slotAgentImages) build(ctx context.Context, key string, img engine.AgentImage, exp, task string, total int) error {
+	x.mu.Lock()
+	b := x.keys[key]
+	if b != nil && b.err != nil && x.now().Sub(b.failed) >= failedBuildTTL {
+		b = nil // try a failed build again after a while
+	}
+	if b != nil {
+		x.mu.Unlock()
+		select {
+		case <-b.done:
+			return b.err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	b = &slotBuild{done: make(chan struct{})}
+	x.keys[key] = b
+	x.built[exp]++
+	n := x.built[exp]
+	x.mu.Unlock()
+	msg := fmt.Sprintf("Building the agent image for task %s", task)
+	if total > 1 {
+		msg = fmt.Sprintf("Building agent image %d of %d: task %s", min(n, total), total, task)
+	}
+	utils.ImageProgress(ctx)(msg)
+	_, err := x.builder.BuildAgentImage(ctx, img)
+	x.mu.Lock()
+	b.err = err
+	if err != nil {
+		b.failed = x.now()
+		if ctx.Err() != nil {
+			delete(x.keys, key) // a cancelled lease did not fail the build: the next slot tries again
+		}
+	}
+	x.mu.Unlock()
+	close(b.done)
+	return err
 }
