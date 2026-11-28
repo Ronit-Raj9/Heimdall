@@ -5,6 +5,7 @@ import { getLocale } from "@/lib/i18n";
 import type { ExperimentStatus, LiveEvent } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { imageBuilding } from "@/components/estimate/imageWait";
 
 type SlotState = "pending" | "running" | "pass" | "fail" | "error";
 
@@ -24,6 +25,7 @@ const MAX_EVENTS = 6;
  */
 export function LiveProgress({ status }: { status: ExperimentStatus }) {
 	const { t } = useTranslation("experimentPage");
+	const { t: h } = useTranslation("ufh2");
 	const locale = getLocale();
 	const expId = status.exp_id;
 	const events = useGetExperimentEventsQuery({ expId, since: 0 }, { pollingInterval: EXPERIMENT_POLL_MS, skipPollingIfUnfocused: true });
@@ -34,6 +36,7 @@ export function LiveProgress({ status }: { status: ExperimentStatus }) {
 	const list = events.data?.events ?? [];
 	const slots = slotStates(grid.data?.rows.flatMap((row) => row.cells) ?? [], list);
 	const latest = list.slice(-MAX_EVENTS).reverse();
+	const building = imageBuilding(list);
 	const spent = live.spent_usd?.state === "observed" && typeof live.spent_usd.v === "number" ? formatValueNumber(live.spent_usd.v, "usd", locale) : null;
 
 	return (
@@ -46,6 +49,12 @@ export function LiveProgress({ status }: { status: ExperimentStatus }) {
 				<span className="tabular-nums">{t("live.slots", { done, total })}</span>
 				{running > 0 && <span className="text-muted-foreground">{t("live.running", { count: running })}</span>}
 				{failed > 0 && <span className="text-chart-error-ink">{t("live.failed", { count: failed })}</span>}
+				{building && (
+					<span className="text-muted-foreground min-w-0 truncate" data-testid="experiment-progress-images" title={building.message}>
+						{h("images.building")}
+						{building.message ? `: ${building.message}` : ""}
+					</span>
+				)}
 				{spent && <span className="text-muted-foreground ml-auto tabular-nums">{t("live.spent", { usd: spent })}</span>}
 			</div>
 			<div className="bg-muted h-2 w-full overflow-hidden rounded-full" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>

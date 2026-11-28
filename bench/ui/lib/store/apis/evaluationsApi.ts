@@ -1,3 +1,4 @@
+import type { TaskImageWait } from "@/lib/types/gateway";
 import { withOrgParam } from "./orgParam";
 import type { DatasetComparison } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
@@ -384,6 +385,8 @@ export interface Estimate {
 	presets?: EstimatePreset[] | null;
 	/** Where the cost came from; "list_price" for an arm with no run history (server wiring). */
 	estimate_basis?: string;
+	/** The wait before the first run while task images are built; absent when no benchmark brings its own. */
+	image_wait?: TaskImageWait | null;
 }
 
 export type BudgetFit = "fits" | "may_exceed" | "exceeds" | "unknown";

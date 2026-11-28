@@ -154,6 +154,9 @@ type EvalBenchmarkEstimate struct {
 	EstCostUSD EvalCostRange    `json:"est_cost_usd"`
 	EstMinutes EvalMinutesRange `json:"est_minutes"`
 	Basis      string           `json:"basis,omitempty"`
+	// TaskImages is how many per-task agent images this benchmark may need
+	// built before its runs start (imagewait_ufh2.go).
+	TaskImages int `json:"task_images,omitempty"`
 	// EstimateBasis is "list_price" when some arm has no run history at all
 	// and its cost is a rough guess: its agent's typical tokens per run times
 	// the model's list price (forecast basis agent_tokens). Empty otherwise.
@@ -190,6 +193,9 @@ type EvalEstimate struct {
 	FromLibrary bool `json:"from_library,omitempty"`
 	// Presets are the preset sizes of the same setup, when asked for.
 	Presets []EvalPresetEstimate `json:"presets,omitempty"`
+	// ImageWait is the wait before the first run while task images are
+	// built; absent when no benchmark brings its own task images.
+	ImageWait *ImageWait `json:"image_wait,omitempty"`
 }
 
 // EvalSlots is how many runs of the evaluation go at once: Concurrency per
@@ -467,6 +473,13 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 		out.EstMinutes.Low, out.EstMinutes.High = agentLow/p/60, agentHigh/p/60
 	}
 	out.EstMinutes.Known = ran && timeKnown
+	images := 0
+	for _, be := range out.PerBenchmark {
+		if be.Skipped == "" {
+			images += be.TaskImages
+		}
+	}
+	out.ImageWait = imageWait(images)
 	if out.FromLibrary {
 		out.Notes = append(out.Notes, "First run, estimate from library data: other agents' finished runs on the same tasks, repriced for your model. Your agent may differ, so the range is wide; it narrows from your own runs after this evaluation.")
 	}
@@ -631,6 +644,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Notes = append(be.Notes, fmt.Sprintf("The MCP route does not apply to %s: it has no MCP tool server.", id))
 	}
 	sets := make([]map[string]any, len(req.Arms))
+	imageAgents := map[string]bool{}
 	for i, a := range req.Arms {
 		path, _ := normalizeAgent(a.Agent)
 		v := deriveTaskImageAgent(agents[path], st, tasks, agents, root)
@@ -641,8 +655,10 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		if v.Set != nil {
 			sets[i] = v.Set
 			be.Notes = append(be.Notes, v.Note)
+			imageAgents[path] = true
 		}
 	}
+	be.TaskImages = len(imageAgents) * ownImageTasks(st, tasks)
 	conds, skipped := faults.Conditions(req.Faults, st)
 	be.Tasks, be.Conditions = len(tasks), conds
 	if skipped != nil {

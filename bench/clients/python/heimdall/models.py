@@ -4727,6 +4727,7 @@ class EvalBenchmarkEstimate(_EvalBenchmarkEstimateRequired, total=False):
     estimate_basis: str
     from_library: bool
     skipped: str
+    task_images: int
 
 
 class _EvalBudgetRequired(TypedDict):
@@ -4769,6 +4770,7 @@ class _EvalEstimateRequired(TypedDict):
 
 class EvalEstimate(_EvalEstimateRequired, total=False):
     from_library: bool
+    image_wait: Optional[ImageWait]
     presets: List[EvalPresetEstimate]
 
 
@@ -6525,6 +6527,12 @@ class ImageSpec(_ImageSpecRequired, total=False):
     context: str
     digest: str
     dockerfile: str
+
+
+class ImageWait(TypedDict):
+    images: int
+    minutes: int
+    up_to: bool
 
 
 class ImportList(TypedDict):
@@ -17363,6 +17371,7 @@ __all__ = [
     'HomeSummary',
     'HumanAction',
     'ImageSpec',
+    'ImageWait',
     'ImportList',
     'ImportRecord',
     'ImportedExperiment',
