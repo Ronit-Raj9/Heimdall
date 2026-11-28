@@ -101,6 +101,14 @@ type WorkerOptions struct {
 	// a benchmark added after the last download fails "load suite" and the
 	// lease is refused. An error is logged and the last copy is used.
 	Sync func(ctx context.Context) error
+	// SlotAgentImages, when set, builds the per-task agent image one slot
+	// of a hosted manifest starts, right before that slot runs (K7). The
+	// worker's replan of such a manifest then records the per-task tags
+	// without building them (WithDeferredTaskAgentBuilds), so the first run
+	// starts after one build instead of after every task's build, and one
+	// task's failed build refuses only that task's slots. Nil keeps the old
+	// order: every image is built when the experiment is admitted.
+	SlotAgentImages func(ctx context.Context, m *schemas.Manifest, s *schemas.Suite, slot *schemas.Slot) error
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -422,6 +430,15 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, why, false, nil)
 		return nil
 	}
+	if why := w.slotAgentImages(sctx, exp, slot); why != "" { // K7: this task's agent image, built now
+		// Given back, not refused: a refusal ends every queued slot of the
+		// experiment (remote.go failRefused), and one task's build must not
+		// stop the other tasks. The slot ends after maxAttempts with the reason.
+		w.logger.Warn("lease given back", "lease", lease.LeaseID, "experiment", lease.ExpID, "task", slot.Task, "reason", why)
+		stop()
+		w.release(ctx, lease, why, false, nil)
+		return nil
+	}
 	// Tenancy area: a hosted manifest defers the gateway preflight to this
 	// runner; it runs before every slot and refuses the lease on a failure
 	// (remotegateway.go).
@@ -612,7 +629,11 @@ func (w *Worker) check(ctx context.Context, lease *schemas.WorkerLease, m *schem
 		return nil, fmt.Sprintf("local suite lock hash %s is not the manifest's %s", suite.LockHash, m.SuiteLockHash)
 	}
 	exp := m.Experiment
-	local, err := w.replan(WithFrozenTasks(ctx, m), &exp) // tasks the coordinator's quarantine dropped before the freeze stay out (2-C-11)
+	pctx := WithFrozenTasks(ctx, m)
+	if w.deferTaskAgentBuilds(m) {
+		pctx = WithDeferredTaskAgentBuilds(pctx) // K7: built per slot, before each slot runs (slotAgentImages)
+	}
+	local, err := w.replan(pctx, &exp) // tasks the coordinator's quarantine dropped before the freeze stay out (2-C-11)
 	if err != nil {
 		return nil, "plan the experiment locally: " + err.Error()
 	}
@@ -1229,4 +1250,25 @@ func removeSealedTree(dir string) error {
 		return nil
 	})
 	return os.RemoveAll(dir)
+}
+
+// deferTaskAgentBuilds reports whether the replan of m leaves the per-task
+// agent images to slotAgentImages: only with that hook, and only for a
+// hosted manifest, whose per-task image ids are adopted from the
+// coordinator's plan (adoptArmImages), so ids the replan would have built
+// never reach the manifest hash.
+func (w *Worker) deferTaskAgentBuilds(m *schemas.Manifest) bool {
+	return w.opts.SlotAgentImages != nil && hostedImagesAdopted(m)
+}
+
+// slotAgentImages builds the slot's per-task agent image when the replan
+// deferred it, and returns why the slot cannot run when the build fails.
+func (w *Worker) slotAgentImages(ctx context.Context, exp *workerExp, slot *schemas.Slot) string {
+	if exp == nil || exp.m == nil || slot == nil || !w.deferTaskAgentBuilds(exp.m) {
+		return ""
+	}
+	if err := w.opts.SlotAgentImages(ctx, exp.m, exp.suite, slot); err != nil {
+		return err.Error()
+	}
+	return ""
 }
