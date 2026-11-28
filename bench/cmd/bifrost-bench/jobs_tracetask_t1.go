@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tracebuild"
 	"github.com/maximhq/bifrost/bench/traceinbox"
 )
@@ -45,11 +48,12 @@ type traceTaskParams struct {
 	modelParams
 }
 
-// Admission is the admission part of the job's result. Status is "not_run"
-// until lane T1's admission step lands; Admitted is false until a person
-// approves.
+// traceTaskAdmission is the admission part of the job's result. Status is
+// "ran", or "not_run" with Reason when no admission could run here.
+// Admitted is false until a person approves.
 type traceTaskAdmission struct {
 	Status   string           `json:"status"`
+	Reason   string           `json:"reason,omitempty"`
 	Admitted bool             `json:"admitted"`
 	Controls []traceTaskCheck `json:"controls"`
 	Guards   []traceTaskCheck `json:"guards"`
@@ -65,6 +69,80 @@ type traceTaskCheck struct {
 type traceTaskResult struct {
 	*tracebuild.Result
 	Admission traceTaskAdmission `json:"admission"`
+	Attempt   int                `json:"attempt"` // 1, or 2 after the one retry with admission's feedback
+}
+
+// errAdmitNeedsWorker: the hosted server process has no Docker.
+var errAdmitNeedsWorker = errors.New("admission of a built draft is not dispatched to a worker yet; run it with heimdall task admit")
+
+// traceTaskAdmit runs admission for the one drafted task under benchRoot.
+// Tests replace it. The default runs suite.Admit in process where this
+// process has Docker (the local server); on the hosted site it returns
+// errAdmitNeedsWorker.
+var traceTaskAdmit = func(ctx context.Context, env jobEnv, benchRoot, suiteID, taskID string) (*schemas.AdmissionRecord, error) {
+	if env.Hosted || env.App == nil || env.App.reg == nil {
+		return nil, errAdmitNeedsWorker
+	}
+	a := env.App
+	s, err := loadSuite(ctx, benchRoot, suiteID)
+	if err != nil {
+		return nil, err
+	}
+	t := s.TaskByID(taskID)
+	if t == nil {
+		return nil, fmt.Errorf("the draft suite has no task %q", taskID)
+	}
+	if problems := suite.StaticValidation(ctx, s, taskID); suite.Errors(problems) > 0 {
+		var msgs []string
+		for _, p := range problems {
+			msgs = append(msgs, fmt.Sprint(p))
+		}
+		return &schemas.AdmissionRecord{Checks: []schemas.AdmissionCheck{{Name: suite.StaticValidationCheck, Want: suite.GotPass, Got: suite.GotFail, Detail: strings.Join(msgs, "; ")}}}, nil
+	}
+	deps := suite.AdmitDeps{Logger: a.logger}
+	for _, e := range a.reg.Environments {
+		if e.GetName() == s.Environment {
+			deps.Env = e
+		}
+	}
+	for _, g := range a.reg.Graders {
+		if g.GetName() == s.Grader {
+			deps.Grader = g
+		}
+	}
+	if deps.Env == nil || deps.Grader == nil {
+		return nil, fmt.Errorf("suite %s: environment %q or grader %q is not registered", s.ID, s.Environment, s.Grader)
+	}
+	if err := a.ensureImages(ctx, s); err != nil {
+		return nil, err
+	}
+	return suite.Admit(ctx, deps, s, t)
+}
+
+// admissionOf splits a record into controls and guards; admitted stays
+// false (a person approves).
+func admissionOf(rec *schemas.AdmissionRecord) traceTaskAdmission {
+	out := traceTaskAdmission{Status: "ran", Controls: []traceTaskCheck{}, Guards: []traceTaskCheck{}}
+	for _, c := range rec.Checks {
+		tc := traceTaskCheck{Name: c.Name, Want: c.Want, Got: c.Got, Detail: c.Detail}
+		if strings.HasPrefix(c.Name, "guard_") {
+			out.Guards = append(out.Guards, tc)
+		} else {
+			out.Controls = append(out.Controls, tc)
+		}
+	}
+	return out
+}
+
+// failedControl is the first control whose result is not the wanted one,
+// as feedback text, or "".
+func failedControl(a traceTaskAdmission) string {
+	for _, c := range a.Controls {
+		if c.Want != c.Got {
+			return fmt.Sprintf("control %s: want %s got %s. %s", c.Name, c.Want, c.Got, c.Detail)
+		}
+	}
+	return ""
 }
 
 func validateTraceTask(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
@@ -125,15 +203,38 @@ func runTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 	if err := os.RemoveAll(buildDir); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(buildDir, 0o755); err != nil {
-		return nil, err
+	var out traceTaskResult
+	feedback := p.Feedback
+	for attempt := 1; attempt <= 2; attempt++ {
+		work := filepath.Join(buildDir, fmt.Sprintf("attempt-%d", attempt))
+		if err := os.MkdirAll(work, 0o755); err != nil {
+			return nil, err
+		}
+		res, err := tracebuild.Build(ctx, tracebuild.Input{Item: p.InboxID, Session: sess, Suite: p.Suite, WorkDir: work,
+			Model: c, Limits: tracebuild.Limits{BudgetUSD: p.BudgetUSD}, Feedback: feedback})
+		if err != nil {
+			if attempt == 2 && out.Result != nil {
+				out.Notes = append(out.Notes, "The retry with admission's feedback failed: "+err.Error())
+				break
+			}
+			return nil, err
+		}
+		out = traceTaskResult{Result: res, Attempt: attempt, Admission: traceTaskAdmission{Status: "not_run", Controls: []traceTaskCheck{}, Guards: []traceTaskCheck{}}}
+		rec, err := traceTaskAdmit(ctx, env, filepath.Join(work, "benchmarks"), p.Suite, res.TaskID)
+		if err != nil {
+			out.Admission.Reason = err.Error()
+			break
+		}
+		out.Admission = admissionOf(rec)
+		feedback = failedControl(out.Admission)
+		if feedback == "" || p.Feedback != "" {
+			break // every control holds, or this job already is the retry
+		}
+		if log != nil {
+			log.Printf("admission refused attempt %d: %s; building once more", attempt, feedback)
+		}
 	}
-	res, err := tracebuild.Build(ctx, tracebuild.Input{Item: p.InboxID, Session: sess, Suite: p.Suite, WorkDir: buildDir,
-		Model: c, Limits: tracebuild.Limits{BudgetUSD: p.BudgetUSD}, Feedback: p.Feedback})
-	if err != nil {
-		return nil, err
-	}
-	out := traceTaskResult{Result: res, Admission: traceTaskAdmission{Status: "not_run", Controls: []traceTaskCheck{}, Guards: []traceTaskCheck{}}}
+	res := out.Result
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return nil, err
