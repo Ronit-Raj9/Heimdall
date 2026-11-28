@@ -14,6 +14,8 @@ import type { ReleaseRecord } from "@/lib/types/bench";
 import "@/components/canaries/uf7bI18n";
 import { Plus, Rocket } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
+import { releaseLinkMissing } from "@/components/releases/releases.utils";
+import "@/components/livescore/ufl9I18n";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChainBadge, ReleaseCards } from "./releaseCards";
@@ -42,6 +44,7 @@ export function noComparisonYet(q: { isSuccess: boolean; data?: { experiments?: 
 export default function ReleasesView() {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: l9 } = useTranslation("ufl9");
 	const releases = useListReleasesQuery();
 	// ?exp=<id>: "Promote this version" on a verdict opens the form with that comparison picked.
 	const [expParam, setExpParam] = useQueryState("exp", parseAsString);
@@ -120,7 +123,14 @@ export default function ReleasesView() {
 							testId="release-timeline-empty"
 						/>
 					) : (
-						<ReleaseCards releases={list} chainOk={releases.data?.chain_ok ?? false} />
+						<>
+							{releaseLinkMissing(list, releaseParam) && (
+								<p className="text-muted-foreground text-sm" data-testid="release-link-missing">
+									{l9("release.notFound")}
+								</p>
+							)}
+							<ReleaseCards releases={list} chainOk={releases.data?.chain_ok ?? false} />
+						</>
 					)}
 					<p className="text-muted-foreground text-xs" data-testid="releases-disclaimer">
 						{t("releases.disclaimer")}

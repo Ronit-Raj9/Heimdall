@@ -109,7 +109,7 @@ export default function FindingsTab() {
 				</div>
 			)}
 			{selected && !current && one.error ? (
-				<LoadError title={l9("finding.loadError")} error={one.error} notFound onRetry={() => void one.refetch()} testId="finding-one-error" />
+				<LoadError title={l9("finding.loadError")} error={one.error} onRetry={() => void one.refetch()} testId="finding-one-error" />
 			) : null}
 			{current ? <FindingDetail key={current.id} finding={current} onClose={() => void setSelected(null)} /> : null}
 			{bothEmpty && investigating ? <InvestigateDialog onDone={() => setInvestigating(false)} /> : null}

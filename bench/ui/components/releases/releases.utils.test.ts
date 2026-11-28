@@ -199,3 +199,13 @@ describe("releaseDisabledReason (N170)", () => {
 		expect(releaseDisabledReason({ ...base, action: "hold", values: { ...named, override: true, overrideReason: "hotfix" } })).toBeNull();
 	});
 });
+describe("releaseLinkMissing", () => {
+	it("is true only for a linked id the loaded log does not hold", async () => {
+		const { releaseLinkMissing } = await import("./releases.utils");
+		const log = [{ release_id: "rel_1" }] as unknown as Parameters<typeof releaseLinkMissing>[0];
+		expect(releaseLinkMissing(log, "rel_1")).toBe(false);
+		expect(releaseLinkMissing(log, "rel_9")).toBe(true);
+		expect(releaseLinkMissing(log, null)).toBe(false);
+		expect(releaseLinkMissing([], "rel_9")).toBe(false);
+	});
+});

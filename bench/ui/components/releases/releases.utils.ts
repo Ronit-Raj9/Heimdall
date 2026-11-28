@@ -175,3 +175,7 @@ export function verdictPolicyDecision(verdict: unknown): ReleasePolicyDecision |
 	const decision = (policy as { decision?: unknown }).decision;
 	return POLICY_DECISIONS.find((d) => d === decision);
 }
+/** A ?release=<id> link whose id is not in the loaded log: the page says so instead of scrolling nowhere. */
+export function releaseLinkMissing(releases: readonly ReleaseRecord[], id: string | null): boolean {
+	return Boolean(id) && releases.length > 0 && !releases.some((r) => r.release_id === id);
+}
