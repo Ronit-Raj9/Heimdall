@@ -19,7 +19,7 @@ import {
 	useScanIssuesMutation,
 	useStartIssueRunMutation,
 } from "@/lib/store/apis/issuebenchApi";
-import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus } from "@/lib/types/issuebench";
+import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus, IssueValidation } from "@/lib/types/issuebench";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,6 +41,14 @@ export function startBody(consent: boolean, provider: string, model: string, bud
 	const body: { consent: boolean; provider?: string; model?: string; budget_usd?: number } = p && m ? { consent, provider: p, model: m } : { consent };
 	if (budgetUSD !== undefined && budgetUSD > 0) body.budget_usd = budgetUSD;
 	return body;
+}
+
+/**
+ * The proof line of a validated issue: fail_to_pass are the fix's tests that failed before the
+ * fix and passed after it (validate keeps only those), so a non-empty list is yes for both.
+ */
+export function proofHolds(v: IssueValidation): boolean {
+	return (v.fail_to_pass?.length ?? 0) > 0;
 }
 
 /** The cap the person typed, or null when it is not a number from 0.01 to 50 (the server's range). */
@@ -400,6 +408,7 @@ export function IssueJobLog({ jobId, t, initialOpen = false }: { jobId: string; 
 }
 
 export function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; writable: boolean; t: T }) {
+	const { t: t5 } = useTranslation("uft5");
 	const [review, reviewState] = useReviewIssueMutation();
 	const [retry, retryState] = useRetryIssueMutation();
 	const [editing, setEditing] = useState(false);
@@ -449,7 +458,10 @@ export function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueI
 				{it.job_id && <IssueJobLog jobId={it.job_id} t={t} />}
 				{error && <div className="text-destructive">{error}</div>}
 			</td>
-			<td className="py-1 pr-2">{v ? t("tests", { f2p: v.fail_to_pass?.length ?? 0, p2p: v.pass_to_pass?.length ?? 0 }) : ""}</td>
+			<td className="py-1 pr-2">
+				{v ? t("tests", { f2p: v.fail_to_pass?.length ?? 0, p2p: v.pass_to_pass?.length ?? 0 }) : ""}
+				{v && <div className="text-muted-foreground text-xs" data-testid={`issuebench-proof-${issue}`}>{t5("proof", { before: t5(proofHolds(v) ? "yes" : "no"), after: t5(proofHolds(v) ? "yes" : "no") })}</div>}
+			</td>
 			<td className="py-1">
 				<div className="flex flex-wrap gap-1">
 					{writable && it.status === "ready" && !editing && (
