@@ -208,7 +208,7 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 			rec.Admitted = false
 		}
 	}
-	deps.Logger.Info("task admission", "suite", s.ID, "task", t.ID, "version", t.Version, "admitted", rec.Admitted)
+	deps.Logger.Info("task admission controls ran; the guards decide admission", "suite", s.ID, "task", t.ID, "version", t.Version, "controls_passed", rec.Admitted)
 	return rec, nil
 }
 

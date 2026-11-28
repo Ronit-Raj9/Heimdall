@@ -152,6 +152,10 @@ func (c *checker) determinism() schemas.AdmissionCheck {
 	return result(CheckDeterminism, true, "")
 }
 
+// approveInstruction is what the clarity guard asks for: a person's review
+// of the instruction, recorded as provenance.instruction_reviewed.
+const approveInstruction = "A person must approve the instruction: open the draft and press Approve."
+
 func (c *checker) clarity() schemas.AdmissionCheck {
 	if p := c.t.Provenance; p != nil && p.InstructionReviewed != nil && *p.InstructionReviewed {
 		return result(CheckClarity, true, "")
@@ -160,11 +164,10 @@ func (c *checker) clarity() schemas.AdmissionCheck {
 	if cl != nil && cl.Verdict == ClarityClear {
 		return result(CheckClarity, true, "")
 	}
-	first := "no check was run"
 	if cl != nil && len(cl.Problems) > 0 && cl.Problems[0].Quote != "" {
-		first = cl.Problems[0].Quote
+		return result(CheckClarity, false, fmt.Sprintf("The instruction may be unclear: %s. %s", cl.Problems[0].Quote, approveInstruction))
 	}
-	return result(CheckClarity, false, fmt.Sprintf("The instruction may be unclear: %s. A person must approve or edit it.", first))
+	return result(CheckClarity, false, approveInstruction)
 }
 
 func (c *checker) provenance() schemas.AdmissionCheck {

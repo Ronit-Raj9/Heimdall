@@ -189,7 +189,7 @@ func TestApplyClarityNeedsReviewOrClear(t *testing.T) {
 	no := false
 	task.Provenance.InstructionReviewed = &no
 	c := check(t, Apply(s, task, okRec()), CheckClarity)
-	if c.Passed || c.Detail != "The instruction may be unclear: the thing. A person must approve or edit it." {
+	if c.Passed || c.Detail != "The instruction may be unclear: the thing. A person must approve the instruction: open the draft and press Approve." {
 		t.Fatalf("clarity = %+v", c)
 	}
 	unclear.Clarity.Verdict = ClarityClear
