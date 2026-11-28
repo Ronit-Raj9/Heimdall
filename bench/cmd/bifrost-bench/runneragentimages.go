@@ -72,7 +72,7 @@ func (x *sharedAgentImages) ensure(ctx context.Context, m *schemas.Manifest, s *
 			return
 		}
 		cfg := am.Config
-		cfg.Image = cfg.Build.Tag // the manifest records the derived per-suite tag; resolve from the build tag, as the planner does
+		cfg.Image = cfg.Build.Tag                                                 // the manifest records the derived per-suite tag; resolve from the build tag, as the planner does
 		img, err := engine.ResolveAgentImageIn(&cfg, s, root, suite.LibraryDir()) // library and built-in build files, as the planner resolves them
 		if err != nil || !img.PerSuite || img.Dockerfile == "" || seen[img.Tag] {
 			return // an image that cannot be resolved is left to its run, as before
