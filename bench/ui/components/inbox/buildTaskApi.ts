@@ -2,10 +2,20 @@ import { benchApi } from "@/lib/store/apis/benchApi";
 
 // Round 7 lane T3: the trace builder routes (handlers/tracetask_t3.go). Shapes follow the Go types.
 
+/** The tracedraft Quote: run_id is the inbox item, seq the tool call (0 for the turns and the final answer). */
 export interface BuildTaskQuote {
+	run_id: string;
+	seq: number;
 	text: string;
-	turn?: number;
-	role?: string;
+}
+/** The finalize job after an approval: admission rerun, then the task admitted in its benchmark. */
+export interface BuildTaskFinalize {
+	job_id: string;
+	status: string;
+	step?: string;
+	error?: string;
+	admitted: boolean;
+	failing?: string[];
 }
 export interface BuildTaskFile {
 	path: string;
@@ -45,6 +55,7 @@ export interface BuildTaskState {
 	error?: string;
 	result?: BuildTaskResult;
 	decision?: BuildTaskDecision;
+	finalize?: BuildTaskFinalize;
 	can_approve: boolean;
 	blocked?: string;
 	can_retry: boolean;

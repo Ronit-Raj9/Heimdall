@@ -14350,8 +14350,8 @@ class TraceTaskApproveRequest(TypedDict):
 
 class TraceTaskApproved(TypedDict):
     decision: TraceTaskDecision
+    finalize_job_id: str
     guards: List[TraceTaskCheck]
-    ready: bool
 
 
 class _TraceTaskBuildRequestRequired(TypedDict):
@@ -14387,7 +14387,7 @@ class TraceTaskDecision(_TraceTaskDecisionRequired, total=False):
 
 class _TraceTaskFailureRequired(TypedDict):
     kind: str
-    quotes: List[TraceTaskQuote]
+    quotes: List[Quote]
     summary: str
 
 
@@ -14400,18 +14400,21 @@ class TraceTaskFile(TypedDict):
     path: str
 
 
+class _TraceTaskFinalizeRequired(TypedDict):
+    admitted: bool
+    job_id: str
+    status: str
+
+
+class TraceTaskFinalize(_TraceTaskFinalizeRequired, total=False):
+    error: str
+    failing: List[str]
+    step: str
+
+
 class TraceTaskMutant(TypedDict):
     name: str
     what_it_does_wrong: str
-
-
-class _TraceTaskQuoteRequired(TypedDict):
-    text: str
-
-
-class TraceTaskQuote(_TraceTaskQuoteRequired, total=False):
-    role: str
-    turn: int
 
 
 class TraceTaskRef(TypedDict):
@@ -14458,6 +14461,7 @@ class TraceTaskState(_TraceTaskStateRequired, total=False):
     decision: Optional[TraceTaskDecision]
     error: str
     failing: List[str]
+    finalize: Optional[TraceTaskFinalize]
     job_id: str
     result: Optional[TraceTaskResult]
     status: str
@@ -18273,8 +18277,8 @@ __all__ = [
     'TraceTaskDecision',
     'TraceTaskFailure',
     'TraceTaskFile',
+    'TraceTaskFinalize',
     'TraceTaskMutant',
-    'TraceTaskQuote',
     'TraceTaskRef',
     'TraceTaskResult',
     'TraceTaskStandin',

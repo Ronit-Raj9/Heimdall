@@ -121,15 +121,52 @@ func TestTraceTaskWebFlow(t *testing.T) {
 	}
 	resp = c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task/approve", []byte(`{"job_id":"`+st.JobID+`"}`), nil)
 	var ap TraceTaskApproved
-	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &ap) != nil || !ap.Ready || ap.Decision.By != "ada@example.com" {
+	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &ap) != nil || ap.FinalizeJobID != "job_b" || ap.Decision.By != "ada@example.com" {
 		t.Fatalf("approve: %d %s", resp.StatusCode(), resp.Body())
 	}
 	raw, _, err := store.Read(context.Background(), projectfs.AreaBenchmarks, "support-evals/tasks/refund-timeout/task.yaml")
 	if err != nil || !strings.Contains(string(raw), "instruction_reviewed: true") {
 		t.Fatalf("task.yaml %s %v", raw, err)
 	}
-	if st := readState(t, c); st.CanApprove || st.Decision == nil {
+	// The approval record is written, then the finalize job starts with T1's params.
+	if dec, _, err := store.Read(context.Background(), projectfs.AreaUploads, "tracetask/inc-1/decision.json"); err != nil || !strings.Contains(string(dec), `"approved"`) {
+		t.Fatalf("decision %s %v", dec, err)
+	}
+	var fp TraceTaskParams
+	if err := json.Unmarshal(fj.list[1].Params, &fp); err != nil || fp.Mode != "finalize" || fp.InboxID != "inc-1" || fp.Suite != "support-evals" || fp.TaskID != "refund-timeout" || fp.Model != "" || fp.BudgetUSD != 0 {
+		t.Fatalf("finalize params %s", fj.list[1].Params)
+	}
+	if st := readState(t, c); st.CanApprove || st.Decision == nil || st.Finalize == nil || st.Finalize.Status != "queued" || st.JobID != "job_a" {
 		t.Fatalf("after approve: %+v", st)
+	}
+	// A finalize that admitted the task: ready.
+	fj.finish(1, []byte(`{"admitted":true,"admission":{"admitted":true,"controls":[{"name":"reference","want":"pass","got":"pass"}],"guards":[{"name":"guard_instruction_clear","got":"pass"}]}}`))
+	if st := readState(t, c); st.Finalize == nil || !st.Finalize.Admitted || st.CanRetry {
+		t.Fatalf("admitted: %+v", st.Finalize)
+	}
+}
+
+// A finalize that failed leaves the task a draft with the failing control and Try again.
+func TestTraceTaskFinalizeRefused(t *testing.T) {
+	c, fj, store := traceTaskServer(t, auth.RoleMember)
+	c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"support-evals","model":"m","budget_usd":0.5}`), nil)
+	fixture, _ := os.ReadFile("testdata/tracetask_result_t3.json")
+	var res TraceTaskResult
+	_ = json.Unmarshal(fixture, &res)
+	if _, err := store.Write(context.Background(), projectfs.AreaBenchmarks, "support-evals/tasks/refund-timeout/task.yaml", []byte(res.Files[0].Content), projectfs.WriteOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	fj.finish(0, fixture)
+	if resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task/approve", []byte(`{"job_id":"job_a"}`), nil); resp.StatusCode() != 200 {
+		t.Fatalf("approve: %d %s", resp.StatusCode(), resp.Body())
+	}
+	fj.finish(1, []byte(`{"admitted":false,"admission":{"admitted":false,"controls":[{"name":"wrong_order_id","want":"fail","got":"pass"}],"guards":[]}}`))
+	st := readState(t, c)
+	if st.Finalize == nil || st.Finalize.Admitted || len(st.Failing) != 1 || !strings.Contains(st.Failing[0], "wrong_order_id") || !st.CanRetry || st.CanApprove {
+		t.Fatalf("refused finalize: %+v %+v", st, st.Finalize)
+	}
+	if resp := c.do(t, "POST", APIPrefix+"/inbox/inc-1/build-task", []byte(`{"suite":"","model":"","budget_usd":0,"retry":true}`), nil); resp.StatusCode() != 202 {
+		t.Fatalf("retry: %d %s", resp.StatusCode(), resp.Body())
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tracedraft"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -66,7 +67,11 @@ type TraceTaskParams struct {
 	Model     string  `json:"model"`
 	BudgetUSD float64 `json:"budget_usd"`
 	RetryOf   string  `json:"retry_of,omitempty"`
-	Feedback  string  `json:"feedback,omitempty"`
+	// Mode "finalize" (lane T1): rerun admission of the approved draft and
+	// admit it through the path that writes the lock; no model, no cap.
+	Mode     string `json:"mode,omitempty"`
+	TaskID   string `json:"task_id,omitempty"`
+	Feedback string `json:"feedback,omitempty"`
 }
 
 // TraceTaskStarted answers POST /inbox/{id}/build-task.
@@ -74,19 +79,12 @@ type TraceTaskStarted struct {
 	JobID string `json:"job_id"`
 }
 
-// TraceTaskQuote is one quote from the session (the tracedraft Quote shape).
-type TraceTaskQuote struct {
-	Text string `json:"text"`
-	Turn int    `json:"turn,omitempty"`
-	Role string `json:"role,omitempty"`
-}
-
 // TraceTaskFailure is what went wrong in the session.
 type TraceTaskFailure struct {
-	Kind          string           `json:"kind"`
-	Summary       string           `json:"summary"`
-	Quotes        []TraceTaskQuote `json:"quotes"`
-	DroppedQuotes int              `json:"dropped_quotes,omitempty"`
+	Kind          string             `json:"kind"`
+	Summary       string             `json:"summary"`
+	Quotes        []tracedraft.Quote `json:"quotes"`
+	DroppedQuotes int                `json:"dropped_quotes,omitempty"`
 }
 
 // TraceTaskFile is one file of the task folder.
@@ -154,6 +152,23 @@ type TraceTaskDecision struct {
 	Task     string    `json:"task,omitempty"`
 }
 
+// TraceTaskFinalize is the finalize job after an approval: admission rerun
+// and, when everything holds, the task admitted in its benchmark.
+type TraceTaskFinalize struct {
+	JobID    string   `json:"job_id"`
+	Status   string   `json:"status"`
+	Step     string   `json:"step,omitempty"`
+	Error    string   `json:"error,omitempty"`
+	Admitted bool     `json:"admitted"`
+	Failing  []string `json:"failing,omitempty"`
+}
+
+// traceTaskFinalizeResult is what this lane reads of a finalize job's result.
+type traceTaskFinalizeResult struct {
+	Admitted  bool                `json:"admitted"`
+	Admission *TraceTaskAdmission `json:"admission,omitempty"`
+}
+
 // TraceTaskState answers GET /inbox/{id}/build-task.
 type TraceTaskState struct {
 	JobID      string             `json:"job_id,omitempty"`
@@ -162,11 +177,13 @@ type TraceTaskState struct {
 	Error      string             `json:"error,omitempty"`
 	Result     *TraceTaskResult   `json:"result,omitempty"`
 	Decision   *TraceTaskDecision `json:"decision,omitempty"`
+	Finalize   *TraceTaskFinalize `json:"finalize,omitempty"`
 	CanApprove bool               `json:"can_approve"`
 	Blocked    string             `json:"blocked,omitempty"` // why Approve is not offered
 	CanRetry   bool               `json:"can_retry"`
 	Failing    []string           `json:"failing,omitempty"` // controls and guards that did not hold
 	Budget     float64            `json:"budget_usd,omitempty"`
+	Org        string             `json:"-"`
 }
 
 // TraceTaskApproveRequest is the body of approve and reject.
@@ -178,7 +195,8 @@ type TraceTaskApproveRequest struct {
 type TraceTaskApproved struct {
 	Decision TraceTaskDecision `json:"decision"`
 	Guards   []TraceTaskCheck  `json:"guards"`
-	Ready    bool              `json:"ready"`
+	// FinalizeJobID is the job that reruns admission and admits the task.
+	FinalizeJobID string `json:"finalize_job_id"`
 }
 
 var traceTaskIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -243,24 +261,71 @@ func (h *traceTaskHandler) decode(ctx *fasthttp.RequestCtx, v any) bool {
 	return true
 }
 
-// latest is the newest tracetask.build job of the item, nil when none.
+// latest is the newest build job of the item (finalize jobs left out), nil when none.
 func (h *traceTaskHandler) latest(work context.Context, org, item string) (*jobs.Job, error) {
+	b, _, err := h.latestBoth(work, org, item)
+	return b, err
+}
+
+// latestBoth is the newest build job and the newest finalize job of the item.
+func (h *traceTaskHandler) latestBoth(work context.Context, org, item string) (*jobs.Job, *jobs.Job, error) {
 	page, err := h.env.Services.Jobs.List(work, org, jobs.Filter{Kind: TraceTaskKind, Limit: 500})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var best *jobs.Job
+	var build, fin *jobs.Job
 	for i := range page.Jobs {
 		j := &page.Jobs[i]
 		var p TraceTaskParams
 		if json.Unmarshal(j.Params, &p) != nil || p.InboxID != item {
 			continue
 		}
-		if best == nil || j.CreatedAt.After(best.CreatedAt) {
-			best = j
+		best := &build
+		if p.Mode == "finalize" {
+			best = &fin
+		}
+		if *best == nil || j.CreatedAt.After((*best).CreatedAt) {
+			*best = j
 		}
 	}
-	return best, nil
+	return build, fin, nil
+}
+
+// finalizeView reads a finalize job; nil when it is not for this build's decision.
+func finalizeView(build, fin *jobs.Job, dec *TraceTaskDecision) *TraceTaskFinalize {
+	if fin == nil || dec == nil || dec.Decision != "approved" || !fin.CreatedAt.After(build.CreatedAt) {
+		return nil
+	}
+	f := &TraceTaskFinalize{JobID: fin.ID, Status: string(fin.Status), Error: fin.Error, Step: jobStep(fin)}
+	if fin.Status == jobs.StatusSucceeded && len(fin.Result) > 0 {
+		var r traceTaskFinalizeResult
+		if err := json.Unmarshal(fin.Result, &r); err != nil {
+			f.Error = "The check's result cannot be read: " + err.Error()
+			return f
+		}
+		f.Admitted = r.Admitted
+		if r.Admission != nil {
+			f.Failing = traceTaskFailing(&TraceTaskResult{Admission: r.Admission}, true)
+		}
+		if !f.Admitted && len(f.Failing) == 0 {
+			f.Failing = []string{"admission did not admit the task"}
+		}
+	}
+	return f
+}
+
+func jobStep(j *jobs.Job) string {
+	var pr struct {
+		Step    string `json:"step"`
+		Message string `json:"message"`
+	}
+	if len(j.Progress) == 0 || json.Unmarshal(j.Progress, &pr) != nil {
+		return ""
+	}
+	if pr.Step != "" {
+		return pr.Step
+	}
+	return pr.Message
 }
 
 func (h *traceTaskHandler) start(ctx *fasthttp.RequestCtx) {
@@ -282,12 +347,11 @@ func (h *traceTaskHandler) start(ctx *fasthttp.RequestCtx) {
 	defer cancel()
 	params := TraceTaskParams{InboxID: item, Suite: req.Suite, Model: req.Model, BudgetUSD: req.BudgetUSD}
 	if req.Retry {
-		prev, err := h.latest(work, org, item)
+		prev, st, err := h.load(work, org, item, true)
 		if err != nil {
 			sendDepError(ctx, mode, "jobs", err)
 			return
 		}
-		st := h.state(prev, nil, true)
 		if prev == nil || !st.CanRetry {
 			lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "Try again is offered once, after admission refused a draft.")
 			return
@@ -348,21 +412,30 @@ func (h *traceTaskHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	j, err := h.latest(work, org, item)
+	_, st, err := h.load(work, org, item, p.Can(auth.RoleMember))
 	if err != nil {
 		sendDepError(ctx, h.env.Mode, "jobs", err)
 		return
 	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, st)
+}
+
+// load is the item's latest build with its decision and finalize job.
+func (h *traceTaskHandler) load(work context.Context, org, item string, member bool) (*jobs.Job, TraceTaskState, error) {
+	j, fin, err := h.latestBoth(work, org, item)
+	if err != nil {
+		return nil, TraceTaskState{}, err
+	}
 	dec := h.readDecision(work, item)
-	if dec != nil && j != nil && dec.JobID != j.ID {
+	if dec != nil && (j == nil || dec.JobID != j.ID) {
 		dec = nil
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.state(j, dec, p.Can(auth.RoleMember)))
+	return j, h.state(j, dec, fin, member), nil
 }
 
 // state turns a job into what the page shows. It never marks a task good:
 // it only reads admission's verdict.
-func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, member bool) TraceTaskState {
+func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, fin *jobs.Job, member bool) TraceTaskState {
 	st := TraceTaskState{}
 	if j == nil {
 		return st
@@ -372,18 +445,7 @@ func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, member boo
 	if json.Unmarshal(j.Params, &pp) == nil {
 		st.Budget = pp.BudgetUSD
 	}
-	if len(j.Progress) > 0 {
-		var pr struct {
-			Step    string `json:"step"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(j.Progress, &pr) == nil {
-			st.Step = pr.Step
-			if st.Step == "" {
-				st.Step = pr.Message
-			}
-		}
-	}
+	st.Step = jobStep(j)
 	if j.Status != jobs.StatusSucceeded || len(j.Result) == 0 {
 		st.Blocked = "The build has not finished."
 		return st
@@ -395,8 +457,16 @@ func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, member boo
 		return st
 	}
 	st.Result = &res
-	st.Failing = traceTaskFailing(&res)
+	st.Failing = traceTaskFailing(&res, false)
 	retried := pp.RetryOf != ""
+	st.Finalize = finalizeView(j, fin, dec)
+	if f := st.Finalize; f != nil && f.Status == string(jobs.StatusSucceeded) && !f.Admitted {
+		// The rerun refused the approved draft: it stays a draft; Try again once.
+		st.Failing = f.Failing
+		st.Blocked = "Admission refused the approved draft."
+		st.CanRetry = !retried && member && res.SpentUSD < pp.BudgetUSD
+		return st
+	}
 	switch {
 	case dec != nil:
 		st.Blocked = "A person already decided on this draft."
@@ -419,7 +489,7 @@ func (h *traceTaskHandler) state(j *jobs.Job, dec *TraceTaskDecision, member boo
 
 // traceTaskFailing lists the controls and guards that did not hold, leaving
 // out the guard that waits for the approval itself.
-func traceTaskFailing(res *TraceTaskResult) []string {
+func traceTaskFailing(res *TraceTaskResult, withReviewed bool) []string {
 	var out []string
 	if res.Admission == nil {
 		return nil
@@ -430,7 +500,7 @@ func traceTaskFailing(res *TraceTaskResult) []string {
 		}
 	}
 	for _, g := range res.Admission.Guards {
-		if g.Name != traceTaskGuardReviewed && g.Got != "pass" {
+		if (withReviewed || g.Name != traceTaskGuardReviewed) && g.Got != "pass" {
 			out = append(out, g.Name+" "+g.Got)
 		}
 	}
@@ -475,7 +545,7 @@ func (h *traceTaskHandler) decide(ctx *fasthttp.RequestCtx) (context.Context, co
 		return nil, nil, nil, "", TraceTaskState{}, false
 	}
 	work, cancel := workContext(ctx, readTimeout)
-	j, err := h.latest(work, org, item)
+	j, st, err := h.load(work, org, item, true)
 	if err != nil {
 		cancel()
 		sendDepError(ctx, h.env.Mode, "jobs", err)
@@ -486,11 +556,8 @@ func (h *traceTaskHandler) decide(ctx *fasthttp.RequestCtx) (context.Context, co
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "This is not the latest build of this failure. Reload the page.")
 		return nil, nil, nil, "", TraceTaskState{}, false
 	}
-	dec := h.readDecision(work, item)
-	if dec != nil && dec.JobID != j.ID {
-		dec = nil
-	}
-	return work, cancel, p, item, h.state(j, dec, true), true
+	st.Org = org
+	return work, cancel, p, item, st, true
 }
 
 func (h *traceTaskHandler) writeDecision(work context.Context, item string, d TraceTaskDecision) error {
@@ -543,16 +610,24 @@ func (h *traceTaskHandler) approve(ctx *fasthttp.RequestCtx) {
 		}
 	}
 	guards = append(guards, reviewedGuard(work, store, rel))
-	ready := true
-	for _, g := range guards {
-		ready = ready && g.Got == "pass"
-	}
 	d := TraceTaskDecision{JobID: st.JobID, Decision: "approved", By: by, At: h.now().UTC(), Task: st.Result.Task.Path}
 	if err := h.writeDecision(work, item, d); err != nil {
 		lib.SendError(ctx, mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "Could not record the approval: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, mode, fasthttp.StatusOK, TraceTaskApproved{Decision: d, Guards: guards, Ready: ready})
+	// The approval is recorded; admission now reruns and, when everything
+	// holds, admits the task in its benchmark (lane T1's finalize mode).
+	fparams, err := json.Marshal(TraceTaskParams{Mode: "finalize", InboxID: item, Suite: st.Result.Task.Suite, TaskID: st.Result.Task.ID})
+	if err != nil {
+		lib.SendError(ctx, mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
+		return
+	}
+	fj, err := h.env.Services.Jobs.Create(work, jobs.NewJob{OrgID: st.Org, Kind: TraceTaskKind, Params: fparams, CreatedBy: createdBy(p)})
+	if err != nil {
+		lib.SendError(ctx, mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "The approval is recorded, but the check could not start: "+err.Error())
+		return
+	}
+	lib.SendJSON(ctx, mode, fasthttp.StatusOK, TraceTaskApproved{Decision: d, Guards: guards, FinalizeJobID: fj.ID})
 }
 
 // reviewedGuard checks provenance.instruction_reviewed in the stored file.

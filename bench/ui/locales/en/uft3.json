@@ -22,7 +22,6 @@
 		"unsafe_action": "Unsafe action",
 		"other": "Other"
 	},
-	"quoteTurn": "Turn {{turn}}",
 	"dropped_one": "{{count}} quote not found in the trace was dropped.",
 	"dropped_other": "{{count}} quotes not found in the trace were dropped.",
 	"shape": "Task shape: {{shape}}",
@@ -41,7 +40,7 @@
 	"notes": "Builder notes",
 	"refused": "Not admitted: {{failing}}",
 	"ready": "Admission passed. A person must approve the instruction.",
-	"approved": "Approved by {{by}}. The task is in {{suite}}.",
+	"approved": "Approved by {{by}}.",
 	"rejected": "Rejected by {{by}}. The draft was discarded.",
 	"blocked": "Approve is not offered: {{reason}}",
 	"approve": "Approve",
@@ -59,5 +58,14 @@
 	"bulkAsk": "{{count}} builds with {{model}} into {{suite}}, up to {{each}} each, {{total}} in total.",
 	"bulkTotal": "Total up to {{total}}",
 	"bulkStarted": "Started {{ok}} of {{count}} builds. Open a failure to see its build.",
-	"bulkFailed": "{{id}}: {{error}}"
+	"bulkFailed": "{{id}}: {{error}}",
+	"checking": "Checking the task.",
+	"checkingStep": "Checking the task: {{step}}",
+	"readyIn": "Ready in {{suite}}.",
+	"openTask": "Open the task",
+	"finalRefused": "Approved, but admission refused it: {{failing}}. The task stays a draft.",
+	"finalFailed": "The check failed: {{error}}",
+	"quoteSeq": "Call {{seq}}",
+	"quoteAnswer": "Turns",
+	"quoteOpen": "Show in the session"
 }

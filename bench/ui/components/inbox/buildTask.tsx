@@ -9,6 +9,7 @@ import { formatUsd } from "@/lib/money";
 import type { InboxSuite } from "@/lib/types/bench";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { buildTaskBody, useDecideBuildTaskMutation, useGetBuildTaskQuery, useStartBuildTaskMutation, type BuildTaskFile, type BuildTaskState } from "./buildTaskApi";
 import "./uft3I18n";
@@ -19,13 +20,24 @@ export const BUILD_TASK_DEFAULT_CAP = 0.5;
 const running = (s?: string) => s === "queued" || s === "running";
 
 /** Round 7 lane T3: "Build a task" on a failure, and the result of the latest build. */
-export function BuildTaskPanel({ itemId, suites, disabled }: { itemId: string; suites: readonly InboxSuite[]; disabled?: boolean }) {
+export function BuildTaskPanel({
+	itemId,
+	suites,
+	disabled,
+	onQuote,
+}: {
+	itemId: string;
+	suites: readonly InboxSuite[];
+	disabled?: boolean;
+	/** Scrolls the session panel to a quoted call (seq n) or the turns (seq 0). */
+	onQuote?: (seq: number) => void;
+}) {
 	const { t } = useTranslation("uft3");
 	const [open, setOpen] = useState(false);
 	const [polling, setPolling] = useState(false);
 	const q = useGetBuildTaskQuery(itemId, { pollingInterval: polling ? 4000 : 0, skipPollingIfUnfocused: true });
 	const state = q.data;
-	const active = running(state?.status);
+	const active = running(state?.status) || running(state?.finalize?.status);
 	// Poll while the latest build is queued or running, also when the page opens on one.
 	useEffect(() => {
 		if (active) setPolling(true);
@@ -56,7 +68,7 @@ export function BuildTaskPanel({ itemId, suites, disabled }: { itemId: string; s
 					}}
 				/>
 			)}
-			{state?.job_id && <BuildTaskView state={state} />}
+			{state?.job_id && <BuildTaskView state={state} onQuote={onQuote} />}
 			{state?.job_id && !disabled && (
 				<BuildTaskActions
 					itemId={itemId}
@@ -161,7 +173,7 @@ const isInstruction = (f: BuildTaskFile) => /(^|\/)instruction\.md$/.test(f.path
 const isCheck = (f: BuildTaskFile) => /^(tests|verifier)\//.test(f.path) || /check/i.test(f.path);
 
 /** The state of the latest build: running, failed, or the result with admission's verdict. */
-export function BuildTaskView({ state }: { state: BuildTaskState }) {
+export function BuildTaskView({ state, onQuote }: { state: BuildTaskState; onQuote?: (seq: number) => void }) {
 	const { t } = useTranslation("uft3");
 	if (running(state.status)) {
 		return (
@@ -198,7 +210,19 @@ export function BuildTaskView({ state }: { state: BuildTaskState }) {
 				<ul className="flex flex-col gap-1">
 					{r.failure.quotes.map((q, i) => (
 						<li key={i} className="border-border border-l-2 pl-2 text-sm" data-testid="build-task-quote">
-							{q.turn !== undefined && <span className="text-muted-foreground mr-2 text-xs">{t("quoteTurn", { turn: q.turn })}</span>}
+							{onQuote ? (
+								<button
+									type="button"
+									className="text-muted-foreground mr-2 text-xs hover:underline"
+									title={t("quoteOpen")}
+									onClick={() => onQuote(q.seq)}
+									data-testid="build-task-quote-open"
+								>
+									{q.seq > 0 ? t("quoteSeq", { seq: q.seq }) : t("quoteAnswer")}
+								</button>
+							) : (
+								<span className="text-muted-foreground mr-2 text-xs">{q.seq > 0 ? t("quoteSeq", { seq: q.seq }) : t("quoteAnswer")}</span>
+							)}
 							<q>{q.text}</q>
 						</li>
 					))}
@@ -284,6 +308,39 @@ export function BuildTaskView({ state }: { state: BuildTaskState }) {
 function Verdict({ state }: { state: BuildTaskState }) {
 	const { t } = useTranslation("uft3");
 	const d = state.decision;
+	const f = state.finalize;
+	const suite = state.result?.task?.suite ?? "";
+	if (d?.decision === "approved" && f) {
+		if (running(f.status)) {
+			return (
+				<p className="text-sm font-medium" role="status" data-testid="build-task-checking">
+					{f.step ? t("checkingStep", { step: f.step }) : t("checking")}
+				</p>
+			);
+		}
+		if (f.admitted) {
+			return (
+				<p className="text-sm font-medium" role="status" data-testid="build-task-admitted">
+					{t("readyIn", { suite })}{" "}
+					<Link to="/suites/$suiteId" params={{ suiteId: suite }} search={{ tab: "edit" } as never} className="hover:underline" data-testid="build-task-open-task">
+						{t("openTask")}
+					</Link>
+				</p>
+			);
+		}
+		if (f.error && (f.failing ?? []).length === 0) {
+			return (
+				<p className="text-destructive text-sm font-medium" role="alert" data-testid="build-task-final-failed">
+					{t("finalFailed", { error: plainJobError(f.error) })}
+				</p>
+			);
+		}
+		return (
+			<p className="text-destructive text-sm font-medium" role="status" data-testid="build-task-final-refused">
+				{t("finalRefused", { failing: (f.failing ?? []).join("; ") })}
+			</p>
+		);
+	}
 	if (d) {
 		return (
 			<p className="text-sm font-medium" role="status" data-testid="build-task-decision">
@@ -330,7 +387,7 @@ export function BuildTaskActions({ itemId, state, onChanged }: { itemId: string;
 	const [start, retrying] = useStartBuildTaskMutation();
 	const [error, setError] = useState("");
 	const r = state.result;
-	if (!r || state.decision || !state.job_id) return null;
+	if (!r || !state.job_id || (state.decision && !state.can_retry)) return null;
 	const jobId = state.job_id;
 	const suite = r.task?.suite ?? "";
 	const left = Math.max(0, (state.budget_usd ?? 0) - r.spent_usd);
@@ -371,6 +428,7 @@ export function BuildTaskActions({ itemId, state, onChanged }: { itemId: string;
 						testId="build-task-retry"
 					/>
 				)}
+				{!state.decision && (
 				<Button
 					type="button"
 					size="sm"
@@ -384,6 +442,7 @@ export function BuildTaskActions({ itemId, state, onChanged }: { itemId: string;
 				>
 					{t("reject")}
 				</Button>
+				)}
 			</div>
 			{error && (
 				<p className="text-destructive text-sm" role="alert" data-testid="build-task-decide-error">

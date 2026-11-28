@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import fixture from "../../../handlers/testdata/tracetask_result_t3.json";
 import { BuildTaskActions, BuildTaskView } from "./buildTask";
 
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("./buildTaskApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("./buildTaskApi")>()),
 	useDecideBuildTaskMutation: () => mutation(),
@@ -51,5 +52,18 @@ describe("Build a task (round 7 lane T3)", () => {
 		expect(refused).toContain('data-testid="build-task-reject"');
 		const decided = render(<BuildTaskActions itemId="inc-1" state={{ ...ready, decision: { job_id: "job_a", decision: "approved", by: "a", at: "" } }} onChanged={() => {}} />);
 		expect(decided).toBe("");
+	});
+	it("opens a quote in the session and shows the finalize states after approval", () => {
+		expect(render(<BuildTaskView state={ready} onQuote={() => {}} />)).toContain('data-testid="build-task-quote-open"');
+		const approved = { ...ready, can_approve: false, decision: { job_id: "job_a", decision: "approved" as const, by: "ada", at: "" } };
+		expect(render(<BuildTaskView state={{ ...approved, finalize: { job_id: "job_b", status: "running", admitted: false } }} />)).toContain("Checking the task.");
+		const ok = render(<BuildTaskView state={{ ...approved, finalize: { job_id: "job_b", status: "succeeded", admitted: true } }} />);
+		expect(ok).toContain("Ready in support-evals.");
+		expect(ok).toContain('href="/suites/support-evals?tab=edit"');
+		const refused = { ...approved, can_retry: true, failing: ["wrong_order_id want fail got pass"], finalize: { job_id: "job_b", status: "succeeded", admitted: false, failing: ["wrong_order_id want fail got pass"] } };
+		expect(render(<BuildTaskView state={refused} />)).toContain("admission refused it: wrong_order_id want fail got pass");
+		const acts = render(<BuildTaskActions itemId="inc-1" state={refused} onChanged={() => {}} />);
+		expect(acts).toContain('data-testid="build-task-retry"');
+		expect(acts).not.toContain('data-testid="build-task-reject"');
 	});
 });

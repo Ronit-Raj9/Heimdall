@@ -443,7 +443,7 @@ export function InboxActions(props: InboxActionsProps) {
 						</Field>
 					)}
 					{/* Round 7 lane T3: a builder model turns this failure into a task (buildTask.tsx). */}
-					<BuildTaskPanel itemId={item.id} suites={props.suites} disabled={!writable} />
+					<BuildTaskPanel itemId={item.id} suites={props.suites} disabled={!writable} onQuote={scrollSessionTo} />
 					{action === "accept" && (
 						<AcceptForm
 							key={`accept-${item.id}`}

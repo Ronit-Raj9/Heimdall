@@ -4,14 +4,14 @@
   "summary": "The agent said the refund was issued after the refund tool timed out.",
   "quotes": [
    {
-    "text": "refund_order timed out after 30s",
-    "turn": 4,
-    "role": "tool"
+    "run_id": "inc-1",
+    "seq": 2,
+    "text": "refund_order timed out after 30s"
    },
    {
-    "text": "Your refund has been issued.",
-    "turn": 5,
-    "role": "assistant"
+    "run_id": "inc-1",
+    "seq": 0,
+    "text": "Your refund has been issued."
    }
   ],
   "dropped_quotes": 1
