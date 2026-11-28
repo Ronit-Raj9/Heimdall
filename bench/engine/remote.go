@@ -109,11 +109,14 @@ type Coordinator struct {
 
 	// Z11 durable leases (remotebook.go): leases kept across a restart,
 	// waiting for their experiment, and the lease book's write queue.
-	pending  map[string]*pendingLease
-	bootAt   time.Time
-	bookQ    chan bookOp
-	bookOnce sync.Once
-	tel      coordTel // lane Z14: experiment spans and start latency (remotetelemetry.go)
+	pending map[string]*pendingLease
+	// refusedNames: worker name -> the token last refused for it, so a
+	// refused register is logged once per worker and token, not every retry.
+	refusedNames map[string]string
+	bootAt       time.Time
+	bookQ        chan bookOp
+	bookOnce     sync.Once
+	tel          coordTel // lane Z14: experiment spans and start latency (remotetelemetry.go)
 }
 
 // remoteWorker is one registered worker.
@@ -124,6 +127,13 @@ type remoteWorker struct {
 	refused  map[string]*leaseRefusal // exp id -> the worker's refusals of it (X3, remoterefuse.go)
 	rejected int
 	jobKinds []string // runner job kinds it takes; empty: every kind
+	// restored marks an entry made only from a kept lease at boot
+	// (remotebook.go): a placeholder, not a live registration, until a call
+	// with its recorded token shows the old process is alive. The first
+	// register for the name by a token of the same organization and pool
+	// adopts it, so a runner whose token was renewed across the restart (the
+	// shared worker claims a fresh one at every start) is not locked out.
+	restored bool
 }
 
 // remoteLease is one slot out on a remote worker.
@@ -250,11 +260,23 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	c.mu.Lock()
 	w, ok := c.workers[req.WorkerID]
 	if ok && c.hosted() && w.scope.TokenID != scope.TokenID {
-		// Same name, another token: not a restart of this runner. Taking the
-		// name over would lose the other runner's leases and rebind its
-		// scope, so the operator must remove that registration first.
-		c.mu.Unlock()
-		return nil, fmt.Errorf("worker %s: %w: the name is registered with another runner token; remove that runner first", req.WorkerID, schemas.ErrWorkerScope)
+		if !w.restored || w.scope.OrgID != scope.OrgID || w.scope.Pool != pool {
+			// Same name, another token: not a restart of this runner. Taking
+			// the name over would lose the other runner's leases and rebind
+			// its scope, so the operator must remove that registration first.
+			c.refusedNameLocked(req.WorkerID, scope.TokenID, w.scope.TokenID)
+			c.mu.Unlock()
+			return nil, fmt.Errorf("worker %s: %w: the name is registered with another runner token; start this runner under another name, or remove the registered runner on the Runners page (a server admin removes the shared worker's)", req.WorkerID, schemas.ErrWorkerScope)
+		}
+		// A placeholder from a kept lease, never confirmed by its old token:
+		// the runner restarted with a renewed token, so it adopts the name.
+		// Its kept leases are given up below like any re-register's.
+		c.logger.Info("remote worker registered with a renewed token: it takes over the entry restored from its kept lease",
+			"worker", req.WorkerID, "pool", pool)
+	}
+	if ok {
+		w.restored = false
+		delete(c.refusedNames, req.WorkerID)
 	}
 	if !ok {
 		w = &remoteWorker{refused: map[string]*leaseRefusal{}}
@@ -1126,6 +1148,7 @@ func (c *Coordinator) loseLocked(l *remoteLease, why string) {
 	}
 	r.release(l.est)
 	r.requeue(l.slot)
+	c.dropPlaceholderLocked(l.worker)
 }
 
 // revokeCancelled ends every remote lease of r whose slot an operator
