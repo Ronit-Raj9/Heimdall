@@ -175,7 +175,7 @@ func shimEnv(t *testing.T, spec *schemas.ShimSpec) (string, string) {
 		}
 	}
 	for _, name := range []string{"pytest", "py.test", "python", "python3"} {
-		writeExec(t, filepath.Join(root, "bin", name), "#!/bin/sh\necho \"REAL "+name+" $*\"\nexit 7\n")
+		writeExec(t, filepath.Join(root, "bin", name), "#!/bin/sh\nprintf '%s\\n' \"REAL "+name+" $*\"\nexit 7\n")
 	}
 	sysPath := os.Getenv("PATH")
 	return root, filepath.Join(root, "shim") + ":" + filepath.Join(root, "bin") + ":" + sysPath
