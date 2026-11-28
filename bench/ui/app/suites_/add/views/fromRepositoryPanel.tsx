@@ -109,7 +109,13 @@ export function FromRepositoryPanel() {
 			<p className="text-muted-foreground text-xs">{t("help")}</p>
 			<label className="flex flex-col gap-1 text-xs">
 				{t("url")}
-				<input className={input} value={form.repo_url} placeholder={t("urlPlaceholder")} onChange={set("repo_url")} data-testid="repotask-url" />
+				<input
+					className={input}
+					value={form.repo_url}
+					placeholder={t("urlPlaceholder")}
+					onChange={set("repo_url")}
+					data-testid="repotask-url"
+				/>
 			</label>
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className="flex flex-col gap-1 text-xs">

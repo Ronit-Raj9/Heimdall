@@ -6,7 +6,15 @@ import { RepoTaskResult, repoCandidates, repoTaskBody } from "./fromRepositoryPa
 
 describe("From a repository", () => {
 	it("posts the repotask.build body the job validates", () => {
-		expect(repoTaskBody({ repo_url: " https://github.com/acme/durations.git ", base: "a1", reference: "b2", suite: "core", template: "python-pytest" })).toEqual({
+		expect(
+			repoTaskBody({
+				repo_url: " https://github.com/acme/durations.git ",
+				base: "a1",
+				reference: "b2",
+				suite: "core",
+				template: "python-pytest",
+			}),
+		).toEqual({
 			repo_url: "https://github.com/acme/durations.git",
 			base: "a1",
 			reference: "b2",
@@ -14,7 +22,9 @@ describe("From a repository", () => {
 			template: "python-pytest",
 		});
 		expect(repoTaskBody({ repo_url: "https://github.com/a/b", base: "", reference: "b", suite: "core", template: "" })).toBeNull();
-		expect(repoTaskBody({ repo_url: "https://github.com/a/b", base: "a", reference: "b", suite: "core", template: "" })).not.toHaveProperty("template");
+		expect(repoTaskBody({ repo_url: "https://github.com/a/b", base: "a", reference: "b", suite: "core", template: "" })).not.toHaveProperty(
+			"template",
+		);
 	});
 
 	it("shows a refused commit pair with the failing control", () => {

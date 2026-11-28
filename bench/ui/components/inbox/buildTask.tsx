@@ -11,7 +11,14 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import { useConfirm } from "@/components/platform/confirmDialog";
-import { buildTaskBody, useDecideBuildTaskMutation, useGetBuildTaskQuery, useStartBuildTaskMutation, type BuildTaskFile, type BuildTaskState } from "./buildTaskApi";
+import {
+	buildTaskBody,
+	useDecideBuildTaskMutation,
+	useGetBuildTaskQuery,
+	useStartBuildTaskMutation,
+	type BuildTaskFile,
+	type BuildTaskState,
+} from "./buildTaskApi";
 import "./uft3I18n";
 
 /** The cap the form starts with (handlers.TraceTaskDefaultCapUSD). */
@@ -83,7 +90,17 @@ export function BuildTaskPanel({
 	);
 }
 
-function BuildTaskForm({ itemId, suites, onCancel, onStarted }: { itemId: string; suites: readonly InboxSuite[]; onCancel(): void; onStarted(): void }) {
+function BuildTaskForm({
+	itemId,
+	suites,
+	onCancel,
+	onStarted,
+}: {
+	itemId: string;
+	suites: readonly InboxSuite[];
+	onCancel(): void;
+	onStarted(): void;
+}) {
 	const { t } = useTranslation("uft3");
 	const ids = useId();
 	const models = useGetModelsQuery();
@@ -233,7 +250,9 @@ export function BuildTaskView({ state, onQuote }: { state: BuildTaskState; onQuo
 						</li>
 					))}
 				</ul>
-				{(r.failure.dropped_quotes ?? 0) > 0 && <p className="text-muted-foreground text-xs">{t("dropped", { count: r.failure.dropped_quotes })}</p>}
+				{(r.failure.dropped_quotes ?? 0) > 0 && (
+					<p className="text-muted-foreground text-xs">{t("dropped", { count: r.failure.dropped_quotes })}</p>
+				)}
 			</div>
 			<p className="text-sm">
 				<span className="font-medium">{t("shape", { shape: r.shape })}</span>. {r.shape_reason}
@@ -338,7 +357,13 @@ function Verdict({ state }: { state: BuildTaskState }) {
 			return (
 				<p className="text-sm font-medium" role="status" data-testid="build-task-admitted">
 					{t("readyIn", { suite })}{" "}
-					<Link to="/suites/$suiteId" params={{ suiteId: suite }} search={{ tab: "edit" } as never} className="hover:underline" data-testid="build-task-open-task">
+					<Link
+						to="/suites/$suiteId"
+						params={{ suiteId: suite }}
+						search={{ tab: "edit" } as never}
+						className="hover:underline"
+						data-testid="build-task-open-task"
+					>
 						{t("openTask")}
 					</Link>
 				</p>
@@ -445,19 +470,19 @@ export function BuildTaskActions({ itemId, state, onChanged }: { itemId: string;
 					/>
 				)}
 				{!state.decision && (
-				<Button
-					type="button"
-					size="sm"
-					variant="ghost"
-					disabled={isLoading}
-					onClick={async () => {
-						if (!(await confirm(t("rejectAsk"), { title: t("reject"), confirmLabel: t("reject"), destructive: true }))) return;
-						await run(() => decide({ item: itemId, jobId, decision: "reject" }).unwrap());
-					}}
-					dataTestId="build-task-reject"
-				>
-					{t("reject")}
-				</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						disabled={isLoading}
+						onClick={async () => {
+							if (!(await confirm(t("rejectAsk"), { title: t("reject"), confirmLabel: t("reject"), destructive: true }))) return;
+							await run(() => decide({ item: itemId, jobId, decision: "reject" }).unwrap());
+						}}
+						dataTestId="build-task-reject"
+					>
+						{t("reject")}
+					</Button>
 				)}
 			</div>
 			{error && (

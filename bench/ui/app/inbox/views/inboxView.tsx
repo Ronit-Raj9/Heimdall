@@ -238,7 +238,10 @@ export function InboxBody({
 					<InboxEmpty />
 				</>
 			) : (
-				<div className={cn("grid min-w-0 grid-cols-1 items-start gap-6", panel && "2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")} data-testid="inbox-layout">
+				<div
+					className={cn("grid min-w-0 grid-cols-1 items-start gap-6", panel && "2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}
+					data-testid="inbox-layout"
+				>
 					<Section
 						title={t("inbox.table.title")}
 						description={t("inbox.table.description")}
@@ -353,12 +356,7 @@ function SinceFilter({ value, onChange }: { value: InboxSince; onChange: (next: 
 			<label htmlFor={id} className="text-muted-foreground sr-only text-sm 2xl:not-sr-only">
 				{t("inbox.since")}
 			</label>
-			<NativeSelect
-				id={id}
-				value={value}
-				onChange={(e) => onChange(e.target.value as InboxSince)}
-				data-testid="inbox-since-filter"
-			>
+			<NativeSelect id={id} value={value} onChange={(e) => onChange(e.target.value as InboxSince)} data-testid="inbox-since-filter">
 				{INBOX_SINCE.map((s) => (
 					<option key={s} value={s}>
 						{t(`inbox.sinceOptions.${s || "any"}`)}

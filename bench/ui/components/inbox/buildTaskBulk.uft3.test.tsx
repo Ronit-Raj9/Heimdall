@@ -20,7 +20,9 @@ describe("Build tasks from these failures (round 7 lane T3)", () => {
 		expect(BUILD_TASK_BULK_MAX).toBe(10);
 	});
 	it("lists open failures with a total and the paid button", () => {
-		const html = render(<BuildTaskBulk items={[item("inc-1"), item("inc-2", "accepted")]} suites={[{ id: "support-evals", template: "qa" }]} />);
+		const html = render(
+			<BuildTaskBulk items={[item("inc-1"), item("inc-2", "accepted")]} suites={[{ id: "support-evals", template: "qa" }]} />,
+		);
 		expect(html).toContain('data-testid="build-task-bulk-inc-1"');
 		expect(html).not.toContain("build-task-bulk-inc-2");
 		expect(html).toContain('data-testid="build-task-bulk-start"');

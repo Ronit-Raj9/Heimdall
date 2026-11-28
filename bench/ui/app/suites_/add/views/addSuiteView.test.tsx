@@ -44,7 +44,7 @@ describe("AddSuiteView", () => {
 		query.result = { ...idle, data: fixture };
 		const html = renderToStaticMarkup(<AddSuiteView />);
 		expect(html).toContain('data-testid="suites-add-your-own"');
-		expect(html).not.toContain("<nav aria-label=\"Breadcrumb\"");
+		expect(html).not.toContain('<nav aria-label="Breadcrumb"');
 	});
 
 	it("shows a failure as an error", () => {

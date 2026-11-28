@@ -171,7 +171,11 @@ describe("InboxActions", () => {
 describe("blockEnterSubmit (paid draft panel)", () => {
 	it("stops Enter in a field and lets other keys through", () => {
 		let stopped = 0;
-		const ev = (key: string, tagName: string) => ({ key, target: { tagName } as unknown as EventTarget, preventDefault: () => void stopped++ });
+		const ev = (key: string, tagName: string) => ({
+			key,
+			target: { tagName } as unknown as EventTarget,
+			preventDefault: () => void stopped++,
+		});
 		blockEnterSubmit(ev("Enter", "INPUT"));
 		expect(stopped).toBe(1);
 		blockEnterSubmit(ev("a", "INPUT"));
