@@ -99,6 +99,9 @@ func syncFlags(name string, args []string) (*syncOpts, int) {
 	if o.token == "" {
 		o.token = os.Getenv("BENCH_WRITE_TOKEN")
 	}
+	if o.token == "" {
+		o.token = storedLoginToken(o.server)
+	}
 	if strings.TrimSpace(o.server) == "" {
 		fmt.Fprintf(os.Stderr, "%s %s: -server is required (or set %s), e.g. -server http://127.0.0.1:8090\n", progName, name, syncServerEnv)
 		return nil, exitUsage

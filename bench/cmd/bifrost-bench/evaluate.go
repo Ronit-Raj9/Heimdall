@@ -115,6 +115,9 @@ func (c *connOpts) finish(fs *flag.FlagSet) {
 	if c.token == "" {
 		c.token = os.Getenv("BENCH_WRITE_TOKEN")
 	}
+	if c.token == "" {
+		c.token = storedLoginToken(c.server)
+	}
 	c.configSet = flagSet(fs, "config")
 }
 

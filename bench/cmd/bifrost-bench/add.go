@@ -59,7 +59,11 @@ func addClient(base string) (*heimdallAPI, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, fmt.Errorf("-url must be an http(s) server root, got %q", base)
 	}
-	return &heimdallAPI{base: u.String(), token: strings.TrimSpace(os.Getenv("HEIMDALL_TOKEN")), client: &http.Client{Timeout: 5 * time.Minute}}, nil
+	tok := strings.TrimSpace(os.Getenv("HEIMDALL_TOKEN"))
+	if tok == "" {
+		tok = storedLoginToken(u.String())
+	}
+	return &heimdallAPI{base: u.String(), token: tok, client: &http.Client{Timeout: 5 * time.Minute}}, nil
 }
 
 func runAdd(args []string) int {
