@@ -97,6 +97,7 @@ func readRunSteps(index ReadIndex, runID string) (RunSteps, error) {
 		}
 	}
 	out.Available = stepsFound || obsFound
+	maskStepSecrets(out.Steps)
 	// Agent events area: the run's agent event status; a file that does not
 	// parse is left out rather than failing the timeline.
 	if data, found, err := readInternal(index, runID, schemas.AgentEventsStatusFile); err == nil && found {
