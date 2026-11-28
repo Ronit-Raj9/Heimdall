@@ -611,7 +611,7 @@ describe("Step4Setup fix wave F26", () => {
 
 	it("shows why nothing can run in plain view when the estimate has no runs", () => {
 		const reason =
-			"this benchmark runs inside each task's own environment; register a container agent (agent claude-code's Dockerfile does not start FROM ${BASE_IMAGE})";
+			"this benchmark runs the agent inside each task's own image and agent claude-code's image cannot be built on top of it (its Dockerfile does not start FROM ${BASE_IMAGE}): create the agent from a template that supports this (Codex CLI, Custom Python, Any CLI, Agent server in the container), or add base_arg: BASE_IMAGE to its build with a Dockerfile that starts FROM ${BASE_IMAGE}";
 		q.estimate = okQuery({
 			runs: 0,
 			est_cost_usd: { low: 0, high: 0, known: true },
@@ -621,7 +621,7 @@ describe("Step4Setup fix wave F26", () => {
 		const html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain('data-testid="step4-nothing-runs"');
 		expect(html).toContain("hd-harbor-bfcl: ");
-		expect(html).toContain("register a container agent");
+		expect(html).toContain("cannot be built on top of it");
 		// The estimate stays in plain view; only the settings above it fold (M3-29).
 		expect(html.slice(html.indexOf('data-testid="step4-estimate"'))).not.toContain("<details");
 		expect(nothingRunsReason(q.estimate.data as never)).toBe(`hd-harbor-bfcl: ${reason}`);

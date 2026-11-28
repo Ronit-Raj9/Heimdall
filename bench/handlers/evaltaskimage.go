@@ -17,9 +17,12 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"strings"
+	"sync"
 
 	benchagents "github.com/maximhq/bifrost/bench/agents"
+	agenttemplates "github.com/maximhq/bifrost/bench/agents/templates"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -30,9 +33,48 @@ import (
 // library's task-image agents (codex-task) build FROM.
 const taskImageBaseArg = "BASE_IMAGE"
 
-// taskImageSkipReason is the plain reason a benchmark is skipped for an agent
-// that cannot run inside a task's own image.
-const taskImageSkipReason = "this benchmark runs inside each task's own environment; register a container agent"
+// taskImageSkipReason is the start of the plain reason a benchmark is
+// skipped for an agent that cannot run inside a task's own image
+// (taskImageSkip gives the whole sentence).
+const taskImageSkipReason = "this benchmark runs the agent inside each task's own image"
+
+// taskImageSkip is the one sentence a user reads when agent id cannot run on
+// a benchmark whose tasks bring their own image: what is wrong and the two
+// ways out (a template that supports it, or base_arg on its build). why, when
+// set, is the technical cause, put in brackets.
+func taskImageSkip(id, why string) string {
+	if why != "" {
+		why = " (" + why + ")"
+	}
+	return fmt.Sprintf("%s and agent %s's image cannot be built on top of it%s: create the agent from a template that supports this (%s), or add base_arg: %s to its build with a Dockerfile that starts FROM ${%s}",
+		taskImageSkipReason, id, why, strings.Join(taskImageTemplates(), ", "), taskImageBaseArg, taskImageBaseArg)
+}
+
+// taskImageTemplates names the agent builder templates whose agents run on
+// a task's own image: a repo template whose shipped agent has a task-image
+// variant (<stem>-task.yaml), or a starter whose rendered build sets
+// base_arg.
+var taskImageTemplates = sync.OnceValue(func() []string {
+	var out []string
+	for _, t := range agentTemplates {
+		switch {
+		case strings.HasPrefix(t.source, "repo:"):
+			if v := taskVariantConfig(t.origin(), nil); v != nil && v.Build != nil && v.Build.BaseArg != "" {
+				out = append(out, t.Name)
+			}
+		case strings.HasPrefix(t.source, "skeleton:"):
+			files, err := agenttemplates.Render(strings.TrimPrefix(t.source, "skeleton:"), "probe", "bench/agent-probe:1")
+			if err != nil || len(files) == 0 {
+				continue
+			}
+			var cfg schemas.AgentConfig
+			if yaml.Unmarshal(files[0].Content, &cfg) == nil && cfg.Build != nil && cfg.Build.BaseArg != "" {
+				out = append(out, t.Name)
+			}
+		}
+	}
+	return out
+})
 
 // remoteAdapters run outside any container the bench builds.
 var remoteAdapters = map[string]bool{"remote_http": true, "a2a": true, "openai_agent": true, "pull": true, "voice_platform": true}
@@ -88,12 +130,12 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 		return taskImageVariant{}
 	}
 	if remoteAdapters[cfg.Adapter] || cfg.Image == "" || cfg.Build == nil || cfg.Build.Dockerfile == "" {
-		return taskImageVariant{Skip: taskImageSkipReason}
+		return taskImageVariant{Skip: taskImageSkip(cfg.ID, "")}
 	}
 	set := map[string]any{"build.base_arg": taskImageBaseArg}
 	b := *cfg.Build
 	b.BaseArg = taskImageBaseArg
-	if lib := taskVariantConfig(cfg.ID, agents); lib != nil && lib.Build != nil && lib.Build.BaseArg != "" && lib.Build.Dockerfile != "" {
+	if lib := taskVariantFor(cfg, agents); lib != nil && lib.Build != nil && lib.Build.BaseArg != "" && lib.Build.Dockerfile != "" {
 		b = *lib.Build
 		set = map[string]any{"build.base_arg": b.BaseArg, "build.dockerfile": b.Dockerfile, "build.tag": b.Tag}
 		if b.Context != "" {
@@ -115,10 +157,73 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 			return taskImageVariant{Skip: fmt.Sprintf("agent %s cannot run here: its task-image build file %s is not in the organization's project, the library or the built-in agents", cfg.ID, b.Dockerfile)}
 		}
 		if !dockerfileUsesArg(path, b.BaseArg) {
-			return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile does not start FROM ${%s})", cfg.ID, b.BaseArg)}
+			return taskImageVariant{Skip: taskImageSkip(cfg.ID, fmt.Sprintf("its Dockerfile does not start FROM ${%s}", b.BaseArg))}
 		}
 	}
 	return taskImageVariant{Set: set, Note: fmt.Sprintf("agent %s is built on each task's own image here", cfg.ID)}
+}
+
+// taskVariantFor is the task-image variant cfg runs with: the one of its own
+// id, else the one of the agent it was made from (originOf), but only while
+// cfg still runs the same tool as that variant: the same adapter and the
+// same launch program (the base name of argv[0]). An agent made from the
+// Codex template whose command was changed to another program gets none.
+func taskVariantFor(cfg *schemas.AgentConfig, agents map[string]*schemas.AgentConfig) *schemas.AgentConfig {
+	if v := taskVariantConfig(cfg.ID, agents); v != nil {
+		return v
+	}
+	o := originOf(cfg)
+	if o == "" || o == cfg.ID {
+		return nil
+	}
+	if v := taskVariantConfig(o, agents); v != nil && sameTool(cfg, v) {
+		return v
+	}
+	return nil
+}
+
+// sameTool reports whether a and b run the same adapter and launch program.
+func sameTool(a, b *schemas.AgentConfig) bool {
+	return a.Adapter == b.Adapter && len(a.Argv) > 0 && len(b.Argv) > 0 && path.Base(a.Argv[0]) == path.Base(b.Argv[0])
+}
+
+// originOf is the agent cfg was made from: its origin field (written by the
+// agent builder at creation), else, for an agent created before that field
+// existed, a shipped agent with a task-image variant that cfg matches on
+// image or build tag, or on adapter, launch program and parser together
+// (a copy of the Codex template keeps argv "codex ..." and parser "codex").
+func originOf(cfg *schemas.AgentConfig) string {
+	if cfg.Origin != "" {
+		return cfg.Origin
+	}
+	entries, err := fs.ReadDir(benchagents.Files, ".")
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		id, ok := strings.CutSuffix(e.Name(), "-task.yaml")
+		if !ok {
+			continue
+		}
+		b, err := fs.ReadFile(benchagents.Files, id+".yaml")
+		if err != nil {
+			continue
+		}
+		var base schemas.AgentConfig
+		if yaml.Unmarshal(b, &base) != nil {
+			continue
+		}
+		if base.Image != "" && cfg.Image == base.Image {
+			return id
+		}
+		if cfg.Build != nil && base.Build != nil && base.Build.Tag != "" && cfg.Build.Tag == base.Build.Tag {
+			return id
+		}
+		if cfg.Parser != "" && cfg.Parser == base.Parser && sameTool(cfg, &base) {
+			return id
+		}
+	}
+	return ""
 }
 
 // taskVariantConfig is the task-image variant agents/<id>-task.yaml of an

@@ -62,7 +62,7 @@ func TestDeriveTaskImageAgent(t *testing.T) {
 		{ID: "svc", Adapter: "remote_http"},
 		{ID: "pre", Adapter: "command", Image: "acme/agent:1"},
 	} {
-		if v := deriveTaskImageAgent(cfg, st, nil, nil, ""); v.Skip != taskImageSkipReason {
+		if v := deriveTaskImageAgent(cfg, st, nil, nil, ""); v.Skip != taskImageSkip(cfg.ID, "") {
 			t.Fatalf("%s: %+v", cfg.ID, v)
 		}
 	}
