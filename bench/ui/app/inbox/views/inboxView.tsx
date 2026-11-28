@@ -17,6 +17,8 @@ import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/a
 import { InboxItemPanel } from "./inboxItemPanel";
 import { Collapsible } from "@/components/inbox/featureHero";
 import { InboxBulkAccept } from "@/components/inbox/inboxBulkAccept";
+import { BuildTaskBulk } from "@/components/inbox/buildTaskBulk";
+import "@/components/inbox/uft3I18n";
 import { ListChecks, Plug } from "lucide-react";
 import { UnknownLinkNote } from "@/components/shell/unknownLinkNote";
 import { ToolbarSearch } from "@/components/ui/toolbar";
@@ -38,6 +40,7 @@ export function InboxTab() {
 	const { t } = useTranslation("bench");
 	const { t: u } = useTranslation("ux13");
 	const { t: g } = useTranslation("inboxGuide");
+	const { t: b } = useTranslation("uft3");
 	const { t: m } = useTranslation("maximFailures");
 	const [urlFilter, setFilter] = useQueryState("state", parseAsStringLiteral(INBOX_FILTERS));
 	const [source, setSource] = useQueryState("source", parseAsString);
@@ -108,6 +111,12 @@ export function InboxTab() {
 			{data?.mode === "live" && (hasOpen || bulkSeen) && !itemId && (
 				<Collapsible icon={ListChecks} title={g("bulk.title")} hint={g("bulk.hint")} testId="inbox-bulk">
 					<InboxBulkAccept items={data.items ?? []} suites={data.suites ?? []} />
+				</Collapsible>
+			)}
+			{/* Round 7 lane T3: one builder job per picked failure (components/inbox/buildTaskBulk.tsx). */}
+			{data?.mode === "live" && hasOpen && !itemId && (
+				<Collapsible icon={ListChecks} title={b("bulkTitle")} hint={b("bulkHint")} testId="build-task-bulk-block">
+					<BuildTaskBulk items={data.items ?? []} suites={data.suites ?? []} />
 				</Collapsible>
 			)}
 			{data?.mode === "live" && (

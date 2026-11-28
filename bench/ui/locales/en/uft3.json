@@ -49,5 +49,15 @@
 	"retry": "Try again",
 	"retryAsk": "The builder tries once more with the failing control as feedback. It spends what is left of the cap.",
 	"approveMeans": "You confirm this instruction asks for the right behaviour. The task joins {{suite}}.",
-	"rejectAsk": "Discard this draft? The task files are removed."
+	"rejectAsk": "Discard this draft? The task files are removed.",
+	"bulkTitle": "Build tasks from these failures",
+	"bulkHint": "One build per failure, each with its own cap. At most 10.",
+	"bulkPick": "Failures",
+	"bulkMax": "Pick at most 10 failures.",
+	"bulkVerb_one": "Build {{count}} task",
+	"bulkVerb_other": "Build {{count}} tasks",
+	"bulkAsk": "{{count}} builds with {{model}} into {{suite}}, up to {{each}} each, {{total}} in total.",
+	"bulkTotal": "Total up to {{total}}",
+	"bulkStarted": "Started {{ok}} of {{count}} builds. Open a failure to see its build.",
+	"bulkFailed": "{{id}}: {{error}}"
 }
