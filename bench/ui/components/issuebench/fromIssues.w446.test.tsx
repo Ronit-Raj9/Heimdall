@@ -6,6 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 import { FromIssues } from "./fromIssues";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/ufl5Api", () => ({
+	useListIssueRunsQuery: () => ({ data: { runs: [] }, isLoading: false }),
+	useCancelIssueRunMutation: () => [async () => ({}), { isLoading: false }],
+	useListDatasetTasksQuery: () => ({ data: { tasks: [], total: 0 }, isLoading: false }),
+	useWriteDatasetTasksMutation: () => [async () => ({}), { isLoading: false }],
+	useDeleteDatasetTaskMutation: () => [async () => ({}), { isLoading: false }],
+	useGetDatasetVersionQuery: () => ({ isLoading: false }),
+}));
 vi.mock("@/lib/store/apis/issuebenchApi", () => ({
 	useGetIssueReadinessQuery: () => okQuery({ hosted: true, worker_online: true, github: true, gateway: true, default_model: true }),
 	useGetIssueRunQuery: () => okQuery(undefined),

@@ -27,6 +27,7 @@ import {
 	type McpToolQuality,
 } from "@/lib/types/mcptest";
 import { cn } from "@/lib/utils";
+import { McpServerReportSection } from "@/components/suites/mcpServerReport";
 import { CopyId } from "@/components/ui/copyId";
 import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
@@ -438,6 +439,7 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 						</Button>
 						<DraftEvaluateLink done={done} />
 					</div>
+					<McpServerReportSection benchmark={done.suite} />
 				</div>
 			)}
 		</Section>

@@ -36,6 +36,14 @@ vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
 	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
 	GroupedModelPicker: ({ testId }: { testId?: string }) => <select data-testid={`${testId}-model`} />,
 }));
+vi.mock("@/lib/store/apis/ufl5Api", () => ({
+	useListIssueRunsQuery: () => ({ data: { runs: [] }, isLoading: false }),
+	useCancelIssueRunMutation: () => [async () => ({}), { isLoading: false }],
+	useListDatasetTasksQuery: () => ({ data: { tasks: [], total: 0 }, isLoading: false }),
+	useWriteDatasetTasksMutation: () => [async () => ({}), { isLoading: false }],
+	useDeleteDatasetTaskMutation: () => [async () => ({}), { isLoading: false }],
+	useGetDatasetVersionQuery: () => ({ isLoading: false }),
+}));
 vi.mock("@/lib/store/apis/issuebenchApi", () => ({
 	useGetIssueReadinessQuery: (...args: unknown[]) => {
 		api.readinessArgs = args;

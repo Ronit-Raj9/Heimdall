@@ -1,0 +1,68 @@
+{
+	"mcpReport": {
+		"title": "Server report",
+		"loadError": "Could not load the server report.",
+		"empty": "No runs yet. Evaluate this benchmark to see how agents use each tool.",
+		"summary": "{{runs}} runs by {{agents}}, {{calls}} tool calls, {{errors}} errors",
+		"tool": "Tool",
+		"picked": "Picked",
+		"valid": "Valid input",
+		"succeeded": "Succeeded",
+		"passed": "Passed",
+		"latency": "p50 / p95",
+		"ms": "{{p50}} / {{p95}} ms",
+		"advice": "What to change ({{n}})",
+		"unlisted": "Agents called tools the server does not list: {{tools}}"
+	},
+	"rows": {
+		"title": "Rows",
+		"add": "Add row",
+		"loadError": "Could not load the rows.",
+		"empty": "No rows yet.",
+		"task": "Task",
+		"titleCol": "Title",
+		"actions": "Actions",
+		"byHand": "Written by hand",
+		"replace": "Replace",
+		"delete": "Delete",
+		"range": "{{first}} to {{last}} of {{total}}",
+		"addTitle": "Add row",
+		"replaceTitle": "Replace {{id}}",
+		"id": "Task id",
+		"question": "Question",
+		"expected": "Accepted answers",
+		"expectedHint": "One per line.",
+		"save": "Save",
+		"saving": "Saving",
+		"cancel": "Cancel",
+		"close": "Close",
+		"deleteTitle": "Delete {{id}}?",
+		"deleteHint": "Removes the task. A new version is recorded; past runs keep their results."
+	},
+	"versions": {
+		"loadError": "Could not load this version.",
+		"added": "Added",
+		"updated": "Replaced",
+		"removed": "Removed",
+		"total": "Tasks"
+	},
+	"issues": {
+		"title": "Past scans",
+		"loadError": "Could not load past scans.",
+		"open": "Open",
+		"shown": "Shown above",
+		"cancel": "Stop build",
+		"status": {
+			"scanned": "Scanned",
+			"running": "Building",
+			"done": "Done",
+			"failed": "Failed",
+			"canceled": "Stopped"
+		}
+	},
+	"harvest": {
+		"evaluation": "Red-team evaluation",
+		"go": "Harvest attacks",
+		"done": "{{added}} new regressions from {{broken}} successful attacks."
+	}
+}

@@ -1,6 +1,7 @@
 // Build tab source "From issues" (lane G06): name any GitHub repository the connected account
 // can read (public ones included), scan it for merged pull requests that close an issue, then
 // build, check and review each one.
+import { PastIssueRuns } from "./pastIssueRuns";
 import { WeeklySync } from "@/components/issuebench/weeklySync";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { Button } from "@/components/ui/button";
@@ -183,6 +184,7 @@ export function FromIssues({ writable }: { writable: boolean }) {
 				</p>
 			)}
 			{runId && <RunView id={runId} writable={writable} readiness={readiness.data} t={t} />}
+			<PastIssueRuns openId={runId} onOpen={setRunId} writable={writable} />
 			<WeeklySync repo={name} writable={writable} />
 		</div>
 	);

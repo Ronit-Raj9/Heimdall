@@ -6,6 +6,7 @@ import { GradingBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading } from "@/components/scenario/scenario.utils";
 import { EmptyState, PageHeader, RouteTabs, suiteIdOf, type RouteTab } from "@/components/shell";
 import { suiteVersionOf } from "@/components/shell/entityLink";
+import { McpServerReportSection } from "@/components/suites/mcpServerReport";
 import { isBuiltinSuite, suiteDisplayDescription } from "@/components/suites/suiteDisplay";
 import { SuiteStatusPill, suiteDisplayName, suitePillState } from "@/components/suites/suiteIdentity";
 import { SuiteRunButton } from "@/components/suites/suiteRunButton";
@@ -331,6 +332,7 @@ function SuiteBody({
 							) : active === "quality" ? (
 								<div className="flex min-w-0 flex-col gap-8" data-testid="suite-quality">
 									<SuiteHealthTab suite={suite} health={health} />
+									{!builtin && <McpServerReportSection benchmark={suite.id} hideUnlessDrafted />}
 									{definedTiers > 0 && (
 										<div id="suite-section-tiers" className="scroll-mt-4">
 											<SuiteTiersTab suite={suite} />

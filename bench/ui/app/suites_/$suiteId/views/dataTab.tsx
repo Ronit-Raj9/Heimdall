@@ -1,4 +1,5 @@
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { DatasetRowsSection, DatasetVersionChanges } from "@/components/suites/datasetRows";
 import { CopyCodeBlock } from "@/components/suites/copyCodeBlock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,7 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-data-tab">
 			<PolicySection suite={suite.id} writable={writable} t={t} />
+			<DatasetRowsSection suite={suite.id} writable={writable} />
 			<VersionsSection suite={suite.id} t={t} />
 			{/* M6-32, Q-189: importing from another platform is a separate job: one line here that opens the form. */}
 			{writable && (
@@ -285,6 +287,7 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 
 function VersionsSection({ suite, t }: { suite: string; t: T }) {
 	const versions = useGetDatasetVersionsQuery(suite);
+	const [open, setOpen] = useState<number | null>(null);
 	return (
 		<Section title={t("versions.title")} testId="suite-data-versions">
 			{versions.isLoading ? (
@@ -297,13 +300,27 @@ function VersionsSection({ suite, t }: { suite: string; t: T }) {
 					testId="suite-data-versions-error"
 				/>
 			) : (
-				<VersionTable versions={versions.data?.versions ?? []} t={t} />
+				<>
+					<VersionTable versions={versions.data?.versions ?? []} t={t} open={open} onOpen={(n) => setOpen(open === n ? null : n)} />
+					<DatasetVersionChanges suite={suite} n={open} />
+				</>
 			)}
 		</Section>
 	);
 }
 
-export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T }) {
+export function VersionTable({
+	versions,
+	t,
+	open = null,
+	onOpen,
+}: {
+	versions: DatasetVersion[];
+	t: T;
+	/** The version whose changes are shown under the table. */
+	open?: number | null;
+	onOpen?(n: number): void;
+}) {
 	if (versions.length === 0) return <EmptyNote testId="suite-data-versions-empty">{t("versions.empty")}</EmptyNote>;
 	return (
 		<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
@@ -322,7 +339,19 @@ export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T
 					{versions.map((v) => (
 						<tr key={v.version} className="border-b last:border-0" data-testid={`suite-data-version-${v.version}`}>
 							<td className="px-4 py-2 font-mono text-xs" title={v.sha256}>
-								v{v.version}
+								{onOpen ? (
+									<button
+										type="button"
+										className="text-primary min-h-11 underline-offset-4 hover:underline"
+										aria-expanded={open === v.version}
+										onClick={() => onOpen(v.version)}
+										data-testid={`suite-data-version-open-${v.version}`}
+									>
+										v{v.version}
+									</button>
+								) : (
+									<>v{v.version}</>
+								)}
 							</td>
 							<td className="text-muted-foreground px-4 py-2 text-xs">{new Date(v.at).toLocaleString()}</td>
 							<td className="text-muted-foreground hidden px-4 py-2 text-xs sm:table-cell" title={v.actor || undefined}>

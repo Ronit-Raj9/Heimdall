@@ -32,6 +32,14 @@ const langfuse: ImportPlatform = {
 	configured: { public_key: true, secret_key: false },
 };
 
+vi.mock("@/lib/store/apis/ufl5Api", () => ({
+	useListIssueRunsQuery: () => ({ data: { runs: [] }, isLoading: false }),
+	useCancelIssueRunMutation: () => [async () => ({}), { isLoading: false }],
+	useListDatasetTasksQuery: () => ({ data: { tasks: [], total: 0 }, isLoading: false }),
+	useWriteDatasetTasksMutation: () => [async () => ({}), { isLoading: false }],
+	useDeleteDatasetTaskMutation: () => [async () => ({}), { isLoading: false }],
+	useGetDatasetVersionQuery: () => ({ isLoading: false }),
+}));
 vi.mock("@/lib/store/apis/annotationApi", () => ({
 	useGetDataPolicyQuery: () => okQuery(view),
 	useSetDataPolicyMutation: () => mutation(),

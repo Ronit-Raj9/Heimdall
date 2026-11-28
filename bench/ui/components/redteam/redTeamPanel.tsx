@@ -1,4 +1,5 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { HarvestForm } from "./harvestForm";
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +109,7 @@ export function RedTeamPanel({ selected, onAdd }: RedTeamPanelProps) {
 			{open && catalog.isLoading && <p className="text-muted-foreground text-sm">Loading...</p>}
 			{open && catalog.isError && <p className="text-destructive text-sm">Could not load the red-team options.</p>}
 			{open && <RegressionsReview />}
+			{open && <HarvestForm />}
 		</section>
 	);
 }
