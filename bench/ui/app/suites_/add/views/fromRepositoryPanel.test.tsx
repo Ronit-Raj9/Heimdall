@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RepoTaskResult, repoTaskBody } from "./fromRepositoryPanel";
+import { RepoTaskResult, repoCandidates, repoTaskBody } from "./fromRepositoryPanel";
 
 describe("From a repository", () => {
 	it("posts the repotask.build body the job validates", () => {
@@ -40,5 +40,11 @@ describe("From a repository", () => {
 	it("shows an admitted task", () => {
 		const html = renderToStaticMarkup(<RepoTaskResult result={{ suite: "core", task: "t01", admitted: true, controls: [] }} />);
 		expect(html).toContain("Admitted: t01 joins core.");
+	});
+
+	it("reads the candidates the find job returns", () => {
+		const c = { base: "a1", reference: "b2", subject: "Fix", lines: 10, files: 2 };
+		expect(repoCandidates({ candidates: [c], skipped: 0 })).toEqual([c]);
+		expect(repoCandidates(undefined)).toEqual([]);
 	});
 });

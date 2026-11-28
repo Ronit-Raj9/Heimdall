@@ -228,3 +228,34 @@ func TestRepoTaskCloneRefusesLarge(t *testing.T) {
 		}
 	}
 }
+
+func TestRepoTaskCandidates(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	repo, base, fix, _ := repoTaskFixture(t)
+	env := suiteOpsEnv(t, true)
+	if err := os.WriteFile(filepath.Join(env.ProjectRoot, "benchmarks", "core", "suite.yaml"), []byte("# template: python-pytest\nid: core\ngrader: hidden_tests\ntasks: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldL, oldC := repoTaskLookup, suiteOpsGitClone
+	defer func() { repoTaskLookup, suiteOpsGitClone = oldL, oldC }()
+	repoTaskLookup = func(context.Context, string) ([]net.IP, error) { return []net.IP{net.ParseIP("140.82.112.3")}, nil }
+	suiteOpsGitClone = func(ctx context.Context, args, _ []string) error {
+		return exec.CommandContext(ctx, "git", "clone", "-q", repo, args[len(args)-1]).Run()
+	}
+	ctx := context.Background()
+	norm, _, err := validateRepoCandidates(ctx, env, json.RawMessage(`{"repo_url":"https://github.com/acme/durations.git","suite":"core"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(norm)
+	out, err := runRepoCandidates(ctx, env, &jobs.Job{ID: "j2", Params: raw}, discardJobLog{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cands := out.(map[string]any)["candidates"].([]repoCandidate)
+	if len(cands) != 1 || cands[0].Base != base || cands[0].Reference != fix {
+		t.Fatalf("candidates %+v, want %s..%s", cands, base, fix)
+	}
+}

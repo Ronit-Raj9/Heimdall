@@ -328,3 +328,83 @@ func repoTaskAdmitHosted(ctx context.Context, env jobEnv, j *jobs.Job, suiteID, 
 	}
 	return v[0], m.ExpID, nil
 }
+
+// repotask.candidates lists recent commits of a public repository that
+// changed both code and tests (tasks mine's ranking over plain git), so the
+// form can fill both commits. It writes nothing.
+const kindRepoTaskCandidates = "repotask.candidates"
+
+func init() {
+	registerJobKind(jobKindSpec{Kind: kindRepoTaskCandidates, Local: true, Hosted: true, Opts: []jobs.KindOption{jobs.WithMaxAttempts(1)},
+		Validate: validateRepoCandidates, Run: runRepoCandidates})
+}
+
+type repoCandidatesParams struct {
+	RepoURL string `json:"repo_url"`
+	Suite   string `json:"suite"`
+}
+
+type repoCandidate struct {
+	Base      string `json:"base"`
+	Reference string `json:"reference"`
+	Subject   string `json:"subject"`
+	Lines     int    `json:"lines"`
+	Files     int    `json:"files"`
+}
+
+func validateRepoCandidates(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
+	var p repoCandidatesParams
+	if err := strictParams(raw, &p); err != nil {
+		return nil, "", err
+	}
+	if _, err := suiteOpsCheckSuite(env, p.Suite); err != nil {
+		return nil, "", err
+	}
+	u, err := checkRepoURL(ctx, p.RepoURL)
+	if err != nil {
+		return nil, "", err
+	}
+	p.RepoURL = u.String()
+	return p, "suite:" + p.Suite, nil
+}
+
+func runRepoCandidates(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
+	var p repoCandidatesParams
+	if err := j.DecodeParams(&p); err != nil {
+		return nil, err
+	}
+	u, pin, err := checkRepoURLPin(ctx, p.RepoURL)
+	if err != nil {
+		return nil, err
+	}
+	suiteDir, err := suiteOpsCheckSuite(env, p.Suite)
+	if err != nil {
+		return nil, err
+	}
+	y, err := os.ReadFile(filepath.Join(suiteDir, "suite.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	globs := scaffold.DefaultTestGlobs(scaffold.DetectTemplate(y))
+	if len(globs) == 0 {
+		return nil, fmt.Errorf("benchmark %s has no code template: use python-pytest, node-test or go-test", p.Suite)
+	}
+	repo, cleanup, err := repoTaskClone(ctx, u, pin, log)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	cands, skipped, err := scaffold.MineCandidates(ctx, scaffold.MineOptions{Repo: repo, TestGlobs: globs, NeedBaseTests: suiteGrader(y) == "hidden_tests"})
+	if err != nil {
+		return nil, fmt.Errorf("find candidates: %v", err)
+	}
+	out := []repoCandidate{}
+	for i, c := range cands {
+		if i >= 20 {
+			break
+		}
+		out = append(out, repoCandidate{Base: c.Parent, Reference: c.Commit, Subject: c.Subject, Lines: c.Lines, Files: len(c.Source) + len(c.Tests)})
+	}
+	log.Printf("%d candidates, %d commits skipped", len(cands), len(skipped))
+	return map[string]any{"candidates": out, "skipped": len(skipped)}, nil
+}

@@ -18,5 +18,8 @@
 	"control": "Check",
 	"want": "Wanted",
 	"got": "Got",
+	"find": "Find candidates",
+	"noCandidates": "No recent commit changed both code and tests.",
+	"size": "{{lines}} lines, {{files}} files",
 	"noBenchmarks": "Create a benchmark first (From code changes)."
 }

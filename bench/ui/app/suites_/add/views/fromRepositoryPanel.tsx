@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import "./uft4I18n";
 
 export const REPO_TASK_KIND = "repotask.build";
+export const REPO_CANDIDATES_KIND = "repotask.candidates";
 export const REPO_TEMPLATES = ["python-pytest", "node-test", "go-test"] as const;
 
 export interface RepoTaskForm {
@@ -34,6 +35,20 @@ interface Control {
 	want: string;
 	got: string;
 	passed: boolean;
+}
+
+export interface RepoCandidate {
+	base: string;
+	reference: string;
+	subject: string;
+	lines: number;
+	files: number;
+}
+
+/** The candidates of a repotask.candidates result. Pure. */
+export function repoCandidates(result: Record<string, JsonValue> | undefined): RepoCandidate[] {
+	const list = result?.candidates;
+	return Array.isArray(list) ? (list as unknown as RepoCandidate[]) : [];
 }
 
 /** The job's result: admitted or the failing check, and every control. */
@@ -84,6 +99,7 @@ export function FromRepositoryPanel() {
 	const suites = (data?.suites ?? []).filter((s) => s.source !== "library");
 	const [form, setForm] = useState<RepoTaskForm>({ repo_url: "", base: "", reference: "", suite: "", template: "" });
 	const [done, setDone] = useState<Job | null>(null);
+	const [found, setFound] = useState<RepoCandidate[] | null>(null);
 	const set = (k: keyof RepoTaskForm) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 	const body = repoTaskBody(form);
 	const input = "border-input bg-background rounded-md border px-2 py-1 text-sm";
@@ -127,6 +143,33 @@ export function FromRepositoryPanel() {
 					</select>
 				</label>
 			</div>
+			{form.repo_url.trim() && form.suite && (
+				<JobRunButton
+					kind={REPO_CANDIDATES_KIND}
+					params={{ repo_url: form.repo_url.trim(), suite: form.suite }}
+					label={t("find")}
+					variant="outline"
+					onDone={(j) => setFound(repoCandidates(j.result))}
+				/>
+			)}
+			{found && found.length === 0 && <p className="text-muted-foreground text-xs">{t("noCandidates")}</p>}
+			{found && found.length > 0 && (
+				<ul className="flex flex-col gap-1 text-xs" data-testid="repotask-candidates">
+					{found.map((c) => (
+						<li key={c.reference}>
+							<button
+								type="button"
+								className="hover:bg-muted w-full rounded px-2 py-1 text-left"
+								onClick={() => setForm({ ...form, base: c.base, reference: c.reference })}
+								data-testid={`repotask-candidate-${c.reference.slice(0, 10)}`}
+							>
+								<span className="font-mono">{c.reference.slice(0, 10)}</span> {c.subject}{" "}
+								<span className="text-muted-foreground">{t("size", { lines: c.lines, files: c.files })}</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
 			{suites.length === 0 && <p className="text-muted-foreground text-xs">{t("noBenchmarks")}</p>}
 			<p className="text-xs" data-testid="repotask-free">
 				{t("free")}
