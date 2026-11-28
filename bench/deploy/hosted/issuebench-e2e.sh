@@ -222,6 +222,8 @@ teardown() {
 			docker network ls -q --filter "label=heimdall.org=$org_id" | xargs -r docker network rm >/dev/null 2>&1 || true
 			# The org's BuildKit cache volume (build sessions, buildsession.go).
 			docker volume rm "heimdall-buildcache-$org_id" >/dev/null 2>&1 || true
+			# Extra build slots (HEIMDALL_ORG_BUILDS) have their own volumes.
+			for k in 1 2 3 4 5 6 7; do docker volume rm "heimdall-buildcache-$org_id-$k" >/dev/null 2>&1 || true; done
 		fi
 		rm -rf "$work" 2>/dev/null || say "could not remove all of $work (files the shared worker wrote as uid 10001); remove it as root"
 	fi
