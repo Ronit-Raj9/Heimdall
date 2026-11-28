@@ -80,32 +80,44 @@ var repoTaskAdmit = func(ctx context.Context, env jobEnv, j *jobs.Job, suiteID, 
 	return t, "", nil
 }
 
+// repoTaskMaxBytes caps the cloned working copy.
+const repoTaskMaxBytes = 200 << 20
+
 // checkRepoURL refuses anything but a public https git address.
 func checkRepoURL(ctx context.Context, raw string) (*url.URL, error) {
+	u, _, err := checkRepoURLPin(ctx, raw)
+	return u, err
+}
+
+// checkRepoURLPin also returns the checked address git is pinned to, so a
+// second lookup by git cannot point elsewhere.
+func checkRepoURLPin(ctx context.Context, raw string) (*url.URL, string, error) {
 	u, err := modelswitch.CheckGatewayURL(raw, true)
 	if err != nil {
 		msg := strings.TrimPrefix(err.Error(), modelswitch.ErrGatewayRefused.Error()+": ")
 		msg = strings.ReplaceAll(strings.ReplaceAll(msg, "gateway's ", "repository's "), "gateway", "repository")
-		return nil, invalid(errors.New(msg))
+		return nil, "", invalid(errors.New(msg))
 	}
 	if u.RawQuery != "" || u.Fragment != "" || u.Port() != "" && u.Port() != "443" {
-		return nil, invalid(errors.New("give the repository's plain https address, without a query or a port"))
+		return nil, "", invalid(errors.New("give the repository's plain https address, without a query or a port"))
 	}
 	if strings.Contains(u.Path, "..") || strings.HasPrefix(u.Path, "/-") {
-		return nil, invalid(errors.New("the repository address is not valid"))
+		return nil, "", invalid(errors.New("the repository address is not valid"))
 	}
+	pin := ""
 	if repoTaskLookup != nil {
 		ips, err := repoTaskLookup(ctx, u.Hostname())
 		if err != nil || len(ips) == 0 {
-			return nil, invalid(fmt.Errorf("the host %s could not be found", u.Hostname()))
+			return nil, "", invalid(fmt.Errorf("the host %s could not be found", u.Hostname()))
 		}
 		for _, ip := range ips {
 			if _, err := modelswitch.CheckGatewayURL("https://"+net.JoinHostPort(ip.String(), "443"), true); err != nil {
-				return nil, invalid(errors.New("the host points to a private or local address; only public repositories work"))
+				return nil, "", invalid(errors.New("the host points to a private or local address; only public repositories work"))
 			}
 		}
+		pin = ips[0].String()
 	}
-	return u, nil
+	return u, pin, nil
 }
 
 func validateRepoTask(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
@@ -153,16 +165,16 @@ func validateRepoTask(ctx context.Context, env jobEnv, raw json.RawMessage) (any
 }
 
 // repoTaskClone clones the public repository into a temporary folder.
-func repoTaskClone(ctx context.Context, u string, log jobs.Logger) (string, func(), error) {
+func repoTaskClone(ctx context.Context, u *url.URL, pin string, log jobs.Logger) (string, func(), error) {
 	tmp, err := os.MkdirTemp("", "heimdall-repotask-*")
 	if err != nil {
 		return "", nil, err
 	}
 	cleanup := func() { _ = os.RemoveAll(tmp) }
 	dir := filepath.Join(tmp, "repo")
-	args := []string{"-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "http.followRedirects=false",
-		"-c", "credential.helper=", "clone", "--quiet", "--no-recurse-submodules", "--", u, dir}
-	env := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + tmp, "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_ASKPASS=/bin/false", "LC_ALL=C"}
+	args := repoTaskCloneArgs(u, pin, dir)
+	env := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + tmp, "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_LFS_SKIP_SMUDGE=1", "LC_ALL=C"}
 	cctx, cancel := context.WithTimeout(ctx, suiteOpsCloneTimeout)
 	defer cancel()
 	log.Printf("cloning %s (public repositories only, no credential is sent)", u)
@@ -170,7 +182,37 @@ func repoTaskClone(ctx context.Context, u string, log jobs.Logger) (string, func
 		cleanup()
 		return "", nil, fmt.Errorf("could not copy %s: check the address; private repositories need GitHub connected (From GitHub)", u)
 	}
+	if n := repoTaskDirBytes(dir); n > repoTaskMaxBytes {
+		cleanup()
+		return "", nil, fmt.Errorf("the repository is %d MB, more than the %d MB limit", n>>20, repoTaskMaxBytes>>20)
+	}
 	return dir, cleanup, nil
+}
+
+// repoTaskCloneArgs is the guarded clone command: https only, no
+// redirects, hooks, submodules or credential helper, the host pinned to
+// the address the check accepted.
+func repoTaskCloneArgs(u *url.URL, pin, dir string) []string {
+	args := []string{"-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "http.followRedirects=false",
+		"-c", "credential.helper=", "-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false"}
+	if pin != "" {
+		args = append(args, "-c", "http.curloptResolve="+u.Hostname()+":443:"+pin)
+	}
+	return append(args, "clone", "--quiet", "--no-recurse-submodules", "--single-branch", "--no-tags", "--", u.String(), dir)
+}
+
+// repoTaskDirBytes is the size of the files under dir.
+func repoTaskDirBytes(dir string) int64 {
+	var n int64
+	_ = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if fi, err := d.Info(); err == nil {
+				n += fi.Size()
+			}
+		}
+		return nil
+	})
+	return n
 }
 
 func runRepoTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
@@ -178,7 +220,8 @@ func runRepoTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, 
 	if err := j.DecodeParams(&p); err != nil {
 		return nil, err
 	}
-	if _, err := checkRepoURL(ctx, p.RepoURL); err != nil { // the host may resolve elsewhere now
+	u, pin, err := checkRepoURLPin(ctx, p.RepoURL) // the host may resolve elsewhere now
+	if err != nil {
 		return nil, err
 	}
 	suiteDir, err := suiteOpsCheckSuite(env, p.Suite)
@@ -191,7 +234,7 @@ func runRepoTask(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, 
 		}
 	}
 	step("cloning")
-	repo, cleanup, err := repoTaskClone(ctx, p.RepoURL, log)
+	repo, cleanup, err := repoTaskClone(ctx, u, pin, log)
 	if err != nil {
 		return nil, err
 	}

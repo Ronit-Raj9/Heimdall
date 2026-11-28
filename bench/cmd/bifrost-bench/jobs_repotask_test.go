@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -181,6 +183,48 @@ func TestRepoTaskBuildFromWebBody(t *testing.T) {
 	} {
 		if _, _, err := validateRepoTask(ctx, env, json.RawMessage(body)); err == nil {
 			t.Errorf("accepted %s", body)
+		}
+	}
+}
+
+func TestRepoTaskCloneArgsGuarded(t *testing.T) {
+	u, _ := url.Parse("https://github.com/acme/app.git")
+	got := strings.Join(repoTaskCloneArgs(u, "140.82.112.3", "/tmp/x"), " ")
+	for _, want := range []string{"protocol.allow=never", "protocol.https.allow=always", "http.followRedirects=false", "credential.helper=",
+		"core.hooksPath=/dev/null", "--no-recurse-submodules", "http.curloptResolve=github.com:443:140.82.112.3", "-- https://github.com/acme/app.git /tmp/x"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("clone args lack %q: %s", want, got)
+		}
+	}
+}
+
+func TestRepoTaskCloneRefusesLarge(t *testing.T) {
+	old := suiteOpsGitClone
+	defer func() { suiteOpsGitClone = old }()
+	var env []string
+	suiteOpsGitClone = func(_ context.Context, args, e []string) error {
+		env = e
+		dir := args[len(args)-1]
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		f, err := os.Create(filepath.Join(dir, "big"))
+		if err != nil {
+			return err
+		}
+		if err := f.Truncate(repoTaskMaxBytes + 1); err != nil {
+			return err
+		}
+		return f.Close()
+	}
+	u, _ := url.Parse("https://github.com/acme/app.git")
+	_, _, err := repoTaskClone(context.Background(), u, "", discardJobLog{})
+	if err == nil || !strings.Contains(err.Error(), "MB limit") {
+		t.Fatalf("large clone: %v", err)
+	}
+	for _, want := range []string{"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_LFS_SKIP_SMUDGE=1", "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS="} {
+		if !slices.Contains(env, want) {
+			t.Errorf("env lacks %s", want)
 		}
 	}
 }
