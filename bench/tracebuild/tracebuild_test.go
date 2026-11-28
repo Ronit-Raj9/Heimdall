@@ -211,3 +211,36 @@ func TestMaxCallsStops(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestStandinWhenReplayIsNotEnough(t *testing.T) {
+	diag := js(t, map[string]any{"kind": "wrong_tool", "summary": "The agent used the status tool instead of the ledger.",
+		"quotes": []map[string]any{{"run_id": "inbox-1", "seq": 1, "text": "timeout after 30s"}}})
+	write := js(t, map[string]any{
+		"instruction": "Where is my refund for order 1042? Use the refund ledger.",
+		"calls":       []map[string]any{{"tool": "refund_ledger", "args": map[string]any{"order_id": "1042"}}},
+		"forbidden":   []map[string]any{{"tool": "refund_status", "args": map[string]any{"order_id": "1042"}}},
+		"standin":     []map[string]any{{"tool": "refund_ledger", "arguments": map[string]any{"order_id": "1042"}, "result": `{"status":"pending"}`}},
+		"standin_why": "The ledger tool was never called in the trace.",
+		"variants": []map[string]any{
+			{"name": "status-tool", "what_it_does_wrong": "calls the status tool", "calls": []map[string]any{{"tool": "refund_status", "args": map[string]any{"order_id": "1042"}}}},
+			{"name": "no-call", "what_it_does_wrong": "never calls a tool", "calls": []map[string]any{}},
+		},
+	})
+	m := &investigator.FakeModel{Replies: []string{diag, write}, CostUSD: 0.01, Cap: 0.5}
+	res, err := Build(context.Background(), input(t, m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Standin == nil || res.Standin.Why == "" {
+		t.Fatalf("no stand-in: %+v", res)
+	}
+	found := false
+	for _, f := range res.Standin.Files {
+		if f.Path == traceimport.ObservedToolsFile && strings.Contains(f.Content, "refund_ledger") && strings.Contains(f.Content, "pending") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("tools.observed.json lacks the stand-in result: %+v", res.Standin.Files)
+	}
+}
