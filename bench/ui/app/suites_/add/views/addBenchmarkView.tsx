@@ -20,6 +20,7 @@ import {
 import type { OnboardInput, OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
 import "@/lib/types/onboard";
 import { AddChooser } from "@/components/suites/addChooserView";
+import { FromRepositoryPanel } from "./fromRepositoryPanel";
 import "@/components/suites/uf6bI18n";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { cn } from "@/lib/utils";
@@ -28,13 +29,7 @@ import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	ONBOARD_STEPS,
-	draftSourceName,
-	keepableSource,
-	stepReached,
-	visibleDrafts,
-} from "./addBenchmarkState";
+import { ONBOARD_STEPS, draftSourceName, keepableSource, stepReached, visibleDrafts } from "./addBenchmarkState";
 
 /** How often a draft is read again while its readiness checks or publish run. */
 /** Q-269: ask before leaving only when the user typed plan edits that no saved draft holds yet. */
@@ -170,10 +165,7 @@ export default function AddBenchmarkView() {
 
 	return (
 		<section className="flex w-full min-w-0 flex-col gap-8" data-testid="onboard-screen">
-			<PageHeader
-				title={t("title")}
-				breadcrumbs={[{ label: t("crumbs.benchmarks"), to: "/suites" }, { label: t("crumbs.add") }]}
-			/>
+			<PageHeader title={t("title")} breadcrumbs={[{ label: t("crumbs.benchmarks"), to: "/suites" }, { label: t("crumbs.add") }]} />
 			{!input && !setId && <AddChooser current="file" />}
 			<StepLine reached={stepReached({ found: !!inv, draft: !!setId })} />
 			<Section title={t("steps.source")} description={t("source.description")} testId="onboard-step-source">
@@ -201,6 +193,7 @@ export default function AddBenchmarkView() {
 				</Section>
 			)}
 			{setId && <DraftSteps id={setId} />}
+			{!input && !setId && <FromRepositoryPanel />}
 			<DraftList current={setId} onOpen={(id) => setSetId(id)} />
 		</section>
 	);
@@ -244,16 +237,17 @@ export function StepLine({ reached }: { reached: number }) {
 	const { t } = useTranslation("onboard");
 	const { t: tu } = useTranslation("uf6b");
 	return (
-		<ol aria-label={tu("add.steps")} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="onboard-step-line">
+		<ol
+			aria-label={tu("add.steps")}
+			className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+			data-testid="onboard-step-line"
+		>
 			{ONBOARD_STEPS.map((step, i) => (
 				<li
 					key={step}
 					aria-current={i === reached ? "step" : undefined}
 					data-state={i < reached ? "done" : i === reached ? "current" : "future"}
-					className={cn(
-						"whitespace-nowrap",
-						i <= reached ? "text-foreground font-medium" : "text-muted-foreground",
-					)}
+					className={cn("whitespace-nowrap", i <= reached ? "text-foreground font-medium" : "text-muted-foreground")}
 				>
 					{t(`steps.${step}`)}
 				</li>
@@ -322,7 +316,9 @@ function DraftList({ current, onOpen }: { current: string | null; onOpen(id: str
 						)}
 						<OverflowMenu
 							label={tu("add.draftMore", { suite: d.suite })}
-							items={[{ label: t("drafts.delete"), onSelect: () => void askDelete(d), destructive: true, testId: `onboard-draft-delete-${d.id}` }]}
+							items={[
+								{ label: t("drafts.delete"), onSelect: () => void askDelete(d), destructive: true, testId: `onboard-draft-delete-${d.id}` },
+							]}
 							testId={`onboard-draft-more-${d.id}`}
 						/>
 					</li>

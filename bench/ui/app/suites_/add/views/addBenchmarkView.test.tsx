@@ -10,6 +10,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import AddBenchmarkView from "./addBenchmarkView";
 
+// The repository panel has its own tests (fromRepositoryPanel.test.tsx); here it needs no store.
+vi.mock("./fromRepositoryPanel", () => ({ FromRepositoryPanel: () => null }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
 		<a href={to} {...rest}>
@@ -108,7 +110,11 @@ const set: OnboardDraftSet = {
 
 describe("Add benchmark", () => {
 	it("renders the drop box first", () => {
-		const html = renderToStaticMarkup(<NuqsTestingAdapter><AddBenchmarkView /></NuqsTestingAdapter>);
+		const html = renderToStaticMarkup(
+			<NuqsTestingAdapter>
+				<AddBenchmarkView />
+			</NuqsTestingAdapter>,
+		);
 		expect(html).toContain('data-testid="onboard-source"');
 		expect(html).toContain('data-testid="onboard-drop"');
 		expect(html).not.toContain("\u2014");

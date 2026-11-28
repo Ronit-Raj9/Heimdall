@@ -8,6 +8,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AddBenchmarkView from "./addBenchmarkView";
 
+// The repository panel has its own tests (fromRepositoryPanel.test.tsx); here it needs no store.
+vi.mock("./fromRepositoryPanel", () => ({ FromRepositoryPanel: () => null }));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
 		<a href={to} {...rest}>
@@ -129,7 +131,11 @@ beforeEach(() => {
 describe("Earlier drafts Delete (N289)", () => {
 	it("asks first, naming the benchmark and its drafted tasks, and deletes on confirm", async () => {
 		api.remove.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-		renderToStaticMarkup(<NuqsTestingAdapter><AddBenchmarkView /></NuqsTestingAdapter>);
+		renderToStaticMarkup(
+			<NuqsTestingAdapter>
+				<AddBenchmarkView />
+			</NuqsTestingAdapter>,
+		);
 		const menu = menus.list.find((m) => m.testId === "onboard-draft-more-d1");
 		const del = menu?.items.find((i) => i.testId === "onboard-draft-delete-d1");
 		expect(del?.label).toBe("Delete");
@@ -144,7 +150,11 @@ describe("Earlier drafts Delete (N289)", () => {
 
 	it("shows a failed delete", () => {
 		api.deleteError = { status: 500, data: { error: { message: "disk full" } } };
-		const html = renderToStaticMarkup(<NuqsTestingAdapter><AddBenchmarkView /></NuqsTestingAdapter>);
+		const html = renderToStaticMarkup(
+			<NuqsTestingAdapter>
+				<AddBenchmarkView />
+			</NuqsTestingAdapter>,
+		);
 		expect(html).toContain("Could not delete the draft");
 		expect(html).toContain("disk full");
 	});
