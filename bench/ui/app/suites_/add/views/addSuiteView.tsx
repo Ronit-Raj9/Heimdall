@@ -8,6 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { w4m5Text } from "@/components/onboard/w4m5I18n";
 import { AlertTriangle, FileCode2, FilePlus2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import FromRepositoryPanel from "./fromRepositoryPanel";
 
 /**
  * The Import tab of Benchmarks (/suites?tab=import; the old /imports). Import a public benchmark with the exact commands
@@ -72,6 +73,7 @@ export default function AddSuiteView() {
 				{ta("entry")}
 			</Link>
 			<AddYourOwnPanel />
+			<FromRepositoryPanel />
 		</section>
 	);
 }

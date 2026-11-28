@@ -1,0 +1,22 @@
+{
+	"title": "From a repository",
+	"help": "A public git repository: the commit before a fix and the fix. The fix's tests become the hidden checks.",
+	"url": "Repository address",
+	"urlPlaceholder": "https://github.com/owner/name.git",
+	"base": "Commit before the fix",
+	"reference": "The fix",
+	"benchmark": "Benchmark",
+	"pickBenchmark": "Pick a benchmark",
+	"template": "Language",
+	"anyTemplate": "As the benchmark",
+	"free": "No model is used. Free.",
+	"run": "Build the task",
+	"confirm": "Copy this repository and test the fix? The commits and their tests are copied into {{suite}}.",
+	"missing": "Give the address, both commits and a benchmark.",
+	"admitted": "Admitted: {{task}} joins {{suite}}. Review its instruction before you run it.",
+	"refused": "Not admitted: {{reason}}",
+	"control": "Check",
+	"want": "Wanted",
+	"got": "Got",
+	"noBenchmarks": "Create a benchmark first (From code changes)."
+}

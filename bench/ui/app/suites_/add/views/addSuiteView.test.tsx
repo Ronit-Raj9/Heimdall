@@ -9,6 +9,8 @@ import AddSuiteView from "./addSuiteView";
 
 const query = vi.hoisted(() => ({ result: {} as Record<string, unknown> }));
 
+vi.mock("./fromRepositoryPanel", () => ({ default: () => null }));
+
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
 		<a href={to} {...rest}>

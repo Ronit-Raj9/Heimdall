@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import AddSuiteView from "./addSuiteView";
 
+vi.mock("./fromRepositoryPanel", () => ({ default: () => null }));
+
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
 		<a href={to} {...rest}>
