@@ -25,6 +25,7 @@ import {
 } from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
+import { TaskReliability } from "./taskReliability";
 import { ModelSwitchReportView } from "@/components/modelswitch/modelSwitchReport"; // Z21 model switch report
 import { GateResultCard, PromoteEvaluation, RepeatEvaluation } from "@/components/releases/promoteEvaluation";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -235,6 +236,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const problem = (evaluation as EvaluationLaunchFacts).problem;
 	const { t: tw } = useTranslation("w4m2");
 	const { t: tu } = useTranslation("ufrb");
+	const { t: tk } = useTranslation("ufk2");
 	// The same cache entry the report card reads: no second request (Q-15).
 	const reportQ = useGetEvaluationReportQuery(evaluation.id, { skip: evaluation.status !== "done" });
 	const note = benchmarksNote(run.length, skipped.length, active);
@@ -426,6 +428,24 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</ul>
 				)}
 			</Section>
+			{/* K2: repeatability, per task "solved 2 of 3" from sealed tries, live while they run. */}
+			{spec.trials > 1 && run.length > 0 && !notStarted && (
+				<Section title={tk("rel.title")} testId="evaluation-reliability">
+					<div className="flex min-w-0 flex-col gap-4">
+						{run.map((child) => (
+							<div key={child.benchmark} className="flex min-w-0 flex-col gap-1">
+								{run.length > 1 && <span className="text-muted-foreground text-xs font-medium">{child.benchmark}</span>}
+								<TaskReliability
+									expId={child.experiment_id}
+									trials={spec.trials}
+									active={isActiveStatus(child.status)}
+									multiArm={spec.mode !== "score"}
+								/>
+							</div>
+						))}
+					</div>
+				</Section>
+			)}
 			{run.length > 0 && skipped.length > 0 && (
 				<Section title={t("detail.skippedTitle")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">

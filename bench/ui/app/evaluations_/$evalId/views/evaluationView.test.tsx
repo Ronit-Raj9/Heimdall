@@ -20,6 +20,7 @@ vi.mock("@/components/reportcard/evaluationReportCard", () => ({
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetExperimentQuery: vi.fn(() => okQuery({ exp_id: "e1", slots: { total: 20, done: 7, running: 2, failed: 0 } })),
+	useListRunsQuery: vi.fn(() => okQuery({ runs: [], total: 0, limit: 500, offset: 0, facets: {} })),
 }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...(await orig<object>()),
@@ -98,6 +99,22 @@ describe("EvaluationBody", () => {
 		expect(html).toContain("needs voice");
 		expect(html).toContain('data-testid="evaluation-cancel"');
 		expect(html).not.toContain('data-testid="report-card-mock"');
+	});
+
+	it("shows reliability per task from sealed tries while runs are pending (K2)", async () => {
+		const { useListRunsQuery } = await import("@/lib/store/apis/benchApi");
+		const r = (task: string, trial: number, outcome: string, sealed = true) => ({ run_id: `r${task}${trial}`, task, arm: "A", condition: "clean", trial, counted: true, sealed, outcome });
+		vi.mocked(useListRunsQuery).mockReturnValue(
+			okQuery({ runs: [r("t1", 1, "pass"), r("t1", 2, "fail"), r("t2", 1, "pass"), r("t2", 2, "unknown", false)], total: 4, limit: 500, offset: 0, facets: {} }) as never,
+		);
+		const html = render(<EvaluationBody evaluation={base} />);
+		expect(html).toContain('data-testid="evaluation-reliability"');
+		expect(html).toContain("solved 1 of 2");
+		expect(html).toContain("solved 1 of 1, 1 to go");
+		expect(html).toContain("Solved every time: 1 of 2 tasks; sometimes: 1; never: 0");
+		const done = render(<EvaluationBody evaluation={{ ...base, status: "done", children: [{ ...base.children[0], status: "done" }] }} />);
+		expect(done).toContain('data-testid="evaluation-reliability"');
+		vi.mocked(useListRunsQuery).mockReturnValue(okQuery({ runs: [], total: 0, limit: 500, offset: 0, facets: {} }) as never);
 	});
 
 	it("renders the report card when done and hides Cancel", () => {

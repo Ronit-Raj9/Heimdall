@@ -1,0 +1,47 @@
+{
+	"steps": {
+		"title": "Step by step",
+		"intro": "Both runs of the task, step by step. Steps before the marked row are the same kind in both runs.",
+		"loading": "Loading the steps of both runs",
+		"error": "Could not load the steps of run {{id}}",
+		"none": "No step record for this run.",
+		"diverge": "First difference",
+		"divergeNote": "The first point where the runs did something different. It is not proven to be the cause.",
+		"same": "No difference found in the steps.",
+		"ended": "Run ended",
+		"more": "Show all",
+		"truncated": "Only the first steps are recorded here.",
+		"kind": {
+			"model_turn": "Model reply",
+			"model_attempt": "Model call",
+			"tool_request": "Tool call",
+			"tool_execution": "Tool result",
+			"command": "Command",
+			"file": "File change",
+			"other": "Step"
+		},
+		"m": {
+			"success": "Result",
+			"steps": "Steps",
+			"tools": "Tool calls",
+			"tokens": "Tokens",
+			"cost": "Cost",
+			"time": "Time"
+		},
+		"solved": "Solved",
+		"notSolved": "Not solved",
+		"open": "Step by step",
+		"thisRun": "This run",
+		"otherRun": "Other run"
+	},
+	"rel": {
+		"title": "Reliability",
+		"task": "solved {{solved}} of {{done}}",
+		"taskNone": "{{left}} tries to go",
+		"taskPending": "solved {{solved}} of {{done}}, {{left}} to go",
+		"headline": "Solved every time: {{always}} of {{tasks}} tasks; sometimes: {{some}}; never: {{never}}",
+		"headlineLive": "So far, from finished tries. Solved every time: {{always}} of {{tasks}} tasks; sometimes: {{some}}; never: {{never}}",
+		"waiting": "No try has finished yet.",
+		"error": "Could not load the tries"
+	}
+}
