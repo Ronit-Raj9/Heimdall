@@ -5995,9 +5995,17 @@ class GatewayCardLine(_GatewayCardLineRequired, total=False):
     blocked: str
     exp_id: str
     measured_at: Optional[str]
+    older: Optional[GatewayCardOlder]
     result: str
     source: Optional[Source]
     start: str
+
+
+class GatewayCardOlder(TypedDict):
+    exp_id: str
+    headline: str
+    measured_at: str
+    result: str
 
 
 class _GatewayHygieneRequired(TypedDict):
@@ -17305,6 +17313,7 @@ __all__ = [
     'GateSummary',
     'GatewayAgent',
     'GatewayCardLine',
+    'GatewayCardOlder',
     'GatewayHygiene',
     'GatewayInfo',
     'GatewayManifest',
