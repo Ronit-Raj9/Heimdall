@@ -154,7 +154,60 @@ func TestBudgetNotEnoughData(t *testing.T) {
 	runs = append(runs, p4BudgetRuns("B", 3, 0.1, func(int) bool { return true })...)
 	runs = append(runs, p4BudgetRuns("C", 3, 0.2, func(int) bool { return true })...)
 	e := p4Compute(t, schemas.GatewayFeatureBudgetCurve, p4BudgetInput(runs, map[string]float64{"A": 1, "B": 0.1, "C": 0.25}))
-	if e.State != StateNotEnoughData || e.Reason != "3 of the 5 tasks needed have results on both setups" || e.Result != "" {
-		t.Fatalf("state %s reason %q result %q", e.State, e.Reason, e.Result)
+	if e.State != StateNotEnoughData || !strings.HasPrefix(e.Reason, "too few runs to recommend a budget") || e.Result != "" || e.Setting != nil || e.Variant != "" {
+		t.Fatalf("state %s reason %q result %q setting %v", e.State, e.Reason, e.Result, e.Setting)
+	}
+	if d := p4BudgetDetails(t, e); d.BestValue != "" || d.Verdict != "" {
+		t.Fatalf("details %+v", d)
+	}
+}
+
+// Rule 1: nothing solved at any budget (the paid run G4: 0 of 11 everywhere).
+func TestBudgetNothingSolvedNoRecommendation(t *testing.T) {
+	no := func(int) bool { return false }
+	runs := p4BudgetRuns("A", 11, 0.0004, no)
+	runs = append(runs, p4BudgetRuns("B", 11, 0.0004, no)...)
+	runs = append(runs, p4BudgetRuns("C", 11, 0.0004, no)...)
+	e := p4Compute(t, schemas.GatewayFeatureBudgetCurve, p4BudgetInput(runs, map[string]float64{"A": 0.05, "B": 0.01, "C": 0.02}))
+	if e.State == StateMeasured || e.Headline != "No setup solved a task, so no budget can be recommended." || e.Setting != nil || e.Result != "" || e.Variant != "" {
+		t.Fatalf("%+v", e)
+	}
+	if strings.Contains(e.Headline, "Best value") {
+		t.Fatal(e.Headline)
+	}
+}
+
+func budgetPts(rates []float64, budgets []float64, runs int) []budgetPoint {
+	var out []budgetPoint
+	for i := range rates {
+		r := rates[i]
+		out = append(out, budgetPoint{Arm: string(rune('A' + i)), BudgetUSD: budgets[i], Runs: runs, SolveRate: &r})
+	}
+	return out
+}
+
+func TestBudgetDecideRules(t *testing.T) {
+	b := []float64{0.10, 0.25, 1.00}
+	// Rule 2: under 10 runs per point.
+	if v := budgetDecide(budgetPts([]float64{0.2, 0.5, 0.5}, b, 9), 1); v.State != StateNotEnoughData || v.BestValue != "" || v.Headline != "Too few runs to recommend a budget." {
+		t.Fatalf("rule 2 %+v", v)
+	}
+	// Rule 3: best value is the cheapest reaching 95% of the best (0.48 >= 0.95*0.50).
+	v := budgetDecide(budgetPts([]float64{0.2, 0.48, 0.5}, b, 10), 1)
+	if v.State != StateMeasured || v.BestValue != "B" || v.Best != "C" || v.Verdict != budgetTooHigh || !strings.Contains(v.Headline, "0.25 USD solves as many tasks") {
+		t.Fatalf("too high %+v", v)
+	}
+	// 0.47 is under 95% of 0.50: the best value is the 1.00 budget.
+	if v := budgetDecide(budgetPts([]float64{0.2, 0.47, 0.5}, b, 10), 1); v.BestValue != "C" || v.Verdict != budgetFits || v.Headline != "Budget fits." {
+		t.Fatalf("fits %+v", v)
+	}
+	// Too low: the budget in use (0.10) is below the best value (0.25).
+	v = budgetDecide(budgetPts([]float64{0.2, 0.5, 0.5}, b, 10), 0.10)
+	if v.Verdict != budgetTooLow || !strings.Contains(v.Headline, "would solve 30 more points") {
+		t.Fatalf("too low %+v", v)
+	}
+	// Not more than twice the best value: fits.
+	if v := budgetDecide(budgetPts([]float64{0.5, 0.5, 0.5}, []float64{0.10, 0.15, 0.20}, 10), 0.20); v.Verdict != budgetFits {
+		t.Fatalf("twice %+v", v)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/leaderboard"
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // ErrNotFeatureTest is returned for a comparison without a gateway test.
@@ -144,7 +145,18 @@ func Compute(ctx context.Context, src leaderboard.Source, root, expID string, re
 		return Effect{}, err
 	}
 	if len(runs) == 0 {
-		return unknown("no finished runs yet"), nil
+		e := unknown("no finished runs yet")
+		// A comparison that ended (it has an analysis) with no counted run is
+		// a result: say why and save it, so the Gateway page shows it.
+		if _, done := src.LatestDecision(expID); done {
+			e.Reason = noRunReason(src, expID)
+			e.Headline = "No result: " + e.Reason
+			e.Fingerprint = Fingerprint(nil, test.Feature)
+			if err := Save(root, e); err != nil {
+				return e, err
+			}
+		}
+		return e, nil
 	}
 	fp := Fingerprint(runs, test.Feature)
 	if !refresh {
@@ -154,6 +166,7 @@ func Compute(ctx context.Context, src leaderboard.Source, root, expID string, re
 	}
 	e := f.Compute(ctx, Input{ExpID: expID, Manifest: m, Test: test, Runs: runs, Src: src})
 	e.Feature, e.ExpID, e.Control, e.Fingerprint, e.ComputedAt = test.Feature, expID, test.Control, fp, now().UTC()
+	NoVerdictGuard(&e, src, expID)
 	if e.Arms == nil {
 		e.Arms = []ArmResult{}
 	}
@@ -174,4 +187,82 @@ func Compute(ctx context.Context, src leaderboard.Source, root, expID string, re
 		return e, err
 	}
 	return e, nil
+}
+
+// Guard limits of every feature test result.
+const GuardMinRuns = 10 // runs per setup before a winner or a saving is named
+
+// noVerdict clears every part of an Effect that names a winner, a saving or
+// a setting to copy.
+func noVerdict(e *Effect, state, reason, headline string) {
+	e.State, e.Reason, e.Headline = state, reason, headline
+	e.Result, e.Variant, e.Setting = "", "", nil
+	e.SolveDelta, e.CostDelta, e.LatencyDelta = nil, nil, nil
+}
+
+// NoVerdictGuard applies the rules every feature test result follows, in
+// this order: a test whose analysis found it broken states no verdict of
+// any kind; nothing solved on any setup gives no winner, no saving and no
+// setting; under GuardMinRuns runs on a setup gives none either. The
+// gateway overhead test answers from a stand-in model, so solving does not
+// apply to it; the broken rule still does.
+func NoVerdictGuard(e *Effect, src leaderboard.Source, expID string) {
+	if as, ok := src.(leaderboard.AnalysisSource); ok {
+		if _, reasons, bad := as.LatestInvalid(expID); bad {
+			reason := "the test was broken"
+			if len(reasons) > 0 {
+				reason += ": " + strings.Join(reasons, "; ")
+			}
+			noVerdict(e, StateNotApplied, reason, "No result: the test was broken, so it states no verdict. Fix it and run it again.")
+			return
+		}
+	}
+	if e.Feature == schemas.GatewayFeatureOverhead || e.State != StateMeasured {
+		if e.State != StateMeasured && e.State != StateNotApplied {
+			e.Result, e.Setting = "", nil
+		}
+		return
+	}
+	graded, solved := false, false
+	for _, a := range e.Arms {
+		if a.SolveRate != nil {
+			graded = true
+			if *a.SolveRate > 0 {
+				solved = true
+			}
+		}
+	}
+	if graded && !solved {
+		noVerdict(e, StateNotEnoughData, "no setup solved a task", "No setup solved a task, so nothing can be recommended.")
+		return
+	}
+	for _, a := range e.Arms {
+		if a.Runs < GuardMinRuns {
+			noVerdict(e, StateNotEnoughData, fmt.Sprintf("too few runs to tell: setup %s has %d runs, %d are needed", a.Arm, a.Runs, GuardMinRuns), "Too few runs to tell. Nothing is recommended yet.")
+			return
+		}
+	}
+}
+
+// noRunReason says why a finished comparison has no counted run.
+func noRunReason(src leaderboard.Source, expID string) string {
+	all := src.Runs(expID)
+	if as, ok := src.(leaderboard.AnalysisSource); ok {
+		if _, reasons, bad := as.LatestInvalid(expID); bad && len(reasons) > 0 && len(all) > 0 {
+			return "no run finished: " + strings.Join(reasons, "; ")
+		}
+	}
+	if len(all) == 0 {
+		return "no run started. The runner refused every run before it began; the comparison's events list the refusal."
+	}
+	infra := 0
+	for _, r := range all {
+		if r.Run.Outcome == schemas.OutcomeAbortedInfra {
+			infra++
+		}
+	}
+	if infra > 0 {
+		return fmt.Sprintf("no run finished: %d of %d were stopped by the machine, not by the agent", infra, len(all))
+	}
+	return fmt.Sprintf("no run finished: %d started and none was sealed", len(all))
 }

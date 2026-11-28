@@ -3,6 +3,7 @@ package gwfeature
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -51,7 +52,7 @@ func TestRouterDraftArms(t *testing.T) {
 	}
 	req := rtReq(nil)
 	req.Provider = "anthropic"
-	exp, notes, err := f.Draft(context.Background(), DraftEnv{Root: t.TempDir()}, req)
+	exp, notes, err := f.Draft(context.Background(), DraftEnv{Root: t.TempDir(), GatewayGet: routerAnalyzer("enabled", nil)}, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,5 +243,34 @@ func TestRouterSettingIsDisabledGlobalRule(t *testing.T) {
 	}
 	if !strings.Contains(e.Setting.Note, "set your app's default model to "+rtCheap) {
 		t.Errorf("note %q", e.Setting.Note)
+	}
+}
+
+// routerAnalyzer answers the complexity analyzer status route.
+func routerAnalyzer(state string, fail error) func(context.Context, string, any) error {
+	return func(_ context.Context, path string, out any) error {
+		if path != "/api/routing/complexity-analyzer-status" {
+			return errors.New("unexpected path " + path)
+		}
+		if fail != nil {
+			return fail
+		}
+		return json.Unmarshal([]byte(`{"state":"`+state+`"}`), out)
+	}
+}
+
+// The paid run G1: the built-in gateway has no classifier, so the test must
+// refuse at the start in plain words instead of ending with 0 runs.
+func TestRouterDraftRefusesWithoutAnalyzer(t *testing.T) {
+	f, _ := Lookup(schemas.GatewayFeatureComplexityRouter)
+	for name, env := range map[string]DraftEnv{
+		"no gateway": {},
+		"disabled":   {GatewayGet: routerAnalyzer("disabled", nil)},
+		"absent":     {GatewayGet: routerAnalyzer("", errors.New("the gateway answered 404"))},
+	} {
+		_, _, err := f.Draft(context.Background(), env, rtReq(nil))
+		if err == nil || !strings.HasPrefix(err.Error(), "The router plugin is not enabled on this gateway") {
+			t.Fatalf("%s: %v", name, err)
+		}
 	}
 }

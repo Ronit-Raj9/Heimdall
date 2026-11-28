@@ -16,6 +16,8 @@ type fakeSource struct {
 	runs      map[string][]leaderboard.Run
 	files     map[string]map[string][]byte // run id, file name
 	reads     int
+	decided   map[string]bool     // experiments with an analysis
+	invalid   map[string][]string // experiments whose newest analysis is invalid, with its reasons
 }
 
 func newFakeSource() *fakeSource {
@@ -45,7 +47,17 @@ func (f *fakeSource) RunFile(runID, name string) ([]byte, error) {
 	return nil, fmt.Errorf("%s/%s: %w", runID, name, fs.ErrNotExist)
 }
 
-func (f *fakeSource) LatestDecision(string) (schemas.Decision, bool) { return "", false }
+func (f *fakeSource) LatestDecision(expID string) (schemas.Decision, bool) {
+	if f.invalid[expID] != nil {
+		return schemas.DecisionInvalid, true
+	}
+	return "", f.decided[expID]
+}
+
+func (f *fakeSource) LatestInvalid(expID string) (string, []string, bool) {
+	r, ok := f.invalid[expID]
+	return "experiment", r, ok
+}
 
 func (f *fakeSource) setFile(runID, name string, data []byte) {
 	if f.files[runID] == nil {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/gwfeature"
+	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -52,7 +53,8 @@ type GatewayCardLine struct {
 	Source        *gwfeature.Source `json:"source,omitempty"`
 	ExpID         string            `json:"exp_id,omitempty"`
 	MeasuredAt    *time.Time        `json:"measured_at,omitempty"`
-	Start         string            `json:"start,omitempty"` // feature id the "Start a test" button drafts; empty when none
+	Start         string            `json:"start,omitempty"`   // feature id the "Start a test" button drafts; empty when none
+	Blocked       string            `json:"blocked,omitempty"` // plain words: why the test cannot run here and what to do; empty when it can
 }
 
 // Report card line values.
@@ -229,9 +231,16 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 	default:
 		l.Enabled, l.EnabledSource = cardOn, "the gateway's complexity analyzer status"
 	}
+	if l.Enabled == cardOff {
+		l.Blocked = "The router plugin is not enabled on this gateway. Set up a classifier in Bifrost's routing settings first."
+	}
 	card.Lines = append(card.Lines, l)
 
-	card.Lines = append(card.Lines, byPlugin(line(schemas.GatewayFeatureSemanticCache, "Semantic cache"), "semantic_cache"))
+	l = byPlugin(line(schemas.GatewayFeatureSemanticCache, "Semantic cache"), "semantic_cache")
+	if l.Enabled == cardOff {
+		l.Blocked = "This gateway has no semantic cache plugin."
+	}
+	card.Lines = append(card.Lines, l)
 	card.Lines = append(card.Lines, byPlugin(line(schemas.GatewayFeaturePromptVersion, "Prompt repository"), "prompts"))
 
 	// Skills repository: only through a connected source.
@@ -277,6 +286,9 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 
 	l = line(schemas.GatewayFeatureProviders, "Use the same model from several providers")
 	l.EnabledSource = "Heimdall cannot see your production routing"
+	if n, ok := cardKeyProviders(ctx, env); ok && n < 2 {
+		l.Blocked = "Add a key for a second provider in Settings, Model keys."
+	}
 	card.Lines = append(card.Lines, l)
 
 	l = line(schemas.GatewayFeatureBudgetCurve, "Budgets")
@@ -311,6 +323,25 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 	card.Lines = append(card.Lines, GatewayCardLine{Feature: cardBatch, Name: "Batch API for judge calls", Enabled: cardOff,
 		EnabledSource: "Heimdall's own judge calls", State: cardNotMeasured, Headline: "Heimdall does not use Bifrost's batch API yet"})
 	return card
+}
+
+// cardKeyProviders counts the providers the org has a usable model key for;
+// ok is false when the key store cannot be read.
+func cardKeyProviders(ctx context.Context, env OrgEnv) (int, bool) {
+	if env.Services.Keys == nil {
+		return 0, false
+	}
+	list, err := env.Services.Keys.List(ctx, env.Services.OrgID, keystore.KindProvider)
+	if err != nil {
+		return 0, false
+	}
+	seen := map[string]bool{}
+	for _, k := range list {
+		if (k.Kind == "" || k.Kind == keystore.KindProvider) && k.Provider != "" && usableKey(k) {
+			seen[strings.ToLower(k.Provider)] = true
+		}
+	}
+	return len(seen), true
 }
 
 func onOff(on bool) string {

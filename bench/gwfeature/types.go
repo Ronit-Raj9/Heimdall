@@ -141,7 +141,9 @@ type DraftRequest struct {
 	Base      string            `json:"base"`  // agent config path, as the New comparison form sends it
 	Model     string            `json:"model,omitempty"`
 	Provider  string            `json:"provider,omitempty"`
-	Tasks     []string          `json:"tasks,omitempty"` // empty: all admitted tasks
+	Tasks     []string          `json:"tasks,omitempty"`      // empty: all admitted tasks
+	TaskCount int               `json:"task_count,omitempty"` // with Tasks empty: the first this many ready tasks; 0: every ready task
+	Name      string            `json:"name,omitempty"`       // the comparison's name; empty: "Bifrost test: <feature>"
 	Trials    int               `json:"trials,omitempty"`
 	BudgetUSD float64           `json:"budget_usd"`
 	Options   map[string]string `json:"options,omitempty"`

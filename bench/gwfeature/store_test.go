@@ -19,6 +19,73 @@ func init() {
 	}})
 }
 
+func init() {
+	Register(Feature{ID: "test_verdict_uff4", Name: "Verdict feature", Compute: func(ctx context.Context, in Input) Effect {
+		return Effect{State: StateMeasured, Headline: "B saved money", Result: "saved", Variant: "B",
+			Arms: ArmResults(in.Runs, in.Manifest, []string{"A", "B"}), Setting: &BifrostSetting{Kind: "virtual_key", Title: "x"}}
+	}})
+}
+
+// verdictSource has n tasks per setup; solved says whether runs pass.
+func verdictSource(t *testing.T, n int, solved bool) *fakeSource {
+	src := newFakeSource()
+	m := &schemas.Manifest{ExpID: "e1", Arms: map[string]schemas.ArmManifest{"A": {Label: "today"}, "B": {Label: "changed"}}}
+	m.Experiment.GatewayTest = &schemas.GatewayTest{Feature: "test_verdict_uff4", Control: "A", Variants: []string{"B"}}
+	src.manifests["e1"] = m
+	for i := 0; i < n; i++ {
+		task := string(rune('a'+i%26)) + strings.Repeat("x", i/26)
+		src.addRun(t, "e1", "ra"+task, task, "A", "clean", 0, 1, solved, 0.01)
+		src.addRun(t, "e1", "rb"+task, task, "B", "clean", 0, 1, solved, 0.005)
+	}
+	return src
+}
+
+func TestGuardKeepsVerdictWithEnoughSolvedRuns(t *testing.T) {
+	e, err := Compute(context.Background(), verdictSource(t, 10, true), t.TempDir(), "e1", false)
+	if err != nil || e.State != StateMeasured || e.Result != "saved" || e.Setting == nil {
+		t.Fatalf("%+v %v", e, err)
+	}
+}
+
+func TestGuardNothingSolvedNoVerdict(t *testing.T) {
+	e, err := Compute(context.Background(), verdictSource(t, 11, false), t.TempDir(), "e1", false)
+	if err != nil || e.State != StateNotEnoughData || e.Result != "" || e.Setting != nil || e.Variant != "" || e.Headline != "No setup solved a task, so nothing can be recommended." {
+		t.Fatalf("%+v %v", e, err)
+	}
+}
+
+func TestGuardTooFewRunsNoVerdict(t *testing.T) {
+	e, err := Compute(context.Background(), verdictSource(t, 9, true), t.TempDir(), "e1", false)
+	if err != nil || e.State != StateNotEnoughData || e.Result != "" || e.Setting != nil || !strings.HasPrefix(e.Reason, "too few runs to tell") {
+		t.Fatalf("%+v %v", e, err)
+	}
+}
+
+// The paid run G3: a broken test said "security problem" next to "Test was broken".
+func TestGuardBrokenTestStatesNoVerdict(t *testing.T) {
+	src := verdictSource(t, 11, true)
+	src.invalid = map[string][]string{"e1": {"runs where Bifrost's MCP log and the tool proxy ledger disagree: B 11 of 11"}}
+	e, err := Compute(context.Background(), src, t.TempDir(), "e1", false)
+	if err != nil || e.State != StateNotApplied || e.Result != "" || e.Setting != nil || strings.Contains(e.Headline, "saved") || !strings.Contains(e.Reason, "ledger disagree") {
+		t.Fatalf("%+v %v", e, err)
+	}
+}
+
+// The paid run G1: a finished comparison with 0 runs says why and is saved.
+func TestComputeFinishedNoRunsSavedWithReason(t *testing.T) {
+	root := t.TempDir()
+	src := featureSource(t, "test_feature_w4p1", true)
+	src.runs["e1"] = nil
+	src.decided = map[string]bool{"e1": true}
+	e, err := Compute(context.Background(), src, root, "e1", false)
+	if err != nil || e.State != StateUnknown || !strings.HasPrefix(e.Reason, "no run started") || !strings.HasPrefix(e.Headline, "No result: ") {
+		t.Fatalf("%+v %v", e, err)
+	}
+	if _, ok, _ := Load(root, "e1"); !ok {
+		t.Fatal("a finished test without runs was not saved")
+	}
+}
+
 func featureSource(t *testing.T, feature string, test bool) *fakeSource {
 	src := newFakeSource()
 	m := &schemas.Manifest{ExpID: "e1", Arms: map[string]schemas.ArmManifest{"A": {Label: "today"}, "B": {Label: "changed"}}}

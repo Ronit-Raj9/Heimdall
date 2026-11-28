@@ -134,6 +134,9 @@ func draftRouter(ctx context.Context, env DraftEnv, req DraftRequest) (*schemas.
 	if _, err := routerTolerance(req.Options); err != nil {
 		return nil, nil, err
 	}
+	if err := routerReady(ctx, env); err != nil {
+		return nil, nil, err
+	}
 	arms := map[string]schemas.ArmSpec{
 		"A": routerArm("strong model only", strong, routerClassifyAll, strong),
 		"B": routerArm("router on", cheap, when, strong),
@@ -539,4 +542,33 @@ func computeRouter(ctx context.Context, in Input) Effect {
 		e.Headline = fmt.Sprintf("With the router on, solve rate changed %s.", pointWords(e.SolveDelta))
 	}
 	return finish()
+}
+
+// routerReady refuses the test at the start when the gateway the runs use
+// has no working complexity analyzer: every rule that reads complexity_tier
+// would then never match, and the runner refuses every run (the paid run G1
+// ended with 0 runs and no reason). Same states as the planner's check
+// (engine checkComplexityRouting).
+func routerReady(ctx context.Context, env DraftEnv) error {
+	notOn := errors.New("The router plugin is not enabled on this gateway: Bifrost's complexity analyzer has no classifier, so no request gets a tier. Set up a classifier in Bifrost's routing settings, then start again.")
+	if env.GatewayGet == nil {
+		return notOn
+	}
+	var st struct {
+		State string `json:"state"`
+		LLM   struct {
+			State string `json:"state"`
+		} `json:"llm"`
+	}
+	if err := env.GatewayGet(ctx, "/api/routing/complexity-analyzer-status", &st); err != nil {
+		return notOn
+	}
+	state := st.State
+	if state == "disabled" && st.LLM.State != "" && st.LLM.State != "disabled" {
+		state = "llm_" + st.LLM.State
+	}
+	if state == "" || state == "disabled" || state == "absent" {
+		return notOn
+	}
+	return nil
 }

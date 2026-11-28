@@ -118,7 +118,7 @@ func init() {
 	gwfeature.Register(gwfeature.Feature{ID: "iwif_test_shape", Name: "Shape", Compute: func(ctx context.Context, in gwfeature.Input) gwfeature.Effect {
 		return gwfeature.Effect{State: gwfeature.StateMeasured, Headline: "measured", Result: "saved", Variant: "B", Tasks: 6,
 			SolveDelta: &gwfeature.Interval{Point: 0.05, Low: &low, High: &high}, CostDelta: &gwfeature.Interval{Point: -0.01}, LatencyDelta: &gwfeature.Interval{Point: 3},
-			Arms:    []gwfeature.ArmResult{{Arm: "A", Label: "today", Runs: 6, Tasks: 6, SolveRate: &solve, CostPerRun: &cost, LatencyMS: &lat}},
+			Arms:    []gwfeature.ArmResult{{Arm: "A", Label: "today", Runs: 10, Tasks: 6, SolveRate: &solve, CostPerRun: &cost, LatencyMS: &lat}},
 			Details: json.RawMessage(`{"points":[]}`), Setting: &gwfeature.BifrostSetting{Kind: "virtual_key", Title: "Key", Where: "Virtual keys", Body: "{}", Note: "n"},
 			Source: gwfeature.Source{Gateway: "v2.5.1", Text: "comparison e_shape"}}
 	}})

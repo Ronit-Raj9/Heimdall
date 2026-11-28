@@ -26,9 +26,8 @@ func init() {
 
 // Budget curve limits.
 const (
-	budgetMinUSD    = 0.01
-	budgetMaxUSD    = 20
-	budgetBestSlack = 0.03 // at most 3 points below the best solve rate
+	budgetMinUSD = 0.01
+	budgetMaxUSD = 20
 )
 
 // p4BaseConfig is the part of the base agent file the budget Draft checks.
@@ -165,6 +164,7 @@ type budgetDetails struct {
 	Points    []budgetPoint `json:"points"` // in budget order
 	Best      string        `json:"best,omitempty"`
 	BestValue string        `json:"best_value,omitempty"`
+	Verdict   string        `json:"verdict,omitempty"` // too_low | too_high | fits: the budget in use against the best value
 }
 
 // budgetOf is a setup's per-run budget from its frozen config.
@@ -233,41 +233,15 @@ func computeBudget(_ context.Context, in Input) (e Effect) {
 		}
 		return 0
 	})
-	// The best setup: the highest solve rate, ties to the larger budget.
-	best := -1
-	for i, p := range det.Points {
-		if p.SolveRate != nil && (best < 0 || *p.SolveRate >= *det.Points[best].SolveRate) {
-			best = i
-		}
-	}
 	defer func() { e.Details, _ = json.Marshal(det) }()
-	if best < 0 {
-		e.State, e.Reason = StateNotEnoughData, "no setup has a graded run yet"
-		e.Headline = "Not enough data yet: " + e.Reason + "."
+	v := budgetDecide(det.Points, budgetOf(in.Manifest, in.Test.Control))
+	det.Best, det.BestValue, det.Verdict = v.Best, v.BestValue, v.Verdict
+	if v.State != StateMeasured {
+		e.State, e.Reason = v.State, v.Reason
+		e.Headline = v.Headline
 		return e
 	}
-	det.Best = det.Points[best].Arm
-	// Best value: the smallest budget that cannot be told apart from the best
-	// and is at most 3 points lower.
-	bestValue := -1
-	for i, p := range det.Points {
-		if i == best {
-			bestValue = i
-			break
-		}
-		pair := PairedTasks(in.Runs, det.Best, p.Arm, SolveValue)
-		if pair.Tasks < MinTasks {
-			e.State, e.Reason = StateNotEnoughData, fmt.Sprintf("%d of the %d tasks needed have results on both setups", pair.Tasks, MinTasks)
-			e.Headline = "Not enough data yet: " + e.Reason + "."
-			return e
-		}
-		if pair.Delta.High != nil && *pair.Delta.High >= 0 && pair.Delta.Point >= -budgetBestSlack {
-			bestValue = i
-			break
-		}
-	}
-	bv := det.Points[bestValue]
-	det.BestValue = bv.Arm
+	bv := det.Points[v.bestValue]
 	if bv.Arm != in.Test.Control {
 		e.Variant = bv.Arm
 		solve := PairedTasks(in.Runs, in.Test.Control, bv.Arm, SolveValue)
@@ -275,14 +249,9 @@ func computeBudget(_ context.Context, in Input) (e Effect) {
 		e.SolveDelta = p4Interval(solve)
 		e.CostDelta = p4Interval(PairedTasks(in.Runs, in.Test.Control, bv.Arm, CostValue))
 		e.LatencyDelta = p4Interval(PairedTasks(in.Runs, in.Test.Control, bv.Arm, LatencyValue))
-		if solve.Tasks < MinTasks {
-			e.State, e.Reason = StateNotEnoughData, fmt.Sprintf("%d of the %d tasks needed have results on both setups", solve.Tasks, MinTasks)
-			e.Headline = "Not enough data yet: " + e.Reason + "."
-			return e
-		}
 	}
 	e.State = StateMeasured
-	e.Headline = budgetHeadline(det.Points, best, bestValue)
+	e.Headline = budgetHeadline(det.Points, v.best, v.bestValue) + " " + v.Headline
 	body, _ := json.MarshalIndent(map[string]any{"budgets": []map[string]any{{"max_limit": bv.BudgetUSD, "reset_duration": "1d"}}}, "", "  ")
 	e.Setting = &BifrostSetting{
 		Kind:  "virtual_key",
@@ -291,8 +260,112 @@ func computeBudget(_ context.Context, in Input) (e Effect) {
 		Body:  string(body),
 		Note:  "The test reset each key's budget every day (1d). Set the reset duration to how often one key starts a new task or session.",
 	}
-	e.Result = p4Result(e, false, budgetBestSlack)
+	switch v.Verdict {
+	case budgetTooHigh:
+		e.Result = "saved"
+	case budgetTooLow:
+		e.Result = "lost"
+	default:
+		e.Result = "worked"
+	}
 	return e
+}
+
+// Budget verdicts on the budget in use.
+const (
+	budgetTooLow  = "too_low"
+	budgetTooHigh = "too_high"
+	budgetFits    = "fits"
+)
+
+// Budget curve rules (owner's "wrong budget" check), in this order.
+const (
+	budgetMinRuns    = 10   // runs per budget point before any recommendation
+	budgetBestShare  = 0.95 // the best value reaches this share of the best solve rate
+	budgetHighFactor = 2.0  // a budget in use above this many times the best value is too high
+)
+
+// budgetVerdict is the decision of the budget curve.
+type budgetVerdict struct {
+	State, Reason, Headline string
+	Best, BestValue         string // arm ids; empty when no recommendation
+	Verdict                 string // too_low | too_high | fits; empty when no recommendation
+	best, bestValue         int    // indexes into the points
+}
+
+// budgetDecide applies the rules: (1) nothing solved at any budget: no
+// recommendation; (2) under 10 runs on a budget point: too few runs; (3) the
+// best value is the cheapest budget reaching 95% of the best solve rate, and
+// the budget in use is too low below it, too high above twice it, else fits.
+// points are in budget order. Pure.
+func budgetDecide(points []budgetPoint, current float64) budgetVerdict {
+	v := budgetVerdict{best: -1, bestValue: -1}
+	graded := false
+	solvedAny := false
+	for _, p := range points {
+		if p.SolveRate != nil {
+			graded = true
+			if *p.SolveRate > 0 {
+				solvedAny = true
+			}
+		}
+	}
+	switch {
+	case !graded:
+		v.State, v.Reason = StateNotEnoughData, "no setup has a graded run yet"
+		v.Headline = "Not enough data yet: " + v.Reason + "."
+		return v
+	case !solvedAny:
+		v.State, v.Reason = StateNotEnoughData, "no setup solved a task"
+		v.Headline = "No setup solved a task, so no budget can be recommended."
+		return v
+	}
+	for _, p := range points {
+		if p.Runs < budgetMinRuns {
+			v.State = StateNotEnoughData
+			v.Reason = fmt.Sprintf("too few runs to recommend a budget: %s USD has %d runs, %d are needed on each budget", p4USD(p.BudgetUSD), p.Runs, budgetMinRuns)
+			v.Headline = "Too few runs to recommend a budget."
+			return v
+		}
+	}
+	// The best: the highest solve rate, ties to the smaller budget.
+	for i, p := range points {
+		if p.SolveRate != nil && (v.best < 0 || *p.SolveRate > *points[v.best].SolveRate) {
+			v.best = i
+		}
+	}
+	top := *points[v.best].SolveRate
+	for i, p := range points {
+		if p.SolveRate != nil && *p.SolveRate >= budgetBestShare*top {
+			v.bestValue = i
+			break
+		}
+	}
+	v.State = StateMeasured
+	v.Best, v.BestValue = points[v.best].Arm, points[v.bestValue].Arm
+	bv := points[v.bestValue]
+	cur := -1
+	for i, p := range points {
+		if p.BudgetUSD == current {
+			cur = i
+		}
+	}
+	switch {
+	case current < bv.BudgetUSD:
+		v.Verdict = budgetTooLow
+		more := ""
+		if cur >= 0 && points[cur].SolveRate != nil {
+			more = fmt.Sprintf(": %s USD would solve %.0f more points (%s instead of %s)", p4USD(bv.BudgetUSD), (*bv.SolveRate-*points[cur].SolveRate)*100, p4Pct(bv.SolveRate), p4Pct(points[cur].SolveRate))
+		}
+		v.Headline = fmt.Sprintf("Your budget of %s USD is too low%s.", p4USD(current), more)
+	case current > budgetHighFactor*bv.BudgetUSD:
+		v.Verdict = budgetTooHigh
+		v.Headline = fmt.Sprintf("Your budget of %s USD is too high: %s USD solves as many tasks.", p4USD(current), p4USD(bv.BudgetUSD))
+	default:
+		v.Verdict = budgetFits
+		v.Headline = "Budget fits."
+	}
+	return v
 }
 
 func p4Pct(v *float64) string {

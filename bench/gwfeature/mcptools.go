@@ -167,6 +167,7 @@ type mcpFilterReport struct {
 	Refused int              `json:"refused"`
 	Listed  int              `json:"listed"`
 	Reached int              `json:"reached"`
+	Unclear int              `json:"unclear,omitempty"` // refused checks the tool ledger still shows: the witnesses disagree
 	Line    string           `json:"line"`
 	Notes   []string         `json:"notes,omitempty"`
 	Calls   []mcpReachedCall `json:"calls,omitempty"`
@@ -277,6 +278,7 @@ func mcpToolsCompute(_ context.Context, in Input) Effect {
 			for _, c := range r.Evidence.BifrostMCP.Clients {
 				clientSvc[c.Service] = true
 			}
+			used := map[int]bool{}
 			for _, c := range r.Evidence.BifrostMCP.FilterChecks {
 				f.Checks++
 				if c.Refused {
@@ -288,12 +290,22 @@ func mcpToolsCompute(_ context.Context, in Input) Effect {
 						listedRefused = true
 					}
 				}
-				for _, call := range r.Evidence.ToolCalls {
-					if call.Server == c.Service && call.Tool == c.Tool && strings.Contains(call.Arguments, mcpFilterMarkerArg) {
-						f.Reached++
-						f.Calls = append(f.Calls, mcpReachedCall{Run: r.RunID, Arm: r.Arm, Tool: c.Service + "/" + c.Tool, By: "check"})
+				// Each ledger call matches one check at most, so two checks of
+				// the same tool cannot count one call twice. A check Bifrost
+				// refused whose call still shows in the tool ledger is a
+				// disagreement of the two witnesses, not a call let through.
+				for k, call := range r.Evidence.ToolCalls {
+					if used[k] || call.Server != c.Service || call.Tool != c.Tool || !strings.Contains(call.Arguments, mcpFilterMarkerArg) {
+						continue
+					}
+					used[k] = true
+					if c.Refused {
+						f.Unclear++
 						break
 					}
+					f.Reached++
+					f.Calls = append(f.Calls, mcpReachedCall{Run: r.RunID, Arm: r.Arm, Tool: c.Service + "/" + c.Tool, By: "check"})
+					break
 				}
 			}
 			for _, call := range r.Evidence.ToolCalls {
@@ -315,6 +327,9 @@ func mcpToolsCompute(_ context.Context, in Input) Effect {
 			f.Line = "No forbidden tool check ran"
 		default:
 			f.Line = fmt.Sprintf("Bifrost refused %d of %d forbidden tool checks; the others gave no clear answer", f.Refused, f.Checks)
+		}
+		if f.Unclear > 0 {
+			f.Notes = append(f.Notes, fmt.Sprintf("%d refused checks still show in the tool ledger; these are not counted as let through", f.Unclear))
 		}
 		if listedRefused {
 			f.Notes = append(f.Notes, "the tool was still listed to the agent, but calls were refused")

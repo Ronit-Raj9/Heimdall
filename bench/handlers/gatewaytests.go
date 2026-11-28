@@ -148,6 +148,11 @@ func (h *gatewayTestsHandler) draft(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
+	pre, err := h.draftTasks(work, &req)
+	if err != nil {
+		h.bad(ctx, err.Error())
+		return
+	}
 	denv := gwfeature.DraftEnv{Root: h.root(), SourceGet: gatewaySourceGet(work, h.env), GatewayGet: gatewayRunGet(work, h.env)}
 	exp, notes, err := f.Draft(work, denv, req)
 	if err != nil {
@@ -167,12 +172,13 @@ func (h *gatewayTestsHandler) draft(ctx *fasthttp.RequestCtx) {
 		}
 	}
 	exp.Budget.TotalUSD = req.BudgetUSD
+	if name := strings.TrimSpace(req.Name); name != "" {
+		exp.Name = name
+	}
 	if exp.Name == "" {
 		exp.Name = "Bifrost test: " + f.Name
 	}
-	if notes == nil {
-		notes = []string{}
-	}
+	notes = append(pre, notes...)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(map[string]any{"experiment": exp, "notes": notes}))
 }
 
