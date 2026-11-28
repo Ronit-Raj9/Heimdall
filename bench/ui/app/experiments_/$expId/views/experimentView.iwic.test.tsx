@@ -25,6 +25,7 @@ vi.mock("@/components/export/exportMenu", () => ({
 	useExperimentExportItems: () => ({ items: [], error: null }),
 	ExperimentExportMenu: () => null,
 }));
+vi.mock("@/components/experiments/reviewLogPanel", () => ({ ReviewLogPanel: () => null }));
 vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetCostExplainQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),

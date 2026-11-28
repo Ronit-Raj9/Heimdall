@@ -63,6 +63,7 @@ import { useTranslation } from "react-i18next";
 import { ActionsTab } from "./actionsTab";
 import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
+import { ReviewLogPanel } from "@/components/experiments/reviewLogPanel";
 import {
 	EXPERIMENT_TABS,
 	behindMore,
@@ -597,7 +598,12 @@ function ExperimentTab({
 				</>
 			);
 		case "runs":
-			return <RunList expId={expId} running={live} testId="experiment-runs" />;
+			return (
+				<div className="flex flex-col gap-4">
+					<RunList expId={expId} running={live} testId="experiment-runs" />
+					<ReviewLogPanel expId={expId} />
+				</div>
+			);
 		case "matrix":
 			return <MatrixTab expId={expId} gradeSource={gradeSource} />;
 		case "cost":

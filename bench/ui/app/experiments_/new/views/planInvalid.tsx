@@ -2,6 +2,7 @@ import "./builderI18n";
 
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import "@/components/experiments/ufl2I18n";
 import type { ExperimentFormValues } from "./experimentFormSchema";
 
 /** The A/B form's fields in the order the page shows them, for the first field to fix (N43). */
@@ -13,6 +14,7 @@ export const FORM_FIELD_ORDER = [
 	"armBLabel",
 	"overridePath",
 	"overrideValue",
+	"changeModels",
 	"primaryCondition",
 	"primaryMetric",
 	"conditions",
@@ -20,6 +22,8 @@ export const FORM_FIELD_ORDER = [
 	"concurrency",
 	"runnerPool",
 	"totalUsd",
+	"alpha",
+	"extraSpec",
 ] as const satisfies readonly (keyof ExperimentFormValues)[];
 
 export type FormFieldName = (typeof FORM_FIELD_ORDER)[number];
@@ -40,6 +44,9 @@ const FIELD_LABEL = {
 	concurrency: "experiments.new.fields.concurrency",
 	runnerPool: "experiments.new.fields.runnerPool",
 	totalUsd: "experiments.new.fields.totalUsd",
+	changeModels: "ufl2.change.models",
+	alpha: "ufl2.advanced.alpha",
+	extraSpec: "ufl2.advanced.extraSpec",
 } as const satisfies Record<FormFieldName, string>;
 
 /** The fields with an error, in form order. errors is react-hook-form's errors object (or any map by field). */
@@ -54,6 +61,8 @@ export function invalidFields(errors: Partial<Record<string, unknown>>): FormFie
 export function PlanInvalidAlert({ fields, onFocus }: { fields: readonly FormFieldName[]; onFocus: (name: FormFieldName) => void }) {
 	const { t } = useTranslation("builder");
 	const { t: tb } = useTranslation("bench");
+	const { t: tl } = useTranslation("ufl2");
+	const label = (key: string) => (key.startsWith("ufl2.") ? tl(key.slice(5) as "advanced.alpha") : tb(key as "experiments.new.fields.name"));
 	if (fields.length === 0) return null;
 	return (
 		<div role="alert" className="text-chart-error-ink flex flex-col gap-1 text-xs" data-testid="plan-invalid">
@@ -69,7 +78,7 @@ export function PlanInvalidAlert({ fields, onFocus }: { fields: readonly FormFie
 						onClick={() => onFocus(name)}
 						dataTestId={`plan-invalid-field-${name}`}
 					>
-						{tb(FIELD_LABEL[name])}
+						{label(FIELD_LABEL[name])}
 					</Button>
 				))}
 			</span>

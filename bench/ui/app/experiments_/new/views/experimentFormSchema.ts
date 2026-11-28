@@ -7,10 +7,77 @@ import { defaultRunnableSuite, startAgent, type BuilderDefaultsOptions, type Rea
 /** A t() key for a validation message. Zod messages are keys, translated where the error renders. */
 export type ValidationKey = `experiments.new.validation.${keyof (typeof benchEn)["experiments"]["new"]["validation"]}`;
 
+/** A validation message from the ufl2 catalog (round 5 lane L2); ErrorText reads the prefix. */
+const msg2 = (key: "alphaRange" | "modelsRequired" | "specJson"): ValidationKey => `ufl2.validation.${key}` as unknown as ValidationKey;
+
 const msg = (key: keyof (typeof benchEn)["experiments"]["new"]["validation"]): ValidationKey => `experiments.new.validation.${key}`;
 
 /** Dotted agent-config path, for example notes.user_file or budgets.turns (DESIGN.md 8.6). */
 const DOTTED_PATH = /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*$/;
+
+/** Arm B's change kinds. custom is the raw path and JSON value, kept under Advanced. */
+export const CHANGE_KINDS = ["routing", "prompt_cache", "failover", "code_mode", "team", "custom"] as const;
+export type ChangeKind = (typeof CHANGE_KINDS)[number];
+
+export function splitModels(raw: string): string[] {
+	return raw
+		.split(",")
+		.map((m) => m.trim())
+		.filter(Boolean);
+}
+
+/** The extra spec box as an object, or null when it is not a JSON object. */
+export function parseExtraSpec(raw: string): Record<string, JsonValue> | null {
+	if (!raw.trim()) return {};
+	try {
+		const v = JSON.parse(raw) as unknown;
+		return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, JsonValue>) : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * The agent-config overrides of arm B (engine.ResolveAgentConfig paths, spec/agent.schema.json).
+ * routing: gateway.routing; failover: gateway.fallbacks; prompt caching and Code Mode: gateway.bifrost.
+ */
+export function armBSet(v: Pick<ExperimentFormValues, "changeKind" | "overridePath" | "overrideValue" | "changeModels" | "routingStrategy" | "cacheMode" | "codeMode" | "teamSize">): Record<string, JsonValue> {
+	const models = splitModels(v.changeModels);
+	switch (v.changeKind) {
+		case "routing": {
+			const targets: JsonValue[] = models.map((model): JsonValue => (v.routingStrategy === "weighted" ? { model, weight: 1 } : { model }));
+			if (v.routingStrategy === "fallback_chain") {
+				return { "gateway.routing": { strategy: "fallback_chain", targets: targets.slice(0, 1), fallbacks: targets.slice(1) } };
+			}
+			return { "gateway.routing": { strategy: v.routingStrategy, targets: v.routingStrategy === "fixed" ? targets.slice(0, 1) : targets } };
+		}
+		case "failover":
+			return { "gateway.fallbacks": models };
+		case "prompt_cache":
+			return { "gateway.bifrost.prompt_cache": v.cacheMode };
+		case "code_mode":
+			return { "gateway.bifrost.mcp.code_mode": v.codeMode };
+		case "team":
+			return {
+				topology: "team",
+				team: Array.from({ length: v.teamSize }, (_, i) => (i === 0 ? { id: "lead", role: "lead" } : { id: `worker${i}`, role: "worker" })),
+			};
+		default:
+			return { [v.overridePath.trim()]: parseOverrideValue(v.overrideValue) };
+	}
+}
+
+/** The advanced spec blocks the form sets (U2 section 2), then the extra JSON box on top. */
+export function advancedSpec(v: ExperimentFormValues): Partial<Experiment> {
+	const out: Record<string, unknown> = {};
+	if (v.aa) out.aa = true;
+	if (v.fairness) out.fairness = "equal_budget";
+	if (v.realism) out.realism = v.realism;
+	if (v.egress) out.egress = v.egress;
+	if (v.sandbagging) out.framing_pairs = [{ id: "sb", kind: "sandbagging", base: "B" }];
+	if (v.attribution) out.attribution = { replay: true };
+	return { ...out, ...(parseExtraSpec(v.extraSpec) ?? {}) } as Partial<Experiment>;
+}
 
 const conditionSchema = z.object({
 	/** "clean" or a probe id. */
@@ -33,8 +100,28 @@ export const experimentFormSchema = z
 		base: z.string().min(1, msg("baseRequired")),
 		armALabel: z.string().trim().min(1, msg("labelRequired")),
 		armBLabel: z.string().trim().min(1, msg("labelRequired")),
-		overridePath: z.string().trim().regex(DOTTED_PATH, msg("pathFormat")),
-		overrideValue: z.string().trim().min(1, msg("valueRequired")),
+		/** What arm B changes: a real control per gateway feature, or any config field by path (custom). */
+		changeKind: z.enum(CHANGE_KINDS),
+		overridePath: z.string().trim(),
+		overrideValue: z.string().trim(),
+		/** Comma-separated models: routing targets or failover fallbacks. */
+		changeModels: z.string().trim(),
+		routingStrategy: z.enum(["weighted", "fallback_chain", "fixed"]),
+		cacheMode: z.enum(["auto_inject", "off"]),
+		codeMode: z.boolean(),
+		teamSize: z.number().int().min(2).max(4),
+		/** Advanced spec options (U2 section 2). */
+		alpha: z.number({ error: msg2("alphaRange") }).gt(0, msg2("alphaRange")).lt(1, msg2("alphaRange")),
+		allowUncalibratedJudge: z.boolean(),
+		heldOut: z.boolean(),
+		aa: z.boolean(),
+		fairness: z.boolean(),
+		realism: z.enum(["", "neutral"]),
+		egress: z.enum(["", "offline", "replay", "live-allowlisted"]),
+		sandbagging: z.boolean(),
+		attribution: z.boolean(),
+		/** More spec blocks as a JSON object, merged into the spec; the server's plan validates them. */
+		extraSpec: z.string().trim(),
 		primaryCondition: z.string().min(1, msg("primaryRequired")),
 		primaryMetric: z.string().min(1, msg("metricRequired")),
 		conditions: z.array(conditionSchema),
@@ -52,6 +139,16 @@ export const experimentFormSchema = z
 		runnerPool: z.string().trim(),
 	})
 	.superRefine((v, ctx) => {
+		if (v.changeKind === "custom") {
+			if (!DOTTED_PATH.test(v.overridePath)) ctx.addIssue({ code: "custom", path: ["overridePath"], message: msg("pathFormat") });
+			if (!v.overrideValue) ctx.addIssue({ code: "custom", path: ["overrideValue"], message: msg("valueRequired") });
+		}
+		if ((v.changeKind === "routing" || v.changeKind === "failover") && splitModels(v.changeModels).length === 0) {
+			ctx.addIssue({ code: "custom", path: ["changeModels"], message: msg2("modelsRequired") });
+		}
+		if (v.extraSpec && parseExtraSpec(v.extraSpec) === null) {
+			ctx.addIssue({ code: "custom", path: ["extraSpec"], message: msg2("specJson") });
+		}
 		if (v.armALabel.trim().toLowerCase() === v.armBLabel.trim().toLowerCase() && v.armBLabel.trim() !== "") {
 			ctx.addIssue({ code: "custom", path: ["armBLabel"], message: msg("labelsDiffer") });
 		}
@@ -105,8 +202,24 @@ export function defaultFormValues(catalog: Catalog, seed: number, opts: BuilderD
 		base: (catalog.agents ? startAgent(catalog, opts) : undefined)?.path ?? "",
 		armALabel: "baseline",
 		armBLabel: "",
+		changeKind: "custom",
 		overridePath: "",
 		overrideValue: "",
+		changeModels: "",
+		routingStrategy: "weighted",
+		cacheMode: "off",
+		codeMode: true,
+		teamSize: 2,
+		alpha: 0.05,
+		allowUncalibratedJudge: false,
+		heldOut: false,
+		aa: false,
+		fairness: false,
+		realism: "",
+		egress: "",
+		sandbagging: false,
+		attribution: false,
+		extraSpec: "",
 		primaryCondition: "clean",
 		primaryMetric: primaryMetric?.name ?? "",
 		conditions: conditionsFor(suite),
@@ -144,7 +257,7 @@ export function toExperiment(v: ExperimentFormValues, ready?: ReadyTasks): Exper
 		base: v.base,
 		arms: {
 			A: { label: v.armALabel.trim() },
-			B: { label: v.armBLabel.trim(), set: { [v.overridePath.trim()]: parseOverrideValue(v.overrideValue) } },
+			B: { label: v.armBLabel.trim(), set: armBSet(v) },
 		},
 		primary: { condition: v.primaryCondition, metric: v.primaryMetric },
 		guards: [...(cleanGuard ? [{ condition: "clean", rule: "no_regression" }] : []), { rule: "no_new_integrity_violation" }],
@@ -152,13 +265,15 @@ export function toExperiment(v: ExperimentFormValues, ready?: ReadyTasks): Exper
 			id: c.condition,
 			tasks: c.allTasks ? { ...allTasks } : { ids: [...c.taskIds] },
 			trials: c.trials,
+			...(v.heldOut ? { split: "held_out" as const } : {}),
 		})),
 		budget: { total_usd: v.totalUsd },
-		verdict: { policy: "paired_signflip", alpha: 0.05, assumed_sd: 0.3 },
+		verdict: { policy: "paired_signflip", alpha: v.alpha, assumed_sd: 0.3, ...(v.allowUncalibratedJudge ? { allow_uncalibrated_judge: true } : {}) },
 		seed: v.seed,
 		concurrency: v.concurrency,
 		manifest_mode: "agent_exposure",
 		...(v.runnerPool.trim() ? { runner: { pool: v.runnerPool.trim() } } : {}),
+		...advancedSpec(v),
 	};
 }
 

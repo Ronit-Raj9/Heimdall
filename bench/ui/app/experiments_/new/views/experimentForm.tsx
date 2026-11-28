@@ -39,12 +39,15 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import "@/app/leaderboard/views/uf4bI18n";
+import "@/components/experiments/ufl2I18n";
 
 /** Agent config keys a catalog agent always has (CatalogAgent): offered on the override path. */
 export const OVERRIDE_KEYS = ["model", "adapter", "parser"] as const;
 import {
+	CHANGE_KINDS,
 	conditionsFor,
 	experimentFormSchema,
+	type ChangeKind,
 	planIsStale,
 	suiteRef,
 	toExperiment,
@@ -349,6 +352,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 									/>
 								)}
 							</Field>
+							<ArmBChange register={register} errors={formState.errors} kind={values.changeKind ?? "custom"} strategy={values.routingStrategy ?? "weighted"}>
 							<div className="grid gap-3">
 								<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath} name="overridePath">
 									{(id, describedBy) => (
@@ -391,6 +395,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 								</Field>
 							</div>
 							<p className="text-muted-foreground text-xs">{t("experiments.new.fields.overrideHint")}</p>
+							</ArmBChange>
 						</div>
 					</div>
 				</FormSection>
@@ -532,6 +537,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 						</Field>
 					</div>
 				</FormSection>
+				<AdvancedSpec register={register} errors={formState.errors} />
 			</div>
 
 			<aside className="flex flex-col gap-4 xl:sticky xl:top-0">
@@ -822,7 +828,7 @@ function Field({
 	error?: FieldError;
 	hint?: string;
 	/** The form field inside, so Plan can bring the first invalid one into view (N43). */
-	name?: FormFieldName;
+	name?: FormFieldName | keyof ExperimentFormValues;
 	children: (id: string, describedBy: string | undefined) => React.ReactNode;
 }) {
 	const id = useId();
@@ -881,9 +887,10 @@ export function TrialsField({
 
 function ErrorText({ message, id, testId }: { message: string; id?: string; testId?: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tl } = useTranslation("ufl2");
 	return (
 		<p id={id} role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
-			{t(message as ValidationKey)}
+			{message.startsWith("ufl2.") ? tl(message.slice(5) as "validation.specJson") : t(message as ValidationKey)}
 		</p>
 	);
 }
@@ -892,4 +899,147 @@ function ErrorText({ message, id, testId }: { message: string; id?: string; test
 export function conditionLayerText(condition: string, probe: { layer: string } | undefined, t: TFunction<"bench">): string {
 	if (probe) return t("experiments.new.fields.conditionProbe", { layer: probeLayerLabel(probe.layer, t) });
 	return condition === "clean" ? t("experiments.new.fields.conditionClean") : t("experiments.new.fields.conditionProbeUnresolved");
+}
+/** Arm B's change: a real control per gateway feature; the raw path and JSON value stay under "Any config field". */
+function ArmBChange({
+	register,
+	errors,
+	kind,
+	strategy,
+	children,
+}: {
+	register: UseFormRegister<ExperimentFormValues>;
+	errors: FieldErrors<ExperimentFormValues>;
+	kind: ChangeKind;
+	strategy: ExperimentFormValues["routingStrategy"];
+	children: React.ReactNode;
+}) {
+	const { t } = useTranslation("ufl2");
+	return (
+		<div className="grid gap-3" data-testid="experiment-arm-b-change">
+			<Field label={t("change.kind")} name="changeKind">
+				{(id) => (
+					<select id={id} className={NATIVE_SELECT} data-testid="experiment-change-kind" {...register("changeKind")}>
+						{CHANGE_KINDS.map((k) => (
+							<option key={k} value={k}>
+								{t(`change.kinds.${k}`)}
+							</option>
+						))}
+					</select>
+				)}
+			</Field>
+			{kind === "routing" && (
+				<div className="grid gap-3 sm:grid-cols-2">
+					<Field label={t("change.strategy")} name="routingStrategy">
+						{(id) => (
+							<select id={id} className={NATIVE_SELECT} data-testid="experiment-routing-strategy" {...register("routingStrategy")}>
+								{(["weighted", "fallback_chain", "fixed"] as const).map((k) => (
+									<option key={k} value={k}>
+										{t(`change.strategies.${k}`)}
+									</option>
+								))}
+							</select>
+						)}
+					</Field>
+					<Field label={t("change.models")} error={errors.changeModels} hint={strategy === "fixed" ? undefined : t("change.routingHint")} name="changeModels">
+						{(id, d) => <Input id={id} aria-describedby={d} placeholder={t("change.modelsPlaceholder")} data-testid="experiment-change-models" {...register("changeModels")} />}
+					</Field>
+				</div>
+			)}
+			{kind === "failover" && (
+				<Field label={t("change.fallbacks")} error={errors.changeModels} name="changeModels">
+					{(id, d) => <Input id={id} aria-describedby={d} placeholder={t("change.modelsPlaceholder")} data-testid="experiment-change-models" {...register("changeModels")} />}
+				</Field>
+			)}
+			{kind === "prompt_cache" && (
+				<Field label={t("change.cache")} name="cacheMode">
+					{(id) => (
+						<select id={id} className={NATIVE_SELECT} data-testid="experiment-cache-mode" {...register("cacheMode")}>
+							<option value="auto_inject">{t("change.cacheOn")}</option>
+							<option value="off">{t("change.cacheOff")}</option>
+						</select>
+					)}
+				</Field>
+			)}
+			{kind === "code_mode" && (
+				<label className="flex items-center gap-2 text-xs">
+					<input type="checkbox" data-testid="experiment-code-mode" {...register("codeMode")} />
+					{t("change.codeMode")}
+				</label>
+			)}
+			{kind === "team" && (
+				<Field label={t("change.teamSize")} hint={t("change.teamHint")} name="teamSize">
+					{(id, d) => (
+						<Input id={id} aria-describedby={d} type="number" min={2} max={4} className="w-24" data-testid="experiment-team-size" {...register("teamSize", { valueAsNumber: true })} />
+					)}
+				</Field>
+			)}
+			{kind === "custom" && children}
+		</div>
+	);
+}
+
+/** U2 section 2: spec options no other form sets. Folded; Plan checks them on the server. */
+function AdvancedSpec({ register, errors }: { register: UseFormRegister<ExperimentFormValues>; errors: FieldErrors<ExperimentFormValues> }) {
+	const { t } = useTranslation("ufl2");
+	const box = (name: "allowUncalibratedJudge" | "heldOut" | "aa" | "fairness" | "sandbagging" | "attribution", label: string) => (
+		<label className="flex items-center gap-2 text-xs">
+			<input type="checkbox" data-testid={`experiment-adv-${name}`} {...register(name)} />
+			{label}
+		</label>
+	);
+	return (
+		<details className="rounded-sm border p-3" open={errors.alpha || errors.extraSpec ? true : undefined} data-testid="experiment-advanced">
+			<summary className="cursor-pointer text-sm font-semibold">{t("advanced.title")}</summary>
+			<div className="mt-3 grid gap-4">
+				<div className="grid gap-4 sm:grid-cols-3">
+					<Field label={t("advanced.alpha")} error={errors.alpha} name="alpha">
+						{(id, d) => (
+							<Input id={id} aria-describedby={d} type="number" step="0.01" min={0} max={1} data-testid="experiment-adv-alpha" {...register("alpha", { valueAsNumber: true })} />
+						)}
+					</Field>
+					<Field label={t("advanced.realism")} name="realism">
+						{(id) => (
+							<select id={id} className={NATIVE_SELECT} data-testid="experiment-adv-realism" {...register("realism")}>
+								<option value="">{t("advanced.realismStandard")}</option>
+								<option value="neutral">{t("advanced.realismNeutral")}</option>
+							</select>
+						)}
+					</Field>
+					<Field label={t("advanced.egress")} name="egress">
+						{(id) => (
+							<select id={id} className={NATIVE_SELECT} data-testid="experiment-adv-egress" {...register("egress")}>
+								<option value="">{t("advanced.egressDefault")}</option>
+								<option value="offline">{t("advanced.egressOffline")}</option>
+								<option value="replay">{t("advanced.egressReplay")}</option>
+								<option value="live-allowlisted">{t("advanced.egressLive")}</option>
+							</select>
+						)}
+					</Field>
+				</div>
+				<div className="grid gap-2 sm:grid-cols-2">
+					{box("heldOut", t("advanced.heldOut"))}
+					{box("aa", t("advanced.aa"))}
+					{box("fairness", t("advanced.fairness"))}
+					{box("sandbagging", t("advanced.sandbagging"))}
+					{box("attribution", t("advanced.attribution"))}
+					{box("allowUncalibratedJudge", t("advanced.uncalibrated"))}
+				</div>
+				<Field label={t("advanced.extraSpec")} error={errors.extraSpec} hint={t("advanced.extraSpecHint")} name="extraSpec">
+					{(id, d) => (
+						<textarea
+							id={id}
+							aria-describedby={d}
+							rows={4}
+							spellCheck={false}
+							className="border-input bg-background w-full min-w-0 rounded-sm border px-3 py-2 font-mono text-xs"
+							placeholder='{"safety": "trifecta"}'
+							data-testid="experiment-adv-extra-spec"
+							{...register("extraSpec")}
+						/>
+					)}
+				</Field>
+			</div>
+		</details>
+	);
 }

@@ -1,0 +1,74 @@
+{
+	"validation": {
+		"alphaRange": "Significance is a number between 0 and 1.",
+		"modelsRequired": "Enter at least one model.",
+		"specJson": "Write a JSON object, for example {\"safety\": \"trifecta\"}."
+	},
+	"change": {
+		"kind": "Change",
+		"kinds": {
+			"routing": "Routing policy",
+			"prompt_cache": "Prompt caching",
+			"failover": "Provider failover",
+			"code_mode": "MCP Code Mode",
+			"team": "Team agents",
+			"custom": "Any config field"
+		},
+		"models": "Models",
+		"modelsPlaceholder": "gpt-4o-mini, claude-haiku-4-5",
+		"fallbacks": "Fallback models",
+		"strategy": "Strategy",
+		"strategies": {
+			"weighted": "Weighted",
+			"fallback_chain": "Fallback chain",
+			"fixed": "Fixed"
+		},
+		"cache": "Prompt caching",
+		"cacheOn": "On",
+		"cacheOff": "Off",
+		"codeMode": "Code Mode",
+		"teamSize": "Members",
+		"teamHint": "Each member runs on its own key under the arm's cap.",
+		"routingHint": "Needs gateway.provider on the base agent."
+	},
+	"advanced": {
+		"title": "Advanced",
+		"alpha": "Significance",
+		"uncalibrated": "Allow an uncalibrated judge",
+		"heldOut": "Held-out tasks only",
+		"aa": "A/A noise floor",
+		"fairness": "Equal budget per arm",
+		"sandbagging": "Sandbagging check",
+		"attribution": "Blame replay",
+		"realism": "Realism",
+		"realismStandard": "Standard",
+		"realismNeutral": "Neutral",
+		"egress": "Internet",
+		"egressDefault": "Benchmark default",
+		"egressOffline": "Offline",
+		"egressReplay": "Replay",
+		"egressLive": "Live, allowlisted",
+		"extraSpec": "More spec (JSON)",
+		"extraSpecHint": "Checked by Plan; refused with the server's reason."
+	},
+	"overhead": {
+		"title": "Gateway overhead",
+		"empty": "No gateway timing in these runs.",
+		"error": "Gateway overhead could not load.",
+		"p50": "Added per call, p50",
+		"p95": "p95",
+		"calls": "Calls",
+		"plugin": "Plugin"
+	},
+	"reviews": {
+		"title": "Review log",
+		"empty": "No reviews yet.",
+		"error": "Review log could not load.",
+		"verified": "Log verifies",
+		"broken": "Log does not verify",
+		"who": "Reviewer",
+		"when": "When",
+		"decision": "Decision",
+		"run": "Run"
+	}
+}

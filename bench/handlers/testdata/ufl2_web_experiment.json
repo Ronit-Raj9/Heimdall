@@ -1,0 +1,22 @@
+{
+	"arms": {
+		"routing": {"gateway.routing": {"strategy": "weighted", "targets": [{"model": "gpt-4o-mini", "weight": 1}, {"model": "claude-haiku-4-5", "weight": 1}]}},
+		"routing_fallback_chain": {"gateway.routing": {"strategy": "fallback_chain", "targets": [{"model": "gpt-4o-mini"}], "fallbacks": [{"model": "claude-haiku-4-5"}]}},
+		"prompt_cache": {"gateway.bifrost.prompt_cache": "auto_inject"},
+		"failover": {"gateway.fallbacks": ["gpt-4o-mini", "claude-haiku-4-5"]},
+		"code_mode": {"gateway.bifrost.mcp.code_mode": true},
+		"team": {"topology": "team", "team": [{"id": "lead", "role": "lead"}, {"id": "worker1", "role": "worker"}]},
+		"custom": {"model": "claude-other"}
+	},
+	"advanced": {
+		"verdict": {"policy": "paired_signflip", "alpha": 0.01, "assumed_sd": 0.3, "allow_uncalibrated_judge": true},
+		"conditions": [{"id": "clean", "tasks": {"all": true}, "trials": 3, "split": "held_out"}],
+		"aa": true,
+		"fairness": "equal_budget",
+		"realism": "neutral",
+		"egress": "offline",
+		"framing_pairs": [{"id": "sb", "kind": "sandbagging", "base": "B"}],
+		"attribution": {"replay": true},
+		"safety": "trifecta"
+	}
+}

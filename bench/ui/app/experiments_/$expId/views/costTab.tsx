@@ -1,5 +1,6 @@
 import { CostExplainPanel } from "@/components/migration/costWaterfall"; // W6 cost explanation
 import { ExperimentParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
+import { GatewayOverheadPanel } from "@/components/experiments/gatewayOverheadPanel";
 import { Info } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
@@ -27,6 +28,7 @@ export function CostTab({ expId, arms }: { expId: string; arms: readonly string[
 			) : (
 				<CostExplainPanel expId={expId} condition={condition ?? undefined} />
 			)}
+			<GatewayOverheadPanel expId={expId} />
 		</div>
 	);
 }
