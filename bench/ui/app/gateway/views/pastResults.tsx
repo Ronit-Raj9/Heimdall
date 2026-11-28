@@ -24,17 +24,17 @@ export function PastResultsTable({ effects, names }: { effects: GwEffect[]; name
 				<thead className="text-muted-foreground text-left text-xs">
 					<tr>
 						<th className="py-1 pr-3 font-normal">{t("past.feature")}</th>
-						<th className="py-1 pr-3 font-normal">{t("past.comparison")}</th>
+						<th className="hidden py-1 pr-3 font-normal sm:table-cell">{t("past.comparison")}</th>
 						<th className="py-1 pr-3 font-normal">{t("past.effect")}</th>
-						<th className="py-1 font-normal whitespace-nowrap">{t("past.date")}</th>
+						<th className="hidden py-1 font-normal whitespace-nowrap sm:table-cell">{t("past.date")}</th>
 					</tr>
 				</thead>
 				<tbody>
 					{effects.map((e) => (
 						<tr key={`${e.exp_id}:${e.feature}`} className="border-t align-top" data-testid={`gateway-past-${e.exp_id}`}>
-							<td className="py-1 pr-3 whitespace-nowrap">{names[e.feature] ?? e.feature}</td>
-							<td className="py-1 pr-3">
-								<Link to="/experiments/$expId" params={{ expId: e.exp_id }} className="text-primary break-all hover:underline">
+							<td className="py-1 pr-3 sm:whitespace-nowrap">{names[e.feature] ?? e.feature}</td>
+							<td className="hidden max-w-56 py-1 pr-3 sm:table-cell">
+								<Link to="/experiments/$expId" params={{ expId: e.exp_id }} title={e.exp_id} className="text-primary block truncate hover:underline">
 									{e.exp_id}
 								</Link>
 							</td>
@@ -42,7 +42,7 @@ export function PastResultsTable({ effects, names }: { effects: GwEffect[]; name
 								{e.result && <span className={cn("mr-2 font-medium", RESULT_TONE[e.result])}>{w(`line.result.${e.result}`)}</span>}
 								{e.headline}
 							</td>
-							<td className="py-1 whitespace-nowrap">{effectDate(e.computed_at)}</td>
+							<td className="hidden py-1 whitespace-nowrap sm:table-cell">{effectDate(e.computed_at)}</td>
 						</tr>
 					))}
 				</tbody>
