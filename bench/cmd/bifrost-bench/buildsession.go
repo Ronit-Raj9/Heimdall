@@ -39,6 +39,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -66,6 +67,11 @@ const (
 	// registryAuthEnv is the file holding the registry's read-only pull
 	// credentials (user:password).
 	registryAuthEnv = "HEIMDALL_SHARED_REGISTRY_AUTH"
+	// orgBuildsEnv is how many image builds of one org may run at once
+	// (default 2, at most 8). Each build slot has its own lock file and its
+	// own cache volume, since two BuildKit daemons must not share a state
+	// folder. 1 restores one build at a time on the org's single cache.
+	orgBuildsEnv = "HEIMDALL_ORG_BUILDS"
 	// registryManifestEnv is the registry manifest (image and digest per
 	// line) registry-sync.sh writes; org builds use base images by these
 	// digests only.
@@ -91,6 +97,7 @@ var (
 // buildSessionConfig is what a session needs besides the build itself.
 type buildSessionConfig struct {
 	Org, Runner, LockDir string
+	Slots                int // build slots of the org; <= 1 is one at a time
 	Docker               string
 	Network              string
 	BuildkitImage        string
@@ -117,6 +124,7 @@ func buildSessionFromEnv(c *buildSessionConfig) error {
 	c.AppArmor = strings.TrimSpace(os.Getenv(buildkitAppArmorEnv))
 	c.BuildkitConfig = strings.TrimSpace(os.Getenv(buildkitConfigEnv))
 	c.Registry = strings.TrimSpace(os.Getenv(sharedRegistryEnv))
+	c.Slots = orgBuildSlots(os.Getenv(orgBuildsEnv))
 	if c.BuildkitImage == "" || c.GuardImage == "" {
 		return fmt.Errorf("%s and %s must be set for build sessions", buildkitImageEnv, buildGuardImageEnv)
 	}
@@ -187,15 +195,59 @@ type sessionNames struct {
 }
 
 func newSessionNames(org, id string) sessionNames {
+	return newSlotSessionNames(org, id, 0)
+}
+
+// newSlotSessionNames: build slot 0 keeps the names of one build at a
+// time (so its cache survives the change); slot k > 0 has its own cache
+// volume heimdall-buildcache-<org>-<k>, still only that org's.
+func newSlotSessionNames(org, id string, slot int) sessionNames {
 	base := "heimdall-build-" + org + "-" + id
+	vol := "heimdall-buildcache-" + org
+	if slot > 0 {
+		vol += "-" + strconv.Itoa(slot)
+	}
 	return sessionNames{id: id, guard: base + "-guard", buildkit: base + "-buildkit", builder: base, host: "hb-build-" + id,
-		volume: "heimdall-buildcache-" + org}
+		volume: vol}
+}
+
+const (
+	defaultOrgBuilds = 2
+	maxOrgBuilds     = 8
+)
+
+// orgBuildSlots reads HEIMDALL_ORG_BUILDS: empty or invalid gives the
+// default, and the value is kept within 1 and maxOrgBuilds.
+func orgBuildSlots(v string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	switch {
+	case err != nil:
+		return defaultOrgBuilds
+	case n < 1:
+		return 1
+	case n > maxOrgBuilds:
+		return maxOrgBuilds
+	}
+	return n
+}
+
+// orgBuildLocks are the lock files of an org's build slots: slot 0 is
+// <org>.lock as before, slot k is <org>.<k>.lock.
+func orgBuildLocks(dir, org string, slots int) []string {
+	if slots < 1 {
+		slots = 1
+	}
+	paths := []string{filepath.Join(dir, org+".lock")}
+	for k := 1; k < slots; k++ {
+		paths = append(paths, filepath.Join(dir, org+"."+strconv.Itoa(k)+".lock"))
+	}
+	return paths
 }
 
 // run is the session: lock, guard, BuildKit, build, cleanup. It returns
 // the build's exit code.
 func (c *buildSessionConfig) run(ctx context.Context, build []string) (int, error) {
-	unlock, err := lockOrgBuild(ctx, filepath.Join(c.LockDir, c.Org+".lock"))
+	unlock, slot, err := lockOrgBuildSlot(ctx, orgBuildLocks(c.LockDir, c.Org, c.Slots))
 	if err != nil {
 		return 1, err
 	}
@@ -204,7 +256,7 @@ func (c *buildSessionConfig) run(ctx context.Context, build []string) (int, erro
 	if newID == nil {
 		newID = buildSessionID
 	}
-	n := newSessionNames(c.Org, newID())
+	n := newSlotSessionNames(c.Org, newID(), slot)
 	d := utils.Docker{Binary: c.Docker}
 	cfgDir, err := os.MkdirTemp("", "heimdall-build-")
 	if err != nil {
