@@ -50,7 +50,7 @@ type Config struct {
 	BudgetUSD float64 // hard cap; must be > 0
 	MaxCalls  int     // 0 means 200
 	MaxTokens int     // per reply; 0 means 1500
-	JobID     string  // names the key: AgentID "investigator", RunID "r_iv_" + JobID
+	JobID     string  // names the key: AgentID "investigator", RunID KeyRunID(JobID)
 	OrgID     string  // hosted: bound with BindExperimentOrg(JobID, OrgID) by the caller
 	Logger    schemas.Logger
 }
@@ -121,6 +121,15 @@ func (r *Runner) Calls() []LedgerRow {
 	return append([]LedgerRow(nil), r.rows...)
 }
 
+var nonKeyChars = regexp.MustCompile(`[^a-z0-9]+`)
+
+// KeyRunID is the run id the job's key is named after. The gateway accepts
+// only ^r_[a-z0-9]+$ (keys are named and swept by that shape), while job ids
+// carry underscores ("iv_job_01m8..."), so every other character is dropped.
+func KeyRunID(jobID string) string {
+	return "r_iv" + nonKeyChars.ReplaceAllString(strings.ToLower(jobID), "")
+}
+
 // Open mints the job's virtual key. A second Open is a no-op.
 func (r *Runner) Open(ctx context.Context) error {
 	r.mu.Lock()
@@ -136,7 +145,7 @@ func (r *Runner) Open(ctx context.Context) error {
 		expID = AgentID
 	}
 	key, err := r.cfg.Gateway.MintKey(ctx, &schemas.RunContext{
-		Run:   &schemas.Run{RunID: "r_iv_" + r.cfg.JobID, ExpID: expID},
+		Run:   &schemas.Run{RunID: KeyRunID(r.cfg.JobID), ExpID: expID},
 		Agent: &schemas.AgentConfig{ID: AgentID, Model: r.cfg.Model, Gateway: schemas.GatewayPolicy{Provider: r.cfg.Provider}},
 	})
 	if err != nil {

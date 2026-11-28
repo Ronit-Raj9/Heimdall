@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/investigator"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -177,5 +178,15 @@ func TestMintKeyByProvider(t *testing.T) {
 	gm.Agent.Gateway.Provider = "gemini"
 	if _, err := g.MintKey(ctx, gm); err == nil || !strings.Contains(err.Error(), "not the gateway provider") {
 		t.Errorf("unconfigured provider: %v", err)
+	}
+}
+
+// PT-1: the investigator names its key after the job id, which carries
+// underscores. The name it builds must pass this gateway's rule.
+func TestInvestigatorKeyRunIDPassesRule(t *testing.T) {
+	for _, job := range []string{"iv_job_01m8ffdps6yptqrs0a0g7gbky1", "job_01ABC", "j1"} {
+		if id := investigator.KeyRunID(job); !runIDPattern.MatchString(id) {
+			t.Fatalf("job %s: run id %s refused by %s", job, id, runIDPattern)
+		}
 	}
 }

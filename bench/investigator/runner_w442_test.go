@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +30,10 @@ func (g *fakeGateway) Preflight(context.Context) (*schemas.GatewayManifest, erro
 func (g *fakeGateway) MintKey(_ context.Context, rc *schemas.RunContext) (*schemas.RunKey, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	// The real gateway refuses any other run id shape (gateways/bifrost/keys.go).
+	if !regexp.MustCompile(`^r_[a-z0-9]+$`).MatchString(rc.Run.RunID) {
+		return nil, fmt.Errorf("mint key for run %s: run id does not match ^r_[a-z0-9]+$", rc.Run.RunID)
+	}
 	g.minted = append(g.minted, rc)
 	return &schemas.RunKey{ID: "vk1", Value: "sk-investigator", Provider: rc.Agent.Gateway.Provider, Model: rc.Agent.Model}, nil
 }
@@ -84,7 +90,7 @@ func newTestRunner(t *testing.T, h http.Handler, budget float64, maxCalls int) (
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	gw := &fakeGateway{}
-	r, err := New(Config{Gateway: gw, URL: srv.URL, Provider: "openai", Model: "gpt-test", Price: testPrice, BudgetUSD: budget, MaxCalls: maxCalls, JobID: "j1"})
+	r, err := New(Config{Gateway: gw, URL: srv.URL, Provider: "openai", Model: "gpt-test", Price: testPrice, BudgetUSD: budget, MaxCalls: maxCalls, JobID: "iv_job_01m8ffdps6yptqrs0a0g7gbky1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +208,19 @@ func TestRunnerCloseRevokesOnce(t *testing.T) {
 	if _, err := r.Call(context.Background(), Request{Purpose: "findings", Messages: []Message{{Role: "user", Content: "hi"}}}); err == nil {
 		t.Fatal("a call after Close was made")
 	}
-	if len(gw.minted) != 1 || gw.minted[0].Agent.ID != "investigator" || gw.minted[0].Run.RunID != "r_iv_j1" {
+	if len(gw.minted) != 1 || gw.minted[0].Agent.ID != "investigator" || gw.minted[0].Run.RunID != "r_ivivjob01m8ffdps6yptqrs0a0g7gbky1" {
 		t.Fatalf("minted %+v", gw.minted)
+	}
+}
+
+// PT-1: job ids carry underscores; the key's run id must still be one the
+// gateway accepts, or every investigation and trace draft fails at Open.
+func TestRunnerOpenWithRealJobIDShape(t *testing.T) {
+	r, gw := newTestRunner(t, http.NotFoundHandler(), 1, 0)
+	if err := r.Open(context.Background()); err != nil {
+		t.Fatalf("Open with a real job id: %v", err)
+	}
+	if got := gw.minted[0].Run.RunID; got != "r_ivivjob01m8ffdps6yptqrs0a0g7gbky1" {
+		t.Fatalf("run id %q", got)
 	}
 }
