@@ -198,6 +198,28 @@ type RunDetail struct {
 	// groups page uses. Only sent on request (?failure=1) for a run that did
 	// not pass and whose evaluation could be grouped.
 	Failure *RunFailureGroup `json:"failure,omitempty"`
+
+	// Skills lists the skills the run installed, from the arm's frozen
+	// manifest files (never the agent's current settings), and whether a
+	// step shows the agent reading each one. Nil when the manifest could not
+	// be read; an empty Installed list means the run installed none.
+	Skills *RunSkills `json:"skills,omitempty"`
+}
+
+// RunSkills is what one run recorded about its skills.
+type RunSkills struct {
+	Installed []RunSkill `json:"installed"`
+}
+
+// RunSkill is one installed skill. ReadStep is the seq of the first step
+// that read a file under the skill's folder (or loaded it by name); 0 with
+// Read false means no step shows it was read.
+type RunSkill struct {
+	Name     string `json:"name"`
+	Files    int    `json:"files"`
+	Read     bool   `json:"read"`
+	ReadStep int    `json:"read_step,omitempty"`
+	ReadPath string `json:"read_path,omitempty"` // <skill>/<file> the step named; empty for a load by name
 }
 
 // RunFailureGroup is the failure group of one run within its evaluation.

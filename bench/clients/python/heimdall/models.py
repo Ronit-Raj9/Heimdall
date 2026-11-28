@@ -11740,6 +11740,7 @@ class RunDetail(_RunDetailRequired, total=False):
     seal_error: str
     services: List[ServiceResult]
     sessions: List[SessionResult]
+    skills: Optional[RunSkills]
     state: List[StateFile]
     suite_title: str
     superseded: bool
@@ -12073,6 +12074,21 @@ class RunServices(TypedDict):
     run_id: str
     sealed: bool
     services: List[RunService]
+
+
+class _RunSkillRequired(TypedDict):
+    files: int
+    name: str
+    read: bool
+
+
+class RunSkill(_RunSkillRequired, total=False):
+    read_path: str
+    read_step: int
+
+
+class RunSkills(TypedDict):
+    installed: List[RunSkill]
 
 
 class RunStep(TypedDict):
@@ -17870,6 +17886,8 @@ __all__ = [
     'RunSample',
     'RunService',
     'RunServices',
+    'RunSkill',
+    'RunSkills',
     'RunStep',
     'RunSteps',
     'RunStepsPage',

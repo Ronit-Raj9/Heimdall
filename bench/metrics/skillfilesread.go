@@ -88,7 +88,7 @@ func (m *skillFilesReadMetric) Compute(_ context.Context, rc *schemas.RunContext
 			read["tool:"+e.ToolName+":"+key] = struct{}{}
 			continue
 		}
-		for _, p := range skillPaths(e.Target, roots) {
+		for _, p := range SkillPaths(e.Target, roots) {
 			read[p] = struct{}{}
 		}
 	}
@@ -135,6 +135,13 @@ func skillRoots(cfg *schemas.AgentConfig) []string {
 			dir = fallbackSkillsDir
 		}
 	}
+	return SkillRootsOf(dir)
+}
+
+// SkillRootsOf returns a skills folder as it may appear in a tool call's
+// target: absolute, and under the home as ~/, $HOME/ and ${HOME}/. The run
+// page's "Skills in this run" block uses it too (handlers/runskills.go).
+func SkillRootsOf(dir string) []string {
 	dir = path.Clean(dir)
 	roots := []string{dir}
 	if rest, ok := strings.CutPrefix(dir, agentHome+"/"); ok {
@@ -153,11 +160,11 @@ func envFolder(cfg *schemas.AgentConfig, name, def string) string {
 	return path.Clean(v)
 }
 
-// skillPaths returns every file path inside an installed skill folder that
+// SkillPaths returns every file path inside an installed skill folder that
 // target names, as <skill>/<file>. A path must name a file in a skill folder
 // (a listing of the skills folder or of one skill names no file), and a
 // skill folder name may not be hidden or a glob.
-func skillPaths(target string, roots []string) []string {
+func SkillPaths(target string, roots []string) []string {
 	var out []string
 	for _, root := range roots {
 		rest := target
@@ -185,3 +192,7 @@ func skillPaths(target string, roots []string) []string {
 	}
 	return out
 }
+
+// IsSkillTool reports whether a tool loads a skill by name (Claude Code
+// Skill, OpenCode skill).
+func IsSkillTool(name string) bool { return skillTools[name] }

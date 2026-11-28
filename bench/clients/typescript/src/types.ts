@@ -1419,6 +1419,24 @@ export interface RunDetail {
 	artifacts?: ArtifactFile[];
 	evidence_contract?: RunEvidenceContract;
 	canonical?: CanonicalRun;
+	/** Skills the run installed, from the arm's frozen manifest; absent when the manifest or steps could not be read. */
+	skills?: RunSkills;
+}
+
+/** What one run recorded about its skills (handlers/runskills.go). An empty list: the run installed none. */
+export interface RunSkills {
+	installed: RunSkill[];
+}
+
+/** One installed skill. read is true only when a step shows the agent reading a file of it or loading it by name. */
+export interface RunSkill {
+	name: string;
+	files: number;
+	read: boolean;
+	/** Seq of the first step that read it. */
+	read_step?: number;
+	/** <skill>/<file> that step named. */
+	read_path?: string;
 }
 
 export interface AdapterFaultEvidence {
