@@ -52,6 +52,7 @@ var versions = [][2]string{
 	{"84933f7f91421383a3e67559bf243d45f329d242da6d1359a31a8da955c5c8f3", "agents/images/opencode/Dockerfile"},
 	{"39b4ceaafe9b7eaed4883c89ccf43b6c669f636ea47331f28f1a8798ac7c5624", "agents/mcploop.yaml"},
 	{"3418200ee664a21f732c39eca4ccac8a462bc3f058247b0ee299867d7ce65caf", "agents/mini-swe-agent.yaml"},
+	{"4d5be6b954d85b3dc8e3db3e05047f13880d816b77b498d53dc72efe48e4e781", "agents/mini-swe-agent.yaml"},
 	{"b050bbf815b9887308baade483fafa271ebba2ab52e6a4c6ffc325a2d08d76ab", "agents/mini-swe-agent.yaml"},
 	{"e548599b879443c56dbb3fe5bfe6cbfefe9bf7b33f8d8212b2c4d6c418c85ecc", "agents/noop.yaml"},
 	{"11ab8d4c7ca8558eda943ad24a108cc2771f2d7a637e0499b2f83450c0d80d87", "agents/opencode.yaml"},

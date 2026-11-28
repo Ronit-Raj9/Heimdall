@@ -258,10 +258,18 @@ func TestMiniSWEAgentConfigPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantArgv := []string{"mini", "-y", "--exit-immediately", "-l", "0", "-m", "openai/gpt-5.6-sol",
-		"-o", "/tmp/bench/mini.traj.json", "-t", testInstruction}
-	if strings.Join(plan.Argv, "\x00") != strings.Join(wantArgv, "\x00") {
-		t.Errorf("argv = %q", plan.Argv)
+	// The tool runs under a sh wrapper that prints its trajectory file
+	// between marker lines (adapters/miniswe.go); model and instruction
+	// are positional arguments, never part of the script.
+	if len(plan.Argv) != 6 || plan.Argv[0] != "sh" || plan.Argv[1] != "-c" || plan.Argv[3] != "mini-swe-agent" ||
+		plan.Argv[4] != "openai/gpt-5.6-sol" || plan.Argv[5] != testInstruction {
+		t.Fatalf("argv = %q", plan.Argv)
+	}
+	for _, part := range []string{`mini -y --exit-immediately -l 0 -m "$1" -o "$f" -t "$2" >&2; rc=$?;`, "f=/tmp/bench/mini.traj.json;",
+		MiniSWETrajectoryBegin + "%s", MiniSWETrajectoryEnd, "exit $rc"} {
+		if !strings.Contains(plan.Argv[2], part) {
+			t.Errorf("script lacks %q: %s", part, plan.Argv[2])
+		}
 	}
 	for k, v := range map[string]string{
 		"OPENAI_API_BASE": testGateway + "/openai/v1",
@@ -272,7 +280,7 @@ func TestMiniSWEAgentConfigPlan(t *testing.T) {
 			t.Errorf("env %s = %q, want %q", k, plan.Env[k], v)
 		}
 	}
-	if agent.Gateway.Provider != "openai" || agent.Notes.ProjectFile != "AGENTS.md" || agent.Parser != "" {
+	if agent.Gateway.Provider != "openai" || agent.Notes.ProjectFile != "AGENTS.md" || agent.Parser != ParserMiniSWE {
 		t.Errorf("gateway %+v, notes %+v, parser %q", agent.Gateway, agent.Notes, agent.Parser)
 	}
 }

@@ -1,6 +1,11 @@
-# mini-swe-agent: the second agent of the compatibility run. No parser, so its
-# runs carry gateway-level evidence only (DESIGN.md 9.5): success, steps,
-# tokens, cost and time from one YAML file and no adapter code.
+# mini-swe-agent: the second agent of the compatibility run. Its steps come
+# from the trajectory file the tool writes (-o). The tmpfs /tmp is not
+# collected, so a small sh wrapper prints the file to stdout after the tool
+# exits, between two marker lines; the begin line carries the file's size so a
+# cut block is seen as truncated (parser mini-swe-agent, adapters/miniswe.go).
+# The tool's console goes to stderr, so stdout holds only the block. The
+# wrapper keeps the tool's exit code. The model and the instruction are
+# passed as positional arguments, never spliced into the script.
 #
 # It calls Bifrost's OpenAI route through litellm with the run key: the
 # `openai/` prefix selects litellm's OpenAI client, which posts the bare model
@@ -16,17 +21,19 @@ build:
   dockerfile: agents/images/mini-swe-agent/Dockerfile
   tag: bench/agent-mini-swe-agent:1
 argv:
-  - mini
-  - -y
-  - --exit-immediately
-  - -l
-  - "0"
-  - -m
+  - sh
+  - -c
+  - >-
+    f=/tmp/bench/mini.traj.json;
+    mini -y --exit-immediately -l 0 -m "$1" -o "$f" -t "$2" >&2; rc=$?;
+    if [ -f "$f" ]; then
+    printf '\n@@heimdall-mswea-trajectory begin bytes=%s\n' "$(wc -c < "$f" | tr -d ' ')";
+    cat "$f"; printf '\n@@heimdall-mswea-trajectory end\n'; fi;
+    exit $rc
+  - mini-swe-agent
   - "openai/{{model}}"
-  - -o
-  - /tmp/bench/mini.traj.json
-  - -t
   - "{{instruction}}"
+parser: mini-swe-agent
 env:
   OPENAI_API_BASE: "{{gateway.url}}/openai/v1"
   OPENAI_BASE_URL: "{{gateway.url}}/openai/v1"
