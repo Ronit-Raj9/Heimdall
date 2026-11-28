@@ -1,0 +1,54 @@
+{
+	"tabs": {
+		"runs": "Runs",
+		"studies": "Studies"
+	},
+	"studies": {
+		"emptyTitle": "No studies yet",
+		"emptyBody": "A study runs the same loop 2 to 5 times and tests the results together. Set Loops in a new run.",
+		"emptyAction": "New study",
+		"loadError": "Could not load the studies.",
+		"name": "Name",
+		"agent": "Agent",
+		"status": "Status",
+		"loops": "Loops",
+		"loopsValue": "{{done}} of {{total}}",
+		"spend": "Spent",
+		"open": "Open",
+		"stop": "Stop",
+		"stopConfirm": "Stop study {{name}}? Loops not started yet will not run. This cannot be undone.",
+		"stopError": "Could not stop the study.",
+		"detailError": "Could not load the study.",
+		"heldOut": "Held-out tasks",
+		"limit": "Limit",
+		"reason": "State",
+		"loopRuns": "Loop runs",
+		"noLoops": "No loop has started yet.",
+		"verdict": "Result",
+		"gain": "Gain {{gain}} (95% range {{low}} to {{high}}), {{better}} of {{loops}} loops better",
+		"noVerdict": "No result until every loop is done.",
+		"close": "Close"
+	},
+	"form": {
+		"loops": "Loops",
+		"loopsHelp": "2 or more makes a study: the limit is shared by the loops.",
+		"loopsError": "Loops must be 1 to 5. A trial runs one loop.",
+		"studyLimit": "Total for {{loops}} loops: at most ${{total}} (${{share}} for each loop).",
+		"studyVerb": "Start study",
+		"source": "Start from",
+		"sourceAgent": "The agent's files",
+		"sourcePrompt": "A Bifrost prompt",
+		"sourcePromptOff": "Not built on this server yet: the loop cannot read a Bifrost prompt as version 0."
+	},
+	"lineage": {
+		"check": "Check the chain",
+		"checking": "Checking",
+		"ok": "Checked now: {{entries}} entries, chain intact.",
+		"broken": "Checked now: chain broken. {{error}}",
+		"error": "Could not check the chain."
+	},
+	"round": {
+		"download": "Download round",
+		"error": "Could not load round {{k}}."
+	}
+}

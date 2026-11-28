@@ -40,3 +40,9 @@ describe("NewImprovementDialog benchmark picker", () => {
 		expect(html).toContain("data-slot=\"select-value\"");
 	});
 });
+// Round 5 lane L7: the study create and chain check hooks, outside a store.
+vi.mock("@/lib/store/apis/improveStudyApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/improveStudyApi")>()),
+	useCreateImprovementStudyMutation: () => [() => ({ unwrap: async () => ({ id: "ims_x" }) }), { isLoading: false }],
+	useLazyCheckImprovementLineageQuery: () => [() => undefined, { isFetching: false, isError: false }],
+}));

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusPill } from "@/components/ui/statusPill";
-import { Section } from "@/components/runs/screenStates";
+import { InlineError, Section } from "@/components/runs/screenStates";
 import type { FileDiff, ImprovementDetail, RoundView } from "@/lib/types/improve";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -13,6 +13,9 @@ import { RoundTimeline } from "./roundTimeline";
 import { VerdictCard } from "./verdictCard";
 import { VersionExplainSection } from "./versionExplain";
 import "./w45impI18n";
+import "./ufl7I18n";
+import { roundUrl, useLazyCheckImprovementLineageQuery } from "@/lib/store/apis/improveStudyApi";
+import { downloadChecked } from "@/lib/downloadChecked";
 
 export interface ImprovementDetailBodyProps {
 	data: ImprovementDetail;
@@ -60,6 +63,7 @@ export function ImprovementDetailBody({ data, onApprove, approving, onContinue }
 					{data.round_views.map((r) => (
 						<RoundCard
 							key={r.n}
+							improvementId={data.id}
 							round={r}
 							paused={data.status === "awaiting_approval" && r.n === data.round_views.length}
 							onApprove={onApprove}
@@ -132,11 +136,13 @@ function IntegrityStrip({ data }: { data: ImprovementDetail }) {
 }
 
 function RoundCard({
+	improvementId,
 	round: r,
 	paused,
 	onApprove,
 	approving,
 }: {
+	improvementId: string;
 	round: RoundView;
 	paused: boolean;
 	onApprove?: (round: number, reason: string) => void;
@@ -147,6 +153,11 @@ function RoundCard({
 	const decision = r.decision || "pending";
 	const tone = r.decision === "committed" ? "ok" : r.decision === "rejected" ? "neutral" : paused ? "warn" : "running";
 	const ev = r.audit?.e_value;
+	const { t: t7 } = useTranslation("ufl7");
+	const [downloadProblem, setDownloadProblem] = useState<string | null>(null);
+	const download = async () => {
+		setDownloadProblem(await downloadChecked(roundUrl(improvementId, r.n), `${improvementId}-round-${r.n}.json`));
+	};
 	return (
 		<article className="flex flex-col gap-2 rounded-lg border p-3" data-testid={`improvement-round-${r.n}`}>
 			<div className="flex flex-wrap items-center gap-2">
@@ -158,7 +169,15 @@ function RoundCard({
 				<span className="text-muted-foreground ml-auto text-xs tabular-nums">
 					{t("round.cost", { v: usd(r.cost.improver + r.cost.screen + r.cost.audit + r.cost.sealed) })}
 				</span>
+				<Button type="button" size="sm" variant="ghost" onClick={() => void download()} data-testid={`improvement-round-download-${r.n}`}>
+					{t7("round.download")}
+				</Button>
 			</div>
+			{downloadProblem && (
+				<p className="text-chart-error-ink text-xs" role="alert" data-testid={`improvement-round-download-error-${r.n}`}>
+					{t7("round.error", { k: r.n })} {downloadProblem}
+				</p>
+			)}
 			{r.why && <p className="text-foreground text-sm">{r.why}</p>}
 			<ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
 				{r.screen && <li>{t("round.practice", { a: pct(r.screen.a.mean), b: pct(r.screen.b.mean) })}</li>}
@@ -240,12 +259,36 @@ function FileDiffView({ diff }: { diff: FileDiff }) {
 
 function LineageTree({ data }: { data: ImprovementDetail }) {
 	const { t } = useTranslation("improve");
+	const { t: t7 } = useTranslation("ufl7");
 	const rows = lineageRows(data.lineage.nodes);
+	const [check, checked] = useLazyCheckImprovementLineageQuery();
+	const chainLine = (lv: { chain_ok: boolean; entries: number; chain_error?: string }): string => {
+		if (lv.chain_ok) return t7("lineage.ok", { entries: lv.entries });
+		return t7("lineage.broken", { error: lv.chain_error ?? "" });
+	};
 	return (
 		<div className="flex flex-col gap-2">
-			<StatusPill tone={data.lineage.chain_ok ? "ok" : "bad"} testId="improvement-chain">
-				{data.lineage.chain_ok ? t("lineage.chainOk") : t("lineage.chainBroken", { error: data.lineage.chain_error ?? "" })}
-			</StatusPill>
+			<div className="flex flex-wrap items-center gap-2">
+				<StatusPill tone={data.lineage.chain_ok ? "ok" : "bad"} testId="improvement-chain">
+					{data.lineage.chain_ok ? t("lineage.chainOk") : t("lineage.chainBroken", { error: data.lineage.chain_error ?? "" })}
+				</StatusPill>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					disabled={checked.isFetching}
+					onClick={() => void check(data.id, false)}
+					data-testid="improvement-chain-check"
+				>
+					{checked.isFetching ? t7("lineage.checking") : t7("lineage.check")}
+				</Button>
+				{checked.data && !checked.isFetching && (
+					<span className={cn("text-xs", checked.data.chain_ok ? "text-foreground" : "text-chart-error-ink")} data-testid="improvement-chain-result">
+						{chainLine(checked.data)}
+					</span>
+				)}
+			</div>
+			<InlineError error={checked.isError ? checked.error : null} title={t7("lineage.error")} testId="improvement-chain-error" />
 			<ul className="flex flex-col gap-1" data-testid="improvement-lineage-tree">
 				{rows.map(({ node, depth }) => (
 					<li

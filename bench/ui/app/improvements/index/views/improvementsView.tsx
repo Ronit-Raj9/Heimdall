@@ -11,13 +11,16 @@ import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetImprovementsQuery } from "@/lib/store/apis/improveApi";
 import type { ImprovementSummary } from "@/lib/types/improve";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Plus, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { isLiveImprovement, listPollMs } from "@/components/improvements/improvementPoll";
 import { useTranslation } from "react-i18next";
 import { ArchiveRowMenu } from "@/components/ui/archiveAction";
 import { ARCHIVED_ROW_CLASS, ArchivedPill, ShowArchivedChip, useShowArchived, withoutArchived } from "@/components/ui/showArchivedChip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StudiesTab, StudyDialog } from "@/components/improvements/studiesTab";
+import "@/components/improvements/ufl7I18n";
 import { archivedCountOf, archivedParam, isArchived } from "@/lib/store/apis/archiveApi";
 
 /** A list row with the optional archive field (phase D decision 6). */
@@ -37,6 +40,18 @@ export default function ImprovementsView() {
 	// Starting a run spends the organization's model keys, so only admins may (policy org(admin)).
 	const admin = canUse(useSession(), "admin");
 	const [creating, setCreating] = useState(false);
+	const { t: t7 } = useTranslation("ufl7");
+	// ?tab=studies opens the Studies tab; a new study opens there with its dialog.
+	const search = useSearch({ strict: false }) as Record<string, unknown> | undefined;
+	const navigateTab = useNavigate();
+	const tab = search?.tab === "studies" ? "studies" : "runs";
+	const setTab = (next: "studies" | null) =>
+		void navigateTab({
+			to: ".",
+			search: ((prev: Record<string, unknown>) => ({ ...prev, tab: next ?? undefined })) as never,
+			replace: true,
+		} as never);
+	const [newStudy, setNewStudy] = useState<string | null>(null);
 	return (
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="improvements-screen">
 			<PageHeader
@@ -55,7 +70,27 @@ export default function ImprovementsView() {
 					{t("create.adminOnly")}
 				</p>
 			)}
-			{creating && <NewImprovementDialog onClose={() => setCreating(false)} />}
+			{creating && (
+				<NewImprovementDialog
+					onClose={() => setCreating(false)}
+					onStudy={(id) => {
+						setTab("studies");
+						setNewStudy(id);
+					}}
+				/>
+			)}
+			{newStudy && <StudyDialog id={newStudy} admin={admin} onClose={() => setNewStudy(null)} />}
+			<Tabs value={tab} onValueChange={(v) => setTab(v === "studies" ? "studies" : null)} className="gap-6">
+				<TabsList className="max-w-full justify-start" data-testid="improvements-tabs">
+					<TabsTrigger value="runs" data-testid="improvements-tab-runs">
+						{t7("tabs.runs")}
+					</TabsTrigger>
+					<TabsTrigger value="studies" data-testid="improvements-tab-studies">
+						{t7("tabs.studies")}
+					</TabsTrigger>
+				</TabsList>
+				<TabsContent value="studies">{tab === "studies" && <StudiesTab admin={admin} onCreate={() => setCreating(true)} />}</TabsContent>
+				<TabsContent value="runs">
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="improvements-loading" />
 			) : list.error || !list.data ? (
@@ -79,6 +114,8 @@ export default function ImprovementsView() {
 					/>
 				</>
 			)}
+				</TabsContent>
+			</Tabs>
 		</section>
 	);
 }

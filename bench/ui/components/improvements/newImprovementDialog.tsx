@@ -26,9 +26,14 @@ import { PRESETS, type PresetName, PresetPicker, TRIAL_LIMITS } from "./presetPi
 import "./w45impI18n";
 import "./uf2bI18n";
 import "./uff6I18n";
+import "./ufl7I18n";
+import { useCreateImprovementStudyMutation } from "@/lib/store/apis/improveStudyApi";
 
 /** The create body plus the task count of a trial or a custom size (improve.Spec max_tasks). */
-export type ImprovementBody = ImprovementSpecBody & { max_tasks?: number };
+export type ImprovementBody = ImprovementSpecBody & { max_tasks?: number; replicate?: { loops: number } };
+
+/** Loops a study runs (improve.MaxLoops); 1 is a plain improvement run. */
+export const MAX_LOOPS = 5;
 
 /** The improvement name rule the server enforces (improve/spec.go nameRe). */
 export const IMPROVEMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -58,6 +63,8 @@ export interface ImprovementForm {
 	tasks: string;
 	/** The whole run's spending limit in dollars, prefilled from the preset. */
 	limit: string;
+	/** Whole loops from version 0: 1 is a run, 2 to 5 a study (POST /improvement-studies). */
+	loops: string;
 }
 
 /** An empty form: the smallest size (a trial), standing instructions ticked. */
@@ -74,10 +81,22 @@ export function newForm(): ImprovementForm {
 		ideas: String(p.ideas),
 		tasks: String(p.pool),
 		limit: String(p.limit),
+		loops: "1",
 	};
 }
 
-export type ImprovementFormProblem = "name" | "agent" | "suite" | "surface" | "rounds" | "ideas" | "tasks" | "limit";
+/** The loop count of the form, 1 when not a whole number yet. */
+export function formLoops(f: ImprovementForm): number {
+	const n = Number(f.loops ?? "1");
+	return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
+/** True when the form starts a study (2 or more loops). */
+export function isStudy(f: ImprovementForm): boolean {
+	return f.preset !== "trial" && formLoops(f) >= 2;
+}
+
+export type ImprovementFormProblem = "name" | "agent" | "suite" | "surface" | "rounds" | "ideas" | "tasks" | "limit" | "loops";
 
 /** True when the size sends its own rounds, ideas and task count. */
 function ownSize(preset: PresetName): boolean {
@@ -106,6 +125,8 @@ export function improvementFormProblems(f: ImprovementForm): ImprovementFormProb
 	}
 	const limit = Number(f.limit);
 	if (f.limit.trim() === "" || !Number.isFinite(limit) || limit <= 0) out.push("limit");
+	const loops = Number(f.loops ?? "1");
+	if (!Number.isInteger(loops) || loops < 1 || loops > MAX_LOOPS || (f.preset === "trial" && loops !== 1)) out.push("loops");
 	return out;
 }
 
@@ -132,6 +153,7 @@ export function improvementSpec(f: ImprovementForm): ImprovementBody {
 	};
 	if (custom) body.rounds = Number(f.rounds);
 	if (custom && f.tasks.trim() !== "") body.max_tasks = Number(f.tasks);
+	if (isStudy(f)) body.replicate = { loops: formLoops(f) };
 	return body;
 }
 
@@ -142,6 +164,7 @@ export function improvementSpec(f: ImprovementForm): ImprovementBody {
 export function createBlock(f: ImprovementForm, estimate: ImprovementEstimate | undefined, estimating: boolean): string | undefined {
 	const first = improvementFormProblems(f)[0];
 	if (first === "tasks") return tasksError(f.preset);
+	if (first === "loops") return i18n.t("form.loopsError", { ns: "ufl7" });
 	if (first) return i18n.t(`reason.${first}`, { ns: "w45imp" });
 	if (estimating) return i18n.t("reason.estimating", { ns: "w45imp" });
 	return estimateBlock(estimate);
@@ -153,8 +176,12 @@ export function createBlock(f: ImprovementForm, estimate: ImprovementEstimate | 
  */
 export function presetPatch(form: ImprovementForm, preset: PresetName): Partial<ImprovementForm> {
 	if (preset === "custom") return { preset, tasks: form.preset === "trial" ? "" : form.tasks };
+	if (preset === "trial") {
+		const t = PRESETS.trial;
+		return { preset, limit: String(t.limit), rounds: String(t.rounds), ideas: String(t.ideas), tasks: String(t.pool), loops: "1" };
+	}
 	const p = PRESETS[preset];
-	return { preset, limit: String(p.limit), rounds: String(p.rounds), ideas: String(p.ideas), tasks: preset === "trial" ? String(p.pool) : "" };
+	return { preset, limit: String(p.limit), rounds: String(p.rounds), ideas: String(p.ideas), tasks: "" };
 }
 
 /** Why the task count is refused, for the size picked. */
@@ -177,8 +204,15 @@ export function improvementConfirmText(f: ImprovementForm, e: ImprovementEstimat
 		parts.push(i18n.t("estimate.confirmUnknown", { ns: "uff6", limit: money(limit) }));
 	}
 	if (f.preset === "trial") parts.push(i18n.t("form.trialNote", { ns: "uff6" }));
+	if (isStudy(f) && limit !== null) parts.push(studyLimitText(limit, formLoops(f)));
 	parts.push(spends);
 	return parts.join(" ");
+}
+
+/** A study's two limits in words, the server's rule (improve.LoopShareUSD: the total split, cents floored). */
+export function studyLimitText(total: number, loops: number): string {
+	const share = Math.floor((total * 100) / loops + 1e-9) / 100;
+	return i18n.t("form.studyLimit", { ns: "ufl7", loops, total: money(total), share: money(share) });
 }
 
 /**
@@ -311,6 +345,8 @@ export function NewImprovementForm({
 	const { t: tw } = useTranslation("w45imp");
 	const { t: tu } = useTranslation("uf2b");
 	const { t: t6 } = useTranslation("uff6");
+	const { t: t7 } = useTranslation("ufl7");
+	const study = isStudy(form);
 	const trial = form.preset === "trial";
 	const choices: SuiteChoice[] = suites.map((s) => (typeof s === "string" ? { value: s, label: s } : s));
 	const readyChoices = choices.filter((c) => !c.notReady);
@@ -434,6 +470,20 @@ export function NewImprovementForm({
 				<span className="text-muted-foreground">{tw("form.fixed")}</span>
 				{problems.includes("surface") && <span className="text-chart-error-ink">{tw("form.surfaceNone")}</span>}
 			</fieldset>
+			<fieldset className="flex flex-col gap-1 text-sm" data-testid="new-improvement-source">
+				<legend className="text-foreground mb-1 font-medium">{t7("form.source")}</legend>
+				<label className="flex items-center gap-2">
+					<input type="radio" name="new-improvement-source" checked readOnly />
+					{t7("form.sourceAgent")}
+				</label>
+				<label className="text-muted-foreground flex items-center gap-2" title={t7("form.sourcePromptOff")}>
+					<input type="radio" name="new-improvement-source" disabled data-testid="new-improvement-source-prompt" />
+					{t7("form.sourcePrompt")}
+				</label>
+				<span className="text-muted-foreground text-xs" data-testid="new-improvement-source-off">
+					{t7("form.sourcePromptOff")}
+				</span>
+			</fieldset>
 			<PresetPicker value={form.preset} onChange={pickPreset} />
 			{trial && (
 				<p className="text-chart-warning-ink text-xs" data-testid="new-improvement-trial-note">
@@ -498,6 +548,22 @@ export function NewImprovementForm({
 					{trial ? t6("form.ideasError", { max: TRIAL_LIMITS.maxIdeas }) : tw("form.ideasError")}
 				</span>
 			)}
+			{!trial && (
+				<label className="flex w-28 flex-col gap-1 text-sm">
+					<span className="text-foreground font-medium">{t7("form.loops")}</span>
+					<Input
+						type="number"
+						min={1}
+						max={MAX_LOOPS}
+						step={1}
+						value={form.loops ?? "1"}
+						onChange={(e) => set({ loops: e.target.value })}
+						data-testid="new-improvement-loops"
+					/>
+				</label>
+			)}
+			{!trial && <span className="text-muted-foreground text-xs">{t7("form.loopsHelp")}</span>}
+			{problems.includes("loops") && <span className="text-chart-error-ink text-xs">{t7("form.loopsError")}</span>}
 			<label className="flex w-full flex-col gap-1 text-sm sm:w-64">
 				<span className="text-foreground font-medium">{tw("form.limit")}</span>
 				<Input
@@ -510,6 +576,11 @@ export function NewImprovementForm({
 				/>
 			</label>
 			{problems.includes("limit") && <span className="text-chart-error-ink text-xs">{tw("form.limitError")}</span>}
+			{study && limitUsd(form.limit) !== null && (
+				<span className="text-muted-foreground text-xs" data-testid="new-improvement-study-limit">
+					{studyLimitText(limitUsd(form.limit) ?? 0, formLoops(form))}
+				</span>
+			)}
 			{error && (
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="new-improvement-error">
 					{error}
@@ -528,7 +599,7 @@ export function NewImprovementForm({
 					{t("create.cancel")}
 				</Button>
 				<PaidButton
-					verb={tu("improve.startVerb")}
+					verb={study ? t7("form.studyVerb") : tu("improve.startVerb")}
 					capUsd={limitUsd(form.limit)}
 					confirm="always"
 					kind="form"
@@ -552,7 +623,7 @@ export function NewImprovementForm({
  * asks for a new estimate after a short pause; Create posts the spec and opens the new run, and a
  * refusal shows under the form.
  */
-export function NewImprovementDialog({ onClose }: { onClose(): void }) {
+export function NewImprovementDialog({ onClose, onStudy }: { onClose(): void; onStudy?(id: string): void }) {
 	const navigate = useNavigate();
 	const { t } = useTranslation("improve");
 	const { t: tu } = useTranslation("uf2b");
@@ -566,7 +637,9 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	// The picker needs only each benchmark id and version: the light list never waits for a pack load.
 	const suitesQ = useGetSuitesLightQuery();
 	const config = useGetAgentConfigQuery(form.agent, { skip: !form.agent });
-	const [create, state] = useCreateImprovementMutation();
+	const [createRun, runState] = useCreateImprovementMutation();
+	const [createStudy, studyState] = useCreateImprovementStudyMutation();
+	const state = isStudy(form) ? studyState : runState;
 	const [estimate, est] = useEstimateImprovementMutation();
 	const complete = improvementFormProblems(form).length === 0;
 	const body = complete ? JSON.stringify(improvementSpec(form)) : "";
@@ -588,7 +661,19 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const submit = async () => {
 		// The run spends the organization's model keys: PaidButton asked first (confirm="always").
 		try {
-			const run = await create(improvementSpec(form)).unwrap();
+			const spec = improvementSpec(form);
+			if (spec.replicate) {
+				// A study (2 to 5 loops) goes to POST /improvement-studies and opens on the Studies tab.
+				const st = await createStudy({ ...spec, replicate: spec.replicate }).unwrap();
+				flushSync(() => {
+					setSent(true);
+					clearDraft();
+				});
+				onClose();
+				onStudy?.(st.id);
+				return;
+			}
+			const run = await createRun(spec).unwrap();
 			flushSync(() => {
 				setSent(true);
 				clearDraft();

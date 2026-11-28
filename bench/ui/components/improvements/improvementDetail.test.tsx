@@ -9,6 +9,14 @@ vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/improveApi")>()),
 	useGetVersionExplainQuery: () => ({ isLoading: false, data: undefined, error: undefined }),
 }));
+// Round 5 lane L7: the chain check answered fresh by GET /improvements/{id}/lineage.
+vi.mock("@/lib/store/apis/improveStudyApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/improveStudyApi")>()),
+	useLazyCheckImprovementLineageQuery: () => [
+		() => undefined,
+		{ isFetching: false, isError: false, data: { nodes: [], entries: 4, chain_ok: true }, error: undefined },
+	],
+}));
 
 describe("ImprovementDetailBody", () => {
 	it("renders the verdict, curve with band and control, rounds, lineage, integrity and spend", () => {
@@ -21,6 +29,9 @@ describe("ImprovementDetailBody", () => {
 			"improvement-line-sealed",
 			"improvement-marker-committed",
 			"improvement-round-1",
+			"improvement-chain-check",
+			"improvement-chain-result",
+			"improvement-round-download-1",
 			"improvement-round-2",
 			"improvement-file-diff",
 			"improvement-lineage-tree",
