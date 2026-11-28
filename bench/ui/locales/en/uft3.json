@@ -43,5 +43,11 @@
 	"ready": "Admission passed. A person must approve the instruction.",
 	"approved": "Approved by {{by}}. The task is in {{suite}}.",
 	"rejected": "Rejected by {{by}}. The draft was discarded.",
-	"blocked": "Approve is not offered: {{reason}}"
+	"blocked": "Approve is not offered: {{reason}}",
+	"approve": "Approve",
+	"reject": "Reject",
+	"retry": "Try again",
+	"retryAsk": "The builder tries once more with the failing control as feedback. It spends what is left of the cap.",
+	"approveMeans": "You confirm this instruction asks for the right behaviour. The task joins {{suite}}.",
+	"rejectAsk": "Discard this draft? The task files are removed."
 }

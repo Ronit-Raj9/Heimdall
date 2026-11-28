@@ -1,9 +1,15 @@
 import "@/lib/i18n";
 
-import { render } from "@/lib/testing/render";
-import { describe, expect, it } from "vitest";
+import { mutation, render } from "@/lib/testing/render";
+import { describe, expect, it, vi } from "vitest";
 import fixture from "../../../handlers/testdata/tracetask_result_t3.json";
-import { BuildTaskView } from "./buildTask";
+import { BuildTaskActions, BuildTaskView } from "./buildTask";
+
+vi.mock("./buildTaskApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("./buildTaskApi")>()),
+	useDecideBuildTaskMutation: () => mutation(),
+	useStartBuildTaskMutation: () => mutation(),
+}));
 import { buildTaskBody, type BuildTaskResult, type BuildTaskState } from "./buildTaskApi";
 
 const result = fixture as unknown as BuildTaskResult;
@@ -33,5 +39,17 @@ describe("Build a task (round 7 lane T3)", () => {
 	});
 	it("shows the running step", () => {
 		expect(render(<BuildTaskView state={{ job_id: "j", status: "running", step: "diagnose", can_approve: false, can_retry: false }} />)).toContain("Building: diagnose");
+	});
+	it("offers Approve with what it means only when the server offers it, and Try again on a refused draft", () => {
+		const ok = render(<BuildTaskActions itemId="inc-1" state={ready} onChanged={() => {}} />);
+		expect(ok).toContain('data-testid="build-task-approve"');
+		expect(ok).toContain("The task joins support-evals.");
+		expect(ok).not.toContain('data-testid="build-task-retry"');
+		const refused = render(<BuildTaskActions itemId="inc-1" state={{ ...ready, can_approve: false, can_retry: true }} onChanged={() => {}} />);
+		expect(refused).not.toContain('data-testid="build-task-approve"');
+		expect(refused).toContain('data-testid="build-task-retry"');
+		expect(refused).toContain('data-testid="build-task-reject"');
+		const decided = render(<BuildTaskActions itemId="inc-1" state={{ ...ready, decision: { job_id: "job_a", decision: "approved", by: "a", at: "" } }} onChanged={() => {}} />);
+		expect(decided).toBe("");
 	});
 });

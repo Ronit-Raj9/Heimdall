@@ -73,8 +73,11 @@ export const buildTaskApi = benchApi.injectEndpoints({
 		startBuildTask: builder.mutation<{ job_id: string }, { item: string; body: BuildTaskBody }>({
 			query: ({ item, body }) => ({ url: path(item), method: "POST", body }),
 		}),
+		decideBuildTask: builder.mutation<unknown, { item: string; jobId: string; decision: "approve" | "reject" }>({
+			query: ({ item, jobId, decision }) => ({ url: `${path(item)}/${decision}`, method: "POST", body: { job_id: jobId } }),
+		}),
 	}),
 	overrideExisting: false,
 });
 
-export const { useGetBuildTaskQuery, useStartBuildTaskMutation } = buildTaskApi;
+export const { useGetBuildTaskQuery, useStartBuildTaskMutation, useDecideBuildTaskMutation } = buildTaskApi;

@@ -9,7 +9,8 @@ import { formatUsd } from "@/lib/money";
 import type { InboxSuite } from "@/lib/types/bench";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildTaskBody, useGetBuildTaskQuery, useStartBuildTaskMutation, type BuildTaskFile, type BuildTaskState } from "./buildTaskApi";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { buildTaskBody, useDecideBuildTaskMutation, useGetBuildTaskQuery, useStartBuildTaskMutation, type BuildTaskFile, type BuildTaskState } from "./buildTaskApi";
 import "./uft3I18n";
 
 /** The cap the form starts with (handlers.TraceTaskDefaultCapUSD). */
@@ -56,6 +57,16 @@ export function BuildTaskPanel({ itemId, suites, disabled }: { itemId: string; s
 				/>
 			)}
 			{state?.job_id && <BuildTaskView state={state} />}
+			{state?.job_id && !disabled && (
+				<BuildTaskActions
+					itemId={itemId}
+					state={state}
+					onChanged={() => {
+						setPolling(true);
+						void q.refetch();
+					}}
+				/>
+			)}
 		</section>
 	);
 }
@@ -304,6 +315,81 @@ function FileBlock({ title, file }: { title: string; file: BuildTaskFile }) {
 				{title} <span className="text-muted-foreground font-mono text-xs">{file.path}</span>
 			</h4>
 			<pre className="bg-muted max-h-64 overflow-auto rounded-sm p-2 text-xs whitespace-pre-wrap">{file.content}</pre>
+		</div>
+	);
+}
+
+/**
+ * Approve, Reject and Try again. Approve shows only when the server offers it (every control and
+ * guard holds and the caller may edit the benchmark); the server checks both again.
+ */
+export function BuildTaskActions({ itemId, state, onChanged }: { itemId: string; state: BuildTaskState; onChanged(): void }) {
+	const { t } = useTranslation("uft3");
+	const confirm = useConfirm();
+	const [decide, { isLoading }] = useDecideBuildTaskMutation();
+	const [start, retrying] = useStartBuildTaskMutation();
+	const [error, setError] = useState("");
+	const r = state.result;
+	if (!r || state.decision || !state.job_id) return null;
+	const jobId = state.job_id;
+	const suite = r.task?.suite ?? "";
+	const left = Math.max(0, (state.budget_usd ?? 0) - r.spent_usd);
+	const run = async (fn: () => Promise<unknown>) => {
+		setError("");
+		try {
+			await fn();
+			onChanged();
+		} catch (e) {
+			setError(plainJobError(getBenchErrorMessage(e)));
+		}
+	};
+	return (
+		<div className="flex flex-col gap-2" data-testid="build-task-actions">
+			{state.can_approve && <p className="text-sm">{t("approveMeans", { suite })}</p>}
+			<div className="flex flex-wrap items-center gap-2">
+				{state.can_approve && (
+					<Button
+						type="button"
+						size="sm"
+						disabled={isLoading}
+						onClick={() => void run(() => decide({ item: itemId, jobId, decision: "approve" }).unwrap())}
+						dataTestId="build-task-approve"
+					>
+						{t("approve")}
+					</Button>
+				)}
+				{state.can_retry && (
+					<PaidButton
+						size="sm"
+						variant="outline"
+						verb={t("retry")}
+						capUsd={left}
+						kind="retry"
+						confirmText={t("retryAsk")}
+						disabled={retrying.isLoading}
+						onConfirm={() => run(() => start({ item: itemId, body: { suite, model: "", budget_usd: 0, retry: true } }).unwrap())}
+						testId="build-task-retry"
+					/>
+				)}
+				<Button
+					type="button"
+					size="sm"
+					variant="ghost"
+					disabled={isLoading}
+					onClick={async () => {
+						if (!(await confirm(t("rejectAsk"), { title: t("reject"), confirmLabel: t("reject"), destructive: true }))) return;
+						await run(() => decide({ item: itemId, jobId, decision: "reject" }).unwrap());
+					}}
+					dataTestId="build-task-reject"
+				>
+					{t("reject")}
+				</Button>
+			</div>
+			{error && (
+				<p className="text-destructive text-sm" role="alert" data-testid="build-task-decide-error">
+					{error}
+				</p>
+			)}
 		</div>
 	);
 }
