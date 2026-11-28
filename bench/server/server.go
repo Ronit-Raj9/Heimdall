@@ -269,6 +269,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewResearchHandler(mode, deps.Index).RegisterRoutes(r, common...)                                           // W4 research with Tavily scorecard (handlers/research.go)
 	// W7 adaptive trials and suite tiers: the trials and tier panel (handlers/adaptive.go, docs/adaptive-trials.md).
 	handlers.NewAdaptiveHandler(mode, deps.Index, deps.Analyzer).RegisterRoutes(r, common...)
+	handlers.NewExtendPoolHandler(mode, deps.Index, deps.Analyzer).RegisterRoutes(r, common...)
 	// W8 judge calibration: calibration card and labels (handlers/calibration.go, docs/judge-calibration.md).
 	handlers.NewCalibrationHandler(mode, deps.Calibration, write).WithHeldOut(deps.Suites, cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	// W5 drift canary: GET /canaries, GET /canaries/{name}, POST /canaries/{name}/run (handlers/canary.go, docs/drift-canary.md).

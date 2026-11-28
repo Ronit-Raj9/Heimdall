@@ -5411,6 +5411,18 @@ class Export(TypedDict):
     rules: List[RuleWhy]
 
 
+class _ExtendPoolViewRequired(TypedDict):
+    exp_id: str
+    extensions: List[PoolMember]
+    parent_pooled: bool
+    pooled: Optional[PooledResult]
+
+
+class ExtendPoolView(_ExtendPoolViewRequired, total=False):
+    parent: str
+    parent_reason: str
+
+
 class ExtendsRef(TypedDict):
     exp_id: str
     kind: str
@@ -9535,6 +9547,33 @@ class _Policy_schemasRequired(TypedDict):
 class Policy_schemas(_Policy_schemasRequired, total=False):
     description: str
     judge_calibration: Optional[JudgeCalibrationPolicy]
+
+
+class _PoolMemberRequired(TypedDict):
+    exp_id: str
+    kind: str
+    name: str
+    pooled: bool
+    runs: int
+
+
+class PoolMember(_PoolMemberRequired, total=False):
+    reason: str
+
+
+class _PooledResultRequired(TypedDict):
+    added_runs: int
+    condition: str
+    d_bar: float
+    mean_a: float
+    mean_b: float
+    metric: str
+    runs: int
+    tasks: int
+
+
+class PooledResult(_PooledResultRequired, total=False):
+    interval: Optional[List[float]]
 
 
 class _PrefsRequired(TypedDict):
@@ -15815,6 +15854,10 @@ class ExportResponse(Export):
     mode: Mode
 
 
+class ExtendPoolViewResponse(ExtendPoolView):
+    mode: Mode
+
+
 class FailurePatternsResponse(FailurePatterns):
     mode: Mode
 
@@ -17285,6 +17328,7 @@ __all__ = [
     'ExplainFile',
     'Explanation',
     'Export',
+    'ExtendPoolView',
     'ExtendsRef',
     'ExtensionRule',
     'FailoverOption',
@@ -17666,6 +17710,8 @@ __all__ = [
     'PolicyValidation',
     'Policy_pii',
     'Policy_schemas',
+    'PoolMember',
+    'PooledResult',
     'Prefs',
     'Preset',
     'PresetInput',
@@ -18291,6 +18337,7 @@ __all__ = [
     'ExplainResponse',
     'ExplanationResponse',
     'ExportResponse',
+    'ExtendPoolViewResponse',
     'FailurePatternsResponse',
     'FaultCatalogResponse',
     'FindingResponse',

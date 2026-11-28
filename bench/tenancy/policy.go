@@ -298,6 +298,7 @@ var OrgPolicy = map[string]Rule{
 	// would make the server run an agent or call out to a URL from the org's
 	// settings are refused in hosted mode until they run on runners.
 	key("GET", api+"/experiments/{id}/adaptive"):       org(viewer),
+	key("GET", api+"/experiments/{id}/extensions"):     org(viewer),
 	key("GET", api+"/experiments/{id}/cost-explain"):   org(viewer),
 	key("GET", api+"/experiments/{id}/export"):         org(viewer),
 	key("GET", api+"/experiments/{id}/migration"):      org(viewer),

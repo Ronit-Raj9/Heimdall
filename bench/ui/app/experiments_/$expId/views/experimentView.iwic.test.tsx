@@ -56,6 +56,7 @@ vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
 	useUnpauseExperimentMutation: () => [() => undefined, { isLoading: false }],
 }));
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => ({}) }));
+vi.mock("@/lib/store/apis/extendPoolApi", () => ({ useGetExperimentExtensionsQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/supportApi", () => ({ useGetExperimentSupportQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/routingApi", () => ({ useGetExperimentRoutingQuery: () => ({}) }));
