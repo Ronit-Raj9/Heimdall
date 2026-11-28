@@ -1,3 +1,4 @@
+import type { WizardMode } from "./evaluateDraft";
 import { isBaselineAgent } from "@/app/agents/views/agentDisplay";
 import { pickableAgents } from "@/components/agents/agentPicker";
 import { BASELINE_AGENTS, type Capability, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
@@ -10,7 +11,7 @@ export function asEvaluateStep(raw: number | null | undefined): EvaluateStep {
 	return raw && raw >= 1 && raw <= 5 ? (Math.trunc(raw) as EvaluateStep) : 1;
 }
 
-export const LEARN_MODES: EvaluationMode[] = ["score", "versions", "models", "opponent"];
+export const LEARN_MODES: WizardMode[] = ["score", "versions", "models", "model_switch", "opponent"];
 
 const CLI_CODING = new Set(["codex", "claude-code", "claude-code-gpt", "opencode", "gemini-cli", "mini-swe-agent", "aider"]);
 

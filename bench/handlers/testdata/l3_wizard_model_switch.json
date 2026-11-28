@@ -1,0 +1,15 @@
+{
+	"name": "scripted: best of 3 models",
+	"mode": "model_switch",
+	"arms": [
+		{ "label": "A", "agent": "scripted", "model": "m1" },
+		{ "label": "B", "agent": "scripted", "model": "m2" },
+		{ "label": "C", "agent": "scripted", "model": "m3" }
+	],
+	"benchmarks": ["longmemeval"],
+	"tasks_per_benchmark": 1,
+	"trials": 1,
+	"faults": ["clean"],
+	"preset": "quick",
+	"split": "held_out"
+}

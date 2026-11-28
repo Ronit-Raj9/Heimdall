@@ -1,36 +1,38 @@
 import { NativeSelect } from "@/components/ui/select";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
-import { useGetAgentVersionsQuery, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
+import { useGetAgentVersionsQuery, } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/evaluateI18n";
 import { cn } from "@/lib/utils";
-import { BarChart3, Check, Cpu, GitCompare, ShieldAlert, Swords } from "lucide-react";
+import { BarChart3, Check, Cpu, GitCompare, ShieldAlert, Swords, Trophy } from "lucide-react";
 import type { ComponentType, KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
-import { BARE_MODEL_AGENT, useEvaluateDraft } from "./evaluateDraft";
+import { BARE_MODEL_AGENT, MODEL_SWITCH_MAX, MODEL_SWITCH_MIN, useEvaluateDraft, type WizardMode } from "./evaluateDraft";
+import "./ufl3I18n";
 import { latestVersion, LEARN_MODES, opponentChoices, type AgentWithCaps } from "./evaluate.utils";
 import "./gw09I18n";
 import { VersionPicker } from "./step1Agent";
 
-const MODE_ICON: Record<EvaluationMode, ComponentType<{ className?: string }>> = {
+const MODE_ICON: Record<WizardMode, ComponentType<{ className?: string }>> = {
 	score: BarChart3,
 	versions: GitCompare,
 	models: Cpu,
 	opponent: Swords,
+	model_switch: Trophy,
 };
 
 /** A step 2 goal: one of the modes, or the red-team goal, a score evaluation with the red-team writer first (M3-48). */
-export type LearnGoal = EvaluationMode | "redteam";
+export type LearnGoal = WizardMode | "redteam";
 
 export const LEARN_GOALS: LearnGoal[] = [...LEARN_MODES, "redteam"];
 
 /** The goal the draft is on. */
-export function goalOf(d: { mode: EvaluationMode; redTeam?: boolean }): LearnGoal {
+export function goalOf(d: { mode: WizardMode; redTeam?: boolean }): LearnGoal {
 	return d.mode === "score" && d.redTeam ? "redteam" : d.mode;
 }
 
 /** The draft patch for a goal. */
-export function goalPatch(g: LearnGoal): { mode: EvaluationMode; redTeam: boolean } {
+export function goalPatch(g: LearnGoal): { mode: WizardMode; redTeam: boolean } {
 	return g === "redteam" ? { mode: "score", redTeam: true } : { mode: g, redTeam: false };
 }
 
@@ -50,6 +52,7 @@ function goalKeys(e: KeyboardEvent<HTMLElement>): void {
 export function Step2Learn() {
 	const { t } = useTranslation("evaluate");
 	const { t: tg } = useTranslation("gw09");
+	const { t: t3 } = useTranslation("ufl3");
 	const { draft, update } = useEvaluateDraft();
 	const agents = useGetAgentsQuery();
 	const versions = useGetAgentVersionsQuery(draft.agent ?? "", { skip: !draft.agent });
@@ -94,8 +97,12 @@ export function Step2Learn() {
 						>
 							<Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
 							<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-								<span className={cn("text-sm font-medium", blocked && "text-muted-foreground")}>{t(`learn.mode.${m}`)}</span>
-								<span className="text-muted-foreground text-sm">{blocked ? t("learn.needTwoVersions") : t(`learn.modeHelp.${m}`)}</span>
+								<span className={cn("text-sm font-medium", blocked && "text-muted-foreground")}>{m === "model_switch" ? t3("mode.label") : t(`learn.mode.${m}`)}</span>
+								<span className="text-muted-foreground text-sm">{blocked
+										? t("learn.needTwoVersions")
+										: m === "model_switch"
+											? t3("mode.help", { min: MODEL_SWITCH_MIN, max: MODEL_SWITCH_MAX })
+											: t(`learn.modeHelp.${m}`)}</span>
 							</span>
 							{on && <Check className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />}
 						</button>
@@ -167,8 +174,8 @@ export function Step2Learn() {
 					<ul className="flex flex-col gap-1 text-sm">
 						{draft.arms.map((a, i) => (
 							<li key={a.label}>
-								{draft.mode === "models" && i > 0 && (!a.model || sameSetup(a, draft.arms[0])) ? (
-									t("learn.secondSetupLater")
+								{(draft.mode === "models" || draft.mode === "model_switch") && i > 0 && (!a.model || sameSetup(a, draft.arms[0])) ? (
+									draft.mode === "model_switch" ? t3("mode.modelLater") : t("learn.secondSetupLater")
 								) : (
 									<>
 										{a.agent || "?"}

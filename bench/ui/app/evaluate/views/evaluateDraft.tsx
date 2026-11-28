@@ -20,6 +20,17 @@ import { evalArmLabel } from "@/lib/evaluationArms";
  * step 4). Steps 3 and 4 fill `benchmarks`, `pack`, `tasksPerBenchmark`, `trials`, `faults`,
  * `budgetUsd`. Step 5 posts `draftToSpec(draft)`.
  */
+/**
+ * The wizard's modes: the API's modes plus model_switch ("Find the best model", one agent on 3 to 6 models), which the
+ * server accepts on POST /evaluations (handlers/modelswitch.go) and the shared API type does not list yet.
+ */
+export type WizardMode = EvaluationMode | "model_switch";
+
+export const MODEL_SWITCH_MODE = "model_switch" as const;
+/** The wizard's range for model_switch; the server takes 2 to 6, two models is the "Two models" mode. */
+export const MODEL_SWITCH_MIN = 3;
+export const MODEL_SWITCH_MAX = 6;
+
 export interface EvaluateDraft {
 	/** The name typed in the wizard; blank means the default name (`defaultName`). */
 	name: string;
@@ -27,7 +38,9 @@ export interface EvaluateDraft {
 	agent: string | null;
 	/** Its version; null means the latest. */
 	version: number | null;
-	mode: EvaluationMode;
+	mode: WizardMode;
+	/** Run only the benchmarks' held-out tasks (spec.split "held_out"); unset is the public split. */
+	split?: "held_out" | null;
 	/** mode "versions": the other version of the same agent (arm B). */
 	compareVersion: number | null;
 	/** mode "opponent": the baseline agent (arm B). */
@@ -124,6 +137,21 @@ export function armsFor(d: EvaluateDraft, defaultModel = ""): EvaluationArm[] {
 			];
 		case "opponent":
 			return [a, keepB({ label: evalArmLabel(1), agent: d.opponent ?? "", model: b0?.model || a.model })];
+		case "model_switch": {
+			// One agent at one version on several models; kept models stay, at least MODEL_SWITCH_MIN rows.
+			const n = Math.max(MODEL_SWITCH_MIN, d.arms.length);
+			return Array.from({ length: Math.min(n, MODEL_SWITCH_MAX) }, (_, i) => {
+				if (i === 0) return a;
+				const p = prev(evalArmLabel(i));
+				return {
+					label: evalArmLabel(i),
+					agent: d.agent!,
+					model: p?.model ?? "",
+					...(p?.provider ? { provider: p.provider } : {}),
+					...(d.version != null ? { version: d.version } : {}),
+				};
+			});
+		}
 	}
 }
 
@@ -138,10 +166,10 @@ export function learnStepReady(d: EvaluateDraft, latest?: number): boolean {
 	return true;
 }
 
-const EVALUATION_MODES: readonly EvaluationMode[] = ["score", "versions", "models", "opponent"];
+const EVALUATION_MODES: readonly WizardMode[] = ["score", "versions", "models", "opponent", MODEL_SWITCH_MODE];
 
 /** Whether a value (for example a link's ?mode=) is one of the evaluation modes. */
-export function isEvaluationMode(m: unknown): m is EvaluationMode {
+export function isEvaluationMode(m: unknown): m is WizardMode {
 	return typeof m === "string" && (EVALUATION_MODES as readonly string[]).includes(m);
 }
 
@@ -163,7 +191,7 @@ export interface DraftLink {
  */
 export function draftFromLink(p: DraftLink, agentRow?: { model?: string } | null): { draft: EvaluateDraft; badMode?: string } {
 	const agent = p.agent || null;
-	const mode: EvaluationMode = isEvaluationMode(p.mode) ? p.mode : "score";
+	const mode: WizardMode = isEvaluationMode(p.mode) ? p.mode : "score";
 	const base: EvaluateDraft = {
 		...EMPTY_DRAFT,
 		agent,
@@ -195,7 +223,8 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 	const faults = d.faults.includes("clean") ? d.faults : ["clean", ...d.faults];
 	return {
 		name: d.name.trim() || defaultName(d),
-		mode: d.mode,
+		// model_switch is a server mode the shared type does not list yet (see WizardMode).
+		mode: d.mode as EvaluationMode,
 		arms: withBareModel(d.arms),
 		benchmarks: d.benchmarks,
 		...(d.pack ? { pack: d.pack } : {}),
@@ -212,6 +241,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		...(d.gate ? { gate: d.gate } : {}),
 		...(d.stream ? { stream: d.stream } : {}),
 		...(d.disclose_budget ? { disclose_budget: true } : {}),
+		...(d.split === "held_out" ? { split: "held_out" as const } : {}),
 	};
 }
 
@@ -251,6 +281,7 @@ export function specToPatch(spec: EvaluationSpec, d?: EvaluateDraft): Partial<Ev
 		gate: spec.gate ?? null,
 		stream: spec.stream ?? null,
 		disclose_budget: Boolean(spec.disclose_budget),
+		split: spec.split === "held_out" ? "held_out" : null,
 	};
 }
 
@@ -261,6 +292,8 @@ export function defaultName(d: EvaluateDraft): string {
 			return `${who} vs v${d.compareVersion ?? "?"}`;
 		case "models":
 			return `${who}: two models`;
+		case "model_switch":
+			return `${who}: best of ${d.arms.length} models`;
 		case "opponent":
 			return d.opponent === BARE_MODEL_AGENT ? `${who} vs the bare model` : `${who} vs ${d.opponent ?? "baseline"}`;
 		default: {

@@ -1,0 +1,20 @@
+{
+	"mode": {
+		"label": "Find the best model",
+		"help": "Your agent on {{min}} to {{max}} models, same tasks.",
+		"modelLater": "Another model, picked in step 4."
+	},
+	"models": {
+		"add": "Add a model",
+		"remove": "Remove",
+		"count": "{{count}} of {{max}} models",
+		"needMore": "Pick at least {{min}} different models.",
+		"same": "Each model can be picked once."
+	},
+	"split": {
+		"title": "Task split",
+		"public": "Public tasks",
+		"heldOut": "Held-out tasks only",
+		"heldOutHelp": "Benchmarks without held-out tasks are skipped."
+	}
+}

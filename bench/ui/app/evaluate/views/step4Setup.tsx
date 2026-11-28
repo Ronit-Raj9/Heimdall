@@ -21,6 +21,8 @@ import { evalArmLabel } from "@/lib/evaluationArms";
 import { isRoughEstimate } from "./evaluate.utils";
 import { KeyLines, useArmKeys } from "./armKeys";
 import "@/lib/types/evaluateI18n";
+import { MODEL_SWITCH_MAX, MODEL_SWITCH_MIN, MODEL_SWITCH_MODE } from "./evaluateDraft";
+import { ufl3 } from "./ufl3I18n";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -147,7 +149,8 @@ export function advancedChanged(spec: EvaluationSpec): boolean {
 		Boolean(spec.mcp_route && spec.mcp_route !== "direct") ||
 		Boolean(spec.failover?.enabled) ||
 		Boolean(spec.gate) ||
-		spec.concurrency != null
+		spec.concurrency != null ||
+		spec.split === "held_out"
 	);
 }
 
@@ -173,7 +176,31 @@ export function specProblem(spec: EvaluationSpec, owns: ReadonlySet<string> = ne
 	if (spec.arms.length === 0) return fw05("problem.noModel", { label: "A" });
 	const noModel = spec.arms.find((a) => !armHasModel(a, owns));
 	if (noModel) return fw05("problem.noModel", { label: noModel.label });
+	if (isModelSwitch(spec)) {
+		if (spec.arms.length < MODEL_SWITCH_MIN) return ufl3("models.needMore", { min: MODEL_SWITCH_MIN });
+		const seen = new Set(spec.arms.map((a) => `${a.provider ?? ""}/${a.model}`));
+		if (seen.size < spec.arms.length) return ufl3("models.same");
+	}
 	return failoverProblem(spec.arms[0], spec.failover);
+}
+
+/** Mode model_switch ("Find the best model"): the shared spec type does not list it yet. */
+export function isModelSwitch(spec: Pick<EvaluationSpec, "mode">): boolean {
+	return (spec.mode as string) === MODEL_SWITCH_MODE;
+}
+
+/** A model_switch spec with one more empty model row (same agent and version as row A), up to MODEL_SWITCH_MAX. */
+export function addModelArm(spec: EvaluationSpec): EvaluationSpec {
+	const a = spec.arms[0];
+	if (!a || spec.arms.length >= MODEL_SWITCH_MAX) return spec;
+	const arm = { label: evalArmLabel(spec.arms.length), agent: a.agent, model: "", ...(a.version != null ? { version: a.version } : {}) };
+	return { ...spec, arms: [...spec.arms, arm] };
+}
+
+/** A model_switch spec without row i, relabelled A, B, C... in order; never below MODEL_SWITCH_MIN. */
+export function removeModelArm(spec: EvaluationSpec, i: number): EvaluationSpec {
+	if (i === 0 || spec.arms.length <= MODEL_SWITCH_MIN) return spec;
+	return { ...spec, arms: spec.arms.filter((_, j) => j !== i).map((x, j) => ({ ...x, label: evalArmLabel(j) })) };
 }
 
 /** Whether the spec is complete enough to estimate or launch: specProblem has nothing to say. */
@@ -579,8 +606,32 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 								)}
 							</>
 						)}
+						{isModelSwitch(spec) && i > 0 && spec.arms.length > MODEL_SWITCH_MIN && (
+							<button
+								type="button"
+								className="text-muted-foreground w-fit text-xs hover:underline"
+								onClick={() => onChange(removeModelArm(spec, i))}
+								data-testid={`step4-remove-model-${arm.label}`}
+							>
+								{ufl3("models.remove")}
+							</button>
+						)}
 					</div>
 				))}
+				{isModelSwitch(spec) && (
+					<div className="flex flex-wrap items-center gap-3 text-sm" data-testid="step4-model-switch">
+						<button
+							type="button"
+							className="text-primary disabled:text-muted-foreground w-fit hover:underline disabled:no-underline"
+							disabled={spec.arms.length >= MODEL_SWITCH_MAX}
+							onClick={() => onChange(addModelArm(spec))}
+							data-testid="step4-add-model"
+						>
+							{ufl3("models.add")}
+						</button>
+						<span className="text-muted-foreground text-xs">{ufl3("models.count", { count: spec.arms.length, max: MODEL_SWITCH_MAX })}</span>
+					</div>
+				)}
 			</section>
 
 			<PresetPicker
@@ -718,6 +769,28 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					</label>
 				))}
 			</section>
+
+			<fieldset className="flex flex-col gap-2" data-testid="step4-split">
+				<legend className="mb-1 text-base font-semibold">{ufl3("split.title")}</legend>
+				{(["public", "held_out"] as const).map((v) => (
+					<label key={v} className="flex items-start gap-2 text-sm" data-testid={`step4-split-${v}`}>
+						<input
+							type="radio"
+							name="step4-split"
+							className="mt-1"
+							checked={(spec.split === "held_out" ? "held_out" : "public") === v}
+							onChange={() => {
+								const { split: _old, ...rest } = spec;
+								onChange(v === "held_out" ? { ...rest, split: "held_out" } : rest);
+							}}
+						/>
+						<span>
+							<span className="font-medium">{v === "held_out" ? ufl3("split.heldOut") : ufl3("split.public")}</span>
+							{v === "held_out" && <span className="text-muted-foreground block">{ufl3("split.heldOutHelp")}</span>}
+						</span>
+					</label>
+				))}
+			</fieldset>
 
 			{spec.arms.length === 1 && (
 				<FailoverSettings
