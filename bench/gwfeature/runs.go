@@ -15,7 +15,7 @@ import (
 
 // version is part of every fingerprint: a change to how effects are computed
 // bumps it so saved effects are recomputed.
-const version = "1.1.0"
+const version = "1.2.0"
 
 // LoadRuns returns the counted runs of an experiment: the newest attempt per
 // slot that is sealed, not superseded and not aborted by infrastructure, of

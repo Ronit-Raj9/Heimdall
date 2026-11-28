@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -56,7 +58,7 @@ type g1Launcher struct {
 	problem map[string]string
 }
 
-func (l g1Launcher) Active(id string) bool                { return l.active[id] }
+func (l g1Launcher) Active(id string) bool                 { return l.active[id] }
 func (l g1Launcher) RunProblem(id string) (string, string) { return l.problem[id], "" }
 
 // g1Arms is the fixed result the test feature computes, per comparison.
@@ -143,6 +145,7 @@ func TestGatewayEffectStatesThroughHandler(t *testing.T) {
 	env := OrgEnv{Cfg: &lib.Config{Root: t.TempDir()}, Mode: testMode, Services: Services{Launcher: l}}
 	h := gatewayTestsRouter(env, src)
 	types := gwPageTypes(t)
+	seen := map[string]any{}
 	for _, tc := range []struct {
 		id, state, result, headline string
 	}{
@@ -155,6 +158,8 @@ func TestGatewayEffectStatesThroughHandler(t *testing.T) {
 	} {
 		st, out := secretsCall(h, "GET", APIPrefix+"/experiments/"+tc.id+"/gateway-effect", "")
 		e := checkEffectShape(t, types, st, out)
+		delete(e, "computed_at")
+		seen[tc.id] = e
 		res, _ := e["result"].(string)
 		if e["state"] != tc.state || res != tc.result || e["headline"] != tc.headline {
 			t.Errorf("%s: state %v result %q headline %q, want %s %q %q", tc.id, e["state"], res, e["headline"], tc.state, tc.result, tc.headline)
@@ -171,6 +176,32 @@ func TestGatewayEffectStatesThroughHandler(t *testing.T) {
 	st, out := secretsCall(bare, "GET", APIPrefix+"/experiments/e_live/gateway-effect", "")
 	if e := checkEffectShape(t, types, st, out); e["state"] != gwfeature.StateRunning || e["headline"] != "Running, 1 of 4 runs graded." {
 		t.Errorf("live run without launcher: %s", out)
+	}
+	g1Fixture(t, "ufg1.effects.json", seen)
+}
+
+// g1Fixture keeps the handler's answers in the file the page tests read:
+// it fails when the file differs, and UPDATE_GW_FIXTURES=1 rewrites it.
+func g1Fixture(t *testing.T, name string, v any) {
+	t.Helper()
+	want, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = append(want, '\n')
+	p := filepath.Join("..", "ui", "components", "gateway", "testdata", name)
+	if os.Getenv("UPDATE_GW_FIXTURES") == "1" {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, want, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	got, err := os.ReadFile(p)
+	if err != nil || string(got) != string(want) {
+		t.Fatalf("%s is not the handler's answer; run with UPDATE_GW_FIXTURES=1 (err %v)", p, err)
 	}
 }
 
@@ -207,7 +238,9 @@ func TestGatewayCardShowsNewestTestAndOlderResultOnlyWhenValid(t *testing.T) {
 		t.Fatalf("no budget line: %s", out)
 		return nil
 	}
+	lines := map[string]any{}
 	line := card([]gwfeature.ArmResult{g1Arm("A", 10, 0.5), g1Arm("B", 10, 0.6)})
+	lines["older_holds"] = line
 	if line["exp_id"] != "e_new" || line["state"] != gwfeature.StateUnknown || line["result"] != nil ||
 		line["headline"] != "No result: no run started: the agent's image could not be built" {
 		t.Fatalf("line is not the newest test: %v", line)
@@ -222,4 +255,6 @@ func TestGatewayCardShowsNewestTestAndOlderResultOnlyWhenValid(t *testing.T) {
 	if line["older"] != nil || line["result"] != nil {
 		t.Fatalf("an older result that no longer holds is shown: %v", line)
 	}
+	lines["older_void"] = line
+	g1Fixture(t, "ufg1.cardlines.json", lines)
 }
