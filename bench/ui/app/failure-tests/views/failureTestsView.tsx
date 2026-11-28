@@ -142,7 +142,7 @@ export function runsBreakdown(e: Pick<Estimate, "runs" | "per_benchmark" | "arms
 	if (!e) return null;
 	const runs = Number(e.runs) || 0;
 	const total = `${runs} ${runs === 1 ? "run" : "runs"}`;
-	const per: EstimateBenchmark[] = (e.per_benchmark ?? []).filter((b) => !b.skipped);
+	const per = (e.per_benchmark ?? []).filter((b) => !b.skipped).map((b: EstimateBenchmark) => ({ tasks: b.tasks ?? 0, conditions: b.conditions ?? [] }));
 	const arms = e.arms ?? 0;
 	const trials = e.trials ?? 0;
 	if (per.length === 0 || arms < 1 || trials < 1) return total;

@@ -341,6 +341,9 @@ export interface Range {
 export interface EstimateBenchmark {
 	benchmark: string;
 	runs?: number;
+	/** Tasks picked and conditions run (clean plus each fault it can take): runs = arms x conditions x trials x tasks. */
+	tasks?: number;
+	conditions?: string[];
 	est_cost_usd?: Range & { known?: boolean; reason?: string };
 	est_minutes?: Range & { known?: boolean };
 	skipped?: string;
