@@ -73,6 +73,9 @@ type FindingRerunRequest struct {
 	Arm    string `json:"arm"`
 	Trials int    `json:"trials,omitempty"`
 	Yes    bool   `json:"yes"`
+	// BudgetUSD caps the rerun's spend (lane F1). 0 keeps the cap of the
+	// experiment the failure came from.
+	BudgetUSD float64 `json:"budget_usd,omitempty"`
 }
 
 // FindingRerunResult is the answer of POST /findings/{id}/rerun.
@@ -536,6 +539,10 @@ func (h *findingsHandler) rerun(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, findingsBadTrials)
 		return
 	}
+	if req.BudgetUSD < 0 || req.BudgetUSD > findingsMaxRerunUSD {
+		h.bad(ctx, findingsBadCap)
+		return
+	}
 	if h.env.Services.Launcher == nil || h.env.Services.Index == nil {
 		sendUnavailable(ctx, h.env.Mode, "experiment launcher")
 		return
@@ -598,6 +605,7 @@ func (h *findingsHandler) rerun(ctx *fasthttp.RequestCtx) {
 		fixed.Agent = m.Experiment.Base
 	}
 	exp.Arms = map[string]schemas.ArmSpec{findingsOldArm: old, findingsFixedArm: fixed}
+	capRerunBudget(exp, req.BudgetUSD)
 	work, cancel := workContext(ctx, evaluationLaunchTimeout)
 	defer cancel()
 	res, err := launchRerun(work, ctx, h.env.Services.Launcher, m, exp, n)
