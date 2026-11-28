@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 )
@@ -40,6 +41,15 @@ func TestTemplateAgentFollowsOriginTaskVariant(t *testing.T) {
 	if v.Skip != "" || v.Set["build.dockerfile"] != "agents/images/codex-task/Dockerfile" || v.Set["image"] != "bench/agent-codex-task:1" || v.Set["build.base_arg"] != "BASE_IMAGE" {
 		t.Fatalf("variant %+v", v)
 	}
+	// The wizard's check (GET /agents/{id}/compatibility) says runnable.
+	harbor := &schemas.Suite{ID: "hd-harbor-bfcl", Track: "terminal", Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierSnapshot},
+		Tasks: []*schemas.Task{{ID: "t1", Environment: &schemas.TaskEnvironment{Image: "harbor/bfcl-t1:1"}}}}
+	env := OrgEnv{Mode: "local", Cfg: &lib.Config{Root: root}, Services: Services{
+		Suites: &fakeSuites{ids: []string{"hd-harbor-bfcl"}, suites: map[string]*schemas.Suite{"hd-harbor-bfcl": harbor}},
+		Agents: compatAgents{{Path: "agents/codex-bfcl.yaml", Config: cfg}}}}
+	if code, out := doCompat(t, env, "codex-bfcl"); code != 200 || len(out.Benchmarks) != 1 || !out.Benchmarks[0].OK {
+		t.Fatalf("compatibility %d %+v", code, out)
+	}
 	run := applySet(cfg, v.Set)
 	img, err := engine.ResolveTaskAgentImage(&run, st, st.TaskByID("t01"), "harbor/t01:1", root, "")
 	if err != nil || !img.PerTask || img.BuildArgs["BASE_IMAGE"] != "harbor/t01:1" {
@@ -66,6 +76,11 @@ func TestTemplateAgentFollowsOriginTaskVariant(t *testing.T) {
 	other, err := decodeAgent([]byte(edited), "agents/codex-bfcl.yaml")
 	if err != nil {
 		t.Fatal(err)
+	}
+	env.Services.Agents = compatAgents{{Path: "agents/codex-bfcl.yaml", Config: other}}
+	if code, out := doCompat(t, env, "codex-bfcl"); code != 200 || len(out.Benchmarks) != 1 || out.Benchmarks[0].OK ||
+		!strings.Contains(out.Benchmarks[0].Reason, "cannot be built on top of it") {
+		t.Fatalf("compatibility after the command change %d %+v", code, out)
 	}
 	v = deriveTaskImageAgent(other, st, nil, agents, root)
 	if v.Skip != taskImageSkip("codex-bfcl", "its Dockerfile does not start FROM ${BASE_IMAGE}") {
