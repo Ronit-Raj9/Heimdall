@@ -45,6 +45,9 @@ type ExperimentsHandler struct {
 	// archiveRoot is the project root whose archive sidecar marks archived
 	// comparisons (UI fix wave D1, uifix_d1_archive.go); "" marks none.
 	archiveRoot string
+	// taskImage derives task-image agents before planning (PAID-8,
+	// experiments_taskimage_f3.go); nil derives nothing.
+	taskImage *taskImageDeps
 }
 
 // NewExperimentsHandler creates the experiments handler. write guards the
@@ -512,6 +515,7 @@ func (h *ExperimentsHandler) decode(ctx *fasthttp.RequestCtx) (*schemas.Experime
 func (h *ExperimentsHandler) planManifest(ctx *fasthttp.RequestCtx, exp *schemas.Experiment) (*schemas.Manifest, error) {
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
+	h.deriveTaskImageArms(work, exp) // PAID-8: the wizard's task-image rule (experiments_taskimage_f3.go)
 	m, err := h.launcher.Plan(work, exp)
 	if err != nil {
 		return nil, err

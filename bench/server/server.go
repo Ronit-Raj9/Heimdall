@@ -194,7 +194,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 // them a policy entry in tenancy/policy.go (TestPolicyCoversEveryRoute).
 func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.Middleware, common []lib.Middleware) *handlers.ExperimentsHandler {
 	mode := cfg.Server.Mode
-	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write).WithArchiveRoot(cfg.Root) // UI fix wave D1: archive sidecar
+	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write).WithArchiveRoot(cfg.Root). // UI fix wave D1: archive sidecar
+		WithTaskImageAgents(deps.Suites, deps.Services.Agents, projectsRoot(deps.Services)) // PAID-8: the wizard's task-image rule
 	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...)            // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewDrainHandler(mode, cfg.Auth.IsHosted(), write, deps.Logger).RegisterRoutes(r, common...) // Z11 drain mode: GET/POST /admin/drain (handlers/drain.go)
@@ -389,4 +390,14 @@ type fasthttpLogger struct{ logger schemas.Logger }
 // Printf implements fasthttp.Logger.
 func (l fasthttpLogger) Printf(format string, args ...any) {
 	l.logger.Debug(fmt.Sprintf(format, args...))
+}
+
+// projectsRoot is the bench root of the org's project store, or "".
+func projectsRoot(s handlers.Services) func() string {
+	return func() string {
+		if s.Projects == nil {
+			return ""
+		}
+		return s.Projects.Root()
+	}
 }
