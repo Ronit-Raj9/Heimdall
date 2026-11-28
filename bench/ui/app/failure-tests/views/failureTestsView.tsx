@@ -643,6 +643,7 @@ export default function FailureTestsView() {
 											selected={form.benchmarks}
 											onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
 											testIdPrefix="ft"
+											showSearch={false}
 										/>
 									</div>
 								)}

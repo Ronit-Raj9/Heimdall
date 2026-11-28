@@ -22,6 +22,8 @@ export interface BenchmarkChecklistProps {
 	onToggle: (id: string) => void;
 	/** The suite list is still loading. */
 	loading?: boolean;
+	/** Hide the built-in search when the parent provides its own. */
+	showSearch?: boolean;
 	/** Prefix of the row and group test ids (`<prefix>-benchmark-<id>`, `<prefix>-group-<capability>`). */
 	testIdPrefix?: string;
 	/** An extra line under a row (step 3 shows published reference scores there). */
@@ -66,6 +68,7 @@ export function BenchmarkChecklist({
 	selected,
 	onToggle,
 	loading,
+	showSearch = true,
 	testIdPrefix = "benchmarks",
 	extra,
 }: BenchmarkChecklistProps) {
@@ -157,15 +160,17 @@ export function BenchmarkChecklist({
 	}
 	return (
 		<div className="flex flex-col gap-3">
-			<input
-				type="search"
-				value={query}
-				onChange={(e) => setQuery(e.target.value)}
-				placeholder={t("benchmarks.search")}
-				aria-label={t("benchmarks.search")}
-				className="border-input bg-background h-10 w-full max-w-md rounded-md border px-3 text-sm"
-				data-testid={`${testIdPrefix}-benchmark-search`}
-			/>
+			{showSearch && (
+				<input
+					type="search"
+					value={query}
+					onChange={(e) => setQuery(e.target.value)}
+					placeholder={t("benchmarks.search")}
+					aria-label={t("benchmarks.search")}
+					className="border-input bg-background h-10 w-full max-w-md rounded-md border px-3 text-sm"
+					data-testid={`${testIdPrefix}-benchmark-search`}
+				/>
+			)}
 			{groups.map((g) => {
 				const picked = g.suites.filter((s) => chosen.has(s.id)).length;
 				const free = g.suites.filter((s) => !chosen.has(s.id) && !checking);
