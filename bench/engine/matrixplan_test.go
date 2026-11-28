@@ -332,3 +332,42 @@ func TestReplanFrozenMatrix(t *testing.T) {
 		t.Fatalf("edited arms beside a matrix: %v", err)
 	}
 }
+
+// TestPlanMatrixAcceptsTaskImageArms (round 6 N1): the comparison handler
+// expands a two-agent matrix and adds the task-image build overrides to the
+// arms; the planner takes those arms beside the matrix, still checks prices,
+// and refuses any other edit.
+func TestPlanMatrixAcceptsTaskImageArms(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment()
+	e.Arms = nil
+	e.Matrix = &schemas.MatrixSpec{Models: []schemas.MatrixModel{{Model: "m1"}, {Model: "m2", Provider: "openai"}}}
+	expanded, err := ExpandMatrix(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	derived := *e
+	derived.Arms = map[string]schemas.ArmSpec{}
+	for id, arm := range expanded.Arms {
+		set := map[string]any{"image": "bench/agent-x-task:1"} // the planner's own task-image checks are covered by its suites; here only the matrix rule
+		for k, v := range arm.Set {
+			set[k] = v
+		}
+		arm.Set = set
+		derived.Arms[id] = arm
+	}
+	m, err := NewPlanner(b.reg, b.root, nil, WithModelPrices(func(string) bool { return true })).Plan(context.Background(), &derived)
+	if err != nil {
+		t.Fatalf("derived matrix arms: %v", err)
+	}
+	if m.Experiment.Arms["A"].Set["image"] != "bench/agent-x-task:1" {
+		t.Fatalf("arm A lost the task-image build: %+v", m.Experiment.Arms["A"])
+	}
+	if _, err := NewPlanner(b.reg, b.root, nil, WithModelPrices(func(string) bool { return false })).Plan(context.Background(), &derived); err == nil {
+		t.Fatal("unpriced matrix models with task-image arms were accepted")
+	}
+	derived.Arms["B"] = schemas.ArmSpec{Label: "edited", Set: map[string]any{"image": "x"}}
+	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), &derived); err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Fatalf("edited arms beside a matrix: %v", err)
+	}
+}

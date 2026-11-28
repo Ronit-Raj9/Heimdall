@@ -515,7 +515,9 @@ func (h *ExperimentsHandler) decode(ctx *fasthttp.RequestCtx) (*schemas.Experime
 func (h *ExperimentsHandler) planManifest(ctx *fasthttp.RequestCtx, exp *schemas.Experiment) (*schemas.Manifest, error) {
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	h.deriveTaskImageArms(work, exp) // PAID-8: the wizard's task-image rule (experiments_taskimage_f3.go)
+	if err := h.deriveTaskImageArms(work, exp); err != nil { // PAID-8: the wizard's task-image rule (experiments_taskimage_f3.go)
+		return nil, err
+	}
 	m, err := h.launcher.Plan(work, exp)
 	if err != nil {
 		return nil, err
