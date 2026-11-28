@@ -86,7 +86,7 @@ func releasedVersion(ctx context.Context, rl ReleaseLog, agent string) LiveVersi
 	for i := len(list.Releases) - 1; i >= 0; i-- {
 		r := list.Releases[i]
 		if r.AgentID == agent && r.Version > 0 {
-			out.Version, out.Source, out.ReleaseID, out.ReleasedAt, out.Approver, out.EvaluationID = r.Version, LiveFromRelease, r.ReleaseID, r.CreatedAt, r.Approver, r.EvaluationID
+			out.Version, out.Source, out.ReleaseID, out.ReleasedAt, out.Approver, out.EvaluationID = r.Version, LiveFromRelease, r.ReleaseID, r.CreatedAt, approverDisplay(r.Approver), r.EvaluationID
 			return out
 		}
 	}

@@ -36,7 +36,7 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 	// The approver defaults to the signed-in person and survives switching the comparison and leaving the page (M7-81).
 	const session = useSession();
 	const [kept, keep] = useFormDraft<{ approver?: string }>("releaseApprover", {});
-	const defaultApprover = kept.approver ?? session.user?.name ?? session.user?.email ?? "";
+	const defaultApprover = kept.approver ?? session.user?.name ?? session.user?.email?.split("@")[0] ?? "";
 
 	return (
 		<Card className="gap-4 py-4 shadow-none" data-testid="release-panel">

@@ -260,7 +260,9 @@ func (h *evalReleaseHandler) release(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	tenancy.SetCreated(ctx, rec.ReleaseID)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, rec)
+	shown := *rec
+	redactRelease(&shown) // name only, never an email or id (K3)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, &shown)
 }
 
 func (h *evalReleaseHandler) live(ctx *fasthttp.RequestCtx) {

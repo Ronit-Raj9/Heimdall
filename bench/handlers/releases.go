@@ -112,7 +112,9 @@ func (h *ReleasesHandler) createRelease(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	tenancy.SetCreated(ctx, rec.ReleaseID)
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, rec)
+	out := *rec
+	redactRelease(&out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
 }
 
 // listReleases handles GET /api/bench/releases: every record in log order,
@@ -132,6 +134,14 @@ func (h *ReleasesHandler) listReleases(ctx *fasthttp.RequestCtx) {
 	if list.Releases == nil {
 		list.Releases = []schemas.ReleaseRecord{}
 	}
+	// Approvers are shown by name only, never an email or an id (K3).
+	shown := *list
+	shown.Releases = make([]schemas.ReleaseRecord, len(list.Releases))
+	for i := range list.Releases {
+		shown.Releases[i] = list.Releases[i]
+		redactRelease(&shown.Releases[i])
+	}
+	list = &shown
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, list)
 }
 
@@ -152,7 +162,9 @@ func (h *ReleasesHandler) getRelease(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "release "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, rec)
+	out := *rec
+	redactRelease(&out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
 
 // getEvidence handles GET /api/bench/releases/{id}/evidence: the evidence
