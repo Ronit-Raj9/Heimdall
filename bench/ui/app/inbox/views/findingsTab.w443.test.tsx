@@ -7,11 +7,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FindingsTab from "./findingsTab";
 
-const state = vi.hoisted(() => ({ list: {} as Record<string, unknown>, experiments: [] as unknown[] }));
+const state = vi.hoisted(() => ({
+	list: {} as Record<string, unknown>,
+	experiments: [] as unknown[],
+	finding: null as string | null,
+	one: {} as Record<string, unknown>,
+	oneArg: "" as string,
+}));
 
 vi.mock("nuqs", () => ({
 	parseAsString: {},
-	useQueryState: () => [null, () => Promise.resolve(new URLSearchParams())],
+	useQueryState: (key: string) => [key === "finding" ? state.finding : null, () => Promise.resolve(new URLSearchParams())],
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -49,6 +55,10 @@ vi.mock("@/lib/store/apis/findingsApi", () => ({
 	useAddFindingMutation: mutation,
 	useGetInvestigationsQuery: () => ({ data: [] }),
 	useGetInvestigationQuery: () => ({ data: undefined }),
+	useGetFindingQuery: (id: string, o: { skip?: boolean }) => {
+		state.oneArg = o.skip ? "" : id;
+		return o.skip ? {} : state.one;
+	},
 }));
 
 vi.mock("@/lib/store/apis/jobRunApi", () => ({
@@ -145,12 +155,13 @@ describe("Findings tab", () => {
 		expect(html).not.toContain("Find out why");
 	});
 
-	it("with a comparison that has failed runs, the empty state offers Find out why with its cap", () => {
+	it("with a comparison that has failed runs, the empty state offers Find out why; the dialog states the cap (PH2-6)", () => {
 		state.experiments = [{ exp_id: "e_1", name: "e1", slots: { failed: 2 } }];
 		const html = renderToStaticMarkup(<FindingsTab />);
 		state.experiments = [];
 		expect(html).toContain("No tracked failures yet");
-		expect(html).toContain("Find out why, up to $1.00");
+		expect(html).toContain("Find out why");
+		expect(html).not.toContain("up to $1.00");
 	});
 
 	it("lists findings with their state badge, and says so when there are none", () => {
@@ -188,5 +199,24 @@ describe("Findings tab", () => {
 		expect(investigationRows([row])).toHaveLength(1);
 		expect(investigationRows({ mode: "live", investigations: [row] })).toHaveLength(1);
 		expect(investigationRows(undefined)).toHaveLength(0);
+	});
+});
+
+describe("FindingsTab: a link to one finding (?finding=)", () => {
+	it("reads a finding the list does not hold by id, GET /findings/{id}", async () => {
+		const one: Finding = { ...base, id: "fnd-000000000009" };
+		const { findingsApi } = await vi.importActual<typeof import("@/lib/store/apis/findingsApi")>("@/lib/store/apis/findingsApi");
+		const ep = findingsApi.endpoints.getFinding as unknown as { initiate: unknown };
+		expect(ep.initiate).toBeTypeOf("function");
+		state.list = { isLoading: false, data: { mode: "live", findings: [], counts: {} } };
+		state.finding = one.id;
+		state.one = { data: one };
+		expect(renderToStaticMarkup(<FindingsTab />)).toContain("Skips the tests");
+		expect(state.oneArg).toBe(one.id);
+		state.one = { error: { status: 404, data: { error: { message: "finding not found" } } } };
+		const html = renderToStaticMarkup(<FindingsTab />);
+		expect(html).toContain("finding-one-error");
+		state.finding = null;
+		state.one = {};
 	});
 });

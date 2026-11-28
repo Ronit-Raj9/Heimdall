@@ -1,4 +1,5 @@
 import "./w443I18n";
+import "@/components/livescore/ufl9I18n";
 
 import { FindingDetail } from "@/components/findings/findingDetail";
 import { FindingList, filterFindings } from "@/components/findings/findingList";
@@ -10,14 +11,12 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { ShowArchivedChip, useShowArchived } from "@/components/ui/showArchivedChip";
 import { archivedCountOf, useGetFindingsWithArchivedQuery } from "@/lib/store/apis/archiveApi";
-import { useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
-import { formatUsd } from "@/lib/money";
+import { useGetFindingQuery, useGetInvestigationsQuery } from "@/lib/store/apis/findingsApi";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { defaultInvestigation } from "@/components/findings/findingPlans";
 import "@/app/failures/views/ufrhI18n";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
-import { INVESTIGATION_START_CAP_USD } from "@/components/findings/findingPlans";
 import { useTranslation } from "react-i18next";
 
 // One constant for the dialog's starting cap and the outer button's label (R7-5); re-exported for tests.
@@ -29,6 +28,7 @@ export { INVESTIGATION_START_CAP_USD } from "@/components/findings/findingPlans"
  */
 export default function FindingsTab() {
 	const { t } = useTranslation("w443");
+	const { t: l9 } = useTranslation("ufl9");
 	// Archived findings stay out unless "Show archived" is on (?archived=1); nothing is deleted.
 	const [showArchived, setShowArchived] = useShowArchived();
 	const list = useGetFindingsWithArchivedQuery({ archived: showArchived ? "include" : undefined });
@@ -38,7 +38,10 @@ export default function FindingsTab() {
 	const [q, setQ] = useQueryState("q", parseAsString);
 	const all = list.data?.findings ?? [];
 	const findings = filterFindings(all, q ?? "");
-	const current = all.find((f) => f.id === selected) ?? null;
+	const listed = all.find((f) => f.id === selected) ?? null;
+	// A link to one finding that the list does not hold (archived, or newer than the list) reads it by id.
+	const one = useGetFindingQuery(selected ?? "", { skip: !selected || list.isLoading || listed !== null });
+	const current = listed ?? (one.data && one.data.id === selected ? one.data : null);
 	const noInvestigations = !investigations.isLoading && !investigations.error && investigationRows(investigations.data).length === 0;
 	// Nothing tracked and nothing investigated: one empty box with the one next step inside it (M7-25).
 	// With no comparison that has failed runs there is nothing to investigate: point at an evaluation, never at paid work (RFR-4).
@@ -53,7 +56,7 @@ export default function FindingsTab() {
 			onClick={() => setInvestigating(true)}
 			data-testid="findings-find-out-why"
 		>
-			{t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) })}
+			{t("investigations.findOut")}
 		</Button>
 	);
 
@@ -76,7 +79,7 @@ export default function FindingsTab() {
 			) : bothEmpty ? (
 				<EmptyState
 					title={t("emptyTitle")}
-					action={investigating ? undefined : { label: t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) }), onClick: () => setInvestigating(true) }}
+					action={investigating ? undefined : { label: t("investigations.findOut"), onClick: () => setInvestigating(true) }}
 					testId="findings-empty"
 				/>
 			) : all.length === 0 ? (
@@ -105,6 +108,9 @@ export default function FindingsTab() {
 					)}
 				</div>
 			)}
+			{selected && !current && one.error ? (
+				<LoadError title={l9("finding.loadError")} error={one.error} notFound onRetry={() => void one.refetch()} testId="finding-one-error" />
+			) : null}
 			{current ? <FindingDetail key={current.id} finding={current} onClose={() => void setSelected(null)} /> : null}
 			{bothEmpty && investigating ? <InvestigateDialog onDone={() => setInvestigating(false)} /> : null}
 			{!bothEmpty && (
