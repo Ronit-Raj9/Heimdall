@@ -161,7 +161,6 @@ runs:
       env:
         MODE: ${{ inputs.mode }}
         BUNDLE: ${{ inputs.bundle }}
-        MODE: ${{ inputs.mode }}
       run: |
         case $MODE in
           evaluate|recorded|live) ;;
