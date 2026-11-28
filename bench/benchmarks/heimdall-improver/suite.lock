@@ -1,0 +1,164 @@
+{
+  "suite": "heimdall-improver",
+  "version": "1.1.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "reflect-edit": {
+      "version": "1.1.0",
+      "instruction_sha256": "c366606a06a428adcb36afec1ede2c443bfa4740d17ebb484e02113ed4903915",
+      "repo_tree_sha256": "6f01a8eae28a6eaa28a3b6eeb0dc83ad5a83d198a49f911345f718b7e467e36a",
+      "verifier_sha256": "5a5af710f690b7182feffdf223410adeeebca0a40f0ad904668ec7de854125d4",
+      "controls_sha256": "1c110a75f071fcd986a07dba87169b6eecdc16e0ba51cc1874aed8c13e7b4574",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: edits (edits.json: missing: no file matches edits.json)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-too-many.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: edits (edits.json: missing: no file matches edits.json)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: edits (edits.json: missing: no file matches edits.json)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-28T04:22:02.460366043Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "f5d064fab4afba5e6c120478507bca2d6c0355edbdf21f89910a4138ae7cc95f",
+        "carry_fingerprint": "4e62747dc3756131e4a2e10182d198803dea34e30152c0e5a6c5178cb1baca93"
+      }
+    }
+  },
+  "probes": {},
+  "created_at": "2026-11-28T04:21:57.237565652Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "b1dc0766d6d2cc2578150f0ae9d789c1c752fc456b4d0c680afc1cc56be5b4bf",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "24265af65b0232613b0918cc6949de73369bc91d987b546832d859f311856e03",
+        "output": "a6bf9033c0749c72d45ebab3f905c8a3c2b7c8753cb76d22ba5ac35fbdbf3b21",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "tasks": "b584aabdc8fcfa45d29118c202f21ca0cc106b415f88f90d1f30c91d535e0c7d",
+        "track": "0c47fcc7df96778c6d8a9a6b979a21c0fbbe0ed0b6d097f2fa27cfec9142b974",
+        "verifier": "678eca282e57c35bf020904ba5e4054af23b9d98a591275b83dc459613a7bf26",
+        "version": "e7ad5986cf98f45d2d11f5a65f149e95ecc61246dd2fb2427ab59a9033b66456",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "reflect-edit": {
+        "settings": "b0fa47a58556b272f073b68097ee1396317dd701731a2c0a7bb6e21d0e5eacfb",
+        "fields": {
+          "capabilities": "4909edd8e13a47110aacf23f118fb8023cc32a730c83365d90b98ab4667aff0e",
+          "controls": "1c504360d1e0b32389e790ed3ea5baf83a8ad622d4b5dbd21178ee620eb40210",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "e91b2125da0f9bc44c5f3f1bcddb390266801dcd694b6bebdfe0e28f924e2eab",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "c1b06c3da95e801728c026780832a6340c9296448498e19411e272503ee8a750",
+          "project": "24265af65b0232613b0918cc6949de73369bc91d987b546832d859f311856e03",
+          "provenance": "869350d90ecb68b0f2c69b8206b289ef7d217ddb0f7a4a3ecd46f2fed955ec09",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "ed49f7a837e53c2a4e4b885d3b4109fcade66c4d9f0700b210d13023bc644878",
+          "title": "4ec6e71f5d529a00fd88afe4a74ba331d81c00ad6ba3c584159de7dda8c0b63b",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "e7ad5986cf98f45d2d11f5a65f149e95ecc61246dd2fb2427ab59a9033b66456"
+        },
+        "files": "e2647c1e5202fb48161ab1d178707a476fc6c92b9d12e98c4ab082312d611e46"
+      }
+    },
+    "probes": {}
+  }
+}
