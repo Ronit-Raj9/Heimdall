@@ -322,6 +322,7 @@ var OrgPolicy = map[string]Rule{
 	key("POST", api+"/canaries/{name}/run"):            deny("a canary look runs agents; hosted servers run none (use a runner)"),
 	key("GET", api+"/inbox"):                           org(viewer),
 	key("GET", api+"/inbox/{id}"):                      org(viewer),
+	key("GET", api+"/inbox/{id}/proposal/estimate"):    org(viewer), // lane F1: draft cost, read only
 	key("POST", api+"/inbox/{id}/accept"):              org(member),
 	key("POST", api+"/inbox/{id}/reject"):              org(member),
 	key("POST", api+"/inbox/{id}/snooze"):              org(member),
