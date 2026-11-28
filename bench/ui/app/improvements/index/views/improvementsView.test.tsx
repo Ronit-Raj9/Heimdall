@@ -22,6 +22,10 @@ vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 
 const filled: ImprovementForm = {
 	...newForm(),
+	// The Small size (the form now opens on the trial, tested in newImprovementDialog.uff6.test.tsx).
+	preset: "small",
+	limit: "15",
+	tasks: "",
 	name: "notes-loop",
 	agent: "acme-agent",
 	suite: "hd-harbor-bfcl@1.0.0",

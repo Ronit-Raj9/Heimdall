@@ -21,9 +21,14 @@ import { flushSync } from "react-dom";
 import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 import { EstimateCard, estimateBlock } from "./estimateCard";
-import { PRESETS, type PresetName, PresetPicker } from "./presetPicker";
+import { money } from "./improve.utils";
+import { PRESETS, type PresetName, PresetPicker, TRIAL_LIMITS } from "./presetPicker";
 import "./w45impI18n";
 import "./uf2bI18n";
+import "./uff6I18n";
+
+/** The create body plus the task count of a trial or a custom size (improve.Spec max_tasks). */
+export type ImprovementBody = ImprovementSpecBody & { max_tasks?: number };
 
 /** The improvement name rule the server enforces (improve/spec.go nameRe). */
 export const IMPROVEMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -46,30 +51,38 @@ export interface ImprovementForm {
 	/** Ticked paths of the agent's files map; folders end in "/". */
 	files: string[];
 	preset: PresetName;
-	/** Custom size only. */
+	/** Trial and custom sizes only. */
 	rounds: string;
 	ideas: string;
+	/** Tasks taken from the benchmark: a trial's count, or empty (every task) for a custom size. */
+	tasks: string;
 	/** The whole run's spending limit in dollars, prefilled from the preset. */
 	limit: string;
 }
 
-/** An empty form: the small size, standing instructions ticked. */
+/** An empty form: the smallest size (a trial), standing instructions ticked. */
 export function newForm(): ImprovementForm {
-	const p = PRESETS.small;
+	const p = PRESETS.trial;
 	return {
 		name: "",
 		agent: "",
 		suite: "",
 		instructions: true,
 		files: [],
-		preset: "small",
+		preset: "trial",
 		rounds: String(p.rounds),
 		ideas: String(p.ideas),
+		tasks: String(p.pool),
 		limit: String(p.limit),
 	};
 }
 
-export type ImprovementFormProblem = "name" | "agent" | "suite" | "surface" | "rounds" | "ideas" | "limit";
+export type ImprovementFormProblem = "name" | "agent" | "suite" | "surface" | "rounds" | "ideas" | "tasks" | "limit";
+
+/** True when the size sends its own rounds, ideas and task count. */
+function ownSize(preset: PresetName): boolean {
+	return preset === "custom" || preset === "trial";
+}
 
 /** Every reason the form cannot be sent yet, in field order. */
 export function improvementFormProblems(f: ImprovementForm): ImprovementFormProblem[] {
@@ -78,11 +91,18 @@ export function improvementFormProblems(f: ImprovementForm): ImprovementFormProb
 	if (!f.agent) out.push("agent");
 	if (!f.suite) out.push("suite");
 	if (!f.instructions && f.files.length === 0) out.push("surface");
-	if (f.preset === "custom") {
+	if (ownSize(f.preset)) {
+		const trial = f.preset === "trial";
 		const rounds = Number(f.rounds);
-		if (!Number.isInteger(rounds) || rounds < 1 || rounds > MAX_IMPROVEMENT_ROUNDS) out.push("rounds");
+		const maxRounds = trial ? TRIAL_LIMITS.maxRounds : MAX_IMPROVEMENT_ROUNDS;
+		if (!Number.isInteger(rounds) || rounds < 1 || rounds > maxRounds) out.push("rounds");
 		const ideas = Number(f.ideas);
-		if (!Number.isInteger(ideas) || ideas < 1 || ideas > MAX_IDEAS) out.push("ideas");
+		const maxIdeas = trial ? TRIAL_LIMITS.maxIdeas : MAX_IDEAS;
+		if (!Number.isInteger(ideas) || ideas < 1 || ideas > maxIdeas) out.push("ideas");
+		const tasks = Number(f.tasks);
+		if (trial) {
+			if (!Number.isInteger(tasks) || tasks < TRIAL_LIMITS.minTasks || tasks > TRIAL_LIMITS.maxTasks) out.push("tasks");
+		} else if (f.tasks.trim() !== "" && (!Number.isInteger(tasks) || tasks < 3)) out.push("tasks");
 	}
 	const limit = Number(f.limit);
 	if (f.limit.trim() === "" || !Number.isFinite(limit) || limit <= 0) out.push("limit");
@@ -91,14 +111,14 @@ export function improvementFormProblems(f: ImprovementForm): ImprovementFormProb
 
 /**
  * The POST /improvements body (A1.8): the preset, the default improver task, what may change (a path
- * ending in "/" is a folder, editable.dirs) and the spending limit. Rounds and ideas per round are
- * sent only for a custom size; a named preset fills them on the server.
+ * ending in "/" is a folder, editable.dirs) and the spending limit. Rounds, ideas per round and the
+ * task count are sent only for a trial or a custom size; a named preset fills them on the server.
  */
-export function improvementSpec(f: ImprovementForm): ImprovementSpecBody {
+export function improvementSpec(f: ImprovementForm): ImprovementBody {
 	const files = f.files.filter((p) => !p.endsWith("/"));
 	const dirs = f.files.filter((p) => p.endsWith("/"));
-	const custom = f.preset === "custom";
-	const body: ImprovementSpecBody = {
+	const custom = ownSize(f.preset);
+	const body: ImprovementBody = {
 		kind: "improvement",
 		name: f.name,
 		agent: `agents/${f.agent}.yaml`,
@@ -111,6 +131,7 @@ export function improvementSpec(f: ImprovementForm): ImprovementSpecBody {
 		budget: { total_usd: Number(f.limit) },
 	};
 	if (custom) body.rounds = Number(f.rounds);
+	if (custom && f.tasks.trim() !== "") body.max_tasks = Number(f.tasks);
 	return body;
 }
 
@@ -120,9 +141,44 @@ export function improvementSpec(f: ImprovementForm): ImprovementSpecBody {
  */
 export function createBlock(f: ImprovementForm, estimate: ImprovementEstimate | undefined, estimating: boolean): string | undefined {
 	const first = improvementFormProblems(f)[0];
+	if (first === "tasks") return tasksError(f.preset);
 	if (first) return i18n.t(`reason.${first}`, { ns: "w45imp" });
 	if (estimating) return i18n.t("reason.estimating", { ns: "w45imp" });
 	return estimateBlock(estimate);
+}
+
+/**
+ * What picking a size changes. PAID-23: Custom keeps the limit, rounds and ideas already there (a
+ * trial's task count is cleared, so Custom starts from every task); a named size fills its own.
+ */
+export function presetPatch(form: ImprovementForm, preset: PresetName): Partial<ImprovementForm> {
+	if (preset === "custom") return { preset, tasks: form.preset === "trial" ? "" : form.tasks };
+	const p = PRESETS[preset];
+	return { preset, limit: String(p.limit), rounds: String(p.rounds), ideas: String(p.ideas), tasks: preset === "trial" ? String(p.pool) : "" };
+}
+
+/** Why the task count is refused, for the size picked. */
+function tasksError(preset: PresetName): string {
+	return preset === "trial"
+		? i18n.t("form.tasksError", { ns: "uff6", min: TRIAL_LIMITS.minTasks, max: TRIAL_LIMITS.maxTasks })
+		: i18n.t("form.tasksErrorCustom", { ns: "uff6" });
+}
+
+/**
+ * The confirm text of Start: the estimate range, the runs and the hard stop, then the trial notice
+ * when the size is a trial, then what the run spends.
+ */
+export function improvementConfirmText(f: ImprovementForm, e: ImprovementEstimate | undefined, spends: string): string {
+	const limit = limitUsd(f.limit);
+	const parts: string[] = [];
+	if (e && limit !== null) {
+		parts.push(i18n.t("estimate.confirm", { ns: "uff6", low: money(e.usd.low), high: money(e.usd.high), runs: e.runs.total, limit: money(limit) }));
+	} else if (limit !== null) {
+		parts.push(i18n.t("estimate.confirmUnknown", { ns: "uff6", limit: money(limit) }));
+	}
+	if (f.preset === "trial") parts.push(i18n.t("form.trialNote", { ns: "uff6" }));
+	parts.push(spends);
+	return parts.join(" ");
 }
 
 /**
@@ -254,6 +310,8 @@ export function NewImprovementForm({
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
 	const { t: tu } = useTranslation("uf2b");
+	const { t: t6 } = useTranslation("uff6");
+	const trial = form.preset === "trial";
 	const choices: SuiteChoice[] = suites.map((s) => (typeof s === "string" ? { value: s, label: s } : s));
 	const readyChoices = choices.filter((c) => !c.notReady);
 	const notReadyChoices = choices.filter((c) => c.notReady);
@@ -261,7 +319,7 @@ export function NewImprovementForm({
 	const block = createBlock(form, estimate, estimating);
 	const set = (patch: Partial<ImprovementForm>) => onChange({ ...form, ...patch });
 	const toggle = (path: string, on: boolean) => set({ files: on ? [...form.files, path].sort() : form.files.filter((p) => p !== path) });
-	const pickPreset = (preset: PresetName) => set({ preset, limit: String(PRESETS[preset].limit) });
+	const pickPreset = (preset: PresetName) => set(presetPatch(form, preset));
 	// The name suggested for the last picked agent: replaced on the next pick only while not edited.
 	const suggested = useRef("");
 	const pickAgent = (agent: string) => {
@@ -377,14 +435,31 @@ export function NewImprovementForm({
 				{problems.includes("surface") && <span className="text-chart-error-ink">{tw("form.surfaceNone")}</span>}
 			</fieldset>
 			<PresetPicker value={form.preset} onChange={pickPreset} />
-			{form.preset === "custom" && (
+			{trial && (
+				<p className="text-chart-warning-ink text-xs" data-testid="new-improvement-trial-note">
+					{t6("form.trialNote")}
+				</p>
+			)}
+			{ownSize(form.preset) && (
 				<div className="flex flex-wrap gap-3">
+					<label className="flex w-28 flex-col gap-1 text-sm">
+						<span className="text-foreground font-medium">{t6("form.tasks")}</span>
+						<Input
+							type="number"
+							min={trial ? TRIAL_LIMITS.minTasks : 3}
+							max={trial ? TRIAL_LIMITS.maxTasks : undefined}
+							step={1}
+							value={form.tasks}
+							onChange={(e) => set({ tasks: e.target.value })}
+							data-testid="new-improvement-tasks"
+						/>
+					</label>
 					<label className="flex w-28 flex-col gap-1 text-sm">
 						<span className="text-foreground font-medium">{t("create.rounds")}</span>
 						<Input
 							type="number"
 							min={1}
-							max={MAX_IMPROVEMENT_ROUNDS}
+							max={trial ? TRIAL_LIMITS.maxRounds : MAX_IMPROVEMENT_ROUNDS}
 							step={1}
 							value={form.rounds}
 							onChange={(e) => set({ rounds: e.target.value })}
@@ -396,7 +471,7 @@ export function NewImprovementForm({
 						<Input
 							type="number"
 							min={1}
-							max={MAX_IDEAS}
+							max={trial ? TRIAL_LIMITS.maxIdeas : MAX_IDEAS}
 							step={1}
 							value={form.ideas}
 							onChange={(e) => set({ ideas: e.target.value })}
@@ -405,8 +480,24 @@ export function NewImprovementForm({
 					</label>
 				</div>
 			)}
-			{problems.includes("rounds") && <span className="text-chart-error-ink text-xs">{t("create.roundsError")}</span>}
-			{problems.includes("ideas") && <span className="text-chart-error-ink text-xs">{tw("form.ideasError")}</span>}
+			{ownSize(form.preset) && (
+				<span className="text-muted-foreground text-xs">
+					{trial
+						? t6("form.tasksHelp", { min: TRIAL_LIMITS.minTasks, max: TRIAL_LIMITS.maxTasks })
+						: t6("form.tasksHelpCustom")}
+				</span>
+			)}
+			{problems.includes("tasks") && <span className="text-chart-error-ink text-xs">{tasksError(form.preset)}</span>}
+			{problems.includes("rounds") && (
+				<span className="text-chart-error-ink text-xs">
+					{trial ? t6("form.roundsError", { max: TRIAL_LIMITS.maxRounds }) : t("create.roundsError")}
+				</span>
+			)}
+			{problems.includes("ideas") && (
+				<span className="text-chart-error-ink text-xs">
+					{trial ? t6("form.ideasError", { max: TRIAL_LIMITS.maxIdeas }) : tw("form.ideasError")}
+				</span>
+			)}
 			<label className="flex w-full flex-col gap-1 text-sm sm:w-64">
 				<span className="text-foreground font-medium">{tw("form.limit")}</span>
 				<Input
@@ -441,7 +532,8 @@ export function NewImprovementForm({
 					capUsd={limitUsd(form.limit)}
 					confirm="always"
 					kind="form"
-					confirmText={tu("improve.confirmText")}
+					estimateRuns={estimate?.runs.total}
+					confirmText={improvementConfirmText(form, estimate, tu("improve.confirmText"))}
 					disabled={block !== undefined || busy}
 					isLoading={busy}
 					title={block}

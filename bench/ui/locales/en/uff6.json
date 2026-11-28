@@ -1,0 +1,22 @@
+{
+	"preset": {
+		"trial": "Smallest (try it)",
+		"trialLine": "{{tasks}} tasks, {{rounds}} round, {{ideas}} idea",
+		"line": "{{rounds}} rounds, {{ideas}} ideas each, every ready task"
+	},
+	"form": {
+		"tasks": "Tasks",
+		"tasksHelp": "Tasks taken from the benchmark, {{min}} to {{max}} for a trial.",
+		"tasksHelpCustom": "Leave empty to use every task.",
+		"tasksError": "A trial uses {{min}} to {{max}} tasks.",
+		"tasksErrorCustom": "Use at least 3 tasks, or leave it empty.",
+		"roundsError": "A trial runs 1 to {{max}} rounds.",
+		"ideasError": "A trial tries 1 to {{max}} ideas per round.",
+		"trialNote": "A trial this small can show the loop works. It cannot prove an improvement."
+	},
+	"estimate": {
+		"minutesUnknown": "Estimated cost: ${{low}} to ${{high}}, time not known yet. Hard stop at ${{limit}}.",
+		"confirm": "Estimated ${{low}} to ${{high}}, about {{runs}} runs. It stops at ${{limit}}.",
+		"confirmUnknown": "No estimate yet. It stops at ${{limit}}."
+	}
+}

@@ -2,6 +2,7 @@ import type { ImprovementEstimate } from "@/lib/types/improve";
 import { useTranslation } from "react-i18next";
 import { detectablePoints, minutes, money } from "./improve.utils";
 import "./w45impI18n";
+import "./uff6I18n";
 
 /** The first refusal of an estimate: the reason Create is disabled. undefined when it allows a run. */
 export function estimateBlock(e: ImprovementEstimate | undefined): string | undefined {
@@ -24,6 +25,7 @@ export interface EstimateCardProps {
 /** What the run will cost and can confirm (A2.9), refreshed by the form after each change. */
 export function EstimateCard({ estimate: e, loading, error, model, teacher, waiting }: EstimateCardProps) {
 	const { t } = useTranslation("w45imp");
+	const { t: t6 } = useTranslation("uff6");
 	let body;
 	if (loading) {
 		body = <p className="text-muted-foreground">{t("estimate.loading")}</p>;
@@ -37,14 +39,17 @@ export function EstimateCard({ estimate: e, loading, error, model, teacher, wait
 			<>
 				<p>{t("estimate.splits", { pool: e.pool, practice: e.splits.practice, gate: e.splits.gate, held_out: e.splits.held_out })}</p>
 				<p>{held ? t("estimate.detectable", { held_out_points: held }) : t("estimate.notEnough")}</p>
-				<p>
-					{t("estimate.cost", {
-						low: money(e.usd.low),
-						high: money(e.usd.high),
-						minutes_low: minutes(e.minutes.low),
-						minutes_high: minutes(e.minutes.high),
-						limit: money(e.usd.limit),
-					})}
+				<p data-testid="estimate-cost">
+					{/* PAID-19: no run time known reads as not known, never "about 0 to 0 minutes". */}
+					{e.minutes.high > 0
+						? t("estimate.cost", {
+								low: money(e.usd.low),
+								high: money(e.usd.high),
+								minutes_low: minutes(e.minutes.low),
+								minutes_high: minutes(e.minutes.high),
+								limit: money(e.usd.limit),
+							})
+						: t6("estimate.minutesUnknown", { low: money(e.usd.low), high: money(e.usd.high), limit: money(e.usd.limit) })}
 				</p>
 				{(e.loops ?? 0) >= 2 && e.usd.limit > 0 && (
 					<p data-testid="estimate-study-limit">
