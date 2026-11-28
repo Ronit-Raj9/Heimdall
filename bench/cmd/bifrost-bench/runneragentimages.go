@@ -69,17 +69,28 @@ func (x *sharedAgentImages) ensure(ctx context.Context, m *schemas.Manifest, s *
 	var needs []need
 	seen := map[string]bool{}
 	add := func(slotArm string, am *schemas.ArmManifest) {
-		if am == nil || am.Config.Build == nil || am.Config.Build.BaseArg == "" || !armRunsSuiteImage(m, slotArm, am) {
+		if am == nil || am.Config.Adapter == "scripted" || am.Config.Build == nil || am.Config.Build.Dockerfile == "" || !armRunsSuiteImage(m, slotArm, am) {
 			return
 		}
 		cfg := am.Config
-		cfg.Image = cfg.Build.Tag                                                 // the manifest records the derived per-suite tag; resolve from the build tag, as the planner does
+		perSuite := cfg.Build.BaseArg != ""
+		if perSuite {
+			cfg.Image = cfg.Build.Tag // the manifest records the derived per-suite tag; resolve from the build tag, as the planner does
+		}
 		img, err := engine.ResolveAgentImageIn(&cfg, s, root, suite.LibraryDir()) // library and built-in build files, as the planner resolves them
-		if err != nil || !img.PerSuite || img.Dockerfile == "" || seen[img.Tag] {
+		if err != nil || img.PerSuite != perSuite || img.Dockerfile == "" || img.Tag == "" || seen[img.Tag] {
 			return // an image that cannot be resolved is left to its run, as before
 		}
 		seen[img.Tag] = true
-		needs = append(needs, need{key: am.ConfigHash + "|" + s.ID + "|" + img.Tag + "|" + fileDigest(img.Dockerfile), img: img})
+		key := am.ConfigHash + "|" + s.ID + "|" + img.Tag + "|" + fileDigest(img.Dockerfile)
+		if !perSuite {
+			// M1: a plain build (a template agent's bench/agent-<id>:1) was
+			// built by nobody on the shared worker unless the owner pressed
+			// Prepare container. It depends only on its build inputs, so two
+			// versions that differ in settings share one build.
+			key = "plain|" + img.Tag + "|" + img.Context + "|" + fileDigest(img.Dockerfile)
+		}
+		needs = append(needs, need{key: key, img: img})
 	}
 	arms := make([]string, 0, len(m.Arms))
 	for id := range m.Arms {
