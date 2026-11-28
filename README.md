@@ -31,15 +31,19 @@ Built by Ronit Raj for the Geek Room x Maxim hackathon, Problem Statement 2 (age
 
 ## Screenshots
 
-Screenshots: coming with the next push.
+From the live site, 28 Nov 2026.
 
-<!-- The files below are added with the next push.
-<img src="bench/docs/media/report-card.png" alt="Report card" width="800">
-<img src="bench/docs/media/comparison-verdict.png" alt="Comparison verdict" width="800">
-<img src="bench/docs/media/through-bifrost.png" alt="Through Bifrost panel" width="800">
-<img src="bench/docs/media/fault-results.png" alt="Fault results" width="800">
-<img src="bench/docs/media/improvement-verdict.png" alt="Improvement verdict" width="800">
--->
+A report card: `mini-swe-agent` on `gpt-6-luna`, 10 tasks of SWE-bench Verified, 70% solved (95% range 40% to 90%), $0.07 in all.
+
+<img src="bench/docs/media/report-card.png" alt="Report card of an evaluation: 70% overall on SWE-bench Verified, with range, cost and cost per solved task" width="800">
+
+One run: what the agent said next to what the grader found (142 hidden tests passed), with model turns, tool uses, cost and time.
+
+<img src="bench/docs/media/run-page.png" alt="Run page: the agent's claim beside the grader's result" width="800">
+
+Benchmarks, each with the count of tasks that passed the readiness controls.
+
+<img src="bench/docs/media/benchmarks.png" alt="Benchmarks list with ready task counts" width="800">
 
 ## See it in 30 seconds
 
