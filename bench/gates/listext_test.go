@@ -24,7 +24,7 @@ func TestNormalTestEditsOnSWEBench(t *testing.T) {
 		{"django-11099 one-line list gains a case, item line gains a case", dj, section(dj,
 			hunkAt(237, 237,
 				`             "o'connell", "عبد ال",`,
-				`             "zerowidth​space", "nonbreaking space",`,
+				"             \"zerowidth\u200bspace\", \"nonbreaking\u00a0space\",",
 				`             "en–dash",`,
 				`+            'joe\n',`,
 				`         ]`,

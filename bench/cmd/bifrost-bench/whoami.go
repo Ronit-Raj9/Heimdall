@@ -53,27 +53,27 @@ func whoami(ctx context.Context, server string, out io.Writer) int {
 		fmt.Fprintln(os.Stderr, "Not logged in. Run: heimdall login")
 		return exitInfra
 	}
-	fmt.Fprintf(out, "Server: %s\n", srv)
+	_, _ = fmt.Fprintf(out, "Server: %s\n", srv)
 	if src == "login" {
 		if c, err := connectlocal.LoadCredentials(); err == nil {
 			if sc := c.Servers[srv]; sc != nil {
 				if sc.Org != "" {
-					fmt.Fprintf(out, "Organization: %s\n", sc.Org)
+					_, _ = fmt.Fprintf(out, "Organization: %s\n", sc.Org)
 				}
 				if sc.Role != "" {
-					fmt.Fprintf(out, "Role: %s\n", sc.Role)
+					_, _ = fmt.Fprintf(out, "Role: %s\n", sc.Role)
 				}
 				if len(sc.Scopes) > 0 {
-					fmt.Fprintf(out, "Access: %s\n", strings.Join(sc.Scopes, ", "))
+					_, _ = fmt.Fprintf(out, "Access: %s\n", strings.Join(sc.Scopes, ", "))
 				}
 				if !sc.ExpiresAt.IsZero() {
-					fmt.Fprintf(out, "Token expires: %s\n", sc.ExpiresAt.Local().Format(time.RFC1123))
+					_, _ = fmt.Fprintf(out, "Token expires: %s\n", sc.ExpiresAt.Local().Format(time.RFC1123))
 				}
 			}
 		}
-		fmt.Fprintln(out, "Token from: stored login")
+		_, _ = fmt.Fprintln(out, "Token from: stored login")
 	} else {
-		fmt.Fprintln(out, "Token from: HEIMDALL_TOKEN")
+		_, _ = fmt.Fprintln(out, "Token from: HEIMDALL_TOKEN")
 	}
 	cctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
@@ -81,6 +81,6 @@ func whoami(ctx context.Context, server string, out io.Writer) int {
 		fmt.Fprintf(os.Stderr, "The server refused the token: %v\n", err)
 		return exitInfra
 	}
-	fmt.Fprintln(out, "Token works.")
+	_, _ = fmt.Fprintln(out, "Token works.")
 	return exitOK
 }

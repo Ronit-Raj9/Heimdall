@@ -81,7 +81,7 @@ func firstSkillRead(name string, roots []string, steps []schemas.StepRecord) (in
 // a whole word.
 func skillNamed(summary, name string) bool {
 	for _, f := range strings.FieldsFunc(summary, func(r rune) bool {
-		return !(r == '-' || r == '_' || r == '.' || r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z')
+		return r != '-' && r != '_' && r != '.' && (r < '0' || r > '9') && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z')
 	}) {
 		if f == name {
 			return true

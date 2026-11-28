@@ -28,7 +28,7 @@ func lockOrgBuildSlot(ctx context.Context, paths []string) (func(), int, error) 
 	closeAll := func(keep int) {
 		for i, f := range files {
 			if f != nil && i != keep {
-				f.Close()
+				_ = f.Close()
 			}
 		}
 	}
@@ -51,7 +51,7 @@ func lockOrgBuildSlot(ctx context.Context, paths []string) (func(), int, error) 
 				closeAll(i)
 				return func() {
 					_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-					f.Close()
+					_ = f.Close()
 				}, i, nil
 			}
 			if !errors.Is(err, syscall.EWOULDBLOCK) {
