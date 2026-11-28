@@ -38,7 +38,8 @@ type T = ReturnType<typeof useTranslation<"issuebench">>["t"];
 export function startBody(consent: boolean, provider: string, model: string, budgetUSD?: number) {
 	const p = provider.trim();
 	const m = model.trim();
-	const body: { consent: boolean; provider?: string; model?: string; budget_usd?: number } = p && m ? { consent, provider: p, model: m } : { consent };
+	const body: { consent: boolean; provider?: string; model?: string; budget_usd?: number } =
+		p && m ? { consent, provider: p, model: m } : { consent };
 	if (budgetUSD !== undefined && budgetUSD > 0) body.budget_usd = budgetUSD;
 	return body;
 }
@@ -302,16 +303,16 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 					<span className="text-muted-foreground text-xs" data-testid="issuebench-cost">
 						{t("cost", { cost: data.cost_usd.toFixed(2) })}
 					</span>
-					</div>
-					)}
-					{items.length > 0 && (
-						<div className="text-muted-foreground flex flex-col gap-1 text-sm" data-testid="issuebench-start-info">
-							<p>{t5("what")}</p>
-							<p>{t5("paid", { cap: (cap ?? 1).toFixed(2) })}</p>
-							<p>{t5("time")}</p>
-						</div>
-					)}
-					{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
+				</div>
+			)}
+			{items.length > 0 && (
+				<div className="text-muted-foreground flex flex-col gap-1 text-sm" data-testid="issuebench-start-info">
+					<p>{t5("what")}</p>
+					<p>{t5("paid", { cap: (cap ?? 1).toFixed(2) })}</p>
+					<p>{t5("time")}</p>
+				</div>
+			)}
+			{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
 			{error && (
 				<p className="text-destructive" role="alert">
 					{error}
@@ -460,7 +461,11 @@ export function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueI
 			</td>
 			<td className="py-1 pr-2">
 				{v ? t("tests", { f2p: v.fail_to_pass?.length ?? 0, p2p: v.pass_to_pass?.length ?? 0 }) : ""}
-				{v && <div className="text-muted-foreground text-xs" data-testid={`issuebench-proof-${issue}`}>{t5("proof", { before: t5(proofHolds(v) ? "yes" : "no"), after: t5(proofHolds(v) ? "yes" : "no") })}</div>}
+				{v && (
+					<div className="text-muted-foreground text-xs" data-testid={`issuebench-proof-${issue}`}>
+						{t5("proof", { before: t5(proofHolds(v) ? "yes" : "no"), after: t5(proofHolds(v) ? "yes" : "no") })}
+					</div>
+				)}
 			</td>
 			<td className="py-1">
 				<div className="flex flex-wrap gap-1">
