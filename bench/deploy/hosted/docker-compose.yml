@@ -588,6 +588,7 @@ services:
       HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-4}
       HEIMDALL_SHARED_HOST_SLOTS: ${HEIMDALL_SHARED_HOST_SLOTS:-0}
+      HEIMDALL_ORG_BUILDS: ${HEIMDALL_ORG_BUILDS:-1}
       # From issues builds (job kind issuebench.work): extra egress hosts for
       # the build sandbox, and builds at once on this worker (default 1).
       BENCH_ISSUEBENCH_EGRESS_ALLOW: ${BENCH_ISSUEBENCH_EGRESS_ALLOW:-}
