@@ -1,0 +1,15 @@
+{
+	"doctor": {
+		"title": "Check this server",
+		"run": "Run checks",
+		"rerun": "Run again",
+		"empty": "No checks run yet.",
+		"hosted": "On the shared server, Run health check covers your organization's part. The full check runs on your own server.",
+		"error": "Could not run the checks.",
+		"allPass": "All checks passed.",
+		"failed_one": "{{count}} check failed.",
+		"failed_other": "{{count}} checks failed.",
+		"status": { "pass": "Pass", "fail": "Fail", "warn": "Warning", "skip": "Skipped" },
+		"version": "Server version {{version}}"
+	}
+}

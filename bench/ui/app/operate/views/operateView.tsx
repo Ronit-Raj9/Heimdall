@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import "@/components/canaries/uf7bI18n";
 import { HealthTile, Panel } from "./uxBits";
+import { DoctorPanel } from "@/components/settings/doctorPanel";
 import "@/components/platform/ufintI18n";
 
 /** Drops empty strings so a job gets only the fields the user filled in. */
@@ -265,12 +266,15 @@ function BackupsList() {
 export function OperatePanels({
 	status,
 	backups,
+	doctor,
 	backupCount,
 	onBackupDone,
 	comparisons = [],
 }: {
 	status: OperateStatus;
 	backups?: ReactNode;
+	/** The "Check this server" panel (round 5 L8); a slot so tests render the panels without a store. */
+	doctor?: ReactNode;
 	backupCount?: number;
 	onBackupDone?(): void;
 	/** Finished comparisons the evidence check can be limited to (M7-72); empty: only "All". */
@@ -332,6 +336,7 @@ export function OperatePanels({
 							<JobRunButton kind="gpu.check" params={compact({ suite: gpuSuite })} label={t("health.gpu")} variant="outline" />
 						</div>
 					)}
+					{doctor}
 				</Section>
 
 				{showEvidence && (
@@ -512,6 +517,7 @@ export default function OperateView() {
 					<OperatePanels
 						status={status}
 						backups={status.hosted ? <BackupsList /> : undefined}
+						doctor={<DoctorPanel hosted={status.hosted} />}
 						backupCount={status.hosted ? backupsQuery.data?.backups.length : undefined}
 						onBackupDone={() => dispatch(operateApi.util.invalidateTags(["OperateBackups"]))}
 						comparisons={(experiments.data?.experiments ?? [])
