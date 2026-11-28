@@ -1084,6 +1084,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		}
 		variantNotes = append(variantNotes, "arm "+a.Label+": "+v.Note)
 	}
+	f.Arms = versionArmTags(spec, f.Arms, s.Projects.Root()) // M1: versions with different build inputs never share a tag
 	// Score mode variants (D5, D6): the cache-on copy, the failover arm and
 	// the no-memory control of the one arm, the first of them as arm B so
 	// the paired verdict plans (withVariantArms).
