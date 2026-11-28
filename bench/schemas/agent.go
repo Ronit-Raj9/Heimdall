@@ -98,6 +98,11 @@ type AgentConfig struct {
 	Parser       string     `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
 	AgentVersion string     `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
 	ImageDigest  string     `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
+	// Origin is the built-in agent (or the starter template) this agent was
+	// made from in the web agent builder, e.g. "codex". A benchmark that runs
+	// the agent on each task's own image uses the origin's task-image
+	// variant when the agent has none of its own (handlers/evaltaskimage.go).
+	Origin string `json:"origin,omitempty" yaml:"origin,omitempty"`
 	// Capabilities is what the agent can do (shell, tools, mcp, sessions,
 	// browser, desktop, voice, gpu; capabilities.go). Empty uses the
 	// defaults of its adapter (DefaultCapabilities).

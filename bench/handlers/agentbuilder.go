@@ -264,6 +264,16 @@ var agentTemplates = []AgentTemplate{
 		}},
 }
 
+// origin is what an agent made from t records in its origin field: the
+// shipped agent a repo template copies (its id, e.g. "codex"), else the
+// template id.
+func (t AgentTemplate) origin() string {
+	if stem, ok := strings.CutPrefix(t.source, "repo:"); ok {
+		return stem
+	}
+	return t.ID
+}
+
 func findTemplate(id string) (AgentTemplate, bool) {
 	for _, t := range agentTemplates {
 		if t.ID == id {
@@ -378,6 +388,7 @@ func renderAgentTemplate(t AgentTemplate, req AgentFromTemplateRequest) ([]rende
 	doc, err := editAgentYAML(doc, func(root *yaml.Node) {
 		abSetPath(root, model, "model")
 		abSetPath(root, provider, "gateway", "provider")
+		abSetPath(root, t.origin(), "origin")
 		if t.multiEnv {
 			rewriteModelEnv(root, provider)
 		}

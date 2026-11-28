@@ -550,6 +550,7 @@ class AgentConfig(_AgentConfigRequired, total=False):
     mcp: Optional[AgentMCP]
     memory: Optional[AgentMemory]
     openai: Optional[OpenAIAgent]
+    origin: str
     parser: str
     permissions_files: List[str]
     pull: Optional[PullAgent]
