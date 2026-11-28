@@ -19,4 +19,4 @@ tasks/edit-config/solution/reference.sh 755 5d6f1ba6538d8551e4b752d3b1c4082a4d3d
 tasks/edit-config/task.yaml 644 c2d965e63d9ca5d06621d2efeb3336889b3ad760d649723f5ed96fb646c1311b
 tasks/edit-config/verifier/requirements.md 644 009bdcfdfd4718ec56e5ed0ddaf095830e2252dee96239b42e1488a5be6e6574
 tasks/edit-config/verifier/tests/checks.py 644 474d2b25d9b5b87eaf640b6b0b78111c8854000af65bae029a09e302adc434d4
-tasks/edit-config/verifier/tests/verify.py 644 d14ae4dfef563bb3a3f800aa94d5f6f868061ee8fd4b4f1330716c4550a1df12
+tasks/edit-config/verifier/tests/verify.py 644 b15276a14a9aed38e171e6d97befc023a90fe1985df0a98b7fbe7950f4481dc3

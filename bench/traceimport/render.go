@@ -140,6 +140,13 @@ func callScript(header string, s *Session, tmpl, service string, replay, keepGoi
 		fmt.Fprintf(&b, "# %d. %s %s\n", c.Seq, oneLine(c.Name, 80), outcome)
 		fmt.Fprintf(&b, "tool(%s, json.loads(%s))\n", quote(c.Name), quote(string(c.Arguments)))
 	}
+	if keepGoing && strings.TrimSpace(s.FinalAnswer) != "" {
+		// The recorded agent's final answer is this control's final
+		// message, so a check on the answer can fail the recorded failure.
+		b.WriteString("# The recorded final answer.\n")
+		fmt.Fprintf(&b, "print(%s)\nPY\n", quote(s.FinalAnswer))
+		return []byte(b.String())
+	}
 	b.WriteString("print(\"calls done\")\nPY\n")
 	return []byte(b.String())
 }

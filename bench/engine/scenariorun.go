@@ -449,7 +449,19 @@ func (p *Pipeline) exportArtifacts(ctx context.Context, st *runState) {
 // covers it.
 func (p *Pipeline) finishAnswer(ctx context.Context, st *runState) error {
 	rc := st.rc
-	if rc.Task == nil || utils.OutputKind(rc.Suite, rc.Task) != schemas.OutputAnswer {
+	if rc.Task == nil {
+		return nil
+	}
+	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputState {
+		// A state task's verifier may also test what the agent said (a
+		// check with "answer": true): its final message goes to answer.txt.
+		// evidence.Answer stays unset, so nothing else changes.
+		if c := st.ev.Claim; c != nil && strings.TrimSpace(c.Text) != "" {
+			return p.writeFile(ctx, st, FileAnswer, []byte(c.Text))
+		}
+		return nil
+	}
+	if utils.OutputKind(rc.Suite, rc.Task) != schemas.OutputAnswer {
 		return nil
 	}
 	a := st.ev.Answer

@@ -135,7 +135,7 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 			rec.Admitted = false
 		}
 	}
-	a.deps.Logger.Info("task admission", "suite", a.s.ID, "task", a.t.ID, "version", a.t.Version, "admitted", rec.Admitted, "controls", kind)
+	a.deps.Logger.Info("task admission controls ran; the guards decide admission", "suite", a.s.ID, "task", a.t.ID, "version", a.t.Version, "controls_passed", rec.Admitted, "controls", kind)
 	return rec, nil
 }
 
@@ -370,6 +370,11 @@ func (a *admitter) exportControl(ctx context.Context, rc *schemas.RunContext, re
 				return diff, "state output: export failed: " + f.Service + "/" + f.ID + ": " + f.Error, "", nil
 			}
 		}
+		// The control's stdout is its final message, as a run's would be:
+		// a check with "answer": true reads it, so a false claim fails.
+		if err := writeStdoutAnswer(rc.Dir, res); err != nil {
+			return nil, "", "", err
+		}
 	case schemas.OutputArtifact:
 		ae, ok := a.deps.Env.(schemas.ArtifactEnvironment)
 		if !ok {
@@ -402,6 +407,22 @@ func (a *admitter) exportControl(ctx context.Context, rc *schemas.RunContext, re
 		}
 	}
 	return diff, "", "", nil
+}
+
+// writeStdoutAnswer writes a state task control's stdout to answer.txt, the
+// final answer the verifier of a state task may read. A control without
+// stdout gets an empty answer.
+func writeStdoutAnswer(dir string, res *schemas.ExecResult) error {
+	text := ""
+	if res != nil && res.StdoutPath != "" {
+		if b, err := os.ReadFile(res.StdoutPath); err == nil {
+			text = strings.TrimSpace(string(b))
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, answerFile), []byte(text), 0o644); err != nil {
+		return fmt.Errorf("write answer: %w", err)
+	}
+	return nil
 }
 
 // controlEnv is the environment a control gets, as a run's agent would:
