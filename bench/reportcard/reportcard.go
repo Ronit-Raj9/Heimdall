@@ -612,9 +612,16 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		slots = append(slots, s)
 	}
 	slices.Sort(slots)
+	// The failover arm (provider failover option) is planned work too: its
+	// runs count in "n of m runs done", so the count matches the estimate's
+	// runs (arms x conditions x trials x tasks). It is not graded here.
+	fbID := schemas.VariantArmID(m, failover.ArmLabelSuffix)
+	if _, shown := armLabel[fbID]; shown {
+		fbID = ""
+	}
 	for _, sl := range m.Slots {
 		_, mapped := armLabel[sl.Arm]
-		if sl.Counted && sl.Arm != "compat" && (mapped || (freshID != "" && sl.Arm == freshID)) {
+		if sl.Counted && sl.Arm != "compat" && (mapped || (freshID != "" && sl.Arm == freshID) || (fbID != "" && sl.Arm == fbID)) {
 			cr.planned++
 		}
 	}
@@ -636,6 +643,10 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		r := runs[i]
 		label, ok := armLabel[r.Slot.Arm]
 		isFresh := freshID != "" && r.Slot.Arm == freshID
+		if fbID != "" && r.Slot.Arm == fbID {
+			cr.done++
+			continue
+		}
 		if (!ok && !isFresh) || r.Slot.Arm == "compat" {
 			continue
 		}

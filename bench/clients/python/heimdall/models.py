@@ -4758,6 +4758,7 @@ class EvalCostRange(_EvalCostRangeRequired, total=False):
 
 
 class _EvalEstimateRequired(TypedDict):
+    arms: int
     budget: EvalBudget
     est_cost_usd: EvalCostRange
     est_minutes: EvalMinutesRange
@@ -4766,6 +4767,7 @@ class _EvalEstimateRequired(TypedDict):
     power: EvalPower
     runs: int
     slots: EvalSlots
+    trials: int
     unpriced_models: List[str]
 
 

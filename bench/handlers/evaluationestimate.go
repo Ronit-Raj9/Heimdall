@@ -196,6 +196,12 @@ type EvalEstimate struct {
 	// ImageWait is the wait before the first run while task images are
 	// built; absent when no benchmark brings its own task images.
 	ImageWait *ImageWait `json:"image_wait,omitempty"`
+	// Arms and Trials are the factors of Runs besides each benchmark's
+	// tasks and conditions: Runs is the sum over benchmarks of
+	// Arms x len(Conditions) x Trials x Tasks (plus stream replays). Arms
+	// counts the arms the launch adds (failover, cache-on, no-memory).
+	Arms   int `json:"arms"`
+	Trials int `json:"trials"`
 }
 
 // EvalSlots is how many runs of the evaluation go at once: Concurrency per
@@ -430,6 +436,7 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 		}()
 	}
 	wg.Wait()
+	out.Arms, out.Trials = req.armCount(), req.Trials
 	allKnown, timeKnown, ran := true, true, false
 	var agentLow, agentHigh float64
 	running := 0

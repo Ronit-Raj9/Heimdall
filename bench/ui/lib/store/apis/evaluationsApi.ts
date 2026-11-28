@@ -342,6 +342,9 @@ export interface Range {
 export interface EstimateBenchmark {
 	benchmark: string;
 	runs?: number;
+	/** Tasks picked and conditions run (clean plus each fault it can take): runs = arms x conditions x trials x tasks. */
+	tasks?: number;
+	conditions?: string[];
 	est_cost_usd?: Range & { known?: boolean; reason?: string };
 	est_minutes?: Range & { known?: boolean };
 	skipped?: string;
@@ -387,6 +390,9 @@ export interface Estimate {
 	estimate_basis?: string;
 	/** The wait before the first run while task images are built; absent when no benchmark brings its own. */
 	image_wait?: TaskImageWait | null;
+	/** Factors of runs besides each benchmark's tasks and conditions: arms (with the ones the launch adds, like the failover arm) and trials. */
+	arms?: number;
+	trials?: number;
 }
 
 export type BudgetFit = "fits" | "may_exceed" | "exceeds" | "unknown";
