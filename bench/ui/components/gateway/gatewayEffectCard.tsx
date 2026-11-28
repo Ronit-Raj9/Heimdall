@@ -201,7 +201,7 @@ export function GatewayEffectView({
 					</p>
 				)}
 				<p className="text-muted-foreground text-xs">{t("line.fromNoDate", { source: effect.source.text })}</p>
-				{noVerdict && (
+				{noVerdict && effect.state !== "unknown" && (
 					<p className="text-muted-foreground text-sm" data-testid="gateway-effect-no-verdict">
 						{l("diff.noVerdict", { reason: l(`diff.${noVerdict}`) })}
 					</p>
