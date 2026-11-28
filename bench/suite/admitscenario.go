@@ -86,6 +86,9 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 	for i, m := range paths.mutants {
 		controls = append(controls, mk(fmt.Sprintf("mutant_%d", i+1), GotFail, m))
 	}
+	for _, v := range a.t.Controls.Variants {
+		controls = append(controls, a.variantControl(kind, v))
+	}
 	abstain := false
 	if kind == utils.ControlAnswer {
 		spec, err := a.answerSpec()
@@ -137,6 +140,41 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 	}
 	a.deps.Logger.Info("task admission controls ran; the guards decide admission", "suite", a.s.ID, "task", a.t.ID, "version", a.t.Version, "controls_passed", rec.Admitted, "controls", kind)
 	return rec, nil
+}
+
+// variantControl is a named wrong-agent control: its file must sit under
+// the task's controls/ folder (so the lock's controls hash covers it) and
+// it must fail.
+func (a *admitter) variantControl(kind string, v schemas.TaskVariant) control {
+	name := "variant_" + v.Name
+	if !validVariantName(v.Name) {
+		return control{name: name, want: GotFail, detail: "variant name must be lowercase letters, digits, - or _"}
+	}
+	clean := filepath.ToSlash(filepath.Clean(v.File))
+	if !strings.HasPrefix(clean, "controls/") {
+		return control{name: name, want: GotFail, detail: "variant " + v.Name + ": file must be under controls/"}
+	}
+	abs, err := resolveIn(a.t.Dir, v.File)
+	if err != nil {
+		return control{name: name, want: GotFail, detail: err.Error()}
+	}
+	c, err := a.fileControl(kind, name, GotFail, abs)
+	if err != nil {
+		return control{name: name, want: GotFail, detail: err.Error()}
+	}
+	return c
+}
+
+func validVariantName(n string) bool {
+	if n == "" || len(n) > 64 {
+		return false
+	}
+	for _, r := range n {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // scriptArgv runs a control script in the agent's place.

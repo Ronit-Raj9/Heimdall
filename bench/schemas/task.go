@@ -160,6 +160,18 @@ type TaskControls struct {
 	// reference itself): at admission it must pass the original tests
 	// (TaskVerifier.OriginalTests) three times and fail the task's tests.
 	Honest string `json:"honest,omitempty" yaml:"honest"`
+	// Variants are named wrong-agent controls (a scripted behaviour or a
+	// fixed answer under controls/): admission runs each in the agent's
+	// place, it must fail, and it is reported as variant_<name>.
+	Variants []TaskVariant `json:"variants,omitempty" yaml:"variants"`
+}
+
+// TaskVariant is one named wrong-agent control of a task.
+type TaskVariant struct {
+	Name string `json:"name" yaml:"name"`
+	File string `json:"file" yaml:"file"`
+	// WhatItDoesWrong says in one sentence how this agent goes wrong.
+	WhatItDoesWrong string `json:"what_it_does_wrong,omitempty" yaml:"what_it_does_wrong"`
 }
 
 // TaskTimeouts are per-task limits. The agent wall time actually used is the

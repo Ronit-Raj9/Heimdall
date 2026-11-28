@@ -188,6 +188,20 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 	for i, m := range paths.mutants {
 		checks = append(checks, a.gradePatch(ctx, fmt.Sprintf("mutant_%d", i+1), m, GotFail))
 	}
+	for _, v := range t.Controls.Variants {
+		name := "variant_" + v.Name
+		abs, err := resolveIn(t.Dir, v.File)
+		switch {
+		case !validVariantName(v.Name):
+			checks = append(checks, failed(schemas.AdmissionCheck{Name: name, Want: GotFail}, errors.New("variant name must be lowercase letters, digits, - or _")))
+		case !strings.HasPrefix(filepath.ToSlash(filepath.Clean(v.File)), "controls/"):
+			checks = append(checks, failed(schemas.AdmissionCheck{Name: name, Want: GotFail}, errors.New("variant "+v.Name+": file must be under controls/")))
+		case err != nil:
+			checks = append(checks, failed(schemas.AdmissionCheck{Name: name, Want: GotFail}, err))
+		default:
+			checks = append(checks, a.gradePatch(ctx, name, abs, GotFail))
+		}
+	}
 	checks = append(checks, a.exploit(ctx, paths.exploit))
 	if t.Notes.Stale != "" && !honestIsRef {
 		staleCheck, err := a.staleNotes(ctx, paths.reference)
