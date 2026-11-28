@@ -238,3 +238,43 @@ func TestPlainRefusalText(t *testing.T) {
 		}
 	}
 }
+
+// TestPlanRefusalEndsRun is PB1-11: a worker whose own plan of the setup
+// fails a check (a prompt cache arm on a provider with no prompt_cache
+// block) refuses it; the run ends at once with the reason, even while
+// another worker has not refused it, instead of staying "Running".
+func TestPlanRefusalEndsRun(t *testing.T) {
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+	events := make(chan Event, 256)
+	rw.run.Events = events
+	done := rw.attach(t)
+	registerDirect(t, rw.c, "w1", BenchVersion)
+	registerDirect(t, rw.c, "w2", BenchVersion)
+	const reason = `plan the experiment locally: plan e1: gateway.bifrost: arm B: prompt_cache: provider openai has no prompt_cache block in Bifrost, so x-bf-prompt-cache-auto-inject is ignored`
+	refuseOnce(t, rw.c, "w1", reason)
+	if n := len(rw.r.queue.pending); n != 0 {
+		t.Fatalf("%d slots still queued after a permanent plan refusal", n)
+	}
+	failed := map[string]bool{}
+	logged := false
+	for _, ev := range drainEvents(events) {
+		if ev.Kind != EventError {
+			continue
+		}
+		if strings.Contains(ev.Message, "the worker cannot run this setup, and trying again would fail the same way: "+reason) {
+			failed[ev.SlotID] = true
+		}
+		if strings.HasPrefix(ev.Message, "worker w1 cannot run this setup: ") {
+			logged = true
+		}
+	}
+	if len(failed) != len(rw.m.Slots) || !logged {
+		t.Fatalf("slots failed with the reason: %d of %d, log line %v", len(failed), len(rw.m.Slots), logged)
+	}
+	if sum := done(); sum.Errors != len(rw.m.Slots) {
+		t.Fatalf("summary errors %d, want %d", sum.Errors, len(rw.m.Slots))
+	}
+	if PlanRefusalPermanent("plan the experiment locally: load suite x: not found") || PlanRefusalPermanent("plan the experiment locally: dial tcp: i/o timeout") || !RefusalPermanent(reason) {
+		t.Fatal("PlanRefusalPermanent classes wrong")
+	}
+}

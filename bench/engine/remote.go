@@ -750,8 +750,8 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 		refusal = c.noteRefusalLocked(l, req.Reason) // X3 (remoterefuse.go)
 	}
 	c.endLocked(l, why)
-	allRefused := req.Refuse && (BuildFailurePermanent(req.Reason) || c.everyWorkerRefusedLocked(l.r)) // PH4-2: a build that cannot succeed ends the run now
-	l.r.remoteOps.Add(1)                                                                               // detach waits for the bookkeeping below (2-A-07)
+	allRefused := req.Refuse && (RefusalPermanent(req.Reason) || c.everyWorkerRefusedLocked(l.r)) // PH4-2, PB1-11: a build or plan that cannot succeed ends the run now
+	l.r.remoteOps.Add(1)                                                                          // detach waits for the bookkeeping below (2-A-07)
 	c.mu.Unlock()
 	defer l.r.remoteOps.Done()
 	c.remove(l.archive)

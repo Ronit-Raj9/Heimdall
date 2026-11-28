@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -234,6 +235,57 @@ func TestGatewayCollect(t *testing.T) {
 		}
 		if strings.Contains(string(raw), "raw-secret") {
 			t.Fatalf("raw gateway rows contain an unredacted secret: %s", raw)
+		}
+	})
+
+	t.Run("tool call row whose redaction breaks JSON is kept, run does not fail", func(t *testing.T) {
+		// PD4-1: an MCP tool result text "token=abc" followed by another key.
+		// The text redaction ate the closing quote and json.Marshal failed with
+		// "invalid character 't' after object key:value pair".
+		rc := testRC(t)
+		rc.Key = &schemas.RunKey{ID: "vk_1"}
+		toolRow := `{"messages":[{"role":"tool","content":[{"text":"token=abc123","type":"text"}]}],"api_key":"raw-secret"}`
+		notJSON := `true{"truncated":`
+		log := &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{
+			{ID: "req1", Kind: "message", Status: "success", Raw: []byte(toolRow)},
+			{ID: "req2", Kind: "message", Status: "success", Raw: []byte(notJSON)},
+			{ID: "req3", Kind: "message", Status: "success"},
+		}}
+		if err := newGatewaySource(Deps{Gateway: &fakeGateway{log: log}}).Collect(context.Background(), rc, &schemas.Evidence{}); err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(rc.Dir, rawRequestsFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+		if len(lines) != 3 {
+			t.Fatalf("%d rows, want 3: %s", len(lines), b)
+		}
+		var rows []rawGatewayRow
+		for _, l := range lines {
+			var r rawGatewayRow
+			if err := json.Unmarshal([]byte(l), &r); err != nil {
+				t.Fatalf("row %s: %v", l, err)
+			}
+			rows = append(rows, r)
+		}
+		var obj map[string]any
+		if err := json.Unmarshal(rows[0].RawDetail, &obj); err != nil || rows[0].RawNote != "" {
+			t.Fatalf("tool row not kept as JSON object: %s note %q", rows[0].RawDetail, rows[0].RawNote)
+		}
+		if strings.Contains(string(b), "abc123") || strings.Contains(string(b), "raw-secret") {
+			t.Fatalf("secret left in raw rows: %s", b)
+		}
+		if !strings.Contains(string(rows[0].RawDetail), `"type":"text"`) {
+			t.Fatalf("tool row lost fields: %s", rows[0].RawDetail)
+		}
+		var str string
+		if err := json.Unmarshal(rows[1].RawDetail, &str); err != nil || str != notJSON || rows[1].RawNote != noteRawNotJSON || !rows[1].RawAvailable {
+			t.Fatalf("invalid body row = %+v", rows[1])
+		}
+		if rows[2].RawAvailable || string(rows[2].RawDetail) != "null" {
+			t.Fatalf("empty body row = %+v", rows[2])
 		}
 	})
 

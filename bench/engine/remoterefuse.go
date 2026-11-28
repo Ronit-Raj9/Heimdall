@@ -61,6 +61,13 @@ func (c *Coordinator) noteRefusalLocked(l *remoteLease, reason string) string {
 		f.n = maxRefusals
 		return fmt.Sprintf("worker %s could not build the agent image: %s. This fails the same way on every try, so the run stops.", l.worker, plain)
 	}
+	if PlanRefusalPermanent(reason) {
+		// PB1-11: the worker's own plan of this setup fails a check (a gateway
+		// feature its Bifrost does not support); it fails the same way on
+		// every try, so the run ends now with the reason.
+		f.n = maxRefusals
+		return fmt.Sprintf("worker %s cannot run this setup: %s. This fails the same way on every try, so the run stops.", l.worker, plain)
+	}
 	if buildFailure(reason) {
 		return fmt.Sprintf("worker %s could not take this run: %s. Retrying the image build (%d of %d) in 1 minute.", l.worker, plain, f.n+1, maxRefusals)
 	}
@@ -99,6 +106,8 @@ func (r *schedRun) failRefused(reason string) {
 	err := fmt.Errorf("every worker refused this run %d times: %s", maxRefusals, PlainRefusal(reason))
 	if BuildFailurePermanent(reason) {
 		err = fmt.Errorf("the agent image cannot be built, and trying again would fail the same way: %s", PlainRefusal(reason))
+	} else if PlanRefusalPermanent(reason) {
+		err = fmt.Errorf("the worker cannot run this setup, and trying again would fail the same way: %s", PlainRefusal(reason))
 	}
 	for _, slot := range r.queue.takeAll() {
 		r.slotError(slot, err)
@@ -167,4 +176,31 @@ func BuildFailurePermanent(reason string) bool {
 		}
 	}
 	return true
+}
+
+// planRefusalPrefix starts a worker refusal whose own plan of the
+// experiment failed (remoteworker.go check).
+const planRefusalPrefix = "plan the experiment locally: "
+
+// PlanRefusalPermanent reports whether a refusal is the worker's plan of the
+// experiment failing a check, after the worker refreshed its project: the
+// same manifest fails the same check on the next try (PB1-11, a prompt cache
+// arm on a provider with no prompt_cache block). A benchmark missing from the
+// project copy or a passing error (network, busy host) is not permanent.
+func PlanRefusalPermanent(reason string) bool {
+	if !strings.HasPrefix(reason, planRefusalPrefix) || strings.Contains(reason, "not found") {
+		return false
+	}
+	for _, m := range transientBuildMarks {
+		if strings.Contains(reason, m) {
+			return false
+		}
+	}
+	return true
+}
+
+// RefusalPermanent reports whether a refusal ends the run at once instead
+// of being offered again (PH4-2, PB1-11).
+func RefusalPermanent(reason string) bool {
+	return BuildFailurePermanent(reason) || PlanRefusalPermanent(reason)
 }
