@@ -90,6 +90,14 @@ type DockerPolicy struct {
 	// Publish publishes a platform image to Registry and returns its digest;
 	// nil keeps today's refusal.
 	Publish PublishFunc
+	// OwnImage finds an image the org built in its own namespace on the
+	// host (the suite base image an org build tagged org-<id>/bench/...).
+	// With PublishOwn, an org build FROM that name starts from it, copied
+	// to the registry under the org's namespace and pinned by digest; nil
+	// keeps such a base refused.
+	OwnImage OwnImageFunc
+	// PublishOwn copies an image of OwnImage to Registry.
+	PublishOwn PublishOwnFunc
 	// PlatformPin reports whether ref is a plain name of the platform's own
 	// images (imagepub.PlatformImages of the read-only checkout and library)
 	// and the pinned reference the platform's own suite lock gives for it
@@ -103,8 +111,9 @@ type DockerPolicy struct {
 	// Builder directly.
 	Session []string
 
-	mu   sync.Mutex
-	tags map[string]string // tag as the org wrote it -> namespaced tag
+	mu      sync.Mutex
+	tags    map[string]string // tag as the org wrote it -> namespaced tag
+	ownPins map[string]string // registry ref of an own image (by image ID) -> digest
 }
 
 // SetApproved replaces the approved image list.
@@ -433,7 +442,7 @@ func (p *DockerPolicy) rewriteBuild(ctx context.Context, rest []string) ([]strin
 			dockerfile = f.value
 		}
 	}
-	if inside(dockerfile, p.Trusted) && inside(ctxDir, p.Trusted) && !inside(dockerfile, p.Untrusted) && !inside(ctxDir, p.Untrusted) {
+	if inside(dockerfile, p.Trusted) && inside(ctxDir, p.Trusted) && !inside(dockerfile, p.Untrusted) && !inside(ctxDir, p.Untrusted) && !p.startsFromOwn(ctx, dockerfile, flags) {
 		// Platform content (the runner's checkout, the built-in library):
 		// built on the host daemon as before.
 		return append([]string{"build"}, rest...), nil
@@ -445,15 +454,7 @@ func (p *DockerPolicy) rewriteBuild(ctx context.Context, rest []string) ([]strin
 	if len(p.Session) == 0 {
 		out = []string{"buildx", "build", "--builder", p.Builder, "--load"}
 	}
-	buildArgs := map[string]string{}
-	for _, f := range flags {
-		if f.name == "--build-arg" {
-			if k, v, ok := strings.Cut(f.value, "="); ok {
-				buildArgs[k] = v
-			}
-		}
-	}
-	bases, err := p.baseContexts(ctx, dockerfile, buildArgs)
+	bases, err := p.baseContexts(ctx, dockerfile, buildArgsOf(flags))
 	if err != nil {
 		return nil, err
 	}

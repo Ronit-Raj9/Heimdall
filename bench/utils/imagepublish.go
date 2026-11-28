@@ -23,3 +23,13 @@ func ImageProgress(ctx context.Context) func(msg string) {
 	}
 	return func(string) {}
 }
+
+// OwnImageFunc returns the host image ID of ref, an image in the org's own
+// namespace (org-<id>/...) on the shared host, and whether it exists. The
+// shared runner inspects the host without a policy.
+type OwnImageFunc func(ctx context.Context, ref string) (id string, ok bool, err error)
+
+// PublishOwnFunc copies the org's own host image hostRef to the shared
+// worker's registry as pushRef (in the same org namespace) and returns the
+// pushed digest.
+type PublishOwnFunc func(ctx context.Context, hostRef, pushRef string) (digest string, err error)

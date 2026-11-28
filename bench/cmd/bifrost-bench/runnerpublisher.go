@@ -6,6 +6,7 @@ package main
 // HEIMDALL_IMAGE_PUBLISHER_URL is set.
 
 import (
+	"context"
 	"os"
 	"strings"
 	"sync"
@@ -49,5 +50,31 @@ func init() {
 		}
 		actual, _ := publisherClients.LoadOrStore(h, c)
 		return actual.(*imagepub.Client).Ensure
+	}
+}
+
+// sharedOwnPublisher returns the publisher's copy of an org's own image to
+// the registry (its suite base image, for an agent built on it), or nil
+// without a publisher.
+func sharedOwnPublisher(h *sharedHost) utils.PublishOwnFunc {
+	if sharedImagePublisher(h) == nil {
+		return nil
+	}
+	c, ok := publisherClients.Load(h)
+	if !ok {
+		return nil
+	}
+	return c.(*imagepub.Client).PublishOwn
+}
+
+// hostOwnImage returns the host lookup of an org's own image: only a ref in
+// its namespace prefix is inspected, on the host daemon without a policy.
+func hostOwnImage(bin, prefix string) utils.OwnImageFunc {
+	return func(ctx context.Context, ref string) (string, bool, error) {
+		if prefix == "" || !strings.HasPrefix(ref, prefix) {
+			return "", false, nil
+		}
+		id, ok, err := utils.Docker{Binary: bin}.ImageID(ctx, ref)
+		return id, ok, err
 	}
 }

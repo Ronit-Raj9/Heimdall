@@ -50,9 +50,9 @@ func TestBaseContextsPublishesMissingBase(t *testing.T) {
 func TestBaseContextsPublishErrorIsPlain(t *testing.T) {
 	org := writeDockerfile(t, "FROM bench/task-a:1\n")
 	for reason, want := range map[string]string{
-		"not a platform image": "it is not an image the platform built",
-		"not on this host":     "it is not on the shared worker",
-		"connection refused":   "the image store did not answer",
+		"not a platform image": "it is neither a platform image nor an image this organization has built, so build the benchmark's base image first (run its readiness check) or pick an agent that starts from a platform image",
+		"not on this host":     "it is not on the shared worker; try again in a few minutes, and tell the server admin if it keeps failing",
+		"connection refused":   "the image store did not answer; try again in a few minutes, and tell the server admin if it keeps failing",
 	} {
 		p := &DockerPolicy{
 			TagPrefix: "org-a/", Builder: "b", Registry: "registry:5000",
@@ -64,7 +64,7 @@ func TestBaseContextsPublishErrorIsPlain(t *testing.T) {
 		if !errors.Is(err, ErrPolicy) || !errors.As(err, &nr) || nr.Ref != "bench/task-a:1" {
 			t.Fatalf("%s: err %v", reason, err)
 		}
-		text := "The container image this run starts from is not ready on the shared worker, and Heimdall could not prepare it: " + want + ". Try again in a few minutes. If it keeps failing, tell the server admin."
+		text := "The container image this run starts from could not be prepared on the shared worker: " + want + "."
 		if err.Error() != text {
 			t.Fatalf("%s: text %q", reason, err.Error())
 		}

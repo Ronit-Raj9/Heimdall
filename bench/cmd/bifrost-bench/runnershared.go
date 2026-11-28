@@ -429,6 +429,9 @@ func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string
 	}
 	if h.registry != "" {
 		p.Publish = sharedImagePublisher(h)
+		if p.PublishOwn = sharedOwnPublisher(h); p.PublishOwn != nil && h.base != nil {
+			p.OwnImage = hostOwnImage(h.base.docker.Binary, p.TagPrefix)
+		}
 		host, client, cred := h.registry, h.regClient, h.regCred
 		if h.manifest != "" {
 			p.Pinned = utils.ManifestPins(h.manifest)

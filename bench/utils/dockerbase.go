@@ -212,6 +212,9 @@ func RegistryHas(ctx context.Context, client *http.Client, host, ref string, cre
 // digestRe is a sha256 image digest.
 var digestRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
+// imageIDHex is the hex of a sha256 image ID.
+var imageIDHex = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
 // ErrNotPinned marks a base image the registry manifest has no digest for.
 var ErrNotPinned = errors.New("not in the registry manifest")
 
@@ -271,6 +274,19 @@ func (p *DockerPolicy) baseContexts(ctx context.Context, dockerfile string, buil
 	}
 	var out []string
 	for _, ref := range bases {
+		if err := p.foreignBase(ref); err != nil {
+			return nil, err
+		}
+		if !p.platformName(ref) {
+			own, err := p.ownContext(ctx, ref)
+			if err != nil {
+				return nil, err
+			}
+			if own != "" {
+				out = append(out, "--build-context", own)
+				continue
+			}
+		}
 		if !p.fromRegistry(ref) {
 			continue
 		}
@@ -306,21 +322,164 @@ func (p *DockerPolicy) baseContexts(ctx context.Context, dockerfile string, buil
 	return out, nil
 }
 
+// foreignBase refuses a base image of another organization: its namespace
+// on the host (org-<other>/...), or any org namespace in the shared
+// registry addressed directly (registry:5000/org-...), which only this
+// policy's own resolution may name.
+func (p *DockerPolicy) foreignBase(ref string) error {
+	if p.TagPrefix == "" {
+		return nil
+	}
+	if err := p.foreign(ref); err != nil {
+		return err
+	}
+	if p.Registry != "" {
+		if rest, ok := strings.CutPrefix(ref, p.Registry+"/"); ok && strings.HasPrefix(rest, "org-") {
+			return fmt.Errorf("%w: base image %s names the shared registry directly; write the image name as the benchmark does", ErrPolicy, ref)
+		}
+	}
+	return nil
+}
+
+// platformName reports whether ref is a name of the platform's images: a
+// plain name of the checkout and library, or one the registry manifest
+// pins. Such a name always means the platform image, never an org's own
+// image of the same name.
+func (p *DockerPolicy) platformName(ref string) bool {
+	if p.PlatformPin != nil {
+		if _, ok := p.PlatformPin(ref); ok {
+			return true
+		}
+	}
+	if p.Pinned != nil {
+		if _, err := p.Pinned(ref); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// ownRef is the host tag of ref in the org's own namespace, or "" when ref
+// cannot name an org image (a registry host, a digest, no namespace).
+func (p *DockerPolicy) ownRef(ref string) string {
+	if p.TagPrefix == "" || p.OwnImage == nil || p.PublishOwn == nil || p.Registry == "" || hasRegistryHost(ref) || strings.Contains(ref, "@") {
+		return ""
+	}
+	if strings.HasPrefix(ref, p.TagPrefix) {
+		return ref
+	}
+	if ns, ok := p.Namespaced(ref); ok {
+		return ns
+	}
+	return p.TagPrefix + ref
+}
+
+// ownContext returns the named build context "ref=docker-image://..." that
+// points base image ref at the org's own image of that name, copied to the
+// registry under the org's namespace with the host image ID as its tag and
+// pinned by the pushed digest, or "" when the org has no image of that name.
+// The ID tag is unguessable to anyone without the same image, and the
+// policy only ever resolves names inside its own TagPrefix.
+func (p *DockerPolicy) ownContext(ctx context.Context, ref string) (string, error) {
+	host := p.ownRef(ref)
+	if host == "" {
+		return "", nil
+	}
+	id, ok, err := p.OwnImage(ctx, host)
+	if err != nil {
+		return "", &ImageNotReady{Ref: ref, Own: true, Plain: "the shared worker could not look it up; try again in a few minutes, and tell the server admin if it keeps failing", Reason: err}
+	}
+	if !ok {
+		return "", nil
+	}
+	hexID := strings.TrimPrefix(id, "sha256:")
+	if !imageIDHex.MatchString(hexID) {
+		return "", &ImageNotReady{Ref: ref, Own: true, Plain: "the shared worker could not read its image ID; build the benchmark's base image again", Reason: fmt.Errorf("image ID %q", id)}
+	}
+	repo, _ := splitRef(host)
+	push := repo + ":" + hexID
+	p.mu.Lock()
+	digest := p.ownPins[push]
+	p.mu.Unlock()
+	if digest == "" {
+		ImageProgress(ctx)("Preparing the container image " + ref)
+		digest, err = p.PublishOwn(ctx, host, push)
+		if err != nil {
+			return "", &ImageNotReady{Ref: ref, Own: true, Plain: "it could not be copied to the shared worker's image store; try again in a few minutes, and tell the server admin if it keeps failing", Reason: err}
+		}
+		if !digestRe.MatchString(digest) {
+			return "", &ImageNotReady{Ref: ref, Own: true, Plain: "the image store returned no digest for it; tell the server admin", Reason: fmt.Errorf("digest %q", digest)}
+		}
+		p.mu.Lock()
+		if p.ownPins == nil {
+			p.ownPins = map[string]string{}
+		}
+		p.ownPins[push] = digest
+		p.mu.Unlock()
+	}
+	return ref + "=docker-image://" + p.Registry + "/" + push + "@" + digest, nil
+}
+
+// startsFromOwn reports whether a platform Dockerfile (a built-in agent on
+// a benchmark's base) starts from an image the org built. Such a build runs
+// on the isolated builder like the org's own, never on the host daemon,
+// since the org wrote what is in its base.
+func (p *DockerPolicy) startsFromOwn(ctx context.Context, dockerfile string, flags []buildFlag) bool {
+	if p.TagPrefix == "" {
+		return false
+	}
+	bases, err := DockerfileBases(dockerfile, buildArgsOf(flags))
+	if err != nil {
+		return false
+	}
+	for _, ref := range bases {
+		if strings.HasPrefix(ref, "org-") {
+			return true
+		}
+		if p.platformName(ref) {
+			continue
+		}
+		if host := p.ownRef(ref); host != "" {
+			if _, ok, err := p.OwnImage(ctx, host); err != nil || ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// buildArgsOf maps the --build-arg flags of a build, name to value.
+func buildArgsOf(flags []buildFlag) map[string]string {
+	out := map[string]string{}
+	for _, f := range flags {
+		if f.name == "--build-arg" {
+			if k, v, ok := strings.Cut(f.value, "="); ok {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
+
 // ImageNotReady is the refusal of an org build whose base image is not in
 // the shared worker's registry and could not be published there. It wraps
 // ErrPolicy, so the lease treats it as a permanent refusal, while its text
 // stays plain and never shows the internal image tag (wave 4, F1.1).
 type ImageNotReady struct {
 	Ref    string
-	Plain  string // the plain reason the publish failed; empty without a publisher
+	Own    bool   // Ref is the org's own image (its name is the org's, so the text shows it)
+	Plain  string // the plain reason and what to do; empty without a publisher
 	Reason error
 }
 
 func (e *ImageNotReady) Error() string {
+	if e.Own {
+		return "The base image " + e.Ref + " that this benchmark built could not be used on the shared worker: " + e.Plain + "."
+	}
 	if errors.Is(e.Reason, ErrNotPinned) && e.Plain == "" {
 		return "The container image this run starts from is not in the shared worker's image store yet. Tell the server admin to copy it there."
 	}
-	return "The container image this run starts from is not ready on the shared worker, and Heimdall could not prepare it: " + e.Plain + ". Try again in a few minutes. If it keeps failing, tell the server admin."
+	return "The container image this run starts from could not be prepared on the shared worker: " + e.Plain + "."
 }
 
 func (e *ImageNotReady) Unwrap() []error { return []error{ErrPolicy, e.Reason} }
@@ -331,9 +490,9 @@ func (e *ImageNotReady) Unwrap() []error { return []error{ErrPolicy, e.Reason} }
 func publishReason(err error) string {
 	switch msg := err.Error(); {
 	case strings.Contains(msg, "not a platform image"):
-		return "it is not an image the platform built"
+		return "it is neither a platform image nor an image this organization has built, so build the benchmark's base image first (run its readiness check) or pick an agent that starts from a platform image"
 	case strings.Contains(msg, "not on this host"):
-		return "it is not on the shared worker"
+		return "it is not on the shared worker; try again in a few minutes, and tell the server admin if it keeps failing"
 	}
-	return "the image store did not answer"
+	return "the image store did not answer; try again in a few minutes, and tell the server admin if it keeps failing"
 }
