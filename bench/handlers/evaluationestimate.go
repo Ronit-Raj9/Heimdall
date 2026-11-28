@@ -722,9 +722,9 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 	}
 	return &schemas.Experiment{
 		Name: "estimate-" + st.ID, Suite: suite, Base: base, Arms: arms,
-		Primary:      schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
-		Guards:       []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
-		Conditions:   cs,
+		Primary:    schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
+		Guards:     []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
+		Conditions: cs,
 		// No budget: the cost forecast does not depend on it (estimateBudget
 		// compares the cap after), so every budget shares one forecast and the
 		// wizard's steps show one range for the same setup.
