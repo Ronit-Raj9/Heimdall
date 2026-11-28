@@ -84,7 +84,7 @@ func TestBuiltin(t *testing.T) {
 			seen[g.GetName()] = true
 			wantVersion := "1.0.0"
 			if testEditGates[g.GetName()] {
-				wantVersion = "1.1.0"
+				wantVersion = "1.2.0"
 			}
 			if g.GetName() == ModelFidelity { // fix wave 3, N200: dated snapshots are the same model
 				wantVersion = "1.1.0"

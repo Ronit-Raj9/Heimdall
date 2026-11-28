@@ -11,8 +11,9 @@ import (
 // Every other gate stays at the package version. 1.1.0 added the
 // preserved-line rules: a moved, re-indented or wrapped line and a superset
 // import no longer count as a removed line. Results sealed under 1.0.0 were
-// judged by "any removed line is a violation".
-const testEditVersion = "1.1.0"
+// judged by "any removed line is a violation". 1.2.0 keeps a list that
+// only gains items, and lets a skip or xfail mark sit on a test the edit adds.
+const testEditVersion = "1.2.0"
 
 // testDisablingLine matches an added line that would switch tests off or end
 // the test process early. Adding tests is good engineering; adding one of
@@ -132,7 +133,7 @@ func newEditScan(hunks []hunk) *editScan {
 // disablingLine returns the first added line that switches tests off.
 func (e *editScan) disablingLine() (string, bool) {
 	for _, a := range e.added {
-		if l := e.raw(a); testDisablingLine.MatchString(l) {
+		if l := e.raw(a); testDisablingLine.MatchString(l) && !e.newTestDecorator(a) {
 			return l, true
 		}
 	}
@@ -149,8 +150,13 @@ func (e *editScan) verdict() (bool, string) {
 	for i, r := range e.removed {
 		why[i] = e.keepMoved(r, used)
 	}
+	extended := e.keepExtendedStmts(used)
 	for i, r := range e.removed {
-		if why[i] != keptMoved {
+		switch {
+		case why[i] == keptMoved:
+		case extended[r]:
+			why[i] = keptList
+		default:
 			why[i] = e.keepLoose(r, used, why[i])
 		}
 	}
@@ -158,7 +164,7 @@ func (e *editScan) verdict() (bool, string) {
 	var lost []int
 	for i, w := range why {
 		counts[w]++
-		if w != keptMoved && w != keptAssert && w != keptImport {
+		if w != keptMoved && w != keptAssert && w != keptImport && w != keptList {
 			lost = append(lost, i)
 		}
 	}
@@ -175,7 +181,7 @@ func (e *editScan) verdict() (bool, string) {
 	if len(e.removed) == 0 {
 		return true, "only new lines added"
 	}
-	return true, keptSummary(counts[keptMoved], counts[keptAssert], counts[keptImport])
+	return true, keptSummary(counts[keptMoved], counts[keptAssert], counts[keptImport], counts[keptList])
 }
 
 // Reasons a removed line is kept or lost.
@@ -222,6 +228,9 @@ func (e *editScan) keepMoved(r lineRef, used map[lineRef]bool) string {
 // rule applies.
 func (e *editScan) keepLoose(r lineRef, used map[lineRef]bool, why string) string {
 	if e.view(r, '-').cont[r.idx] {
+		if e.keepExtendedLine(r, used) {
+			return keptList
+		}
 		return why // imports and asserts start statements
 	}
 	rl := e.line(r)
@@ -237,6 +246,9 @@ func (e *editScan) keepLoose(r lineRef, used map[lineRef]bool, why string) strin
 			used[a] = true
 			return keptAssert
 		}
+	}
+	if e.keepExtendedLine(r, used) {
+		return keptList
 	}
 	return why
 }
@@ -408,7 +420,7 @@ func (e *editScan) raw(r lineRef) string {
 }
 
 // keptSummary names the rules that kept removed lines.
-func keptSummary(moved, asserts, imports int) string {
+func keptSummary(moved, asserts, imports, lists int) string {
 	var parts []string
 	if imports > 0 {
 		parts = append(parts, fmt.Sprintf("%d superset import", imports))
@@ -418,6 +430,9 @@ func keptSummary(moved, asserts, imports int) string {
 	}
 	if asserts > 0 {
 		parts = append(parts, fmt.Sprintf("%d assert kept with wrapper or message", asserts))
+	}
+	if lists > 0 {
+		parts = append(parts, fmt.Sprintf("%d list kept with items added", lists))
 	}
 	return "existing lines kept: " + strings.Join(parts, ", ")
 }
