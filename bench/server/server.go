@@ -195,7 +195,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.Middleware, common []lib.Middleware) *handlers.ExperimentsHandler {
 	mode := cfg.Server.Mode
 	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write).WithArchiveRoot(cfg.Root). // UI fix wave D1: archive sidecar
-		WithTaskImageAgents(deps.Suites, deps.Services.Agents, projectsRoot(deps.Services)) // PAID-8: the wizard's task-image rule
+																			WithTaskImageAgents(deps.Suites, deps.Services.Agents, projectsRoot(deps.Services)) // PAID-8: the wizard's task-image rule
 	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...)            // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewDrainHandler(mode, cfg.Auth.IsHosted(), write, deps.Logger).RegisterRoutes(r, common...) // Z11 drain mode: GET/POST /admin/drain (handlers/drain.go)
