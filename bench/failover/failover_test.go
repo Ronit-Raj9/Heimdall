@@ -150,7 +150,8 @@ func TestBuildRunReport(t *testing.T) {
 		t.Fatalf("cost %v", r.CostChangeUSD)
 	}
 	fail := BuildRunReport(RunCell{Runs: 1, Successes: 1}, RunCell{Runs: 2, FallbackRuns: 1}, RunCell{Runs: 1})
-	if fail.FailoverWorked || !strings.Contains(fail.Summary, "still failed there") {
+	// The fallback was reached and the task failed: failover worked, task failed.
+	if !fail.FailoverWorked || !fail.FallbackReached || fail.SuccessWith || !strings.Contains(fail.Summary, "task still failed") {
 		t.Fatalf("report %+v", fail)
 	}
 }

@@ -29,8 +29,12 @@ type Report struct {
 	Failover   ArmStats `json:"failover"`
 	NoFailover ArmStats `json:"no_failover"`
 	// FailoverWorked: Bifrost answered from a fallback during the outage
-	// and the failover arm had no calls left failing.
+	// and the failover arm had no calls left failing (call reports), or a
+	// fallback answered in the outage arm (run reports). It says nothing
+	// about the task: SuccessWith does.
 	FailoverWorked bool `json:"failover_worked"`
+	// FallbackReached: at least one call or run was answered by a fallback.
+	FallbackReached bool `json:"fallback_reached"`
 	// ExtraLatencyMS is the failover arm's mean call latency minus the
 	// clean arm's: the price of trying the dead primary first.
 	ExtraLatencyMS float64 `json:"extra_latency_ms"`
@@ -78,7 +82,8 @@ func Summarise(r ArmResult) ArmStats {
 // BuildReport compares the three arms.
 func BuildReport(clean, with, without ArmResult) Report {
 	r := Report{Clean: Summarise(clean), Failover: Summarise(with), NoFailover: Summarise(without)}
-	r.FailoverWorked = r.Failover.FallbackServed > 0 && r.Failover.Errors == 0
+	r.FallbackReached = r.Failover.FallbackServed > 0
+	r.FailoverWorked = r.FallbackReached && r.Failover.Errors == 0
 	r.ExtraLatencyMS = r.Failover.MeanLatencyMS - r.Clean.MeanLatencyMS
 	if r.Clean.CostKnown && r.Failover.CostKnown {
 		d := r.Failover.CostUSD - r.Clean.CostUSD
@@ -99,8 +104,6 @@ func summary(r Report) string {
 		return "Failover worked: Bifrost moved calls to the fallback model and the task passed."
 	case r.FailoverWorked:
 		return "Failover worked at the gateway, but the task still failed on the fallback model."
-	case r.PerRun && r.Failover.FallbackServed > 0:
-		return "Failover reached the fallback model, but the task still failed there."
 	case r.Failover.FallbackServed > 0:
 		return "Failover was partial: some calls reached the fallback model, others still failed."
 	default:
@@ -137,10 +140,13 @@ func (c RunCell) stats() ArmStats {
 
 // BuildRunReport compares the three arms from their graded runs. Latency is
 // the mean wall time per run and cost the mean cost per run; failover worked
-// when a fallback answered in the outage arm and the task passed there.
+// when a fallback answered in the outage arm; the task result is separate.
 func BuildRunReport(clean, with, without RunCell) Report {
 	r := Report{Clean: clean.stats(), Failover: with.stats(), NoFailover: without.stats(), PerRun: true}
-	r.FailoverWorked = r.Failover.FallbackServed > 0 && r.Failover.TaskSuccess
+	// A failed task is not a failed failover: a run's errors are task
+	// failures, so reaching the fallback is the gateway's whole job here.
+	r.FallbackReached = r.Failover.FallbackServed > 0
+	r.FailoverWorked = r.FallbackReached
 	if r.Clean.MeanLatencyMS > 0 && r.Failover.MeanLatencyMS > 0 {
 		r.ExtraLatencyMS = r.Failover.MeanLatencyMS - r.Clean.MeanLatencyMS
 	}
