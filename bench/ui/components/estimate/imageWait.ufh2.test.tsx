@@ -7,7 +7,7 @@ import { render } from "@/lib/testing/render";
 import type { Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { describe, expect, it } from "vitest";
 
-const t = (k: string, o?: Record<string, unknown>) => String(i18n.t(k, o));
+const t = (k: string, o?: Record<string, unknown>) => String(i18n.t(k as never, o as never));
 const wait = { images: 5, minutes: 2, total_minutes: 7, up_to: true };
 const plan = { errors: [], warnings: [], est_usd: { state: "observed", v: 0.4 }, est_wall_s: { state: "observed", v: 600 } } as unknown as ExperimentPlan;
 

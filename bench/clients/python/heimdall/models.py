@@ -6532,6 +6532,7 @@ class ImageSpec(_ImageSpecRequired, total=False):
 class ImageWait(TypedDict):
     images: int
     minutes: int
+    total_minutes: int
     up_to: bool
 
 

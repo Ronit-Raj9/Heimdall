@@ -35,7 +35,7 @@ export function needState(need: GwNeed | undefined, tasksIn: number, trialsIn: n
 	}
 	trials = Math.max(1, trials);
 	const runs = need.runs_per_setup ?? 0;
-	const line = need.default_trials === 1
+	const line: { key: "need.runs" | "need.runsOneTrial"; o: Record<string, number> } = need.default_trials === 1
 		? { key: "need.runsOneTrial" as const, o: { runs, tasks: need.default_tasks } }
 		: { key: "need.runs" as const, o: { runs, tasks: need.default_tasks, trials: need.default_trials } };
 	if (need.paired_tasks && tasks < need.paired_tasks) return { status: "impossible", line, problem: { key: "need.tooFewTasks", o: { tasks, need: need.paired_tasks } } };
