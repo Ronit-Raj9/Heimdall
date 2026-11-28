@@ -74,6 +74,11 @@ type launcher struct {
 	statesAt time.Time
 
 	problems runProblemCache // N151: newest run problem per experiment (runproblem.go)
+
+	// services are the org's request-path services (deps.Services, set by
+	// applyServiceHooks), so jobs read runs, suites and agents the way the
+	// org's handlers do (K4). nil until the org's deps are built.
+	services *handlers.Services
 }
 
 // liveRun is one running experiment's event fan-out.

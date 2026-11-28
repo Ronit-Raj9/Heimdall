@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -25,7 +26,10 @@ func init() {
 	registerJobKind(jobKindSpec{
 		Kind: kindValidityScan, Local: true, Hosted: true,
 		Opts: []jobs.KindOption{jobs.WithMaxAttempts(1)},
-		Validate: func(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+		Validate: func(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
+			if env.Services.Index == nil || env.App == nil || env.App.reg == nil { // refused at start, not after (K4)
+				return nil, "", fmt.Errorf("%w: This server cannot read runs, so the scan cannot run.", jobs.ErrInvalidParams)
+			}
 			var p struct{}
 			if len(raw) > 0 && string(raw) != "null" {
 				if err := strictParams(raw, &p); err != nil {
