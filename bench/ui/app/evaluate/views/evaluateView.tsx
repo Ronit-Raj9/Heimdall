@@ -437,13 +437,19 @@ function EvaluateWizard() {
 	const step = (wanted > reach ? reach : wanted) as EvaluateStep;
 	// Load the benchmark list while the person picks an agent, so step 3 opens filled (M3-35).
 	useGetSuitesLightQuery();
-	const go = (s: EvaluateStep) => void setStepRaw(s === 1 ? null : s, { history: stepHistoryMode("user") });
-	// Resume (M3-44): opened without ?step= on a draft that has an agent, the wizard goes to the furthest step it can.
+	// Resume (M3-44): opened without ?step= on a draft that has an agent, the wizard goes to the furthest step it can,
+	// but never past step 2 before benchmarks are picked (resumeStep). A step the person chose ends the resume, so a
+	// late agents list never moves them on (round 6 N1: Next on step 1 landed on step 3).
 	const resumed = useRef(false);
+	const go = (s: EvaluateStep) => {
+		resumed.current = true;
+		void setStepRaw(s === 1 ? null : s, { history: stepHistoryMode("user") });
+	};
 	useEffect(() => {
 		if (resumed.current || linkPending || agentsQ.isLoading) return;
 		resumed.current = true;
-		if (stepRaw == null && draft.agent && reach > 1) void setStepRaw(reach, { history: stepHistoryMode("fix") });
+		const to = resumeStep(draft, reach);
+		if (stepRaw == null && draft.agent && to > 1) void setStepRaw(to, { history: stepHistoryMode("fix") });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [linkPending, agentsQ.isLoading]);
 	const [launchSlot, setLaunchSlot] = useState<HTMLElement | null>(null);
@@ -607,6 +613,16 @@ function EvaluateWizard() {
  * previous step; a correction of the URL (link params, the step clamp) replaces, so Back never lands on a step
  * the page refuses.
  */
+/**
+ * The step a resumed draft opens on (M3-44, round 6 N1). Step 2's default mode ("score") counts as ready, so the
+ * furthest reachable step skips "What to learn" for a draft that only has an agent: such a draft opens on step 2.
+ * A draft with benchmarks or a pack has been past step 2 and opens on the furthest step.
+ */
+export function resumeStep(d: Pick<EvaluateDraft, "benchmarks" | "pack">, reach: EvaluateStep): EvaluateStep {
+	if (reach > 2 && d.benchmarks.length === 0 && !d.pack) return 2;
+	return reach;
+}
+
 export function stepHistoryMode(reason: "user" | "fix"): "push" | "replace" {
 	return reason === "user" ? "push" : "replace";
 }
