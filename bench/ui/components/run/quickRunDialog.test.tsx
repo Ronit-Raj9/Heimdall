@@ -45,7 +45,7 @@ describe("quick test dialog (fix wave 3, N229)", () => {
 		const html = render(
 			<QuickRunDialog suite="s" agent="a" model={{ provider: "openai", model: "m" }} tasks={5} onClose={() => undefined} />,
 		);
-		expect(html).toContain("About 10 runs, up to $5.");
+		expect(html).toContain("About 10 runs, up to $1.");
 		expect(html.indexOf('data-testid="quickrun-estimate"')).toBeLessThan(html.indexOf('data-testid="quickrun-submit"'));
 		const toggle = html.match(/<input[^>]*data-testid="quickrun-compare-toggle"[^>]*>/)?.[0] ?? "";
 		expect(toggle).not.toContain("checked");
@@ -67,7 +67,7 @@ describe("QuickRunDialog paid start (Q-31, Q-32)", () => {
 		const start = html.match(/<button[^>]*data-testid="quickrun-submit"[^>]*>/)?.[0] ?? "";
 		expect(start).toContain('data-paid="true"');
 		expect(start).toContain('type="button"');
-		expect(html).toContain("up to $5.00");
+		expect(html).toContain("up to $1.00");
 		expect(html).toContain('data-heimdall-dialog="open"');
 	});
 });

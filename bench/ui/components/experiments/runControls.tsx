@@ -26,6 +26,7 @@ import {
 } from "@/lib/store/apis/runControlApi";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/runControl";
+import "@/components/experiments/ufn2I18n";
 import "@/app/compare/views/w4m3I18n";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Pause, ShieldCheck, ShieldAlert } from "lucide-react";
@@ -297,7 +298,11 @@ function LiveSettings({ c, live }: { c: RunControls; live: boolean }) {
 	const [held, setHeld] = useState<string[]>(c.state.paused_models ?? []);
 	const [reason, setReason] = useState("");
 	useEffect(() => setHeld(c.state.paused_models ?? []), [c.state.paused_models]);
+	const { t: tn } = useTranslation("ufn2");
 	const { patch: body, dirty, invalid } = controlsPatch(c, conc, cap, held, reason);
+	// A new cap on a live comparison commits money: it asks first, naming the old and the new amount (N2, PQ1-2).
+	const capChange = live && body.total_usd !== undefined;
+	const capFrom = effectiveCap(c) > 0 ? formatCost(effectiveCap(c)) : t("panel.capNone");
 	const submit = () => {
 		void patch({
 			expId: c.exp_id,
@@ -373,9 +378,22 @@ function LiveSettings({ c, live }: { c: RunControls; live: boolean }) {
 					<Input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} data-testid="live-reason" />
 				</label>
 				<div className="flex items-center gap-2 sm:col-span-2">
-					<Button type="submit" size="sm" disabled={!dirty || invalid} isLoading={state.isLoading} dataTestId="live-apply">
-						{t("panel.save")}
-					</Button>
+					{capChange ? (
+						<ConfirmButton
+							label={t("panel.save")}
+							question={tn("cap.confirm", { from: capFrom, to: formatCost(body.total_usd ?? 0) })}
+							confirmLabel={tn("cap.yes")}
+							cancelLabel={tn("cap.keep", { from: capFrom })}
+							onConfirm={submit}
+							disabled={!dirty || invalid}
+							isLoading={state.isLoading}
+							testId="live-apply"
+						/>
+					) : (
+						<Button type="submit" size="sm" disabled={!dirty || invalid} isLoading={state.isLoading} dataTestId="live-apply">
+							{t("panel.save")}
+						</Button>
+					)}
 					{state.isSuccess && !dirty && <span className="text-muted-foreground text-xs">{t("panel.saved")}</span>}
 				</div>
 				{state.error && <ErrorLine error={state.error} title={t("panel.saveError")} testId="live-settings-error" />}

@@ -57,6 +57,20 @@ export function buildQuickRunRequest(v: {
 }
 
 /** The limits of the three numbers (the server refuses more than 50 tasks), fix wave 3, N229. */
+/**
+ * The agent's own model as a picker value (N2, PQ1-9): "provider/model" from the agent's config; null when the config
+ * names no provider, so the picker stays empty instead of showing another model.
+ */
+export function agentModelRef(model: string | undefined): ModelRef | null {
+	const m = (model ?? "").trim();
+	const i = m.indexOf("/");
+	if (i <= 0 || i === m.length - 1) return null;
+	return { provider: m.slice(0, i), model: m.slice(i + 1) };
+}
+
+/** The first cap the form shows (N2): one dollar, the one-click limit, not five; the estimate line names the runs. */
+export const QUICKRUN_DEFAULT_BUDGET = "1";
+
 export const QUICKRUN_LIMITS = { tasks: [1, 50], trials: [1, 5], budget: [0.5, 100] } as const;
 
 /** What is wrong with each typed number, as a quickrun key; an empty object when all three are fine. */
@@ -109,7 +123,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 	const [compareV, setCompare] = useState<ModelRef | null>(null);
 	const [tasksT, setTasks] = useState(String(tasks ?? QUICKRUN_DEFAULT_TASKS));
 	const [trialsT, setTrials] = useState("1");
-	const [budgetT, setBudget] = useState("5");
+	const [budgetT, setBudget] = useState(QUICKRUN_DEFAULT_BUDGET);
 	const [missingModel, setMissingModel] = useState(false);
 	const problems = quickRunProblems({ tasks: tasksT, trials: trialsT, budget: budgetT });
 	const invalid = Object.keys(problems).length > 0;
@@ -221,7 +235,13 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 						{!agent && (
 							<label className="block space-y-1 text-sm">
 								<span className="font-medium">{t("agent")}</span>
-								<select className={fieldCls} value={agentV} onChange={(e) => setAgent(e.target.value)} data-testid="quickrun-agent">
+								<select className={fieldCls} value={agentV} onChange={(e) => {
+										setAgent(e.target.value);
+										// The agent's own model, unless the caller fixed one (N2).
+										if (!model) setModel(agentModelRef(agentList.find((a) => a.path === e.target.value)?.model));
+									}}
+									data-testid="quickrun-agent"
+								>
 									<option value="">{t("agentDefault")}</option>
 									{agentList.map((a) => (
 										<option key={a.path} value={a.path}>
