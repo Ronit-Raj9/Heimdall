@@ -2,6 +2,7 @@ import type { EstimatePreset, EvaluationEstimate, EvaluationSpec } from "@/lib/s
 import i18n from "i18next";
 import "./gw14I18n";
 import { cn } from "@/lib/utils";
+import { costRangeText } from "./evaluate.utils";
 
 /**
  * Evaluation size presets (G4-16) and worker slots (G4-04) for wizard step 4. The presets come
@@ -9,15 +10,18 @@ import { cn } from "@/lib/utils";
  * and smallest detectable change of this exact setup. Picking one sets tasks, trials and faults.
  */
 
-function money(n: number): string {
-	return n < 10 ? `$${n.toFixed(2)}` : `$${Math.round(n)}`;
+/** "$1.20 to $4.00" or "price not known" (costRangeText, as step 4 and step 5 write it). */
+export function presetCost(p: Pick<EstimatePreset, "est_cost_usd">): string {
+	return costRangeText(p.est_cost_usd) ?? "price not known";
 }
 
-/** "$1.20 to $4" or "price not known". */
-export function presetCost(p: Pick<EstimatePreset, "est_cost_usd">): string {
-	const c = p.est_cost_usd;
-	if (!c?.known) return "price not known";
-	return c.low === c.high ? money(c.low) : `${money(c.low)} to ${money(c.high)}`;
+/** The estimate of the draft itself: the card of the draft's size shows it, so it never disagrees with step 5. */
+export type DraftEstimate = Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">;
+
+/** The preset with the draft's own runs, cost and time when it is the draft's size and the draft's estimate is in. */
+export function presetFacts(p: EstimatePreset, on: boolean, draft: DraftEstimate | undefined): EstimatePreset {
+	if (!on || !draft) return p;
+	return { ...p, runs: draft.runs, est_cost_usd: draft.est_cost_usd, est_minutes: draft.est_minutes };
 }
 
 /** "about 20 to 45 min", "about 2 h" or "time not known". */
@@ -51,10 +55,13 @@ export function PresetPicker({
 	spec,
 	presets,
 	onPick,
+	draft,
 }: {
 	spec: EvaluationSpec;
 	presets: readonly EstimatePreset[];
 	onPick(p: EstimatePreset): void;
+	/** The draft's own estimate (the request step 5 sends too). */
+	draft?: DraftEstimate;
 }) {
 	if (presets.length === 0) return null;
 	const current = matchingPreset(spec, presets);
@@ -63,15 +70,16 @@ export function PresetPicker({
 			<h3 className="text-base font-semibold">Size</h3>
 			<p className="text-muted-foreground text-sm">Start small for a first answer; more tasks see smaller changes.</p>
 			<div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Size">
-				{presets.map((p) => {
-					const on = current === p.id;
+				{presets.map((preset) => {
+					const on = current === preset.id;
+					const p = presetFacts(preset, on, draft);
 					return (
 						<button
 							key={p.id}
 							type="button"
 							role="radio"
 							aria-checked={on}
-							onClick={() => onPick(p)}
+							onClick={() => onPick(preset)}
 							className={cn(
 								"flex flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-colors",
 								on ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-muted",

@@ -10,7 +10,7 @@ export function render(node: ReactNode, session: SessionInfo = LOCAL_SESSION): s
 
 /** A settled RTK Query hook result with data. */
 export function okQuery<T>(data: T) {
-	return { data, error: undefined, isLoading: false, isFetching: false, isError: false, isSuccess: true, refetch: () => undefined };
+	return { data, currentData: data, error: undefined, isLoading: false, isFetching: false, isError: false, isSuccess: true, refetch: () => undefined };
 }
 
 /** An RTK Query hook result still loading. */

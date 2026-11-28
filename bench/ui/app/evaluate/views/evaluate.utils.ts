@@ -3,6 +3,18 @@ import { isBaselineAgent } from "@/app/agents/views/agentDisplay";
 import { pickableAgents } from "@/components/agents/agentPicker";
 import { BASELINE_AGENTS, type Capability, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
 import type { AgentSummary } from "@/lib/types/bench";
+import { formatUsd } from "@/lib/money";
+
+/**
+ * The one way the wizard writes an estimated cost range ("$0.04 to $0.10"), on the size cards, in step 4 and
+ * in step 5, so the same estimate never reads as two numbers. Undefined when the cost is not known.
+ */
+export function costRangeText(c: { low: number; high: number; known?: boolean } | undefined): string | undefined {
+	if (!c?.known) return undefined;
+	const a = formatUsd(c.low);
+	const b = formatUsd(c.high);
+	return a === b ? a : `${a} to ${b}`;
+}
 
 export const EVALUATE_STEPS = [1, 2, 3, 4, 5] as const;
 export type EvaluateStep = (typeof EVALUATE_STEPS)[number];

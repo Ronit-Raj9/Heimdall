@@ -18,7 +18,7 @@ import { armHasModel, useOwnModelAgents } from "./ownModel";
 import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
 import { useDebounced } from "./useDebounced";
 import { evalArmLabel } from "@/lib/evaluationArms";
-import { isRoughEstimate } from "./evaluate.utils";
+import { costRangeText, isRoughEstimate } from "./evaluate.utils";
 import { KeyLines, useArmKeys } from "./armKeys";
 import "@/lib/types/evaluateI18n";
 import { MODEL_SWITCH_MAX, MODEL_SWITCH_MIN, MODEL_SWITCH_MODE } from "./evaluateDraft";
@@ -221,10 +221,6 @@ export function concurrencyNote(slots: EstimateSlots | undefined, value: number)
 	return fw05("slots.overWorker", { n: String(n), value: String(value) });
 }
 
-function money(n: number): string {
-	return n < 10 ? `$${n.toFixed(2)}` : `$${Math.round(n)}`;
-}
-
 function range(low: number, high: number, fmt: (n: number) => string): string {
 	// Compared after formatting, so 0.6 to 1.4 minutes reads "1 min", never "1 to 1" (N211).
 	const a = fmt(low);
@@ -243,7 +239,7 @@ export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd"
 } {
 	const runs = Number(e.runs) || 0;
 	const c = e.est_cost_usd;
-	const cost = c?.known ? range(c.low, c.high, money) : c?.reason ? `price not known (${c.reason})` : "price not known";
+	const cost = c?.known ? (costRangeText(c) ?? "") : c?.reason ? `price not known (${c.reason})` : "price not known";
 	const m = e.est_minutes;
 	const minutesKnown = m && m.known !== false && (m.low > 0 || m.high > 0);
 	const minutes = minutesKnown ? `${range(m.low, m.high, (n) => String(Math.max(1, Math.round(n))))} min` : "time not known";
@@ -636,7 +632,8 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 
 			<PresetPicker
 				spec={spec}
-				presets={presets.data?.presets ?? []}
+				presets={presets.currentData?.presets ?? []}
+				draft={estimate.currentData}
 				onPick={(p) => onChange({ ...spec, tasks_per_benchmark: p.tasks_per_benchmark, trials: p.trials, faults: p.faults, preset: p.id })}
 			/>
 
