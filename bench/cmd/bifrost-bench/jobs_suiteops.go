@@ -360,7 +360,7 @@ func runTaskFromCommit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 		return nil, err
 	}
 	defer cleanup()
-	if err := p.suiteOpsRepo.recordSource(ctx, env, p.Suite); err != nil {
+	if err := p.recordSource(ctx, env, p.Suite); err != nil {
 		return nil, err
 	}
 	license := p.License
@@ -464,7 +464,7 @@ func runTasksMineJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	if p.DryRun {
 		return suiteOpsMinePreview(ctx, env, p, suiteDir, repo, log)
 	}
-	if err := p.suiteOpsRepo.recordSource(ctx, env, p.Suite); err != nil {
+	if err := p.recordSource(ctx, env, p.Suite); err != nil {
 		return nil, err
 	}
 	if env.Hosted {

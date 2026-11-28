@@ -37,7 +37,7 @@ func TestOTLPAgent(t *testing.T) {
 // TestAgentNameCleaned: the trace-given agent name loses control and format
 // characters, keeps one line and is cut to MaxAgentBytes.
 func TestAgentNameCleaned(t *testing.T) {
-	if got := agentName("evil‮tob\x1b[31m\x00 bot\n2"); got != "eviltob[31m bot 2" {
+	if got := agentName("evil\u202etob\x1b[31m\x00 bot\n2"); got != "eviltob[31m bot 2" {
 		t.Fatalf("agent %q", got)
 	}
 	if got := agentName(strings.Repeat("a", 500)); len(got) > MaxAgentBytes+3 {

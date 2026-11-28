@@ -88,7 +88,7 @@ func TestProbeCreatedOnBothNetworks(t *testing.T) {
 	probe := strings.Fields(all[cr])[2]
 	conn := indexWith(all, "network connect bench-hnet-r_1 "+probe)
 	start := indexWith(all, "start "+probe)
-	if conn < 0 || start < 0 || !(cr < conn && conn < start) {
+	if conn < 0 || start < 0 || cr >= conn || conn >= start {
 		t.Fatalf("probe order create %d, connect %d, start %d:\n%s", cr, conn, start, strings.Join(all, "\n"))
 	}
 	if callWith(all, "run -d --name "+probe) != "" {
@@ -154,7 +154,7 @@ func TestToolProxyJoinsEvalNetworkBeforeStart(t *testing.T) {
 	cr := indexWith(all, "create --name bench-tp-r_1")
 	conn := indexWith(all, "network connect --alias tp-r_1 heimdall-org-x bench-tp-r_1")
 	start := indexWith(all, "start bench-tp-r_1")
-	if cr < 0 || conn < 0 || start < 0 || !(cr < conn && conn < start) {
+	if cr < 0 || conn < 0 || start < 0 || cr >= conn || conn >= start {
 		t.Fatalf("tool proxy order create %d, connect %d, start %d:\n%s", cr, conn, start, strings.Join(all, "\n"))
 	}
 	if c := connectAfterStart(all); c != "" {
@@ -234,7 +234,7 @@ func TestNetWatchHolderJoinsServiceNetworkBeforeStart(t *testing.T) {
 	svc := indexWith(all, "network connect bench-net-r_1 "+holder)
 	fault := indexWith(all, "network connect bench-fnet-r_1 "+holder)
 	start := indexWith(all, "start "+holder)
-	if svc < 0 || fault < 0 || start < 0 || !(cr < svc && svc < start && fault < start) {
+	if svc < 0 || fault < 0 || start < 0 || cr >= svc || svc >= start || fault >= start {
 		t.Fatalf("holder order create %d, service %d, fault %d, start %d:\n%s", cr, svc, fault, start, strings.Join(all, "\n"))
 	}
 	if c := connectAfterStart(all); c != "" {

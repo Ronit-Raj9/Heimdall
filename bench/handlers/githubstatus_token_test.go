@@ -29,7 +29,7 @@ func statusTestHandler(t *testing.T, unreadable bool) *GitHubHandler {
 	if _, err := mem.Create(context.Background(), "org_1", keystore.KindSecret, keystore.Put{Provider: auth.GitHubRepoProvider, Label: "octo", Value: statusTestToken}, "usr_1"); err != nil {
 		t.Fatal(err)
 	}
-	var keys keystore.Store = mem
+	keys := mem
 	if unreadable {
 		keys = unreadableKeys{mem}
 	}

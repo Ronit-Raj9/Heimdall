@@ -78,7 +78,7 @@ func Write(taskDir string, r Record) error {
 	}
 	defer os.Remove(tmp.Name())
 	if _, err := tmp.Write(append(data, '\n')); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {

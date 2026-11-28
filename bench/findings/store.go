@@ -183,7 +183,7 @@ func (st *fileStore) read() ([]Finding, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read findings: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Finding
 	sc := bufio.NewScanner(io.LimitReader(f, maxFileSize))
 	sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
@@ -251,7 +251,7 @@ func (st *fileStore) lock() (func(), error) {
 	}
 	release, err := flock(f)
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		st.mu.Unlock()
 		return nil, err
 	}

@@ -26,7 +26,7 @@ func ExecGit(ctx context.Context, env []string, args ...string) ([]byte, error) 
 	if err != nil {
 		return nil, fmt.Errorf("could not make a home folder for git: %w", err)
 	}
-	defer os.RemoveAll(home)
+	defer func() { _ = os.RemoveAll(home) }()
 	base := make([]string, 0, len(os.Environ())+8+len(env))
 	for _, kv := range os.Environ() {
 		if strings.HasPrefix(kv, "GIT_") || strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") {

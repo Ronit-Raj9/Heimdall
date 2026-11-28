@@ -247,13 +247,13 @@ func fetchNewestModels(ctx context.Context, a *app, providers []string) ([]newes
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Bifrost answered %d", resp.StatusCode)
+		return nil, fmt.Errorf("Bifrost answered %d", resp.StatusCode) //nolint:staticcheck // ST1005: starts with the product name Bifrost
 	}
 	var out struct {
 		Models []newestModel `json:"models"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, fmt.Errorf("Bifrost's answer did not parse: %w", err)
+		return nil, fmt.Errorf("Bifrost's answer did not parse: %w", err) //nolint:staticcheck // ST1005: starts with the product name Bifrost
 	}
 	return out.Models, nil
 }

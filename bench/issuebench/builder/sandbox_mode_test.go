@@ -22,7 +22,7 @@ func TestCopyFilesModesIgnoreUmask(t *testing.T) {
 	run := func(_ context.Context, _ []byte, args ...string) ([]byte, error) {
 		if args[0] == "cp" {
 			src := args[1]
-			filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+			_ = filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 				if err == nil {
 					if fi, err := d.Info(); err == nil {
 						rel, _ := filepath.Rel(filepath.Dir(src), p)

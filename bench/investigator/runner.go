@@ -328,7 +328,7 @@ func (r *Runner) chat(ctx context.Context, body []byte, maxTok int) (string, []b
 		r.addSpend(usd)
 		return "", nil, "", usd, 0, fmt.Errorf("call gateway: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return "", nil, "", 0, 0, fmt.Errorf("read response: %w", err)

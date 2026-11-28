@@ -359,7 +359,6 @@ func (st *editState) render(file string) {
 	case len(its) > 0:
 		sep := ""
 		if cur != "" {
-			sep = "\n"
 			if !strings.HasSuffix(cur, "\n") {
 				sep = "\n\n"
 			} else if !strings.HasSuffix(cur, "\n\n") {

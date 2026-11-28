@@ -72,7 +72,7 @@ func (f *fakeDocker) imageDir(ref string) string {
 		return d
 	}
 	d := filepath.Join(f.root, "img-"+strings.NewReplacer(":", "_", "/", "_").Replace(ref))
-	os.MkdirAll(d, 0o755)
+	_ = os.MkdirAll(d, 0o755)
 	f.images[ref] = d
 	return d
 }
@@ -135,12 +135,12 @@ func (f *fakeDocker) Run(ctx context.Context, stdin []byte, args ...string) ([]b
 		}
 		var cmd *exec.Cmd
 		if strings.HasSuffix(src, "/.") || strings.HasSuffix(p, "/") {
-			os.MkdirAll(target, 0o755)
+			_ = os.MkdirAll(target, 0o755)
 			cmd = exec.Command("cp", "-a", src, target+"/")
 		} else if fi, err := os.Stat(target); err == nil && fi.IsDir() {
 			cmd = exec.Command("cp", "-a", src, target+"/")
 		} else {
-			os.MkdirAll(filepath.Dir(target), 0o755)
+			_ = os.MkdirAll(filepath.Dir(target), 0o755)
 			cmd = exec.Command("cp", "-a", src, target)
 		}
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -216,7 +216,7 @@ func testConfig(f *fakeDocker) DockerConfig {
 
 func repoDir(t *testing.T) string {
 	d := t.TempDir()
-	os.WriteFile(filepath.Join(d, "hello.txt"), []byte("hi\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(d, "hello.txt"), []byte("hi\n"), 0o644)
 	return d
 }
 
@@ -230,7 +230,7 @@ func TestSandboxCreateCopyStartOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sb.Close(context.Background())
+	defer func() { _ = sb.Close(context.Background()) }()
 	// after the snapshot check (create, start, exec, commit, run, rmi, rm):
 	subs := f.subs()
 	var after []string
@@ -303,7 +303,7 @@ func TestSandboxReplayFallback(t *testing.T) {
 	var logged []string
 	cfg.Log = func(format string, a ...any) {
 		logged = append(logged, fmt.Sprintf(format, a...))
-		t.Log(fmt.Sprintf(format, a...))
+		t.Logf(format, a...)
 	}
 	ctx := context.Background()
 	fac := DockerFactory(cfg)
@@ -311,16 +311,16 @@ func TestSandboxReplayFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sb.Close(ctx)
+	defer func() { _ = sb.Close(ctx) }()
 	if len(logged) != 1 || !strings.Contains(logged[0], "does not keep changes on docker commit; the builder replays commands instead") {
 		t.Fatalf("log %q", logged)
 	}
-	sb.Exec(ctx, "echo one > a.txt", time.Minute)
+	_, _, _ = sb.Exec(ctx, "echo one > a.txt", time.Minute)
 	id, err := sb.Snapshot(ctx)
 	if err != nil || id != "replay:1" {
 		t.Fatalf("snapshot %q %v", id, err)
 	}
-	sb.Exec(ctx, "echo two > b.txt", time.Minute)
+	_, _, _ = sb.Exec(ctx, "echo two > b.txt", time.Minute)
 	if err := sb.Rollback(ctx, id); err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestSandboxReplayFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sb2.Close(ctx)
+	_ = sb2.Close(ctx)
 	if len(logged) != 1 || len(f.calledWith("commit")) != 1 {
 		t.Fatalf("check ran again: log %d commits %d", len(logged), len(f.calledWith("commit")))
 	}
@@ -349,8 +349,8 @@ func TestSandboxCommitSnapshotsWhenRuntimeKeepsChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sb.Close(ctx)
-	sb.Exec(ctx, "echo one > a.txt", time.Minute)
+	defer func() { _ = sb.Close(ctx) }()
+	_, _, _ = sb.Exec(ctx, "echo one > a.txt", time.Minute)
 	id, err := sb.Snapshot(ctx)
 	if err != nil || strings.HasPrefix(id, "replay:") {
 		t.Fatalf("snapshot %q %v", id, err)
@@ -434,7 +434,7 @@ func TestSandboxRealDocker(t *testing.T) {
 	if out, err := exec.Command("docker", "network", "create", "--internal", "--label", "heimdall.issuebench=test", netName).CombinedOutput(); err != nil {
 		t.Fatalf("%v %s", err, out)
 	}
-	defer exec.Command("docker", "network", "rm", netName).Run()
+	defer func() { _ = exec.Command("docker", "network", "rm", netName).Run() }()
 	cfg := DockerConfig{Docker: "docker", Network: netName, Labels: map[string]string{issuebench.LabelJob: "w04test"},
 		ExtraEnv: []string{"HEIMDALL_EXTRA=1"}, Files: map[string][]byte{"/etc/heimdall-egress/ca.crt": []byte("CERT\n")}}
 	sb, err := DockerFactory(cfg)(ctx, img, repoDir(t), nil)

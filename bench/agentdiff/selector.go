@@ -189,7 +189,7 @@ func latestTwo(arms []*armRecord, agent, suite string) (resolved, resolved, erro
 		if len(seen) == 1 {
 			plural = ""
 		}
-		return resolved{}, resolved{}, fmt.Errorf("%w: %s has %d version%s with saved runs; two are needed. Run each version on a benchmark first, then compare them here.", ErrBadQuery, agent, len(seen), plural)
+		return resolved{}, resolved{}, fmt.Errorf("%w: %s has %d version%s with saved runs; two are needed. Run each version on a benchmark first, then compare them here.", ErrBadQuery, agent, len(seen), plural) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	b := resolved{selector: seen[0].hash, hash: seen[0].hash, rec: seen[0]}
 	a := resolved{selector: seen[1].hash, hash: seen[1].hash, rec: seen[1]}
@@ -231,7 +231,7 @@ func pickSuite(arms []*armRecord, a, b resolved, suite string) (string, error) {
 		}
 	}
 	if best == "" {
-		return "", fmt.Errorf("%w: These two versions never ran the same benchmark, so there is nothing to compare. Pick another version A.", ErrBadQuery)
+		return "", fmt.Errorf("%w: These two versions never ran the same benchmark, so there is nothing to compare. Pick another version A.", ErrBadQuery) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	return best, nil
 }

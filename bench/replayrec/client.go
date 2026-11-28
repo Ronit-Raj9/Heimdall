@@ -227,7 +227,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values, out any) er
 	if err != nil {
 		return fmt.Errorf("log server: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	c.mu.Lock()
 	left := int64(MaxReadBytes) - c.read
 	c.mu.Unlock()

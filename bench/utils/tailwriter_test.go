@@ -9,7 +9,7 @@ import (
 func TestTailWriterKeepsLastLines(t *testing.T) {
 	w := NewTailWriter(3)
 	for i := 1; i <= 10; i++ {
-		fmt.Fprintf(w, "line %d\n", i)
+		_, _ = fmt.Fprintf(w, "line %d\n", i)
 	}
 	if got := w.String(); got != "line 8\nline 9\nline 10" {
 		t.Fatalf("tail %q", got)
@@ -25,7 +25,7 @@ func TestTailWriterKeepsLastLines(t *testing.T) {
 	// The zero value keeps 15 lines.
 	var z TailWriter
 	for i := 1; i <= 20; i++ {
-		fmt.Fprintf(&z, "%d\n", i)
+		_, _ = fmt.Fprintf(&z, "%d\n", i)
 	}
 	if got := z.Tail(); len(got) != DefaultTailLines || got[0] != "6" || got[14] != "20" {
 		t.Fatalf("zero tail %q", got)

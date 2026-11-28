@@ -67,8 +67,8 @@ func TestInvestigatorCallerCapsAndRevokes(t *testing.T) {
 	}
 	done()
 	done()
-	if gw.calGateway.revoked != 1 {
-		t.Fatalf("key revoked %d times, want 1", gw.calGateway.revoked)
+	if gw.revoked != 1 {
+		t.Fatalf("key revoked %d times, want 1", gw.revoked)
 	}
 	k, err := ks.Get(context.Background(), "org1", key.ID)
 	if err != nil {

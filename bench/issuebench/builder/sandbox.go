@@ -166,7 +166,7 @@ func CheckSnapshots(ctx context.Context, cfg DockerConfig, image string) error {
 	if err != nil {
 		return fmt.Errorf("snapshot check: create: %w", err)
 	}
-	defer cfg.Run(cleanup, nil, "rm", "-f", id)
+	defer func() { _, _ = cfg.Run(cleanup, nil, "rm", "-f", id) }()
 	if _, err := run(time.Minute, "start", id); err != nil {
 		return fmt.Errorf("snapshot check: start: %w", err)
 	}
@@ -177,7 +177,7 @@ func CheckSnapshots(ctx context.Context, cfg DockerConfig, image string) error {
 	if err != nil {
 		return fmt.Errorf("snapshot check: commit: %w", err)
 	}
-	defer cfg.Run(cleanup, nil, "rmi", "-f", img)
+	defer func() { _, _ = cfg.Run(cleanup, nil, "rmi", "-f", img) }()
 	out, err := run(time.Minute, append(append([]string{"run", "--rm"}, base...), img, "cat", snapshotCheckFile)...)
 	if err != nil || !strings.Contains(out, "heimdall-snapshot-ok") {
 		return fmt.Errorf("snapshot check: the committed image lost the change (%v)", err)
@@ -292,7 +292,7 @@ func (s *dockerSandbox) copyFiles(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 	tops := map[string]bool{}
 	for p, b := range s.cfg.Files {
 		clean := path.Clean("/" + p)

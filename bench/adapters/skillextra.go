@@ -27,7 +27,7 @@ func RestrictSkillsExtra(on bool) { restrictSkillsExtra.Store(on) }
 // SkillsExtraRestricted reports whether the skills.extra rule is on.
 func SkillsExtraRestricted() bool { return restrictSkillsExtra.Load() }
 
-var errSkillsExtra = errors.New(SkillsExtraRefusal)
+var errSkillsExtra = errors.New(SkillsExtraRefusal) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 
 // uploadCollectionRel reports whether the slash path rel (relative to the
 // project) is agents/<id>/skills or agents/<id>/skills/<name>.

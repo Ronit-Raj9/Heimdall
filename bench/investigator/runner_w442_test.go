@@ -71,7 +71,7 @@ func (s *replyServer) handler(t *testing.T) http.HandlerFunc {
 			s.replies = s.replies[1:]
 		}
 		s.mu.Unlock()
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"model":   "gpt-test",
 			"choices": []any{map[string]any{"message": map[string]any{"content": reply}}},
 			"usage":   map[string]any{"prompt_tokens": 1000, "completion_tokens": 200},

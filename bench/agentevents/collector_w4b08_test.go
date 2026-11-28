@@ -19,7 +19,7 @@ func w4b08Collector(t *testing.T, lim Limits) (*Collector, *httptest.Server) {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(c)
-	t.Cleanup(func() { srv.Close(); c.Close() })
+	t.Cleanup(func() { srv.Close(); _ = c.Close() })
 	return c, srv
 }
 
@@ -34,7 +34,7 @@ func w4b08Post(t *testing.T, url, ct, enc string, body []byte) (int, []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, raw
 }

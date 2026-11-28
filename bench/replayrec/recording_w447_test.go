@@ -184,8 +184,8 @@ func TestSessionsSampling(t *testing.T) {
 			return
 		}
 		var off, lim int
-		fmt.Sscan(r.URL.Query().Get("offset"), &off)
-		fmt.Sscan(r.URL.Query().Get("limit"), &lim)
+		_, _ = fmt.Sscan(r.URL.Query().Get("offset"), &off)
+		_, _ = fmt.Sscan(r.URL.Query().Get("limit"), &lim)
 		end := min(off+lim, len(logs))
 		page := []map[string]any{}
 		if off < len(logs) {
@@ -220,16 +220,16 @@ func TestSessionsSampling(t *testing.T) {
 func TestClientSessionBuilds(t *testing.T) {
 	rows := toolSession("12 C")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/logs":
+		switch r.URL.Path {
+		case "/api/logs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"logs": []map[string]any{
 				{"id": "r1", "timestamp": t0, "status": "success", "session_id": "s1"},
 				{"id": "x9", "timestamp": t0, "status": "success", "session_id": "other"},
 				{"id": "r2", "timestamp": t0.Add(time.Second), "status": "success", "session_id": "s1"},
 			}})
-		case r.URL.Path == "/api/logs/r1":
+		case "/api/logs/r1":
 			_ = json.NewEncoder(w).Encode(rows[1])
-		case r.URL.Path == "/api/logs/r2":
+		case "/api/logs/r2":
 			_ = json.NewEncoder(w).Encode(rows[0])
 		default:
 			t.Errorf("unexpected fetch %s", r.URL.Path)

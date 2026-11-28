@@ -91,10 +91,10 @@ func itemViewFor(ctx *fasthttp.RequestCtx, c caller, q *annotate.Queue, it *anno
 // created_by_name.
 func (h *annotationHandler) queueViewFor(ctx *fasthttp.RequestCtx, c caller, f *annotate.File) AnnotationQueueView {
 	v := h.queueView(c, f)
-	if v.Queue.CreatedBy != "" || v.Queue.CreatedByEmail != "" {
+	if v.CreatedBy != "" || v.CreatedByEmail != "" {
 		pp := annotationPeopleOf(ctx)
-		v.CreatedByName, v.Queue.CreatedByEmail = pp.person(v.Queue.CreatedBy, v.Queue.CreatedByEmail)
-		if _, keepRaw := displayActor(ctx, "", nil); !keepRaw && strings.Contains(v.Queue.CreatedBy, "@") {
+		v.CreatedByName, v.CreatedByEmail = pp.person(v.CreatedBy, v.CreatedByEmail)
+		if _, keepRaw := displayActor(ctx, "", nil); !keepRaw && strings.Contains(v.CreatedBy, "@") {
 			v.Queue.CreatedBy = ""
 		}
 	}

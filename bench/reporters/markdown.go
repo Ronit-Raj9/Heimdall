@@ -60,7 +60,7 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 		// B-against-A effect is descriptive only, so it is not shown as the result.
 		writeSetups(bw, a.Verdict.Setups)
 		if len(a.Verdict.Guards) > 0 {
-			bw.WriteString("Guards below compare setup B against setup A only; the setups result above is the result.\n\n")
+			_, _ = bw.WriteString("Guards below compare setup B against setup A only; the setups result above is the result.\n\n")
 		}
 		writeGuards(bw, a.Verdict.Guards)
 	} else {
@@ -648,16 +648,16 @@ func orDash(s string) string {
 // leader, the setups that cannot be told apart from it, the setups behind it,
 // the leader against every other setup, and safety rules broken per setup.
 func writeSetups(w *bufio.Writer, s *schemas.SetupsVerdict) {
-	w.WriteString("## Setups\n\n| Field | Value |\n|---|---|\n")
+	_, _ = w.WriteString("## Setups\n\n| Field | Value |\n|---|---|\n")
 	row(w, "Leader", orUnknown(s.Leader))
 	row(w, "Top group", orDash(strings.Join(s.TopGroup, ", ")))
 	row(w, "Behind the leader", orDash(strings.Join(s.Behind, ", ")))
 	if !s.Separable {
 		row(w, "Separable", "no: no pair could reach alpha whatever the results")
 	}
-	w.WriteString("\n")
+	_, _ = w.WriteString("\n")
 	if s.Note != "" {
-		w.WriteString(cell(s.Note) + "\n\n")
+		_, _ = w.WriteString(cell(s.Note) + "\n\n")
 	}
 	if len(s.Pairs) > 0 {
 		w.WriteString("| Leader | Other | Common tasks | Differing tasks | Mean difference | Holm p | Significant | Reason |\n|---|---|---|---|---|---|---|---|\n")

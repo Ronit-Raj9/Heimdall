@@ -28,11 +28,11 @@ func TestDetectLicense(t *testing.T) {
 	if got := DetectLicense(d); got != LicenseUnknown {
 		t.Fatalf("no file: %q", got)
 	}
-	os.WriteFile(filepath.Join(d, "LICENSE"), []byte("Copyright 2026 Steven Loria\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software"), 0o644)
+	_ = os.WriteFile(filepath.Join(d, "LICENSE"), []byte("Copyright 2026 Steven Loria\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software"), 0o644)
 	if got := DetectLicense(d); got != "MIT" {
 		t.Fatalf("MIT: %q", got)
 	}
-	os.WriteFile(filepath.Join(d, "LICENSE"), []byte("Some custom terms"), 0o644)
+	_ = os.WriteFile(filepath.Join(d, "LICENSE"), []byte("Some custom terms"), 0o644)
 	if got := DetectLicense(d); got != LicenseUnknown {
 		t.Fatalf("custom: %q", got)
 	}

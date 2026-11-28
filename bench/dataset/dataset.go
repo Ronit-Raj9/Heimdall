@@ -759,7 +759,7 @@ func taskFolderSHA(dir string) (string, error) {
 		}
 		rel, _ := filepath.Rel(dir, p)
 		fh := sha256.Sum256(data)
-		fmt.Fprintf(h, "%s %s\n", filepath.ToSlash(rel), hex.EncodeToString(fh[:]))
+		_, _ = fmt.Fprintf(h, "%s %s\n", filepath.ToSlash(rel), hex.EncodeToString(fh[:]))
 		return nil
 	})
 	if err != nil {

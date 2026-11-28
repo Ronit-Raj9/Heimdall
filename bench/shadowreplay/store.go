@@ -234,7 +234,7 @@ func writeFile(path string, b []byte) error {
 		return err
 	}
 	if _, err := tmp.Write(b); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		os.Remove(tmp.Name())
 		return err
 	}

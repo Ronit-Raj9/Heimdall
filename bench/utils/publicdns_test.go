@@ -72,7 +72,7 @@ func dnsStub(t *testing.T) (addr string, hits *atomic.Int32) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { pc.Close() })
+	t.Cleanup(func() { _ = pc.Close() })
 	hits = &atomic.Int32{}
 	go func() {
 		buf := make([]byte, 1500)

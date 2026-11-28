@@ -186,7 +186,7 @@ func writeRepoArchive(dst, repoDir string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer src.Close()
+		defer func() { _ = src.Close() }()
 		if _, err := io.CopyN(tw, src, h.Size); err != nil {
 			return fmt.Errorf("archive %s: %w", rel, err)
 		}

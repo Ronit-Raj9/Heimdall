@@ -49,11 +49,11 @@ func (h *evalCardHandler) get(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	q := url.Values{}
-	ctx.QueryArgs().VisitAll(func(k, v []byte) {
+	for k, v := range ctx.QueryArgs().All() {
 		if string(k) == "where" {
 			q.Add("where", string(v))
 		}
-	})
+	}
 	report := base + "/report"
 	if len(q) > 0 {
 		report += "?" + q.Encode()

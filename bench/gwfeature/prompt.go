@@ -140,7 +140,7 @@ func promptSetValue(p schemas.BifrostPrompt) (map[string]any, error) {
 
 func promptDraft(ctx context.Context, env DraftEnv, req DraftRequest) (*schemas.Experiment, []string, error) {
 	if env.SourceGet == nil {
-		return nil, nil, errors.New(promptErrConnect)
+		return nil, nil, errors.New(promptErrConnect) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	id := strings.TrimSpace(req.Options["prompt_id"])
 	if id == "" {

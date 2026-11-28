@@ -67,11 +67,11 @@ func (e *dockerWorkspace) copyToSpool(ctx context.Context, container, src, spool
 	if runErr != nil && w.err == nil && cpCannotSee(errBuf.String()) {
 		res.fellBack = true
 		if err := fh.Truncate(0); err != nil {
-			fh.Close()
+			_ = fh.Close()
 			return res, err
 		}
 		if _, err := fh.Seek(0, io.SeekStart); err != nil {
-			fh.Close()
+			_ = fh.Close()
 			return res, err
 		}
 		w = &cappedWriter{w: fh, limit: limit}

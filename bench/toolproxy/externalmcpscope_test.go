@@ -28,7 +28,7 @@ func TestDraftAllowStaysOnMCPServerHost(t *testing.T) {
 		seen = append(seen, r.Method+" "+r.Host+r.URL.Path)
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"jsonrpc":"2.0","id":1,"result":{}}`)
+		_, _ = fmt.Fprint(w, `{"jsonrpc":"2.0","id":1,"result":{}}`)
 	}))
 	defer up.Close()
 	roots := x509.NewCertPool()
@@ -50,7 +50,7 @@ func TestDraftAllowStaysOnMCPServerHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	fmt.Fprintf(conn, "POST http://evil.example/x/acme/ HTTP/1.1\r\nHost: evil.example\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(body), body)
 	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
 	if err != nil {
