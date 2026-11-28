@@ -30,6 +30,7 @@ import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
+import { ExtendPoolNote } from "@/components/experiments/extendPoolNote";
 import { useAppDispatch } from "@/lib/store";
 import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
 import { skipToken } from "@reduxjs/toolkit/query/react";
@@ -452,6 +453,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					</Link>
 				</p>
 			)}
+
+			<ExtendPoolNote expId={expId} />
 
 			{live && <LiveProgress status={st} />}
 

@@ -1,0 +1,11 @@
+{
+	"pool": {
+		"includes_one": "Includes {{count}} run added by Extend:",
+		"includes_other": "Includes {{count}} runs added by Extend:",
+		"result": "Together: {{tasks}} tasks, {{runs}} runs. Success {{a}}% vs {{b}}%, difference {{d}} points",
+		"range": "(range {{lo}} to {{hi}})",
+		"notPooled": "Not counted here: {{reason}}",
+		"childPooled": "Its runs count in",
+		"childNotPooled": "Its runs are not counted in {{parent}}: {{reason}}"
+	}
+}
