@@ -261,6 +261,18 @@ func jobCoordinator(env jobEnv) *engine.Coordinator {
 	return nil
 }
 
+// noJobRunnerError is errNoJobRunner, except when a worker is online but
+// takes only some job kinds (the shared worker) and not kind: then "No
+// worker online" is false, so the error says the worker does not run this
+// job (PQ2-3).
+func noJobRunnerError(c *engine.Coordinator, kind string) error {
+	if c != nil && c.HasJobRunnerFor(kindAgentBuild) {
+		return fmt.Errorf("The shared worker is online but does not run %s jobs: it runs agent builds and issue benchmarks only. "+
+			"Add your own worker under Settings > Workers to run this job.", kind)
+	}
+	return errNoJobRunner
+}
+
 // jobRunnerOnline reports whether a live runner of c takes jobs of kind: an
 // org's own runner (every kind) or the shared worker, which takes only some
 // kinds (agent.build among them since fix wave 3, N181).
@@ -273,7 +285,7 @@ func jobRunnerOnline(c *engine.Coordinator, kind string) bool {
 func runOnRunner(ctx context.Context, env jobEnv, j *jobs.Job, rk runnerKind, argv, collect []string, log jobs.Logger) (any, error) {
 	c := jobCoordinator(env)
 	if !jobRunnerOnline(c, rk.kind) {
-		return nil, errNoJobRunner
+		return nil, noJobRunnerError(c, rk.kind)
 	}
 	snap, skipped, err := projectSnapshot(env.ProjectRoot, argv)
 	if err != nil {
