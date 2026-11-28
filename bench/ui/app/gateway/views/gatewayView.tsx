@@ -20,6 +20,7 @@ import { ModelWatchCard } from "./modelWatchCard";
 import { RegisteredAgents } from "./registeredAgents";
 import { SkillImportAction } from "./skillImport";
 import "./uf7cI18n";
+import "./uff4I18n";
 import "./w4p6I18n";
 
 // The shared status pill: On green, Off and Not known neutral grey.
@@ -89,7 +90,10 @@ export function GatewayCardLineRow({
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
 	const what = u(`line.what.${line.feature}` as "line.what.batch", { defaultValue: "" });
+	const { t: f } = useTranslation("uff4");
 	const blocked = !connected && NEEDS_SOURCE.has(line.feature);
+	// The server says why this test cannot run on this gateway (round 4, lane F4).
+	const cannotRun = !blocked && Boolean(line.blocked);
 	const notTested = line.state === "not_measured" && !line.result;
 	const from = line.source
 		? line.measured_at
@@ -138,7 +142,8 @@ export function GatewayCardLineRow({
 						type="button"
 						size="sm"
 						variant="outline"
-						disabled={blocked}
+						disabled={blocked || cannotRun}
+						title={blocked ? u("page.connectFirst") : cannotRun ? line.blocked : undefined}
 						onClick={() => onStart(line)}
 						data-testid={`gateway-line-${line.feature}-start`}
 					>
@@ -148,6 +153,11 @@ export function GatewayCardLineRow({
 				{line.start && blocked && (
 					<span className="text-muted-foreground text-xs" data-testid={`gateway-line-${line.feature}-blocked`}>
 						{u("page.connectFirst")}
+					</span>
+				)}
+				{line.start && cannotRun && (
+					<span className="text-muted-foreground max-w-64 text-right text-xs" data-testid={`gateway-line-${line.feature}-cannot-run`}>
+						{f("form.blocked", { reason: line.blocked })}
 					</span>
 				)}
 			</div>

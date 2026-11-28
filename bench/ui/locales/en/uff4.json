@@ -1,0 +1,25 @@
+{
+	"form": {
+		"name": "Name",
+		"namePlaceholder": "Bifrost test: {{feature}}",
+		"nameHint": "Optional. Shown in the comparison list.",
+		"taskCount": "Tasks",
+		"taskCountHint": "How many ready tasks to run. Small is cheap; 10 or more per setup can name a winner.",
+		"taskCountBad": "A whole number from 1 to 200",
+		"suitePartReady": "{{name}}, {{ready}} of {{count}} tasks ready (uses only the ready ones)",
+		"noToolsAgent": "This agent answers in text only and never calls the benchmark's tools. Pick an agent that uses tools.",
+		"estimate": "Estimate: about ${{usd}} (up to ${{high}}). The budget is the cap.",
+		"estimateUpper": "Estimate: at most ${{high}}. The budget is the cap.",
+		"confirmEstimate": "Start this test? Estimate about ${{est}}, at most ${{budget}}.",
+		"blocked": "Cannot run here: {{reason}}"
+	},
+	"opt": {
+		"tools_b": {
+			"hint": "Comma-separated service/tool names, at least one, for example agentdojo/get_balance.",
+			"placeholder": "agentdojo/get_balance, agentdojo/get_most_recent_transactions"
+		},
+		"targets": {
+			"placeholder": "openai:gpt-5.4-mini, azure:gpt-5.4-mini"
+		}
+	}
+}

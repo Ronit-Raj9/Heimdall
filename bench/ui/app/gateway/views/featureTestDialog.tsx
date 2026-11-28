@@ -1,5 +1,5 @@
 import { InlineError } from "@/components/runs/screenStates";
-import { ModelPicker } from "@/components/models/modelPicker";
+import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShowTestsChip } from "@/components/ui/toolbar";
 import {
 	useCreateExperimentMutation,
+	useEstimateExperimentMutation,
 	useGetAgentsQuery,
 	usePlanExperimentMutation,
 	useStartExperimentMutation,
@@ -15,7 +16,7 @@ import {
 import { useDraftGatewayTestMutation } from "@/lib/store/apis/gatewayApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
-import type { Experiment, ExperimentPlan } from "@/lib/types/bench";
+import type { Experiment, ExperimentPlan, Forecast } from "@/lib/types/bench";
 import type { GwDraftRequest, GwDraftResponse } from "@/lib/types/gateway";
 import { useNavigate } from "@tanstack/react-router";
 import { formatUsd } from "@/lib/money";
@@ -25,6 +26,7 @@ import "@/app/schedules/views/ufrjI18n";
 import { useTranslation } from "react-i18next";
 import "./uf7cI18n";
 import "./w4p6I18n";
+import "./uff4I18n";
 
 /** How a setting is entered: a model picker, a number, free text, a comma list, yes or no, or one of the budgets typed above. */
 export type OptionKind = "model" | "number" | "text" | "list" | "yesno" | "budgetPick";
@@ -112,10 +114,17 @@ export interface FeatureTestForm {
 	provider: string;
 	budget: string;
 	trials: string;
+	/** Ready tasks to run; "" runs every ready task. */
+	taskCount?: string;
+	/** The comparison's name; "" keeps the server's "Bifrost test: <feature>". */
+	name?: string;
 	options: Record<string, string>;
 }
 
-export type DraftProblem = "needBudget" | "needFields" | "needModel" | "needTrials";
+export type DraftProblem = "needBudget" | "needFields" | "needModel" | "needTrials" | "needTaskCount";
+
+/** Largest task count the server takes (bench/handlers/gatewaytests_uff4.go). */
+export const MAX_TASK_COUNT = 200;
 
 /** The fields still missing or wrong, by field name ("suite", "base", "model", "budget", "trials" or an option key). Pure. */
 export function missingFields(feature: string, f: FeatureTestForm): string[] {
@@ -130,6 +139,10 @@ export function missingFields(feature: string, f: FeatureTestForm): string[] {
 		const trials = Number(f.trials);
 		if (!Number.isInteger(trials) || trials < 1) out.push("trials");
 	}
+	if ((f.taskCount ?? "").trim() !== "") {
+		const n = Number(f.taskCount);
+		if (!Number.isInteger(n) || n < 1 || n > MAX_TASK_COUNT) out.push("taskCount");
+	}
 	return out;
 }
 
@@ -138,6 +151,7 @@ export function draftRequest(feature: string, f: FeatureTestForm): { req?: GwDra
 	const missing = missingFields(feature, f);
 	if (missing.includes("budget")) return { problem: "needBudget" };
 	if (missing.includes("trials")) return { problem: "needTrials" };
+	if (missing.includes("taskCount")) return { problem: "needTaskCount" };
 	if (missing.length === 1 && missing[0] === "model") return { problem: "needModel" };
 	if (missing.length > 0) return { problem: "needFields" };
 	const budget = Number(f.budget);
@@ -147,6 +161,8 @@ export function draftRequest(feature: string, f: FeatureTestForm): { req?: GwDra
 		if (v) options[o.key] = v;
 	}
 	const trials = Number(f.trials);
+	const taskCount = Number((f.taskCount ?? "").trim() || "0");
+	const name = (f.name ?? "").trim();
 	return {
 		req: {
 			feature,
@@ -155,6 +171,8 @@ export function draftRequest(feature: string, f: FeatureTestForm): { req?: GwDra
 			...(f.model.trim() ? { model: f.model.trim() } : {}),
 			...(f.provider.trim() ? { provider: f.provider.trim() } : {}),
 			...(Number.isInteger(trials) && trials > 0 ? { trials } : {}),
+			...(taskCount > 0 ? { task_count: taskCount } : {}),
+			...(name ? { name } : {}),
 			budget_usd: budget,
 			...(Object.keys(options).length ? { options } : {}),
 		},
@@ -167,16 +185,22 @@ export interface FeatureTestCalls {
 	plan(exp: Experiment): Promise<ExperimentPlan>;
 	create(exp: Experiment): Promise<{ exp_id: string }>;
 	start(expId: string): Promise<unknown>;
+	/** Expected cost from history or price bounds (POST /estimate); optional, a failure leaves it out. */
+	estimate?(exp: Experiment): Promise<Forecast>;
 }
 
 /** Step one: draft, then plan the drafted comparison (the usual estimate and refusals). */
 export async function prepareFeatureTest(
 	calls: FeatureTestCalls,
 	req: GwDraftRequest,
-): Promise<{ draft: GwDraftResponse; plan: ExperimentPlan }> {
+): Promise<Prepared> {
 	const draft = await calls.draft(req);
 	const plan = await calls.plan(draft.experiment);
-	return { draft, plan };
+	let forecast: Forecast | undefined;
+	if (calls.estimate && plan.errors.length === 0) {
+		forecast = await calls.estimate(draft.experiment).catch(() => undefined);
+	}
+	return { draft, plan, ...(forecast ? { forecast } : {}) };
 }
 
 /** Step two, after the confirmation: create, then start. Answers the new comparison's id. */
@@ -186,7 +210,21 @@ export async function startFeatureTest(calls: FeatureTestCalls, exp: Experiment)
 	return created.exp_id;
 }
 
-type Prepared = { draft: GwDraftResponse; plan: ExperimentPlan };
+type Prepared = { draft: GwDraftResponse; plan: ExperimentPlan; forecast?: Forecast };
+
+/**
+ * The cost estimate to show and to name in the confirm: the plan's when observed, else the forecast's
+ * (history: the median and the high end; upper bound: the high end only). null when neither knows. Pure.
+ */
+export function costEstimate(p: Prepared): { usd: number; high: number | null; upper: boolean } | null {
+	const est = planEstimate(p.plan);
+	if (est) return { usd: est.usd, high: null, upper: false };
+	const c = p.forecast?.cost_usd;
+	if (!c) return null;
+	if (c.kind === "history" && c.median !== null) return { usd: c.median, high: c.high, upper: false };
+	if (c.kind === "upper_bound" && c.high !== null) return { usd: c.high, high: c.high, upper: true };
+	return null;
+}
 
 /** The plan's minutes when the time is observed, even when the cost is not. Pure. */
 export function planMinutes(plan: ExperimentPlan): number | null {
@@ -226,15 +264,21 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 	const { t: r } = useTranslation("ufrj");
 	const { notes } = prepared.draft;
 	const { plan } = prepared;
+	const { t: f } = useTranslation("uff4");
 	const est = planEstimate(plan);
+	const cost = costEstimate(prepared);
 	const minutes = planMinutes(plan);
-	const over = overBudget(est?.usd, budget);
+	const over = overBudget(cost?.usd, budget);
 	return (
 		<div className="flex flex-col gap-3 text-sm" data-testid="feature-test-prepared">
 			<p data-testid="feature-test-estimate">
 				{est
 					? u("dialog.estimateLine", { usd: formatUsd(est.usd).slice(1), minutes: est.minutes })
-					: minutes !== null
+					: cost
+						? cost.upper
+							? f("form.estimateUpper", { high: formatUsd(cost.usd).slice(1) })
+							: f("form.estimate", { usd: formatUsd(cost.usd).slice(1), high: formatUsd(cost.high ?? cost.usd).slice(1) })
+						: minutes !== null
 						? r("gw.estimateUnknownCost", { minutes })
 						: r("gw.estimateUnknownBoth")}
 			</p>
@@ -265,7 +309,9 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 			)}
 			{confirming && (
 				<p className="font-medium" data-testid="feature-test-confirm">
-					{confirmText((k, o) => String(u(k, { ...o })), plan, budget)}
+					{cost && !est
+						? f("form.confirmEstimate", { est: formatUsd(cost.usd).slice(1), budget: formatUsd(budget).slice(1) })
+						: confirmText((k, o) => String(u(k, { ...o })), plan, budget)}
 				</p>
 			)}
 		</div>
@@ -287,6 +333,29 @@ export function suiteReady(s: { task_count?: number; admitted_count?: number }):
 	return s.admitted_count >= Number(s.task_count);
 }
 
+/**
+ * Whether a benchmark can be picked: some tasks are ready (the server then runs only the ready ones),
+ * or it reports no counts (the plan still decides). Pure.
+ */
+export function suitePickable(s: { task_count?: number; admitted_count?: number }): boolean {
+	return suiteReady(s) || Number(s.admitted_count) > 0;
+}
+
+/** Agents that never call a benchmark's tools (one model call, text only). */
+export const TEXT_ONLY_AGENTS: ReadonlySet<string> = new Set(["bare-model", "noop", "refuse", "toy", "oracle", "exploit"]);
+
+/** The agents a feature test starts with, in order of preference: they use the benchmark's tools. */
+export const TOOL_AGENTS = ["mcploop", "fw-plain-openai", "mini-swe-agent", "codex", "claude-code"];
+
+/** The agent a new form starts with: the first tool-using agent in TOOL_AGENTS, else the first one that is not text only. Pure. */
+export function defaultAgent<T extends { id: string; path: string }>(agents: readonly T[]): T | undefined {
+	for (const id of TOOL_AGENTS) {
+		const a = agents.find((x) => x.id === id);
+		if (a) return a;
+	}
+	return agents.find((a) => !TEXT_ONLY_AGENTS.has(a.id));
+}
+
 /** The agent option's name; the model is shown beside it as a hint (Q-207). Pure. */
 export function agentLabel(a: { id: string }) {
 	return a.id;
@@ -303,7 +372,8 @@ export function errorDetail(e: unknown): string {
 }
 
 // A suggested budget, so the estimate shows before anything is typed (the server caps it at MAX_DRAFT_USD).
-const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", budget: "5", trials: "2", options: {} };
+// Small defaults (3 tasks, 1 trial) so a first test is cheap; the server caps the budget at MAX_DRAFT_USD.
+const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", budget: "1", trials: "1", taskCount: "3", name: "", options: {} };
 
 /** The wait after the last change before the estimate is worked out. */
 export const ESTIMATE_DELAY_MS = 500;
@@ -333,6 +403,8 @@ export function FeatureTestDialog({
 	const [plan] = usePlanExperimentMutation();
 	const [create] = useCreateExperimentMutation();
 	const [start] = useStartExperimentMutation();
+	const [estimate] = useEstimateExperimentMutation();
+	const { t: f } = useTranslation("uff4");
 	const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
 	const [form, setForm] = useState<FeatureTestForm>(() => ({ ...EMPTY, ...initial }));
 	// "Agent's own model" or a model picked for both setups (Q-299): the picker is shown only when asked,
@@ -353,14 +425,23 @@ export function FeatureTestDialog({
 	const [showTests, setShowTests] = useShowTests();
 	const suiteList = pickableSuites(suites.data?.suites ?? [], showTests);
 	const readySuites = suiteList.shown.filter(suiteReady);
-	const notReadySuites = suiteList.shown.filter((s) => !suiteReady(s));
+	const partSuites = suiteList.shown.filter((s) => !suiteReady(s) && suitePickable(s));
+	const notReadySuites = suiteList.shown.filter((s) => !suitePickable(s));
 	const agentList = pickableAgents(agents.data?.agents ?? [], showTests);
 	const calls: FeatureTestCalls = {
 		draft: (req) => draft(req).unwrap(),
 		plan: (exp) => plan(exp).unwrap(),
 		create: (exp) => create(exp).unwrap(),
 		start: (id) => start(id).unwrap(),
+		estimate: (exp) => estimate(exp).unwrap(),
 	};
+	// Start with an agent that uses the benchmark's tools (the paid run G: bare-model never called one).
+	const firstAgent = defaultAgent(agentList.shown);
+	useEffect(() => {
+		if (open && !form.base && firstAgent) setForm((x) => (x.base ? x : { ...x, base: firstAgent.path }));
+	}, [open, form.base, firstAgent]);
+	const pickedAgent = agentList.shown.find((a) => a.path === form.base);
+	const textOnly = pickedAgent ? TEXT_ONLY_AGENTS.has(pickedAgent.id) : false;
 	const set = (patch: Partial<FeatureTestForm>, field: string) => {
 		setForm((f) => ({ ...f, ...patch }));
 		setTouched((s) => new Set(s).add(field));
@@ -401,7 +482,7 @@ export function FeatureTestDialog({
 			setError(e);
 		}
 	};
-	const est = prepared ? planEstimate(prepared.plan) : null;
+	const est = prepared ? costEstimate(prepared) : null;
 	const budgetUsd = Number(form.budget);
 	const needed = (key: string, text?: string) =>
 		touched.has(key) && missing.has(key) ? (
@@ -409,7 +490,12 @@ export function FeatureTestDialog({
 				{text ?? u("dialog.fieldNeeded")}
 			</span>
 		) : null;
-	const opt = (key: string, part: "label" | "hint" | "placeholder") => String(u(`dialog.opt.${key}.${part}` as "dialog.opt.grid.label"));
+	const opt = (key: string, part: "label" | "hint" | "placeholder") => {
+		// Round 4 texts that say the format the server takes (PG-12, PG-23).
+		const own = `opt.${key}.${part}` as "opt.tools_b.hint";
+		const v = f(own, { defaultValue: "" });
+		return v ? String(v) : String(u(`dialog.opt.${key}.${part}` as "dialog.opt.grid.label"));
+	};
 	const modelRequired = NEEDS_MODEL.has(feature);
 	const budgets = budgetChoices(form.options.budgets);
 	return (
@@ -461,6 +547,11 @@ export function FeatureTestDialog({
 									{suiteLabel((k, o) => String(u(k, o)), s)}
 								</SelectItem>
 							))}
+							{partSuites.map((s) => (
+								<SelectItem key={s.id} value={suiteOption(s)} title={s.id} data-testid={`feature-test-suite-part-ready-${s.id}`}>
+									{f("form.suitePartReady", { name: suiteDisplayName(s.id), ready: s.admitted_count ?? 0, count: s.task_count ?? 0 })}
+								</SelectItem>
+							))}
 							{notReadySuites.map((s) => (
 								<SelectItem key={s.id} value={suiteOption(s)} title={s.id} disabled data-testid={`feature-test-suite-not-ready-${s.id}`}>
 									{r("gw.suiteNotReady", { name: suiteDisplayName(s.id), ready: s.admitted_count ?? 0, count: s.task_count ?? 0 })}
@@ -494,6 +585,11 @@ export function FeatureTestDialog({
 						</SelectContent>
 					</Select>
 					{needed("base")}
+					{textOnly && (
+						<span className="text-chart-warning-ink text-xs" data-testid="feature-test-text-only">
+							{f("form.noToolsAgent")}
+						</span>
+					)}
 				</label>
 				<div className="flex flex-col gap-1" data-testid="feature-test-model">
 					<span>
@@ -518,10 +614,10 @@ export function FeatureTestDialog({
 						</Select>
 					)}
 					{(modelRequired || !ownModel) && (
-						<ModelPicker
+						<GroupedModelPicker
 							value={form.model ? { provider: form.provider || "openai", model: form.model } : null}
 							onChange={(v) => set({ model: v.model, provider: v.provider }, "model")}
-							purpose="agent"
+							label={t("dialog.model")}
 							testId="feature-test-model-picker"
 						/>
 					)}
@@ -538,10 +634,10 @@ export function FeatureTestDialog({
 									{o.required && <span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>}
 								</label>
 								{o.kind === "model" ? (
-									<ModelPicker
-										value={form.options[o.key] ? { provider: "openai", model: form.options[o.key] } : null}
-										onChange={(v) => setOption(o.key, v.model)}
-										purpose="agent"
+									<GroupedModelPicker
+										value={form.options[o.key] ? { provider: form.options[`${o.key}_provider`] || "openai", model: form.options[o.key] } : null}
+										onChange={(v) => set({ options: { ...form.options, [o.key]: v.model, [`${o.key}_provider`]: v.provider } }, o.key)}
+										label={opt(o.key, "label")}
 										testId={`feature-test-opt-${o.key}-input`}
 									/>
 								) : o.kind === "yesno" ? (
@@ -584,6 +680,28 @@ export function FeatureTestDialog({
 					</fieldset>
 				)}
 				<div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+					<label className="flex flex-col gap-1">
+						{f("form.taskCount")}
+						<Input
+							inputMode="numeric"
+							value={form.taskCount ?? ""}
+							onChange={(e) => set({ taskCount: e.target.value }, "taskCount")}
+							data-testid="feature-test-task-count"
+						/>
+						<span className="text-muted-foreground text-xs">{f("form.taskCountHint")}</span>
+						{needed("taskCount", f("form.taskCountBad"))}
+					</label>
+					<label className="flex flex-col gap-1">
+						{f("form.name")}
+						<Input
+							value={form.name ?? ""}
+							maxLength={120}
+							placeholder={f("form.namePlaceholder", { feature: name })}
+							onChange={(e) => set({ name: e.target.value }, "name")}
+							data-testid="feature-test-name"
+						/>
+						<span className="text-muted-foreground text-xs">{f("form.nameHint")}</span>
+					</label>
 					<label className="flex flex-col gap-1">
 						{t("dialog.budget")}
 						<Input

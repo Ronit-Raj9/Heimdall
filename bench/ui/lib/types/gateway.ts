@@ -64,6 +64,10 @@ export interface GwDraftRequest {
 	model?: string;
 	provider?: string;
 	tasks?: string[];
+	/** With tasks empty: the first this many ready tasks. */
+	task_count?: number;
+	/** The comparison's name; absent keeps "Bifrost test: <feature>". */
+	name?: string;
 	trials?: number;
 	budget_usd: number;
 	options?: Record<string, string>;
@@ -98,6 +102,8 @@ export interface GwCardLine {
 	exp_id?: string;
 	measured_at?: string;
 	start?: string;
+	/** Why the test cannot run here and what to do; absent when it can. */
+	blocked?: string;
 }
 export interface GwReportCard {
 	gateway: GwGatewayInfo;
