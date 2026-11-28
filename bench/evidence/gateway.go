@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,10 @@ type rawGatewayRow struct {
 	RequestID    string          `json:"request_id"`
 	RawAvailable bool            `json:"raw_available"`
 	RawDetail    json.RawMessage `json:"raw_detail"`
+	// RawNote says why RawDetail holds the body as a JSON string instead of
+	// the gateway's JSON object: the body was not valid JSON, so it is kept
+	// as text rather than dropped or allowed to fail the run.
+	RawNote string `json:"raw_note,omitempty"`
 }
 
 // Gateway request kinds and statuses this package reads.
@@ -147,13 +152,81 @@ func rawGatewayRows(log *schemas.RequestLog) []rawGatewayRow {
 	}
 	rows := make([]rawGatewayRow, len(log.Requests))
 	for i, request := range log.Requests {
-		raw := request.Raw
-		if len(raw) > 0 {
-			raw = json.RawMessage(utils.RedactSecrets(string(raw)))
-		}
-		rows[i] = rawGatewayRow{RequestID: request.ID, RawAvailable: len(raw) > 0, RawDetail: raw}
+		raw, note := redactRawDetail(request.Raw)
+		rows[i] = rawGatewayRow{RequestID: request.ID, RawAvailable: len(raw) > 0, RawDetail: raw, RawNote: note}
 	}
 	return rows
+}
+
+// Notes for a raw body that is not kept as the gateway's JSON object.
+const (
+	noteRawNotJSON      = "gateway body was not valid JSON; kept as a string"
+	noteRawRedactedText = "gateway body could not be redacted as JSON; kept as redacted text"
+)
+
+// redactRawDetail returns the secret-redacted raw body as valid JSON, so the
+// row always encodes (PD4-1). The text redaction alone can cut across JSON
+// string boundaries: in `"text":"token=abc","type":"text"` it swallows the
+// closing quote and leaves invalid JSON, which made json.Marshal fail on the
+// json.RawMessage and failed the run. Order: text redaction when the result
+// is still valid JSON (keeps the bytes as before); else redaction of every
+// string and secret-named key inside the decoded value; a body that was
+// never valid JSON is stored as a redacted JSON string with a note.
+func redactRawDetail(raw json.RawMessage) (json.RawMessage, string) {
+	if len(raw) == 0 {
+		return nil, ""
+	}
+	if text := utils.RedactSecrets(string(raw)); json.Valid([]byte(text)) {
+		return json.RawMessage(text), ""
+	}
+	var v any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&v); err == nil && !dec.More() && json.Valid(raw) {
+		if b, err := json.Marshal(redactJSONValue(v)); err == nil {
+			return b, ""
+		}
+	}
+	b, err := json.Marshal(utils.RedactSecrets(string(raw)))
+	if err != nil { // unreachable: a Go string always encodes
+		return nil, noteRawNotJSON
+	}
+	if json.Valid(raw) {
+		return b, noteRawRedactedText
+	}
+	return b, noteRawNotJSON
+}
+
+// redactJSONValue redacts every string of a decoded JSON value and blanks
+// string values under secret-named keys.
+func redactJSONValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, x := range t {
+			if _, ok := x.(string); ok && secretKey(k) {
+				t[k] = "[redacted]"
+				continue
+			}
+			t[k] = redactJSONValue(x)
+		}
+		return t
+	case []any:
+		for i, x := range t {
+			t[i] = redactJSONValue(x)
+		}
+		return t
+	case string:
+		return utils.RedactSecrets(t)
+	default:
+		return v
+	}
+}
+
+// secretKey reports whether a JSON key names a secret the text redaction
+// would blank as `"key":"..."`.
+func secretKey(k string) bool {
+	probe := `"` + k + `":"x"`
+	return utils.RedactSecrets(probe) != probe
 }
 
 // redactRequestErrors removes secrets from the request log that stays in
