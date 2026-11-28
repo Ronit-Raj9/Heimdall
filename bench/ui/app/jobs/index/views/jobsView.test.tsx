@@ -19,6 +19,12 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useCancelJobMutation: () => mutation(),
 }));
 
+// K5 (PQ1-7): a comparison run job's Retry reads the comparison's cap from its run controls.
+vi.mock("@/lib/store/apis/runControlApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/runControlApi")>()),
+	useGetRunControlsQuery: () => okQuery({ state: { total_usd: 0 }, total_usd: 0.5 }),
+}));
+
 const CLI_JOB = { ...FAILED_JOB, id: "job_export", kind: "export.run", target: "exp_1" };
 
 beforeEach(() => {
@@ -38,6 +44,7 @@ describe("JobsView", () => {
 		expect(html).toContain(`data-testid="jobs-retry-${FAILED_JOB.id}"`);
 		expect(html).not.toContain(`data-testid="jobs-retry-${RUNNING_JOB.id}"`);
 		expect(html).toContain("Download results, exp_1");
+		if (FAILED_JOB.kind === "experiment.run") expect(html).toContain("up to $0.50");
 	});
 
 	it("shows why a job failed, a phone list with status, and no Retry on a finished job (M2-2, M2-3, N8-1)", () => {

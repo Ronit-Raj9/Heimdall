@@ -25,7 +25,7 @@ export interface FollowUpJobProps {
 	 * Set when the job starts paid runs (M4-33, M4-41): the shared PaidButton with the cost, the
 	 * estimate under it and always a confirm with the amount. Unset: the plain JobRunButton.
 	 */
-	paid?: { estimateUsd?: number | null; estimateRuns?: number | null };
+	paid?: { estimateUsd?: number | null; estimateRuns?: number | null; capUsd?: number | null };
 	testId: string;
 }
 
@@ -64,7 +64,7 @@ export function FollowUpJob({ kind, params, label, confirm, missing, paid, testI
 						<div>
 							<PaidButton
 								verb={label}
-								capUsd={null}
+								capUsd={paid.capUsd ?? null}
 								estimateUsd={paid.estimateUsd}
 								estimateRuns={paid.estimateRuns ?? undefined}
 								confirm="auto"
