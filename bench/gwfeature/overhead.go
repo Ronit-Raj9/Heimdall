@@ -23,8 +23,8 @@ func init() {
 
 // Overhead test limits.
 const (
-	overheadMinRows      = 50 // rows with a breakdown needed for a report
-	overheadDefaultTasks = 10
+	overheadMinRows  = 50 // rows with a breakdown needed for a report
+	overheadMaxTasks = 25 // the test runs at most this many tasks; 13 reach 50 calls at 4 per run
 )
 
 func draftOverhead(ctx context.Context, env DraftEnv, req DraftRequest) (*schemas.Experiment, []string, error) {
@@ -38,8 +38,8 @@ func draftOverhead(ctx context.Context, env DraftEnv, req DraftRequest) (*schema
 		return nil, nil, errors.New("pick the model this test runs on")
 	}
 	req.Trials = 1
-	if len(req.Tasks) > overheadDefaultTasks {
-		req.Tasks = req.Tasks[:overheadDefaultTasks]
+	if len(req.Tasks) > overheadMaxTasks {
+		req.Tasks = req.Tasks[:overheadMaxTasks]
 	}
 	exp := p4Base(env, req)
 	exp.ScriptedUpstream = true

@@ -22,23 +22,24 @@ const (
 
 // draftTasks checks the name, the task count and the agent against the
 // benchmark, and fills req.Tasks with ready tasks when the request names
-// none. It answers the notes to show, in plain words.
-func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.DraftRequest) ([]string, error) {
+// none. It answers the notes to show, in plain words, and the number of
+// tasks the test runs (0 when it cannot be known here).
+func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.DraftRequest) ([]string, int, error) {
 	notes := []string{}
 	if len([]rune(strings.TrimSpace(req.Name))) > gatewayDraftMaxName {
-		return nil, fmt.Errorf("Keep the name to %d characters or fewer.", gatewayDraftMaxName)
+		return nil, 0, fmt.Errorf("Keep the name to %d characters or fewer.", gatewayDraftMaxName)
 	}
 	if req.TaskCount < 0 || req.TaskCount > gatewayDraftMaxTasks {
-		return nil, fmt.Errorf("The number of tasks must be between 1 and %d.", gatewayDraftMaxTasks)
+		return nil, 0, fmt.Errorf("The number of tasks must be between 1 and %d.", gatewayDraftMaxTasks)
 	}
 	src := h.env.Services.Suites
 	if src == nil {
-		return notes, nil
+		return notes, max(len(req.Tasks), req.TaskCount), nil
 	}
 	id, _, _ := strings.Cut(strings.TrimSpace(req.Suite), "@")
 	s, err := src.LoadSuite(ctx, id)
 	if err != nil || s == nil {
-		return nil, fmt.Errorf("The benchmark %s could not be read.", id)
+		return nil, 0, fmt.Errorf("The benchmark %s could not be read.", id)
 	}
 	if cfg := (&evaluationsHandler{env: h.env}).agentConfigs(ctx)[strings.TrimSpace(req.Base)]; cfg != nil {
 		if ok, _, reason, _ := compat.Full(cfg, s); !ok {
@@ -49,15 +50,15 @@ func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.Dra
 			if !strings.HasPrefix(reason, "agent ") {
 				reason = fmt.Sprintf("agent %s cannot run this benchmark: %s", cfg.ID, reason)
 			}
-			return nil, fmt.Errorf("The %s. Pick an agent that uses the benchmark's tools.", reason)
+			return nil, 0, fmt.Errorf("The %s. Pick an agent that uses the benchmark's tools.", reason)
 		}
 	}
 	if len(req.Tasks) > 0 {
-		return notes, nil
+		return notes, len(req.Tasks), nil
 	}
 	ready := readyTaskIDs(s)
 	if len(ready) == 0 {
-		return nil, errors.New("No task of this benchmark is ready yet, so a test cannot start.")
+		return nil, 0, errors.New("No task of this benchmark is ready yet, so a test cannot start.")
 	}
 	total := len(s.TaskIDs)
 	pick := ready
@@ -72,7 +73,7 @@ func (h *gatewayTestsHandler) draftTasks(ctx context.Context, req *gwfeature.Dra
 			notes = append(notes, fmt.Sprintf("Runs %d of the %d tasks.", len(pick), total))
 		}
 	}
-	return notes, nil
+	return notes, len(pick), nil
 }
 
 // readyTaskIDs is the tasks of s the lock admitted, in suite order; every

@@ -108,12 +108,14 @@ func (h *gatewayTestsHandler) bad(ctx *fasthttp.RequestCtx, msg string) {
 
 func (h *gatewayTestsHandler) features(ctx *fasthttp.RequestCtx) {
 	type item struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID   string         `json:"id"`
+		Name string         `json:"name"`
+		Need gwfeature.Need `json:"need"`
 	}
+	calls := h.callsPerRun(strings.TrimSpace(string(ctx.QueryArgs().Peek("base"))))
 	out := []item{}
 	for _, f := range gwfeature.Features() {
-		out = append(out, item{ID: f.ID, Name: f.Name})
+		out = append(out, item{ID: f.ID, Name: f.Name, Need: gwfeature.NeedOf(f.ID, calls)})
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, map[string]any{"features": out})
 }
@@ -148,10 +150,18 @@ func (h *gatewayTestsHandler) draft(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	pre, err := h.draftTasks(work, &req)
+	pre, taskCount, err := h.draftTasks(work, &req)
 	if err != nil {
 		h.bad(ctx, err.Error())
 		return
+	}
+	need := h.needCheck(f.ID, req, taskCount)
+	if need != nil && need.Status == "impossible" {
+		h.bad(ctx, need.Problem+" "+need.Line)
+		return
+	}
+	if need != nil && need.Problem != "" {
+		pre = append(pre, need.Problem)
 	}
 	denv := gwfeature.DraftEnv{Root: h.root(), SourceGet: gatewaySourceGet(work, h.env), GatewayGet: gatewayRunGet(work, h.env)}
 	exp, notes, err := f.Draft(work, denv, req)
@@ -179,7 +189,7 @@ func (h *gatewayTestsHandler) draft(ctx *fasthttp.RequestCtx) {
 		exp.Name = "Bifrost test: " + f.Name
 	}
 	notes = append(pre, notes...)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(map[string]any{"experiment": exp, "notes": notes}))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(map[string]any{"experiment": exp, "notes": notes, "need": need, "image_wait": h.imageWait(work, req, taskCount)}))
 }
 
 func (h *gatewayTestsHandler) effect(ctx *fasthttp.RequestCtx) {

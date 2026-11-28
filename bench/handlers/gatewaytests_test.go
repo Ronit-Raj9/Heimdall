@@ -103,7 +103,7 @@ func TestDraftUnknownFeature400(t *testing.T) {
 		t.Fatalf("%d %s", st, out)
 	}
 	st, out = secretsCall(h, "GET", APIPrefix+"/gateway/features", "")
-	if st != 200 || !strings.Contains(out, `{"id":"w4p1_test_draft","name":"Test draft"}`) {
+	if st != 200 || !strings.Contains(out, `{"id":"w4p1_test_draft","name":"Test draft",`) {
 		t.Fatalf("features: %d %s", st, out)
 	}
 }

@@ -28,8 +28,9 @@ export function effectOf(answer: unknown): GwEffect | null {
 /** The Bifrost feature test routes (audit/W4_DESIGN_3_BIFROST.md 3.6, 6.6, 14.4, 16.3, 17.3). */
 export const gatewayApi = benchApi.enhanceEndpoints({ addTagTypes: ["Gateway"] }).injectEndpoints({
 	endpoints: (builder) => ({
-		getGatewayFeatures: builder.query<{ features: GwFeature[] }, void>({
-			query: () => "/gateway/features",
+		/** With an agent path, the overhead test's need uses that agent's measured calls per run. */
+		getGatewayFeatures: builder.query<{ features: GwFeature[] }, string | void>({
+			query: (base) => (base ? `/gateway/features?base=${encodeURIComponent(base)}` : "/gateway/features"),
 			providesTags: [{ type: "Gateway", id: "FEATURES" }],
 		}),
 		draftGatewayTest: builder.mutation<GwDraftResponse, GwDraftRequest>({
@@ -90,6 +91,7 @@ export const gatewayApi = benchApi.enhanceEndpoints({ addTagTypes: ["Gateway"] }
 
 export const {
 	useDraftGatewayTestMutation,
+	useGetGatewayFeaturesQuery,
 	useGetGatewayEffectQuery,
 	useGetGatewayEffectOptionalQuery,
 	useGetGatewayReportCardQuery,

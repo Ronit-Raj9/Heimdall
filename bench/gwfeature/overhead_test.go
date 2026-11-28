@@ -24,7 +24,7 @@ func TestOverheadDraftIsScriptedSingleArm(t *testing.T) {
 	}
 	exp, notes, err := f.Draft(context.Background(), DraftEnv{Root: t.TempDir(), GatewayGet: get},
 		DraftRequest{Feature: f.ID, Suite: "s@1", Base: "agents/a.yaml", Model: "claude-sonnet-4-5", Trials: 3, BudgetUSD: 1,
-			Tasks: []string{"t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12"}})
+			Tasks: overheadTaskIDs(30)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestOverheadDraftIsScriptedSingleArm(t *testing.T) {
 		t.Fatalf("scripted %v arms %+v", exp.ScriptedUpstream, exp.Arms)
 	}
 	c := exp.Conditions[0]
-	if c.Trials != 1 || len(c.Tasks.IDs) != 10 || c.Tasks.IDs[9] != "t10" {
+	if c.Trials != 1 || len(c.Tasks.IDs) != overheadMaxTasks || c.Tasks.IDs[overheadMaxTasks-1] != fmt.Sprintf("t%d", overheadMaxTasks) {
 		t.Fatalf("condition %+v", c)
 	}
 	g := exp.GatewayTest
@@ -119,4 +119,12 @@ func TestOverheadPluginWithoutTime(t *testing.T) {
 	if strings.Join(d.NoTime, ",") != "semantic_cache" {
 		t.Fatalf("no time %v", d.NoTime)
 	}
+}
+
+func overheadTaskIDs(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("t%d", i+1)
+	}
+	return out
 }
