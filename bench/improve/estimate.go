@@ -197,10 +197,18 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 		out.OK = false
 		out.Refusals = append(out.Refusals, EstimateNote{Code: code, Message: msg})
 	}
-	if stats.MinPossiblePUpper(ns) > aMain {
+	trial := s.IsTrial()
+	if trial {
+		// A trial is sized to show the loop works, not to decide: the gate
+		// and held-out limits below would refuse it, so they become the
+		// trial's own notice instead. It still needs practice tasks.
+		out.Trial = true
+		out.Warnings = append(out.Warnings, EstimateNote{Code: "trial", Message: TrialText})
+	}
+	if !trial && stats.MinPossiblePUpper(ns) > aMain {
 		refuse("too_few_held_out", fmt.Sprintf("This benchmark gives %d held-out tasks. With so few, no result could ever be shown to be better. Use a benchmark with at least 40 tasks, or add tasks.", ns))
 	}
-	if stats.MinPossiblePUpper(na) > gateLevel {
+	if !trial && stats.MinPossiblePUpper(na) > gateLevel {
 		refuse("gate_never_passes", fmt.Sprintf("With %d gate tasks no new version could ever be kept. Use at least 40 tasks, or fewer rounds.", na))
 	}
 	if nd < 4 {
@@ -222,10 +230,10 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 
 	// Warnings.
 	warn := func(code, msg string) { out.Warnings = append(out.Warnings, EstimateNote{Code: code, Message: msg}) }
-	if claimMDE > 15 && !math.IsInf(claimMDE, 0) {
+	if !trial && claimMDE > 15 && !math.IsInf(claimMDE, 0) {
 		warn("weak_held_out", fmt.Sprintf("With %d held-out tasks only a gain of about %.0f points or more can be confirmed. A smaller real gain will end as not proven yet.", ns, claimMDE))
 	}
-	if gateMDE > 20 && !math.IsInf(gateMDE, 0) {
+	if !trial && gateMDE > 20 && !math.IsInf(gateMDE, 0) {
 		warn("weak_gate", fmt.Sprintf("The gate tasks are few: a new version is kept only when it is about %.0f points better on them.", gateMDE))
 	}
 	if in.W <= 0 {

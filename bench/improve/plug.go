@@ -177,6 +177,9 @@ type Estimate struct {
 	Warnings   []EstimateNote     `json:"warnings"`
 	// Loops is the number of whole loops of a study (absent for one run).
 	Loops int `json:"loops,omitempty"`
+	// Trial is true for a small trial (PresetTrial): it can show the loop
+	// works and cannot prove an improvement.
+	Trial bool `json:"trial,omitempty"`
 }
 
 // EstimateRuns are the planned run counts of an estimate.

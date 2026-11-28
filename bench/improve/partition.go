@@ -48,6 +48,10 @@ func Partition(tasks []string, spec *Spec) (Splits, error) {
 	}
 	key := func(t string) string { return utils.SHA256Bytes(fmt.Appendf(nil, "%d\x00%s", spec.Seed, t)) }
 	slices.SortFunc(pool, func(a, b string) int { return strings.Compare(key(a), key(b)) })
+	if spec.MaxTasks > 0 && len(pool) > spec.MaxTasks {
+		// The same seeded order picks the sample, so it is reproducible.
+		pool = pool[:spec.MaxTasks]
+	}
 	n := len(pool)
 	nd := max(1, int(math.Round(spec.Splits.Dev*float64(n))))
 	na := max(1, int(math.Round(spec.Splits.Audit*float64(n))))

@@ -83,7 +83,25 @@ const (
 	PresetMedium = "medium"
 	PresetLarge  = "large"
 	PresetCustom = "custom"
+	// PresetTrial is the small trial: a few tasks, one round, no controls.
+	// It shows the loop works and never keeps a new version (TrialText).
+	PresetTrial = "trial"
 )
+
+// Sizes of a trial (Spec.MaxTasks with PresetTrial).
+const (
+	DefaultTrialTasks = 12
+	MinTrialTasks     = 10
+	MaxTrialTasks     = 40
+	MaxTrialRounds    = 3
+	MaxTrialIdeas     = 2
+)
+
+// TrialText is what a trial says before the start and in its result.
+const TrialText = "A trial this small can show the loop works. It cannot prove an improvement."
+
+// TrialDecision is the gate's reason in every round of a trial.
+const TrialDecision = "a trial never keeps a new version: it is too small to prove a gain"
 
 // presetValues are the counts and caps a preset fills into unset fields (A3.6).
 type presetValues struct {
@@ -100,6 +118,7 @@ type presetValues struct {
 var presets = map[string]presetValues{
 	PresetSmall:  {rounds: 3, candidates: 2, keep: 2, screen: 1, gate: 2, sealed: 2, improverUSD: 0.30, extension: true, limitUSD: 15},
 	PresetMedium: {rounds: 5, candidates: 4, keep: 4, merge: true, restart: []int{3, 5}, screen: 1, gate: 3, sealed: 2, curve: true, improverUSD: 0.60, extension: true, limitUSD: 60},
+	PresetTrial:  {rounds: 1, candidates: 1, keep: 1, screen: 1, gate: 1, sealed: 1, improverUSD: 0.10, limitUSD: 3},
 	PresetLarge:  {rounds: 8, candidates: 8, keep: 8, merge: true, restart: []int{3, 6}, screen: 2, gate: 3, sealed: 3, curve: true, improverUSD: 1.50, limitUSD: 400},
 }
 
@@ -108,11 +127,14 @@ var DefaultFrozen = []string{"adapter", "image", "build", "argv", "env", "model"
 
 // Spec is an improvement run definition, frozen and hashed at creation.
 type Spec struct {
-	Kind     string       `json:"kind" yaml:"kind"`
-	Name     string       `json:"name" yaml:"name"`
-	Agent    string       `json:"agent" yaml:"agent"` // agents/<id>.yaml or agents/<id>.yaml@v<N>: version 0
-	Suite    string       `json:"suite" yaml:"suite"` // benchmark whose tasks are partitioned
-	Tasks    []string     `json:"tasks,omitempty" yaml:"tasks"`
+	Kind  string   `json:"kind" yaml:"kind"`
+	Name  string   `json:"name" yaml:"name"`
+	Agent string   `json:"agent" yaml:"agent"` // agents/<id>.yaml or agents/<id>.yaml@v<N>: version 0
+	Suite string   `json:"suite" yaml:"suite"` // benchmark whose tasks are partitioned
+	Tasks []string `json:"tasks,omitempty" yaml:"tasks"`
+	// MaxTasks caps the task pool: a seeded sample of that many tasks is
+	// partitioned. 0 means every task. A trial defaults to DefaultTrialTasks.
+	MaxTasks int          `json:"max_tasks,omitempty" yaml:"max_tasks"`
 	Rounds   int          `json:"rounds" yaml:"rounds"`
 	Seed     int64        `json:"seed" yaml:"seed"`
 	Editable Editable     `json:"editable" yaml:"editable"`
@@ -342,6 +364,15 @@ func (s *Spec) presetDefaults() {
 	if s.Commit.Alpha == 0 {
 		s.Commit.Alpha = DefaultGateAlpha
 	}
+	if s.Preset == PresetTrial {
+		// A trial proves nothing, so it pays for no control arms.
+		if s.Controls == nil {
+			s.Controls = []string{}
+		}
+		if s.MaxTasks == 0 {
+			s.MaxTasks = DefaultTrialTasks
+		}
+	}
 	if s.Controls == nil {
 		s.Controls = []string{ControlNullImprover, ControlRetries}
 	}
@@ -448,9 +479,26 @@ func (s *Spec) validateW4() []error {
 	var errs []error
 	bad := func(f string, a ...any) { errs = append(errs, fmt.Errorf(f, a...)) }
 	switch s.Preset {
-	case "", PresetSmall, PresetMedium, PresetLarge, PresetCustom:
+	case "", PresetSmall, PresetMedium, PresetLarge, PresetCustom, PresetTrial:
 	default:
-		bad("preset must be small, medium, large or custom")
+		bad("preset must be trial, small, medium, large or custom")
+	}
+	if s.MaxTasks < 0 || (s.MaxTasks > 0 && s.MaxTasks < 3) {
+		bad("max_tasks must be 0 (every task) or at least 3")
+	}
+	if s.IsTrial() {
+		if s.MaxTasks < MinTrialTasks || s.MaxTasks > MaxTrialTasks {
+			bad("A trial uses %d to %d tasks.", MinTrialTasks, MaxTrialTasks)
+		}
+		if s.Rounds > MaxTrialRounds {
+			bad("A trial runs at most %d rounds.", MaxTrialRounds)
+		}
+		if s.Improver.Candidates > MaxTrialIdeas {
+			bad("A trial tries at most %d ideas per round.", MaxTrialIdeas)
+		}
+		if s.Replicate.Loops > 1 {
+			bad("A trial runs one loop only.")
+		}
 	}
 	im := s.Improver
 	if im.Candidates < 1 || im.Candidates > MaxCandidates || im.Keep < 1 || im.Keep > MaxCandidates {
@@ -498,6 +546,10 @@ func (s *Spec) validateW4() []error {
 	}
 	return errs
 }
+
+// IsTrial reports whether the spec is a small trial: it never keeps a new
+// version and its result says it cannot prove an improvement.
+func (s *Spec) IsTrial() bool { return s.Preset == PresetTrial }
 
 // Hash is the spec's content hash, frozen in the improvement record.
 func (s *Spec) Hash() (string, error) { return utils.HashJSON(s) }

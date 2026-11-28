@@ -84,7 +84,11 @@ func improveEstimatePool(s *schemas.Suite, spec *improve.Spec) (improve.Estimate
 	if err != nil {
 		return improve.EstimateInput{}, err
 	}
-	return improve.EstimateInput{Spec: spec, Pool: len(pool),
+	n := len(pool)
+	if spec.MaxTasks > 0 {
+		n = min(n, spec.MaxTasks)
+	}
+	return improve.EstimateInput{Spec: spec, Pool: n,
 		Splits: improve.SplitCounts{Practice: len(sp.Dev), Gate: len(sp.Audit), HeldOut: len(sp.Sealed), Impossible: honeypots}}, nil
 }
 

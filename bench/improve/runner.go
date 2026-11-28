@@ -55,6 +55,11 @@ func (r *Runner) Create(ctx context.Context, spec *Spec, actor string) (*Record,
 	if err != nil {
 		return nil, err
 	}
+	if r.RefuseUndecidable {
+		if err := sizeRefusal(spec, splits); err != nil {
+			return nil, err
+		}
+	}
 	prot, err := r.Exec.Protect(ctx, spec, slices.Concat(splits.Audit, splits.Sealed))
 	if err != nil {
 		return nil, fmt.Errorf("read protected task content: %w", err)
@@ -75,6 +80,36 @@ func (r *Runner) Create(ctx context.Context, spec *Spec, actor string) (*Record,
 	}
 	return rec, r.save(rec)
 }
+
+// sizeRefusal refuses, before anything is stored, a size whose gate or
+// held-out check can never decide, or with too few practice tasks: the
+// same rules as the estimate's refusals (the money rule is left to the
+// estimate, which knows the run cost). A trial is exempt from the two
+// decision rules because it never decides.
+func sizeRefusal(spec *Spec, sp Splits) error {
+	if DefaultEstimator == nil {
+		return nil
+	}
+	e := DefaultEstimator.Estimate(EstimateInput{Spec: spec, Pool: len(sp.Dev) + len(sp.Audit) + len(sp.Sealed),
+		Splits: SplitCounts{Practice: len(sp.Dev), Gate: len(sp.Audit), HeldOut: len(sp.Sealed), Impossible: len(sp.Honeypots)}})
+	for _, n := range e.Refusals {
+		switch n.Code {
+		case "too_few_held_out", "gate_never_passes", "too_few_practice":
+			return badSize{errors.New(n.Message)}
+		}
+	}
+	return nil
+}
+
+// ErrBadSize marks a spec refused at create because its size can never
+// decide (sizeRefusal); the error's text is the plain reason.
+var ErrBadSize = errors.New("this size cannot decide")
+
+// badSize is a size refusal that reads as its own sentence and still
+// matches ErrBadSize.
+type badSize struct{ error }
+
+func (e badSize) Unwrap() []error { return []error{ErrBadSize, e.error} }
 
 // Get returns a stored improvement.
 func (r *Runner) Get(id string) (*Record, error) { return r.load(id) }
@@ -1227,6 +1262,12 @@ func (r *Runner) audit(ctx context.Context, rec *Record, rd *Round) error {
 		why := fmt.Sprintf("blocked: flagged runs rose from %d to %d", c.A.Vetoed, c.B.Vetoed)
 		look(CommitDecision{Level: level, N: len(d), Missing: missing, P: 1, Mean: mean(d), NNonzero: nonzero(d), Why: why})
 		r.decide(rec, rd, DecisionRejected, why)
+	case rec.Spec.IsTrial():
+		// A trial runs the gate to show it works but never keeps a version:
+		// its few tasks cannot prove a gain, and no look of the error budget
+		// is spent.
+		look(CommitDecision{Level: level, N: len(d), Missing: missing, P: 1, Mean: mean(d), NNonzero: nonzero(d), Skipped: true, Why: TrialDecision})
+		r.decide(rec, rd, DecisionRejected, TrialDecision)
 	default:
 		dec := rule.Decide(d, missing, len(rec.Splits.Audit), level)
 		look(dec)

@@ -140,7 +140,21 @@ func (r *Runner) verdict(rec *Record) (*Verdict, error) {
 		fillFinal(rec.Final, v)
 	}
 	r.decorate(rec, v)
+	trialVerdict(rec, v)
 	return v, nil
+}
+
+// trialVerdict makes a trial's verdict say what a trial can and cannot
+// show: whatever its numbers, it claims no gain.
+func trialVerdict(rec *Record, v *Verdict) {
+	if !rec.Spec.IsTrial() {
+		return
+	}
+	v.State = VerdictNotClaimable
+	v.Headline = TrialText
+	if !slices.Contains(v.Notes, TrialText) {
+		v.Notes = append(v.Notes, TrialText)
+	}
 }
 
 // claimInput builds the claim's input from counted runs on tasks.

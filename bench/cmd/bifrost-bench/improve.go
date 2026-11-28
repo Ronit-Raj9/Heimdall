@@ -290,7 +290,7 @@ var improveOnEvent func(a *app) func(kind string, rec *improve.Record)
 // newImproveRunner wires the runner over the runs root.
 func newImproveRunner(a *app) *improve.Runner {
 	r := &improve.Runner{Root: filepath.Join(a.store.Root(), improve.DefaultDir), Exec: improveExecutor{a: a}, Logger: a.logger,
-		Objects: improve.Objects{Root: filepath.Join(a.store.Root(), improve.DefaultDir, "objects")}}
+		Objects: improve.Objects{Root: filepath.Join(a.store.Root(), improve.DefaultDir, "objects")}, RefuseUndecidable: true}
 	if improveOnEvent != nil {
 		r.OnEvent = improveOnEvent(a)
 	}

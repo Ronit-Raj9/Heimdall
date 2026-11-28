@@ -28,6 +28,10 @@ type Runner struct {
 	Objects Objects
 	// OnEvent is called when a run finishes or pauses; nil calls nothing.
 	OnEvent func(kind string, rec *Record)
+	// RefuseUndecidable refuses at Create a size whose gate or held-out
+	// check can never decide (sizeRefusal). The server sets it; scripted
+	// tests of the loop leave it off to run on tiny pools.
+	RefuseUndecidable bool
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
