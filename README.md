@@ -4,7 +4,7 @@
 
 # Heimdall
 
-Heimdall is a release gate for agent changes that pass through Bifrost: it runs your real agent through Bifrost with the change, breaks the gateway on purpose with its own Bifrost plugin, and says better, worse, or too early to tell.
+Heimdall is a release gate for agent changes that pass through Bifrost: it runs your real agent through Bifrost with the change, injects gateway faults on purpose (through its own Bifrost plugin, or through a fault proxy behind Bifrost), and says better, worse, or too early to tell.
 
 Built by Ronit Raj for the Geek Room x Maxim hackathon, Problem Statement 2 (agent benchmarking platform). This repository is a fork of [Bifrost](https://github.com/maximhq/bifrost); Heimdall lives in `bench/` and `plugins/heimdall/`.
 
@@ -26,7 +26,7 @@ Built by Ronit Raj for the Geek Room x Maxim hackathon, Problem Statement 2 (age
 ## What is different
 
 - **Verdicts that can say "too early to tell".** Two versions of an agent run on the same tasks, and an exact paired test decides better, worse, or too early to tell. A small sample never passes as a win.
-- **Faults injected inside Bifrost.** The `plugins/heimdall` Bifrost plugin breaks the gateway on purpose (error codes, rate limits, timeouts, latency, outage windows), so the agent meets the failures it will meet in production.
+- **Faults injected at the gateway.** Error codes, rate limits, timeouts, latency and outage windows are injected on the model calls that pass through Bifrost, so the agent meets the failures it will meet in production. With `HEIMDALL_FAULT_MODE=plugin` the `plugins/heimdall` Bifrost plugin injects them inside the gateway; the default hosted setup, the live site included, injects them through a fault proxy behind Bifrost.
 - **Every task proven by controls before it counts.** A task joins a benchmark only after its official solution passes and empty, wrong and cheating answers fail.
 
 ## Screenshots
@@ -96,14 +96,14 @@ flowchart LR
 | Bifrost feature | What Heimdall does with it | Where |
 |---|---|---|
 | Governance virtual keys and budgets | One virtual key per run, minted before and revoked after; the evaluation's spending limit becomes a hard Bifrost budget | [`bench/gateways/bifrost/keys.go`](bench/gateways/bifrost/keys.go) |
-| Plugin `PreLLMHook` and `PostLLMHook` | The heimdall plugin injects planned faults inside the gateway and tags every call with its run and evaluation | [`plugins/heimdall/`](plugins/heimdall/) |
+| Plugin `PreLLMHook` and `PostLLMHook` | The heimdall plugin tags every call with its run and evaluation; in plugin fault mode (`HEIMDALL_FAULT_MODE=plugin`) it also injects the planned faults inside the gateway. The default is a fault proxy behind Bifrost | [`plugins/heimdall/`](plugins/heimdall/) |
 | Fallbacks | "Provider failover" takes the primary down on purpose and reports whether failover worked, its latency and cost | [`bench/faults/`](bench/faults/) |
-| Semantic cache | "Bifrost cache on vs off" runs two setups that differ only in the cache and reports hit rate, latency, cost and quality | [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md) |
+| Semantic cache | "Bifrost cache on vs off" runs two setups that differ only in the cache and reports hit rate, latency, cost and quality. Needs a gateway with the semantic cache plugin loaded; the gateway of the live site has none | [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md) |
 | MCP gateway | A task's MCP tool servers can go through Bifrost, so tool calls appear in its logs next to model calls | [`bench/mcptest/`](bench/mcptest/) |
 | Logs API and gateway request rows | The Through Bifrost panel on every run lists provider, model, fallbacks, cache hits, faults, tokens, cost and latency per call | [`bench/traceinbox/`](bench/traceinbox/) |
-| Routing export | "Use this in Bifrost" writes the winning routing rules of a model switch to your own gateway | [`bench/gateways/bifrost/`](bench/gateways/bifrost/) |
+| Routing export | "Use this in Bifrost" shows the winning setting of a finished test as text to copy into your own gateway. Heimdall never writes to a gateway | [`bench/gateways/bifrost/`](bench/gateways/bifrost/) |
 | `x-bf-*` headers | Each run's requests carry Bifrost's headers for the features under test | [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md) |
-| Prompt and skills repositories | Planned: improvement runs read and write prompts and skills kept in Bifrost | not built yet |
+| Prompt and skills repositories | A prompt version or a skill version kept in Bifrost can be a test arm, and a skill version can be imported into an agent (Gateway page, with your own Bifrost connected) | [`bench/gwfeature/`](bench/gwfeature/) |
 
 Every touchpoint with file paths and sequence diagrams: [`bench/docs/bifrost-integration.md`](bench/docs/bifrost-integration.md).
 
@@ -126,7 +126,7 @@ The server serves the API and the UI and schedules evaluations. Workers run each
 
 ## Tests and CI
 
-At the time of writing: 1,566 Go test files under `bench/`, 425 UI test files under `bench/ui/` and 3 Go test files in `plugins/heimdall/`.
+At the time of writing: 1,896 Go test files under `bench/`, 749 UI test files under `bench/ui/` and 3 Go test files in `plugins/heimdall/`.
 
 ```sh
 cd bench && GOWORK=off go vet ./... && GOWORK=off go test -count=1 ./...
