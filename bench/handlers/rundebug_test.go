@@ -110,19 +110,19 @@ func TestReplayAndForkStartUncountedChild(t *testing.T) {
 		exp.Conditions[0].Tasks.IDs[0] != "t01" || exp.Concurrency != 1 {
 		t.Fatalf("replay experiment = %+v", exp)
 	}
-	ctx = dbgDo(r, "POST", "/runs/r_1/fork", `{"call":1,"message":"check the tests first"}`)
+	ctx = dbgDo(r, "POST", "/runs/r_1/fork", `{"call":1,"message":"check the tests first","budget_usd":0.5}`)
 	if ctx.Response.StatusCode() != fasthttp.StatusCreated {
 		t.Fatalf("fork %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 	if d := l.planned.Debug; d.Mode != schemas.DebugFork || d.Call != 1 || d.Edit == nil || d.Edit.Message != "check the tests first" {
 		t.Fatalf("fork spec = %+v", d)
 	}
-	for _, body := range []string{`{"call":9}`, `{"call":1,"response":"a","message":"b"}`, `{"nope":1}`} {
+	for _, body := range []string{`{"call":9,"budget_usd":0.5}`, `{"call":1,"response":"a","message":"b","budget_usd":0.5}`, `{"nope":1}`} {
 		if ctx := dbgDo(r, "POST", "/runs/r_1/fork", body); ctx.Response.StatusCode() != 400 {
 			t.Fatalf("fork %s: %d", body, ctx.Response.StatusCode())
 		}
 	}
-	if ctx := dbgDo(r, "POST", "/runs/r_1/debug", `{"breakpoints":{"every":true}}`); ctx.Response.StatusCode() != 409 {
+	if ctx := dbgDo(r, "POST", "/runs/r_1/debug", `{"breakpoints":{"every":true},"budget_usd":0.5}`); ctx.Response.StatusCode() != 409 {
 		t.Fatalf("breakpoints without a hold controller: %d", ctx.Response.StatusCode())
 	}
 }
@@ -197,7 +197,7 @@ func TestReplayAllowedForModelFaultRun(t *testing.T) {
 func TestForkRefusedForFaultRun(t *testing.T) {
 	l := &fakeLauncher{}
 	r := debugServer(t, Services{Index: debugIndex(true, schemas.GenericProbeModelBrownout, ""), Launcher: l, Holds: &fakeHolds{}})
-	for _, c := range []struct{ path, body string }{{"/runs/r_1/fork", `{"call":1,"message":"x"}`}, {"/runs/r_1/debug", `{"breakpoints":{"every":true}}`}} {
+	for _, c := range []struct{ path, body string }{{"/runs/r_1/fork", `{"call":1,"message":"x","budget_usd":0.5}`}, {"/runs/r_1/debug", `{"breakpoints":{"every":true},"budget_usd":0.5}`}} {
 		ctx := dbgDo(r, "POST", c.path, c.body)
 		if ctx.Response.StatusCode() != fasthttp.StatusConflict {
 			t.Fatalf("%s: %d %s", c.path, ctx.Response.StatusCode(), ctx.Response.Body())
