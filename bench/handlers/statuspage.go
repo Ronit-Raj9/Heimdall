@@ -30,6 +30,7 @@ func NewStatusPageHandler(mode schemas.Mode, svc *statuspage.Service) *StatusPag
 // RegisterRoutes registers GET /status.
 func (h *StatusPageHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	r.GET(StatusPagePath, lib.ChainMiddlewares(h.get, middlewares...))
+	h.registerIncidentRoutes(r, middlewares...)
 }
 
 func (h *StatusPageHandler) get(ctx *fasthttp.RequestCtx) {

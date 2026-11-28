@@ -3,6 +3,8 @@ import { StatusDot, StatusPill, type StatusTone } from "@/components/ui/statusPi
 import { type Incident, type StatusLevel, type StatusPage, useGetStatusPageQuery } from "@/lib/store/apis/statusApi";
 import "@/lib/types/statusI18n";
 import { usePageTitle } from "@/lib/routing/pageTitle";
+import { useSession } from "@/lib/session/sessionContext";
+import { IncidentAdmin } from "./incidentForm";
 import { useTranslation } from "react-i18next";
 
 /** How each level reads at a glance. */
@@ -25,6 +27,7 @@ function when(iso?: string): string {
 export default function StatusView() {
 	const { t } = useTranslation("status");
 	const q = useGetStatusPageQuery(undefined, { pollingInterval: 30_000, skipPollingIfUnfocused: true });
+	const session = useSession();
 
 	usePageTitle(t("page.title"));
 
@@ -45,7 +48,12 @@ export default function StatusView() {
 			</div>
 		);
 	}
-	return <StatusPageView page={q.data} />;
+	return (
+		<>
+			<StatusPageView page={q.data} />
+			{session.serverAdmin && <IncidentAdmin open={q.data.incidents.filter((i) => i.status !== "resolved")} onSaved={() => q.refetch()} />}
+		</>
+	);
 }
 
 /** The page body for one answer (tests render it directly). */

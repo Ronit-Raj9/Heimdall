@@ -101,7 +101,8 @@ rule tests, Auto-improve, Settings). "Comparison page" means
 | `skill rules` | none | CLI only | rule list reference |
 | `skill scan` | Agent page, Tools tab, skill upload (scanned on upload) | web | |
 | `status incident list` | Status page (`/status`) | web | read only |
-| `status incident open` / `update` / `resolve` / `remove` | none | CLI only | operator task; no write route yet |
+| `status incident open` / `update` / `resolve` | Status page (`/status`), **Post an incident**, **Update an incident** (server admins) | web | `POST /api/bench/status/incidents`, `POST /api/bench/status/incidents/{id}` |
+| `status incident remove` | none | CLI only | operator task |
 | `suite admit` | Suite page, Ops tab, **Admit all tasks** (job `suite.admit`) | web | hosted: runs on a runner |
 | `suite init` | Benchmarks, **New suite** | web | |
 | `suite lint` / `lock` | Suite page, Edit tab, **Lint**, **Lock** (jobs `suite.lint`, `suite.lock`) | web | |
@@ -122,7 +123,7 @@ rule tests, Auto-improve, Settings). "Comparison page" means
   `init`, `ci card`, `ci evaluate`, `login`, `logout`): they act on a machine or a checkout the website cannot
   reach. The website shows the exact command where one is needed.
 - Operator tasks (`admin`, `drain`, `images`, `registry`, `egress`,
-  `reference` writes, `status incident` writes, `db`): shell tasks on the
+  `reference` writes, `status incident remove`, `db`): shell tasks on the
   server, not user actions.
 - Not wired yet (`bifrost cache-replays`, `bifrost cache-ab`, `paired`, `mock fixtures`, `canary simulate`, `mcp scan`,
   `skill rules`, `codescan rules`, `index query`, `release export`,

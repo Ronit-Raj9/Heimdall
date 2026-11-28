@@ -1,0 +1,20 @@
+{
+	"incident": {
+		"heading": "Post an incident",
+		"title": "Title",
+		"message": "Note",
+		"impact": "Impact",
+		"open": "Post",
+		"opening": "Posting...",
+		"noteHeading": "Update an incident",
+		"which": "Incident",
+		"status": "Status",
+		"addNote": "Add note",
+		"adding": "Saving...",
+		"none": "No open incidents.",
+		"public": "Shown publicly on this page.",
+		"error": "Could not save the incident.",
+		"impacts": { "none": "None", "minor": "Minor", "major": "Major", "critical": "Critical", "maintenance": "Maintenance" },
+		"statuses": { "investigating": "Investigating", "identified": "Identified", "monitoring": "Monitoring", "resolved": "Resolved" }
+	}
+}
