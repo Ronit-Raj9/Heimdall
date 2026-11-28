@@ -45,8 +45,8 @@ func (g *t5GitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := g.f.candidate
-	switch {
-	case r.URL.Path == "/graphql":
+	switch r.URL.Path {
+	case "/graphql":
 		var q struct {
 			Query string `json:"query"`
 		}
@@ -77,9 +77,9 @@ func (g *t5GitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			data = map[string]any{"repository": map[string]any{"nameWithOwner": ibeRepo, "defaultBranchRef": map[string]any{"name": "main"}, "primaryLanguage": map[string]any{"name": "Python"}}}
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
-	case r.URL.Path == "/repos/"+ibeRepo+"/commits/"+c.MergeSHA:
+	case "/repos/" + ibeRepo + "/commits/" + c.MergeSHA:
 		_ = json.NewEncoder(w).Encode(map[string]any{"sha": c.MergeSHA, "parents": []map[string]any{{"sha": c.BaseSHA}}})
-	case r.URL.Path == "/repos/"+ibeRepo+"/compare/"+c.BaseSHA+"..."+c.MergeSHA:
+	case "/repos/" + ibeRepo + "/compare/" + c.BaseSHA + "..." + c.MergeSHA:
 		_, _ = io.WriteString(w, g.diff)
 	default:
 		w.WriteHeader(http.StatusNotFound)

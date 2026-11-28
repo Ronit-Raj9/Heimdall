@@ -105,7 +105,7 @@ const traceTaskNoWorker = "No worker online"
 
 func traceTaskAdmitLocal(ctx context.Context, env jobEnv, benchRoot, suiteID, taskID string) (*schemas.AdmissionRecord, error) {
 	if env.App == nil || env.App.reg == nil {
-		return nil, errors.New(traceTaskNoWorker)
+		return nil, errors.New(traceTaskNoWorker) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	a := env.App
 	s, err := loadSuite(ctx, benchRoot, suiteID)
@@ -386,7 +386,7 @@ func finalizeTraceTask(ctx context.Context, env jobEnv, j *jobs.Job, p traceTask
 	verdict, expID, err := traceTaskFinalAdmit(ctx, env, j, p.Suite, p.TaskID, log)
 	if err != nil {
 		if errors.Is(err, errNoRunner) {
-			return nil, errors.New(traceTaskNoWorker)
+			return nil, errors.New(traceTaskNoWorker) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 		}
 		return nil, err
 	}

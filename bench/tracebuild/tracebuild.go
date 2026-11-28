@@ -237,7 +237,7 @@ func (l *loop) call(ctx context.Context, msgs []investigator.Message, schema str
 	}
 	if r.Served != "" && r.Model != "" && r.Served != r.Model {
 		//nolint:staticcheck // ST1005: a full sentence shown to the user as is
-		return "", fmt.Errorf("The gateway answered with %s, not %s. Nothing was built.", r.Served, r.Model)
+		return "", fmt.Errorf("The gateway answered with %s, not %s. Nothing was built.", r.Served, r.Model) //nolint:staticcheck // ST1005: a full sentence shown to the user as is
 	}
 	return r.Text, nil
 }
