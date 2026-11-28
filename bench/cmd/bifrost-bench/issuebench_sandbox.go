@@ -130,6 +130,7 @@ func ibEgressSandboxWith(ctx context.Context, o ibEgressOptions, req issuebench.
 	if o.Runtime != "" {
 		pargs = append(pargs, "--runtime", o.Runtime)
 	}
+	pargs = utils.RaisePidsForGVisor(pargs, o.Runtime) // gVisor counts its own threads (utils/gvisorpids.go)
 	// The image's entrypoint is already `heimdall-egress egress serve`.
 	pargs = append(pargs, o.Image, "-ca", egress.ServiceCAPath, "-log", "")
 	if _, err := call(ctx, 5*time.Minute, pargs...); err != nil {

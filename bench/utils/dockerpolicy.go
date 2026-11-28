@@ -254,8 +254,12 @@ func (p *DockerPolicy) RewriteContext(ctx context.Context, args []string) ([]str
 		}
 	}
 	out := append([]string(nil), prefix...)
-	if (sub == "run" || sub == "create" || sub == "container run" || sub == "container create") && p.Runtime != "" && !hasFlag(rest, "--runtime") {
+	starts := sub == "run" || sub == "create" || sub == "container run" || sub == "container create"
+	if starts && p.Runtime != "" && !hasFlag(rest, "--runtime") {
 		out = append(out, "--runtime", p.Runtime)
+	}
+	if starts { // gVisor counts its own threads in the pids limit (gvisorpids.go)
+		rest = RaisePidsForGVisor(rest, p.Runtime)
 	}
 	for _, a := range rest {
 		if err := p.foreign(a); err != nil {

@@ -47,7 +47,15 @@ func processRule(st *runState, sess *schemas.SessionSpec) *schemas.ProcessFault 
 func (p *Pipeline) execAgent(ctx context.Context, st *runState, plan *schemas.RunPlan, sess *schemas.SessionSpec) (*schemas.ExecResult, error) {
 	rule := processRule(st, sess)
 	if rule == nil {
-		return st.env.Exec(ctx, st.rc, plan)
+		var res *schemas.ExecResult
+		err := p.retryBusyStart(ctx, st, schemas.StageRun, func() (bool, error) { // gVisor busy host (startretry.go)
+			var eerr error
+			res, eerr = st.env.Exec(ctx, st.rc, plan)
+			// Retried only when certain the agent never ran.
+			launched := !errors.Is(eerr, schemas.ErrNotLaunched) && res != nil && !res.Started.IsZero()
+			return launched, eerr
+		})
+		return res, err
 	}
 	if err := rule.Validate(); err != nil {
 		return nil, err

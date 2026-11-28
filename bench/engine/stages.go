@@ -64,7 +64,12 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.resolveSecrets(ctx, st); err != nil { // G01: org secrets the run names (secrets.go)
 		return err
 	}
-	h, err := st.env.Create(ctx, st.rc)
+	var h *schemas.EnvironmentHandle
+	err := p.retryBusyStart(ctx, st, schemas.StagePrepare, func() (bool, error) { // gVisor busy host (startretry.go)
+		var cerr error
+		h, cerr = st.env.Create(ctx, st.rc)
+		return false, cerr
+	})
 	if err != nil {
 		return wrapPart("environment", st.env, fmt.Errorf("create workspace: %w", err))
 	}
