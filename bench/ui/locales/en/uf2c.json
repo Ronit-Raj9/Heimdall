@@ -31,6 +31,7 @@
 	},
 	"setup": {
 		"savedIn": "Saved in",
+		"editCode": "Edit code",
 		"unsaved": "Unsaved changes",
 		"noChanges": "No changes"
 	},

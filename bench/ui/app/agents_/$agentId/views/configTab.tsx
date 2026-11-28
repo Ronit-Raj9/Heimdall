@@ -152,6 +152,17 @@ function SavedNotice({ doc }: { doc: AgentConfigDoc }) {
 	);
 }
 
+/**
+ * The folder of the agent's own code inside the project's agents area (the folder of its
+ * build.dockerfile, e.g. "images/my-agent"), or "" for an agent without a build of its own.
+ */
+export function agentCodeDir(yaml: string): string {
+	const m = /^[ \t]+dockerfile:[ \t]*["']?(agents\/[^\s"'#]+)["']?[ \t]*(#.*)?$/m.exec(yaml);
+	if (!m) return "";
+	const dir = m[1].slice("agents/".length).split("/").slice(0, -1).join("/");
+	return dir.includes("..") ? "" : dir;
+}
+
 /** One titled group of the config form. */
 function FormSection({ title, hint, children, testId }: { title: string; hint?: string; children: ReactNode; testId?: string }) {
 	return (
@@ -172,6 +183,7 @@ function FormSection({ title, hint, children, testId }: { title: string; hint?: 
 function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onReload: () => void; checkFailed: boolean }) {
 	const { t } = useTranslation("agentBuilder");
 	const fileValid = doc.fields.adapter !== "";
+	const codeDir = agentCodeDir(doc.yaml);
 	const [view, setView] = useState<"form" | "yaml">(fileValid ? "form" : "yaml");
 	const { t: ta } = useTranslation("agentFirst");
 	const { t: tu } = useTranslation("uf2c");
@@ -293,6 +305,19 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 			</div>
 			<p className="text-muted-foreground -mt-2 min-w-0 truncate text-xs" title={doc.path} data-testid="config-path">
 				{tu("setup.savedIn")} <span className="font-mono">{doc.path}</span>
+				{codeDir && (
+					<>
+						{" · "}
+						<Link
+							to="/settings"
+							search={{ tab: "files", area: "agents", dir: codeDir } as never}
+							className="text-primary hover:underline"
+							data-testid="config-edit-code"
+						>
+							{tu("setup.editCode")}
+						</Link>
+					</>
+				)}
 			</p>
 			{!fileValid && <p className="text-warning-ink text-sm">{t("config.invalidFile")}</p>}
 
