@@ -21,9 +21,11 @@ import "./ufrhI18n";
 const src = (path: string) => readFileSync(resolve(__dirname, "../../..", path), "utf8");
 
 describe("Failures round 2 (lane RH)", () => {
-	it("Q-204: the check-fix rerun names its estimate as the cap and always asks first", () => {
+	it("Q-204: the check-fix rerun names its cap (opened on the estimate) and always asks first", () => {
 		const code = src("components/findings/checkFixDialog.tsx");
-		expect(code).toContain("capUsd={estimate.usd}");
+		// Lane F1: the cap is its own field, opening on rerunCap(estimate), and the server enforces it.
+		expect(code).toContain("rerunCap(estimate.usd)");
+		expect(code).toContain("capUsd={cap}");
 		expect(code).not.toContain('confirm="auto"');
 		// The confirm text and the label round through the same helper.
 		expect(code).toContain("formatUsd(estimate.usd)");

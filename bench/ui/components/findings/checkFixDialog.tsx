@@ -8,7 +8,9 @@ import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/
 import { useRerunFindingMutation, type Finding } from "@/lib/store/apis/findingsApi";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { findingExperiment, rerunEstimate } from "./findingPlans";
+import { CAP_MIN, findingExperiment, rerunBody, rerunCap, rerunEstimate } from "./findingPlans";
+import { plainJobError } from "./jobModel";
+import "./uff1I18n";
 
 const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 text-sm";
 
@@ -20,6 +22,7 @@ const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 te
  */
 export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: () => void }) {
 	const { t } = useTranslation("w443");
+	const { t: u } = useTranslation("uff1");
 	const experiments = useListExperimentsQuery().data?.experiments ?? [];
 	const fromHistory = findingExperiment(finding);
 	const [expId, setExpId] = useState(fromHistory);
@@ -36,17 +39,24 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 	const estimate = rerunEstimate(n, trials, source);
 	// One helper for the label and the confirm, so both name the same rounded number.
 	const usd = estimate.usd === null ? null : formatUsd(estimate.usd).replace(/^\$/, "");
+	// Every paid start has a cap (lane F1): it opens on the estimate with some room and follows it
+	// until the user types one; the server stops the rerun there.
+	const [capText, setCapText] = useState<string | null>(null);
+	const suggested = rerunCap(estimate.usd);
+	const capNum = capText === null ? suggested : Number(capText);
+	const cap = Number.isFinite(capNum) && capNum >= CAP_MIN && capNum <= 50 ? capNum : null;
+	const capStr = cap === null ? "" : cap.toFixed(2);
 	const ask =
 		usd === null
-			? t("checkFix.askUnknown", { runs: estimate.runs, n, trials })
-			: t("checkFix.ask", { runs: estimate.runs, n, trials, usd });
+			? u("checkFix.askUnknown", { runs: estimate.runs, n, trials, cap: capStr })
+			: u("checkFix.ask", { runs: estimate.runs, n, trials, usd, cap: capStr });
 
 	// Paid work: PaidButton always asks first, naming the runs and the estimate (M7-26). The label
 	// names the estimate as its amount (owner decision 1: the label always shows a dollar figure).
 	const start = async () => {
 		const res = await rerun({
 			id: finding.id,
-			body: { exp_id: expId, arm: armValue, trials, yes: true },
+			body: rerunBody(expId, armValue, trials, cap ?? suggested),
 		});
 		if ("data" in res && res.data) {
 			setNote(res.data.note ?? t("checkFix.started"));
@@ -109,12 +119,25 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 					data-testid="check-fix-trials"
 				/>
 			</label>
+			<label className="flex flex-col gap-1 text-sm">
+				{u("checkFix.cap")}
+				<input
+					type="number"
+					min={CAP_MIN}
+					max={50}
+					step={0.05}
+					className={fieldClass}
+					value={capText ?? String(suggested)}
+					onChange={(e) => setCapText(e.target.value)}
+					data-testid="check-fix-cap"
+				/>
+			</label>
 			<p className="text-muted-foreground text-sm" data-testid="check-fix-confirm">
 				{t("checkFix.confirm", { n, trials })}
 			</p>
 			{state.error ? (
 				<p className="text-destructive text-sm" role="alert" data-testid="check-fix-error">
-					{getBenchErrorMessage(state.error)}
+					{plainJobError(getBenchErrorMessage(state.error))}
 				</p>
 			) : null}
 			{note ? (
@@ -126,13 +149,13 @@ export function CheckFixDialog({ finding, onDone }: { finding: Finding; onDone: 
 				<PaidButton
 					size="sm"
 					verb={t("checkFix.verb")}
-					capUsd={estimate.usd}
+					capUsd={cap}
 					estimateRuns={estimate.runs}
 					estimateUsd={estimate.usd}
 					confirm="always"
 					kind="form"
 					confirmText={ask}
-					disabled={!expId || !armValue || state.isLoading}
+					disabled={!expId || !armValue || cap === null || state.isLoading}
 					onConfirm={start}
 					testId="check-fix-start"
 				/>

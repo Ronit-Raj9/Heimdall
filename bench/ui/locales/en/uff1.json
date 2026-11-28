@@ -1,0 +1,28 @@
+{
+	"jobError": {
+		"key": "The model key for this job could not be made. Try again. If it fails again, check the key in Settings, Model keys.",
+		"unknown": "The job did not start."
+	},
+	"model": {
+		"label": "Model",
+		"noKey": "Add a working model key in Settings, Model keys, then pick a model here."
+	},
+	"investigate": {
+		"option": "{{name}}, {{count}} failed runs, {{date}}",
+		"optionNoDate": "{{name}}, {{count}} failed runs",
+		"hidden_one": "1 comparison with no failed runs is not listed.",
+		"hidden_other": "{{count}} comparisons with no failed runs are not listed.",
+		"none": "No comparison has failed runs, so there is nothing to investigate.",
+		"ask": "Investigate {{name}} with {{model}}? A model reads up to 20 failed runs and stops at ${{cap}}."
+	},
+	"draft": {
+		"estimate": "Usually about {{usd}}, at most {{max}} if the draft must be fixed once.",
+		"estimateUnknown": "The price list does not know this model, so no estimate. The cap still holds.",
+		"ask": "Draft with {{model}}? One model call, two at most. {{estimate}} It stops at ${{cap}}."
+	},
+	"checkFix": {
+		"cap": "Spending cap ($)",
+		"ask": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times, old and fixed agent)? About ${{usd}}, stops at ${{cap}}.",
+		"askUnknown": "Rerun {{runs}} runs ({{n}} tasks, {{trials}} times, old and fixed agent)? Cost not known yet, stops at ${{cap}}."
+	}
+}

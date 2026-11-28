@@ -62,3 +62,27 @@ export function rerunEstimate(
 	if (spent === null || spent === undefined || done <= 0) return { runs, usd: null };
 	return { runs, usd: Math.round((spent / done) * runs * 100) / 100 };
 }
+/** Only the comparisons with failed runs, in investigableExperiments order: the others have nothing to read (PH2-5). */
+export function failedExperiments(experiments: readonly ExperimentStatus[]): ExperimentStatus[] {
+	return investigableExperiments(experiments).filter((e) => (e.slots?.failed ?? 0) > 0);
+}
+
+/**
+ * The body of the findings.investigate job exactly as the server reads it (jobs_findings_w442.go
+ * investigateParams, unknown fields refused): the comparison, the model and its provider, the cap
+ * and the confirm. With no model picked, provider and model are empty and the server refuses.
+ */
+export function investigationBody(expId: string, model: { provider: string; model: string } | null, cap: number) {
+	return { exp_id: expId, provider: model?.provider ?? "", model: model?.model ?? "", budget_usd: cap, yes: true };
+}
+
+/** Check fix spending cap: the estimate rounded up with room for one slow run, at least 0.25 and at most 50 dollars. */
+export function rerunCap(usd: number | null): number {
+	if (usd === null) return 1;
+	return Math.min(50, Math.max(0.25, Math.ceil(Number((usd * 150).toFixed(6))) / 100));
+}
+
+/** The body of POST /findings/{id}/rerun as the server reads it (FindingRerunRequest). */
+export function rerunBody(expId: string, arm: string, trials: number, cap: number) {
+	return { exp_id: expId, arm, trials, budget_usd: cap, yes: true as const };
+}

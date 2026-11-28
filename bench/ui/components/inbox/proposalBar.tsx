@@ -1,3 +1,6 @@
+import { defaultJobModel, plainJobError } from "@/components/findings/jobModel";
+import "@/components/findings/uff1I18n";
+import { GroupedModelPicker, type PickedModel } from "@/components/models/groupedModelPicker";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { Input } from "@/components/ui/input";
@@ -5,11 +8,14 @@ import { PaidButton } from "@/components/ui/paidButton";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useAcceptInboxItemMutation } from "@/lib/store/apis/inboxApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
+import { formatUsd } from "@/lib/money";
+import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import { useGetInboxProposalQuery, type ProposalReason, type TraceProposal } from "@/lib/store/apis/traceDraftApi";
 import type { InboxAcceptRequest, InboxTaskKind } from "@/lib/types/bench";
 import { ChevronDown, Sparkles } from "lucide-react";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useGetDraftEstimateQuery } from "./draftEstimateApi";
 import { useTranslation } from "react-i18next";
 import { guideFormErrors, guideFrom, isToolKind, type GuideCallRow, type GuideFormValues } from "./inboxGuide.utils";
 import "./w445I18n";
@@ -25,6 +31,25 @@ export function blockEnterSubmit(e: Pick<KeyboardEvent, "key" | "target" | "prev
 
 /** Default spending cap of one draft, in US dollars (the job caps it at 2.00). */
 export const DEFAULT_DRAFT_BUDGET = 0.5;
+
+/**
+ * The trace.draft job as the server reads it (jobs_tracedraft_w445.go traceDraftParams: item, suite,
+ * kind, provider, model, budget_usd, yes; unknown fields refused). Exported so a test can hold it
+ * against the server's field list.
+ */
+export function traceDraftJob(item: string, suite: string, kind: InboxTaskKind, model: PickedModel | null, budget: number) {
+	return { kind: "trace.draft", params: { item, suite, kind, provider: model?.provider ?? "", model: model?.model ?? "", budget_usd: budget, yes: true } };
+}
+
+/** The estimate line of the draft confirm, or null while it loads. */
+export function draftEstimateText(
+	u: (k: "draft.estimate" | "draft.estimateUnknown", o?: Record<string, unknown>) => string,
+	e: { priced: boolean; usd: number; max_usd: number } | undefined,
+): string | null {
+	if (!e) return null;
+	if (!e.priced) return u("draft.estimateUnknown");
+	return u("draft.estimate", { usd: formatUsd(e.usd), max: formatUsd(e.max_usd) });
+}
 
 /** The form values a proposal fills in: the guide fields of the kind, every call the model named. */
 export function prefillFromProposal(p: TraceProposal, kind: InboxTaskKind): Partial<GuideFormValues> {
@@ -111,11 +136,8 @@ export interface ProposalBarProps {
 export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: ProposalBarProps) {
 	const { t } = useTranslation("w445");
 	const { t: f } = useTranslation("uf7a");
-	const ids = useId();
 	const [confirming, setConfirming] = useState(false);
 	const barRef = useRef<HTMLDivElement>(null);
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
 	const [budget, setBudget] = useState(String(DEFAULT_DRAFT_BUDGET));
 	const [draftJob, setDraftJob] = useState<string | null>(null);
 	const [admitJob, setAdmitJob] = useState<string | null>(null);
@@ -137,7 +159,7 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 			void refetch();
 		} else if (draftStatus === "failed" || draftStatus === "cancelled") {
 			setDraftJob(null);
-			setError(draft.data?.error ?? draftStatus);
+			setError(plainJobError(draft.data?.error ?? draftStatus));
 		}
 	}, [draftJob, draftStatus, draft.data?.error, refetch]);
 
@@ -157,21 +179,18 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 			setDone(t("proposal.added", { benchmark: suite }));
 		} else if (admitStatus === "failed" || admitStatus === "cancelled") {
 			setAdmitJob(null);
-			setError(admit.data?.error ?? admitStatus);
+			setError(plainJobError(admit.data?.error ?? admitStatus));
 		}
 	}, [admitJob, admitStatus, admit.data?.error, suite, t]);
 
-	const startDraft = async () => {
+	const startDraft = async (chosen: PickedModel | null) => {
 		setError(null);
 		try {
-			const job = await createJob({
-				kind: "trace.draft",
-				params: { item: itemId, suite, kind, provider: provider.trim(), model: model.trim(), budget_usd: Number(budget), yes: true },
-			}).unwrap();
+			const job = await createJob(traceDraftJob(itemId, suite, kind, chosen, Number(budget))).unwrap();
 			setConfirming(false);
 			setDraftJob(job.id);
 		} catch (e) {
-			setError(getBenchErrorMessage(e));
+			setError(plainJobError(getBenchErrorMessage(e)));
 		}
 	};
 
@@ -239,65 +258,15 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 				/>
 			</div>
 			{confirming && (
-				<div
-					className="bg-muted flex flex-col gap-2 rounded-sm px-3 py-2"
-					role="dialog"
-					aria-label={t("proposal.draft")}
-					data-testid="proposal-confirm"
-					onKeyDown={blockEnterSubmit}
-				>
-					<p className="text-sm">{t("proposal.confirm", { budget: Number(budget).toFixed(2) })}</p>
-					<div className="flex flex-wrap items-end gap-2">
-						<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-provider`}>
-							{t("proposal.provider")}
-							<Input
-								id={`${ids}-provider`}
-								className="h-8 w-36"
-								value={provider}
-								onChange={(e) => setProvider(e.target.value)}
-								data-testid="proposal-provider"
-							/>
-						</label>
-						<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-model`}>
-							{t("proposal.model")}
-							<Input
-								id={`${ids}-model`}
-								className="h-8 w-48"
-								value={model}
-								onChange={(e) => setModel(e.target.value)}
-								data-testid="proposal-model"
-							/>
-						</label>
-						<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-budget`}>
-							{t("proposal.budget")}
-							<Input
-								id={`${ids}-budget`}
-								className="h-8 w-24"
-								type="number"
-								min="0.01"
-								max="2"
-								step="0.01"
-								value={budget}
-								onChange={(e) => setBudget(e.target.value)}
-								data-testid="proposal-budget"
-							/>
-						</label>
-						{/* A paid model call: it always asks once more through the shared confirm, which opens on Cancel. */}
-						<PaidButton
-							size="sm"
-							verb={f("accept.draftVerb")}
-							capUsd={Number(budget) > 0 ? Number(budget) : null}
-							confirm="always"
-							kind="form"
-							disabled={starting || !provider.trim() || !model.trim() || !(Number(budget) > 0)}
-							onConfirm={startDraft}
-							testId="proposal-start"
-						/>
-						<Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)} dataTestId="proposal-cancel">
-							{t("proposal.cancel")}
-						</Button>
-					</div>
-				</div>
+				<DraftPanel
+					itemId={itemId}
+					kind={kind}
+					budget={budget}
+					setBudget={setBudget}
+					starting={starting}
+					onStart={startDraft}
+					onCancel={() => setConfirming(false)}
+				/>
 			)}
 			{draftJob && (
 				<p className="text-muted-foreground text-xs" role="status" data-testid="proposal-drafting">
@@ -356,5 +325,91 @@ export function ProposalBar({ itemId, suite, kind, values, onChange, onQuote }: 
 				</p>
 			)}
 		</div>
+	);
+}
+/**
+ * The paid draft panel: the model picker opening on the org's default working model (PT-2), the
+ * cap, and the estimate from the server's price list (PT-8). Mounted only while it is open, so
+ * its model and estimate queries run only then.
+ */
+function DraftPanel({
+	itemId,
+	kind,
+	budget,
+	setBudget,
+	starting,
+	onStart,
+	onCancel,
+}: {
+	itemId: string;
+	kind: InboxTaskKind;
+	budget: string;
+	setBudget: (v: string) => void;
+	starting: boolean;
+	onStart: (m: PickedModel | null) => void | Promise<unknown>;
+	onCancel: () => void;
+}) {
+	const { t } = useTranslation("w445");
+	const { t: f } = useTranslation("uf7a");
+	const { t: u } = useTranslation("uff1");
+	const ids = useId();
+	const models = useGetModelsQuery();
+	const [picked, setPicked] = useState<PickedModel | null>(null);
+	const fallback = useMemo(() => defaultJobModel(models.data), [models.data]);
+	const chosen = picked ?? fallback;
+	const provider = chosen?.provider ?? "";
+	const model = chosen?.model ?? "";
+	const est = useGetDraftEstimateQuery({ item: itemId, model, kind }, { skip: !model });
+	const estimate = draftEstimateText(u, est.data);
+	return (
+				<div
+					className="bg-muted flex flex-col gap-2 rounded-sm px-3 py-2"
+					role="dialog"
+					aria-label={t("proposal.draft")}
+					data-testid="proposal-confirm"
+					onKeyDown={blockEnterSubmit}
+				>
+					<p className="text-sm">{t("proposal.confirm", { budget: Number(budget).toFixed(2) })}</p>
+					{estimate ? (
+						<p className="text-muted-foreground text-xs" data-testid="proposal-estimate">
+							{estimate}
+						</p>
+					) : null}
+					<div className="flex flex-wrap items-end gap-2">
+						<div className="flex min-w-56 flex-col gap-0.5 text-xs">
+							<span>{u("model.label")}</span>
+							<GroupedModelPicker value={chosen} onChange={setPicked} label={u("model.label")} testId="proposal-model" />
+						</div>
+						<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-budget`}>
+							{t("proposal.budget")}
+							<Input
+								id={`${ids}-budget`}
+								className="h-8 w-24"
+								type="number"
+								min="0.01"
+								max="2"
+								step="0.01"
+								value={budget}
+								onChange={(e) => setBudget(e.target.value)}
+								data-testid="proposal-budget"
+							/>
+						</label>
+						{/* A paid model call: it always asks once more through the shared confirm, which opens on Cancel. */}
+						<PaidButton
+							size="sm"
+							verb={f("accept.draftVerb")}
+							capUsd={Number(budget) > 0 ? Number(budget) : null}
+							confirm="always"
+							kind="form"
+							confirmText={u("draft.ask", { model, estimate: estimate ?? "", cap: Number(budget) > 0 ? Number(budget).toFixed(2) : "" })}
+							disabled={starting || !provider || !model || !(Number(budget) > 0)}
+							onConfirm={() => onStart(chosen)}
+							testId="proposal-start"
+						/>
+						<Button type="button" size="sm" variant="ghost" onClick={onCancel} dataTestId="proposal-cancel">
+							{t("proposal.cancel")}
+						</Button>
+					</div>
+				</div>
 	);
 }
