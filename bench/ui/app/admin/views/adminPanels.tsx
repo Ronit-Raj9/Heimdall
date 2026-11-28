@@ -1,3 +1,4 @@
+import { OrgPlanSetter } from "./orgPlan";
 import { ConfirmButton } from "@/components/platform/badges";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -179,6 +180,7 @@ export function AdminOrgsPanel() {
 	return (
 		<div className="flex flex-col gap-4" data-testid="admin-orgs">
 			{current && <QuotaEditor key={current.id} org={current} onClose={() => setEditing(null)} />}
+			{current && <OrgPlanSetter key={`plan-${current.id}`} orgId={current.id} orgName={current.name} />}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 				<Table>
 					<TableHeader>

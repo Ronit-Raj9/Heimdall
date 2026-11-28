@@ -9,7 +9,66 @@
 		"allPass": "All checks passed.",
 		"failed_one": "{{count}} check failed.",
 		"failed_other": "{{count}} checks failed.",
-		"status": { "pass": "Pass", "fail": "Fail", "warn": "Warning", "skip": "Skipped" },
+		"status": {
+			"pass": "Pass",
+			"fail": "Fail",
+			"warn": "Warning",
+			"skip": "Skipped"
+		},
 		"version": "Server version {{version}}"
+	},
+	"liveEdit": {
+		"edit": "Edit",
+		"title": "Edit monitor",
+		"name": "Name",
+		"tasks": "Tasks",
+		"interval": "Every (minutes)",
+		"budget": "Per day (US$)",
+		"minDrop": "Alert on drop (%)",
+		"floor": "Lowest pass rate (%)",
+		"save": "Save",
+		"cancel": "Cancel",
+		"saved": "Saved.",
+		"fixed": "Agent and benchmark stay fixed.",
+		"bad": "Check the numbers: whole tasks, interval at least {{min}} minutes, budget above 0, percents 0 to 100."
+	},
+	"jobPriority": {
+		"label": "Priority",
+		"step": {
+			"10": "Highest",
+			"5": "Higher",
+			"0": "Normal",
+			"-5": "Lower",
+			"-10": "Lowest"
+		}
+	},
+	"plan": {
+		"title": "Plan",
+		"set": "Set plan",
+		"confirm": "Set {{org}} to the {{plan}} plan without a payment? Billing changes at once.",
+		"done": "Now on {{plan}} ({{status}}).",
+		"name": {
+			"free": "Free",
+			"team": "Team",
+			"enterprise": "Enterprise"
+		}
+	},
+	"modalApps": {
+		"title": "Leftover Modal apps",
+		"load": "Look",
+		"reload": "Look again",
+		"none": "No leftover apps.",
+		"error": "Could not list the Modal apps.",
+		"tasks": "{{tasks}} tasks",
+		"stopHint": "They bill until stopped: run modal app stop <name> with your Modal account."
+	},
+	"whatIf": {
+		"title": "What if",
+		"tasks": "Tasks",
+		"drop": "Pass rate drop (%)",
+		"run": "Simulate",
+		"hint": "A simulation of this monitor's alarm rule. Free; 0 means no drift.",
+		"falseAlarm": "With no drift: a false alarm within 30 checks {{month}}.",
+		"detect": "With this drop: caught at the first check {{first}}, within 3 checks {{by3}}."
 	}
 }

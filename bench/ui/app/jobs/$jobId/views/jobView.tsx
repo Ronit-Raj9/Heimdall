@@ -1,4 +1,5 @@
 import { RoleGate } from "@/components/platform/accessNotes";
+import { JobPriority } from "@/components/jobs/jobPriority";
 import { ConfirmButton, JobStatusBadge } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { JobProgressBar, useJobKindLabel } from "@/components/platform/jobsDrawer";
@@ -136,6 +137,11 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 									{t("jobs.page.openVerdict")}
 								</Link>
 							</Button>
+						)}
+						{job.status === "queued" && (
+							<RoleGate min="admin" fallback={null}>
+								<JobPriority jobId={job.id} priority={job.priority} />
+							</RoleGate>
 						)}
 						{activeJob && !job.cancel_requested && (
 							<RoleGate min="member">

@@ -1,3 +1,4 @@
+import { EditLiveMonitor } from "./editLiveMonitor";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { NativeSelect } from "@/components/ui/select";
 import { PageHeader } from "@/components/shell";
@@ -366,14 +367,16 @@ function MonitorPanel({ id }: { id: string }) {
 export function MonitorDetailBody({ d }: { d: MonitorDetailResponse }) {
 	const { t } = useTranslation("liveMonitors");
 	const s = d.samples;
+	const [editing, setEditing] = useState(false);
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="live-monitor-detail">
 			<Section
 				title={d.name}
 				description={d.problem || `${d.agent} · ${d.benchmark} · ${d.schedule}`}
-				actions={<MonitorActions d={d} />}
+				actions={<MonitorActions d={d} onEdit={() => setEditing(true)} />}
 				testId="live-monitor-summary"
 			>
+				{editing && <EditLiveMonitor d={d} minInterval={15} onClose={() => setEditing(false)} />}
 				<p className="text-muted-foreground text-xs">
 					{t("detail.tasks")}: {d.tasks.join(", ") || "-"}
 					{d.tasks_note ? ` (${d.tasks_note})` : ""}
@@ -457,8 +460,9 @@ function IncidentCard({ i }: { i: MonitorIncident }) {
 	);
 }
 
-function MonitorActions({ d }: { d: MonitorDetailResponse }) {
+function MonitorActions({ d, onEdit }: { d: MonitorDetailResponse; onEdit: () => void }) {
 	const { t } = useTranslation("liveMonitors");
+	const { t: l8 } = useTranslation("ufl8");
 	const { t: m } = useTranslation("uf7b");
 	const confirm = useConfirm();
 	const [act, state] = useMonitorActionMutation();
@@ -503,6 +507,9 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 				data-testid="live-monitor-pause"
 			>
 				{d.paused ? t("actions.resume") : t("actions.pause")}
+			</Button>
+			<Button size="sm" variant="outline" onClick={onEdit} data-testid="live-monitor-edit-open">
+				{l8("liveEdit.edit")}
 			</Button>
 			<Button
 				size="sm"

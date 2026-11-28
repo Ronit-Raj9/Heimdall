@@ -1,3 +1,4 @@
+import { WhatIf } from "./whatIf";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { CanaryDetailBody } from "@/components/canaries/canaryDetail";
 import { CanaryList } from "@/components/canaries/canaryList";
@@ -227,10 +228,13 @@ function CanaryPanel({ name, onEdit, onDeleted }: { name: string; onEdit(d: Cana
 	}
 	const def = detail.data.definition;
 	return (
-		<CanaryDetailBody
-			detail={detail.data}
-			actions={<CanaryActions name={name} definition={def} onEdit={() => onEdit(def)} onDeleted={onDeleted} />}
-		/>
+		<div className="flex min-w-0 flex-col gap-4">
+			<CanaryDetailBody
+				detail={detail.data}
+				actions={<CanaryActions name={name} definition={def} onEdit={() => onEdit(def)} onDeleted={onDeleted} />}
+			/>
+			<WhatIf def={def} />
+		</div>
 	);
 }
 

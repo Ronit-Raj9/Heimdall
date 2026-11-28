@@ -26,6 +26,8 @@ import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import "@/components/canaries/uf7bI18n";
 import { HealthTile, Panel } from "./uxBits";
 import { DoctorPanel } from "@/components/settings/doctorPanel";
+import { ModalAppsPanel } from "@/components/settings/modalAppsPanel";
+import { RoleGate } from "@/components/platform/accessNotes";
 import "@/components/platform/ufintI18n";
 
 /** Drops empty strings so a job gets only the fields the user filled in. */
@@ -517,7 +519,14 @@ export default function OperateView() {
 					<OperatePanels
 						status={status}
 						backups={status.hosted ? <BackupsList /> : undefined}
-						doctor={<DoctorPanel hosted={status.hosted} />}
+						doctor={
+							<>
+								<DoctorPanel hosted={status.hosted} />
+								<RoleGate min="admin" fallback={null}>
+									<ModalAppsPanel />
+								</RoleGate>
+							</>
+						}
 						backupCount={status.hosted ? backupsQuery.data?.backups.length : undefined}
 						onBackupDone={() => dispatch(operateApi.util.invalidateTags(["OperateBackups"]))}
 						comparisons={(experiments.data?.experiments ?? [])
