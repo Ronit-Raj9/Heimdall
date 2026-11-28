@@ -245,6 +245,13 @@ func (h *RunsHandler) withDebugAllowed(ctx context.Context, rv *RunView, out sch
 		d.FromCondition = m.Experiment.Debug.FromCondition
 		out.Run.Debug = &d
 	}
+	// Skills in this run (handlers/runskills.go): left out when the steps
+	// cannot be read, so the page never says "no sign it was read" unseen.
+	if m != nil && h.index != nil {
+		if st, err := readRunSteps(h.index, rv.Run.RunID); err == nil {
+			out.Skills = runSkillsOf(m, rv.Slot, st.Steps)
+		}
+	}
 	probe := conditionProbe(ctx, h.suites, rv, m)
 	out.DebugAllowed = runDebugAllowed(rv.Slot.Condition, probe, rv.Sealed, out.Run.Debug)
 	if a := out.DebugAllowed; a != nil && a.Fork {

@@ -1,3 +1,4 @@
+import { RunSkillsBlock } from "@/components/runs/runSkills";
 import "@/components/reportcard/ufrbI18n";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { runHasVoice } from "@/app/runs_/$runId/views/runTabs";
@@ -312,6 +313,8 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				<PerSetup lanes={lanes}>
 					{(lane) => (
 						<>
+							{/* M2: the skills each setup's run installed, and the step that read each */}
+							<RunSkillsBlock runId={lane.pairRun.run.run_id} skills={lane.detail.data?.skills} />
 							<RunRemoteCoverage runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 							{/* W9 routing policy under test */}
 							<RunGatewayPolicy runId={lane.pairRun.run.run_id} />

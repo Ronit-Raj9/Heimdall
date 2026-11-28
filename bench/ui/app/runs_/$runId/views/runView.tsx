@@ -16,6 +16,7 @@ import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
 import { RunA2APanel } from "@/components/runs/a2a/runA2APanel";
 import { RunFileDownloads } from "@/components/runs/runFileDownloads";
 import { CompareWithRun } from "@/components/runs/compareWithRun";
+import { RunSkillsBlock } from "@/components/runs/runSkills"; // M2 skills in this run
 import { RunEvidenceStatus } from "@/components/runs/runEvidenceStatus";
 import { RunOutput, runOutputKind } from "@/components/runs/runOutput";
 import { ServicesList, SessionsTimeline, ToolCallTable } from "@/components/runs/runScenario";
@@ -382,6 +383,8 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 			</Section>
 
 			<RunBehaviourChecks runId={run.run_id} />
+
+			<RunSkillsBlock runId={run.run_id} skills={detail.skills} />
 
 			<details
 				className="group max-w-4xl rounded-xl border"
