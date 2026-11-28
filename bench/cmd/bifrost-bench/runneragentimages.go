@@ -167,7 +167,17 @@ func orgOwnedFile(root, path string) bool {
 	if root == "" {
 		return false
 	}
-	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	// Resolve links first: a linked folder inside the project must not make a
+	// file outside it look like the organization's own.
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false
+	}
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(realRoot, realPath)
 	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		return false
 	}

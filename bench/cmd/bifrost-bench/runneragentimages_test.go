@@ -202,3 +202,33 @@ func readTestFile(t *testing.T, path string) string {
 	}
 	return string(raw)
 }
+
+// A linked folder inside the project does not make a file outside it the
+// organization's own, and a linked file is not a regular file.
+func TestOrgOwnedFileResolvesLinks(t *testing.T) {
+	project, outside := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(project, "agents", "images", "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	own := filepath.Join(project, "agents", "images", "a", "Dockerfile")
+	out := filepath.Join(outside, "Dockerfile")
+	for _, f := range []string{own, out} {
+		if err := os.WriteFile(f, []byte("FROM scratch\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(outside, filepath.Join(project, "agents", "images", "link")); err != nil {
+		t.Skip("no symlinks here")
+	}
+	if err := os.Symlink(out, filepath.Join(project, "agents", "images", "a", "Linked")); err != nil {
+		t.Fatal(err)
+	}
+	if !orgOwnedFile(project, own) {
+		t.Fatal("a file in the project is the organization's own")
+	}
+	for _, p := range []string{filepath.Join(project, "agents", "images", "link", "Dockerfile"), filepath.Join(project, "agents", "images", "a", "Linked"), out, filepath.Join(project, "..", filepath.Base(outside), "Dockerfile")} {
+		if orgOwnedFile(project, p) {
+			t.Fatalf("%s is outside the project and must not count as the organization's own", p)
+		}
+	}
+}
