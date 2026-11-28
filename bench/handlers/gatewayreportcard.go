@@ -14,6 +14,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/gwfeature"
 	"github.com/maximhq/bifrost/bench/keystore"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -55,6 +56,7 @@ type GatewayCardLine struct {
 	MeasuredAt    *time.Time        `json:"measured_at,omitempty"`
 	Start         string            `json:"start,omitempty"`   // feature id the "Start a test" button drafts; empty when none
 	Blocked       string            `json:"blocked,omitempty"` // plain words: why the test cannot run here and what to do; empty when it can
+	Older         *GatewayCardOlder `json:"older,omitempty"`   // an older test's result that still holds, when the newest has none
 }
 
 // Report card line values.
@@ -104,7 +106,7 @@ var gatewayCardNow = time.Now
 func (h *gatewayTestsHandler) reportCard(ctx *fasthttp.RequestCtx) {
 	work, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(buildGatewayReportCard(work, h.env, h.root())))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(buildGatewayReportCard(work, h.env, h.root(), h.source())))
 }
 
 // cardRead is one gateway read: ok false when the gateway did not answer.
@@ -144,7 +146,7 @@ func countListed(raw json.RawMessage, key string) (int, []json.RawMessage) {
 	return 0, nil
 }
 
-func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) GatewayReportCard {
+func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string, lsrc leaderboard.Source) GatewayReportCard {
 	card := GatewayReportCard{Gateway: GatewayInfo{Plugins: []string{}}, Source: gatewaySourceInfo(env, root), Lines: []GatewayCardLine{}, CheckedAt: gatewayCardNow().UTC()}
 	run := gatewayRunGet(ctx, env)
 	if env.Cfg != nil && strings.TrimSpace(env.Cfg.Gateway.URL) != "" {
@@ -186,12 +188,20 @@ func buildGatewayReportCard(ctx context.Context, env OrgEnv, root string) Gatewa
 			newest[e.Feature] = e
 		}
 	}
+	picks := cardEffects(ctx, env, lsrc, root)
 	line := func(id, name string) GatewayCardLine {
 		l := GatewayCardLine{Feature: id, Name: name, Enabled: cardUnknown, State: cardNotMeasured, Headline: cardNotMeasHead}
 		if _, ok := gwfeature.Lookup(id); ok {
 			l.Start = id
 		}
-		if e, ok := newest[id]; ok {
+		if p, ok := picks[id]; ok {
+			e := p.current
+			l.State, l.Result, l.Headline, l.ExpID, l.Older = e.State, e.Result, e.Headline, e.ExpID, p.older
+			s := e.Source
+			l.Source = &s
+			at := p.at.UTC()
+			l.MeasuredAt = &at
+		} else if e, ok := newest[id]; ok && picks == nil {
 			l.State, l.Result, l.Headline, l.ExpID = e.State, e.Result, e.Headline, e.ExpID
 			s := e.Source
 			l.Source = &s

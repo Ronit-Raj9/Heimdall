@@ -122,6 +122,22 @@ func List(root string) ([]Effect, error) {
 // feature's Compute, saved. A comparison with no counted run is unknown and
 // not saved.
 func Compute(ctx context.Context, src leaderboard.Source, root, expID string, refresh bool) (Effect, error) {
+	return ComputeWith(ctx, src, root, expID, refresh, Facts{})
+}
+
+// Facts is what the server knows of a comparison beyond its run folder.
+// Either func may be nil: unknown.
+type Facts struct {
+	// Active reports whether the comparison's runs are queued or running now.
+	Active func(expID string) bool
+	// Problem returns why no run could start (the runner's refusal), "" when none.
+	Problem func(expID string) string
+}
+
+// ComputeWith is Compute with the server's facts. A comparison whose runs
+// are still going is StateRunning with its progress and no verdict, never
+// broken, and is not saved.
+func ComputeWith(ctx context.Context, src leaderboard.Source, root, expID string, refresh bool, facts Facts) (Effect, error) {
 	m, ok := src.Manifest(expID)
 	if !ok || m == nil || m.Experiment.GatewayTest == nil {
 		return Effect{}, ErrNotFeatureTest
@@ -144,12 +160,24 @@ func Compute(ctx context.Context, src leaderboard.Source, root, expID string, re
 	if err != nil {
 		return Effect{}, err
 	}
+	if graded, planned := len(runs), plannedRuns(m, f.AllConditions); stillRunning(src, expID, facts) {
+		e := unknown("")
+		e.State, e.Reason = StateRunning, ""
+		e.Headline = fmt.Sprintf("Running, %d of %d runs graded.", graded, planned)
+		e.Source.Runs = graded
+		e.Source.Text = fmt.Sprintf("comparison %s: %d of %d runs graded", expID, graded, planned)
+		return e, nil
+	}
 	if len(runs) == 0 {
 		e := unknown("no finished runs yet")
+		problem := ""
+		if facts.Problem != nil {
+			problem = strings.TrimSpace(facts.Problem(expID))
+		}
 		// A comparison that ended (it has an analysis) with no counted run is
 		// a result: say why and save it, so the Gateway page shows it.
-		if _, done := src.LatestDecision(expID); done {
-			e.Reason = noRunReason(src, expID)
+		if _, done := src.LatestDecision(expID); done || problem != "" {
+			e.Reason = noRunReason(src, expID, problem)
 			e.Headline = "No result: " + e.Reason
 			e.Fingerprint = Fingerprint(nil, test.Feature)
 			if err := Save(root, e); err != nil {
@@ -209,11 +237,11 @@ func noVerdict(e *Effect, state, reason, headline string) {
 func NoVerdictGuard(e *Effect, src leaderboard.Source, expID string) {
 	if as, ok := src.(leaderboard.AnalysisSource); ok {
 		if _, reasons, bad := as.LatestInvalid(expID); bad {
-			reason := "the test was broken"
+			reason := "the check of this test failed and gave no reason"
 			if len(reasons) > 0 {
-				reason += ": " + strings.Join(reasons, "; ")
+				reason = strings.TrimSuffix(strings.Join(reasons, "; "), ".")
 			}
-			noVerdict(e, StateNotApplied, reason, "No result: the test was broken, so it states no verdict. Fix it and run it again.")
+			noVerdict(e, StateNotApplied, "the test was broken: "+reason, "Broken: "+reason+". Fix it and run it again.")
 			return
 		}
 	}
@@ -245,8 +273,11 @@ func NoVerdictGuard(e *Effect, src leaderboard.Source, expID string) {
 }
 
 // noRunReason says why a finished comparison has no counted run.
-func noRunReason(src leaderboard.Source, expID string) string {
+func noRunReason(src leaderboard.Source, expID, problem string) string {
 	all := src.Runs(expID)
+	if len(all) == 0 && problem != "" {
+		return "no run started: " + strings.TrimSuffix(problem, ".")
+	}
 	if as, ok := src.(leaderboard.AnalysisSource); ok {
 		if _, reasons, bad := as.LatestInvalid(expID); bad && len(reasons) > 0 && len(all) > 0 {
 			return "no run finished: " + strings.Join(reasons, "; ")
@@ -265,4 +296,29 @@ func noRunReason(src leaderboard.Source, expID string) string {
 		return fmt.Sprintf("no run finished: %d of %d were stopped by the machine, not by the agent", infra, len(all))
 	}
 	return fmt.Sprintf("no run finished: %d started and none was sealed", len(all))
+}
+
+// plannedRuns counts the comparison's slots a feature counts.
+func plannedRuns(m *schemas.Manifest, allConditions bool) int {
+	n := 0
+	for _, sl := range m.Slots {
+		if sl.Arm == "compat" {
+			continue
+		}
+		if allConditions || sl.Condition == schemas.ConditionClean {
+			n++
+		}
+	}
+	return n
+}
+
+// stillRunning reports whether the comparison's runs are still going: the
+// server says so, or, when it cannot tell, a run is started and not sealed.
+func stillRunning(src leaderboard.Source, expID string, facts Facts) bool {
+	if facts.Active != nil {
+		return facts.Active(expID)
+	}
+	return slices.ContainsFunc(src.Runs(expID), func(r leaderboard.Run) bool {
+		return !r.Sealed && !r.Superseded && r.Run.Outcome != schemas.OutcomeAbortedInfra
+	})
 }

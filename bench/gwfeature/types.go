@@ -22,6 +22,7 @@ const (
 	StateNotEnoughData = "not_enough_data" // too few tasks, hits or rows; Reason says how many and how many are needed
 	StateNotApplied    = "not_applied"     // Bifrost did not apply the changed setting on that setup's calls: the test is broken
 	StateUnknown       = "unknown"         // no report can be built; Reason says why
+	StateRunning       = "running"         // runs still going: Headline says how many are graded, no verdict
 )
 
 // Interval is a point estimate with an optional 95% range.
@@ -211,4 +212,23 @@ func Features() []Feature {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+// Replace swaps the registered feature with f.ID for f and returns the
+// function that puts the old one back. Tests of other packages use it to
+// give a real feature id a fixed result.
+func Replace(f Feature) (restore func()) {
+	mu.Lock()
+	defer mu.Unlock()
+	old, had := features[f.ID]
+	features[f.ID] = f
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if had {
+			features[f.ID] = old
+		} else {
+			delete(features, f.ID)
+		}
+	}
 }

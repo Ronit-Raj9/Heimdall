@@ -198,7 +198,7 @@ func (h *gatewayTestsHandler) effect(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	e, err := gwfeature.Compute(work, src, h.root(), id, string(ctx.QueryArgs().Peek("refresh")) == "1")
+	e, err := gwfeature.ComputeWith(work, src, h.root(), id, string(ctx.QueryArgs().Peek("refresh")) == "1", gatewayFacts(h.env))
 	if errors.Is(err, gwfeature.ErrNotFeatureTest) {
 		// ?optional=1 lets a page that shows this card on every comparison
 		// ask without a 404: a comparison that is no feature test answers

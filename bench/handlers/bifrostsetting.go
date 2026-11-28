@@ -72,7 +72,7 @@ func (h *bifrostSettingHandler) get(ctx *fasthttp.RequestCtx) {
 	if m.Experiment.GatewayTest != nil {
 		work, cancel := workContext(ctx, readTimeout)
 		defer cancel()
-		e, err := gwfeature.Compute(work, src, h.tests.root(), id, false)
+		e, err := gwfeature.ComputeWith(work, src, h.tests.root(), id, false, gatewayFacts(h.tests.env))
 		if err != nil && !errors.Is(err, gwfeature.ErrNotFeatureTest) {
 			lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "the feature report could not be built: "+err.Error())
 			return
