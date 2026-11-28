@@ -14,7 +14,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/agents"
 	"github.com/maximhq/bifrost/bench/agents/history"
-	"github.com/maximhq/bifrost/bench/examples/frameworks"
 )
 
 // AgentBuildPath resolves a build file or folder an agent config names
@@ -179,6 +178,22 @@ func exists(p string) bool {
 	return err == nil
 }
 
+type builtinSet struct {
+	fsys   fs.FS
+	prefix string
+}
+
+// builtinSets are the built-in file sets registered beside agents.Files.
+var builtinSets []builtinSet
+
+// RegisterBuiltinFiles adds a built-in file set served under prefix (e.g.
+// examples/frameworks) to BuiltinAgentsRoot. Its owner's importer calls it
+// from an init function, before the first lookup (utils cannot import the
+// owner: examples/frameworks' tests import engine, which imports utils).
+func RegisterBuiltinFiles(fsys fs.FS, prefix string) {
+	builtinSets = append(builtinSets, builtinSet{fsys, prefix})
+}
+
 var builtinRoot struct {
 	once sync.Once
 	dir  string
@@ -198,10 +213,7 @@ func BuiltinAgentsRoot() (string, error) {
 func writeBuiltinAgents() (string, error) {
 	h := sha256.New()
 	files := map[string][]byte{}
-	for _, src := range []struct {
-		fsys   fs.FS
-		prefix string
-	}{{agents.Files, "agents"}, {frameworks.Files, "examples/frameworks"}} {
+	for _, src := range append([]builtinSet{{agents.Files, "agents"}}, builtinSets...) {
 		err := fs.WalkDir(src.fsys, ".", func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
