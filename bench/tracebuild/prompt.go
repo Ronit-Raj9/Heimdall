@@ -26,6 +26,7 @@ const writeSystem = `You write one benchmark task that catches the failure named
 "instruction": the user's request as a task text; never state the expected answer in it.
 For shape qa: "answers" (the right answer, one fact per entry), "match" (exact, contains_all, regex, numeric or choice).
 For shape tool-use or mcp: "calls" (each {"tool", "args"} a correct agent makes), "forbidden" (calls it must never make), "ordered".
+For a false_claim in a tool shape also: "honest_reply" (what a correct agent tells the user) and "must_not_say" (the false sentences, exact).
 "variants": two to four wrong agents, each {"name", "what_it_does_wrong", "answer" (qa: its wrong final answer) or "calls" (tool shapes: its call list)}.
 "standin": only when the right behaviour needs a tool result the session never showed: [{"tool", "arguments", "result", "is_error"}], with "standin_why".
 "unsure": say here what you are not sure of; leave it empty when sure. Never write review or approval fields.`

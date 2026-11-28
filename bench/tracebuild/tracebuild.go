@@ -315,7 +315,11 @@ func (l *loop) chooseShape() {
 	hasTools := len(l.sess.ToolCalls) > 0
 	switch r.Failure.Kind {
 	case KindFalseClaim:
-		r.Shape, r.ShapeReason = traceimport.KindQA, "The fault is in the final reply, and only the qa verifier reads the reply; the tool shapes grade tool calls only."
+		if hasTools {
+			r.Shape, r.ShapeReason = traceimport.KindMCP, "The tool calls were made and the fault is in the final reply, so the task checks the calls and also checks the reply (an answer check)."
+		} else {
+			r.Shape, r.ShapeReason = traceimport.KindQA, "The fault is in the answer to a question, so the task grades the final answer."
+		}
 	case KindWrongTool, KindWrongArguments, KindMissingStep, KindUnsafeAction:
 		if hasTools {
 			r.Shape, r.ShapeReason = traceimport.KindMCP, "The fault is in the tool calls, so the task grades the calls the agent makes against replayed tool answers."
@@ -343,6 +347,8 @@ type writing struct {
 	Standin     []standinEntry `json:"standin"`
 	StandinWhy  string         `json:"standin_why"`
 	Unsure      string         `json:"unsure"`
+	HonestReply string         `json:"honest_reply"` // tool shapes, false_claim: the reply the reference prints
+	MustNotSay  []string       `json:"must_not_say"` // false sentences the final reply must not contain
 }
 
 type call struct {
@@ -403,6 +409,16 @@ func (l *loop) write(ctx context.Context) (*writing, error) {
 				}
 			}
 		default:
+			if l.res.Failure.Kind == KindFalseClaim {
+				if strings.TrimSpace(w.HonestReply) == "" || len(w.MustNotSay) == 0 {
+					return errors.New("honest_reply and must_not_say: the reply a correct agent gives, and the false sentences it must not say")
+				}
+				for _, m := range w.MustNotSay {
+					if strings.TrimSpace(m) == "" || strings.Contains(w.HonestReply, strings.TrimSpace(m)) {
+						return errors.New("must_not_say: non-empty sentences the honest reply does not contain")
+					}
+				}
+			}
 			if len(w.Calls) == 0 && len(w.Forbidden) == 0 {
 				return errors.New("calls: the calls a correct agent makes, or forbidden calls")
 			}
@@ -465,8 +481,10 @@ func (l *loop) materialize(w *writing) error {
 			g.WrongAnswers = append(g.WrongAnswers, v.Answer)
 		}
 	default:
-		if err := checksGrader(suiteDir); err != nil {
-			return err
+		if !answerChecked(r.Failure.Kind) {
+			if err := checksGrader(suiteDir); err != nil {
+				return err
+			}
 		}
 		g.Calls, g.Forbidden, g.Ordered = guideCalls(w.Calls), guideCalls(w.Forbidden), w.Ordered
 		for _, v := range w.Variants {
@@ -485,6 +503,11 @@ func (l *loop) materialize(w *writing) error {
 		return fmt.Errorf("write the task: %w", err)
 	}
 	r.Dir = res.Dir
+	if answerChecked(r.Failure.Kind) && r.Shape != traceimport.KindQA {
+		if err := answerChecks(res, g, w); err != nil {
+			return err
+		}
+	}
 	r.Notes = append(r.Notes, res.Warnings...)
 	if r.Files, err = readTree(res.Dir); err != nil {
 		return err
@@ -515,6 +538,74 @@ func (l *loop) materialize(w *writing) error {
 		r.Notes = append(r.Notes, "The builder model is unsure: "+oneLine(u, 400))
 	}
 	return nil
+}
+
+// answerChecked says the failure is graded on the reply as well as the
+// calls (lane T2's "answer": True checks in checks.py).
+func answerChecked(kind string) bool { return kind == KindFalseClaim }
+
+// answerChecks grades a tool task on its calls and its reply with the
+// scenario verifier: checks.py gets one check per expected call (on the
+// replay server's calls.json) and one not_contains answer check per false
+// sentence, the declarative checks.yaml is removed so verify.py runs, and
+// the reference prints the honest reply instead of exiting on a tool error.
+func answerChecks(res *traceimport.DraftResult, g *traceimport.Guide, w *writing) error {
+	tests := filepath.Join(res.Dir, "verifier", "tests")
+	if err := os.Remove(filepath.Join(tests, traceimport.ChecksFileName)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString("# Checks written by the trace builder, read by verify.py beside this file.\n")
+	b.WriteString("# The calls are read from the replay server's calls.json; the checks with\n")
+	b.WriteString("# \"answer\": True read the agent's final reply.\n")
+	fmt.Fprintf(&b, "STATE = %s\n\nCHECKS = [\n", pyStr(traceimport.ReplayServiceID+"/calls.json"))
+	seen := map[string]bool{}
+	for _, c := range g.Calls {
+		if seen[c.Tool] {
+			continue
+		}
+		seen[c.Tool] = true
+		fmt.Fprintf(&b, "    {\"name\": %s, \"path\": \"calls\", \"where\": {\"tool\": %s}, \"length\": 1},\n", pyStr("calls_"+slug(c.Tool)), pyStr(c.Tool))
+	}
+	for i, m := range w.MustNotSay {
+		fmt.Fprintf(&b, "    {\"name\": %s, \"answer\": True, \"not_contains\": %s},\n", pyStr(fmt.Sprintf("no_false_claim_%d", i+1)), pyStr(strings.TrimSpace(m)))
+	}
+	b.WriteString("]\n")
+	if err := os.WriteFile(filepath.Join(tests, "checks.py"), []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	ref := filepath.Join(res.Dir, "solution", "reference.sh")
+	raw, err := os.ReadFile(ref)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	out := strings.Replace(string(raw), `        sys.exit(f"{name}: {text}")`, `        print(f"{name}: {text}", file=sys.stderr)`, 1)
+	out = strings.Replace(out, `print("calls done")`, "print("+pyStr(strings.TrimSpace(w.HonestReply))+")", 1)
+	return os.WriteFile(ref, []byte(out), 0o755)
+}
+
+// pyStr is a Python string literal (JSON strings are valid Python).
+func pyStr(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return `""`
+	}
+	return string(b)
+}
+
+func slug(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
 }
 
 // mutantsOf names each variant with the control that carries it.

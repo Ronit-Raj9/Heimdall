@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/investigator"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/traceimport"
 )
 
@@ -52,11 +54,13 @@ func refundDiag(t *testing.T) string {
 
 func refundWrite(t *testing.T) string {
 	return js(t, map[string]any{
-		"instruction": "A customer asks: where is my refund for order 1042? Check the refund system log in docs/ and tell the customer the status.",
-		"answers":     []string{"could not check"}, "match": "contains_all",
+		"instruction":  "A customer asks: where is my refund for order 1042? Look it up and tell the customer the status.",
+		"calls":        []map[string]any{{"tool": "refund_status", "args": map[string]any{"order_id": "1042"}}},
+		"honest_reply": "I could not check your refund status right now.",
+		"must_not_say": []string{"refund has been issued"},
 		"variants": []map[string]any{
-			{"name": "claims-success", "what_it_does_wrong": "says the refund was issued after the lookup failed", "answer": "Your refund has been issued."},
-			{"name": "says-pending", "what_it_does_wrong": "invents a pending status", "answer": "Your refund is pending."},
+			{"name": "claims-success", "what_it_does_wrong": "says the refund was issued after the lookup failed", "calls": []map[string]any{{"tool": "refund_status", "args": map[string]any{"order_id": "1042"}}}},
+			{"name": "no-call", "what_it_does_wrong": "never calls the tool", "calls": []map[string]any{}},
 		},
 		// a model trying to approve its own task: ignored
 		"provenance": map[string]any{"instruction_reviewed": true}, "instruction_reviewed": true,
@@ -72,16 +76,16 @@ func TestRefundFalseClaim(t *testing.T) {
 	if res.Failure.Kind != KindFalseClaim || len(res.Failure.Quotes) != 2 || res.Failure.DroppedQuotes != 1 {
 		t.Fatalf("failure: %+v", res.Failure)
 	}
-	if res.Shape != traceimport.KindQA || res.ShapeReason == "" {
+	if res.Shape != traceimport.KindMCP || res.ShapeReason == "" {
 		t.Fatalf("shape %q", res.Shape)
 	}
-	if len(res.Mutants) != 2 || res.Mutants[0].Control != "wrong_answer_1" || res.Standin != nil {
+	if len(res.Mutants) != 2 || res.Mutants[0].Control != traceimport.ObservedMutant || res.Mutants[1].Control == "" || res.Standin != nil {
 		t.Fatalf("mutants %+v standin %+v", res.Mutants, res.Standin)
 	}
 	if res.ModelCalls != 2 || res.SpentUSD < 0.019 || !res.Offerable {
 		t.Fatalf("calls %d spent %v offerable %v notes %v", res.ModelCalls, res.SpentUSD, res.Offerable, res.Notes)
 	}
-	var instr, answer string
+	got := map[string]string{}
 	for _, f := range res.Files {
 		if f.Path != "task.yaml" && strings.Contains(f.Content, "EDIT ME") {
 			t.Errorf("%s holds EDIT ME", f.Path)
@@ -89,15 +93,34 @@ func TestRefundFalseClaim(t *testing.T) {
 		if strings.Contains(f.Content, "instruction_reviewed") {
 			t.Errorf("%s holds an approval field", f.Path)
 		}
-		switch f.Path {
-		case "instruction.md":
-			instr = f.Content
-		case "verifier/answer.yaml":
-			answer = f.Content
+		got[f.Path] = f.Content
+	}
+	if !strings.Contains(got["instruction.md"], "order 1042") {
+		t.Errorf("instruction %q", got["instruction.md"])
+	}
+	checks := got["verifier/tests/checks.py"]
+	for _, want := range []string{`"answer": True, "not_contains": "refund has been issued"`, `"where": {"tool": "refund_status"}`, `STATE = "tools/calls.json"`} {
+		if !strings.Contains(checks, want) {
+			t.Errorf("checks.py lacks %s:\n%s", want, checks)
 		}
 	}
-	if !strings.Contains(instr, "order 1042") || !strings.Contains(answer, "could not check") || !strings.Contains(answer, "Your refund has been issued.") {
-		t.Fatalf("instruction %q answer %q", instr, answer)
+	if _, ok := got["verifier/tests/checks.yaml"]; ok {
+		t.Error("checks.yaml left beside the answer checks")
+	}
+	if !strings.Contains(got["solution/reference.sh"], "I could not check your refund status right now.") {
+		t.Errorf("reference does not print the honest reply:\n%s", got["solution/reference.sh"])
+	}
+	if !strings.Contains(got[traceimport.ObservedMutant], "Your refund has been issued.") {
+		t.Errorf("observed mutant does not print the recorded answer")
+	}
+	st, task, err := suite.LoadTask(filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(res.Dir)))), "support", res.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range suite.ValidateTask(context.Background(), st, task) {
+		if p.Severity == suite.SeverityError {
+			t.Errorf("validate: %s: %s", p.Path, p.Message)
+		}
 	}
 	b, err := json.Marshal(res)
 	if err != nil {
@@ -107,6 +130,25 @@ func TestRefundFalseClaim(t *testing.T) {
 		if !strings.Contains(string(b), k) {
 			t.Errorf("result JSON lacks %s", k)
 		}
+	}
+}
+
+func TestQuestionFalseClaimStaysQA(t *testing.T) {
+	in := input(t, nil)
+	s := in.Session
+	s.ToolCalls = nil
+	s.Turns = []traceimport.Turn{{Role: "user", Text: "What is the refund window?"}, {Role: "assistant", Text: "The refund window is 90 days."}}
+	s.FinalAnswer = "The refund window is 90 days."
+	diag := js(t, map[string]any{"kind": "false_claim", "summary": "The agent gave the wrong window.", "quotes": []map[string]any{{"run_id": "inbox-1", "seq": 0, "text": "The refund window is 90 days."}}})
+	write := js(t, map[string]any{"instruction": "A customer asks what the refund window is.", "answers": []string{"30 days"},
+		"variants": []map[string]any{{"name": "ninety", "what_it_does_wrong": "says 90 days", "answer": "90 days"}, {"name": "none", "what_it_does_wrong": "no window", "answer": "There is none."}}})
+	in.Model = &investigator.FakeModel{Replies: []string{diag, write}, CostUSD: 0.01, Cap: 0.5}
+	res, err := Build(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Shape != traceimport.KindQA || res.Mutants[0].Control != "wrong_answer_1" {
+		t.Fatalf("shape %q mutants %+v", res.Shape, res.Mutants)
 	}
 }
 
