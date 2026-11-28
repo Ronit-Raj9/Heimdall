@@ -142,3 +142,66 @@ func TestBuiltinAgentBuildFilesShip(t *testing.T) {
 }
 
 func yamlUnmarshalAgent(b []byte, cfg *schemas.AgentConfig) error { return yaml.Unmarshal(b, cfg) }
+
+// orgWithOldMiniSWE is an organization seeded on 21 Nov: mini-swe-agent's
+// Dockerfile then built FROM bench/coding-core-base:1, not ${BASE_IMAGE}.
+func orgWithOldMiniSWE(t *testing.T, edit func([]byte) []byte) (string, string) {
+	t.Helper()
+	old, err := os.ReadFile(filepath.Join("testdata", "builtin-old", "mini-swe-agent.Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	df := filepath.Join(root, "agents", "images", "mini-swe-agent", "Dockerfile")
+	if err := os.MkdirAll(filepath.Dir(df), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(df, edit(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root, df
+}
+
+func miniSWE() *schemas.AgentConfig {
+	return &schemas.AgentConfig{ID: "mini-swe-agent", Adapter: "command", Image: "bench/agent-mini-swe-agent:1",
+		Build: &schemas.ImageSpec{Dockerfile: "agents/images/mini-swe-agent/Dockerfile", Tag: "bench/agent-mini-swe-agent:1"}}
+}
+
+func TestUneditedOldBuiltinFollowsCurrent(t *testing.T) {
+	t.Setenv(suite.LibraryEnv, "")
+	root, own := orgWithOldMiniSWE(t, func(b []byte) []byte { return b })
+	st := taskImageSuite()
+	st.BaseImage = schemas.ImageSpec{Tag: "bench/tb-base:1"}
+	v := deriveTaskImageAgent(miniSWE(), st, nil, nil, root)
+	if v.Skip != "" || v.Set == nil {
+		t.Fatalf("wizard check after the upgrade: %+v", v)
+	}
+	cfg := applySet(miniSWE(), v.Set)
+	img, err := engine.ResolveTaskAgentImage(&cfg, st, st.TaskByID("t01"), "harbor/t01:1", root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := os.ReadFile(filepath.Join("..", "agents", "images", "mini-swe-agent", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(img.Dockerfile)
+	if err != nil || string(got) != string(cur) || img.Dockerfile == own {
+		t.Fatalf("resolved %s (err %v), want the current built-in Dockerfile", img.Dockerfile, err)
+	}
+	if b, _ := os.ReadFile(own); strings.Contains(string(b), "${BASE_IMAGE}") {
+		t.Fatal("the project's copy was rewritten")
+	}
+}
+
+func TestEditedOldBuiltinKeepsOrgFile(t *testing.T) {
+	t.Setenv(suite.LibraryEnv, "")
+	root, own := orgWithOldMiniSWE(t, func(b []byte) []byte { return append(b, []byte("RUN echo org edit\n")...) })
+	if p, found := utils.AgentBuildPath(root, "", "agents/images/mini-swe-agent/Dockerfile"); p != own || !found {
+		t.Fatalf("edited copy resolved to %s", p)
+	}
+	st := taskImageSuite()
+	if v := deriveTaskImageAgent(miniSWE(), st, nil, nil, root); !strings.HasPrefix(v.Skip, taskImageSkipReason) {
+		t.Fatalf("edited copy must keep its own FROM: %+v", v)
+	}
+}

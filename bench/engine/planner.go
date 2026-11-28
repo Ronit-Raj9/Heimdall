@@ -1343,6 +1343,9 @@ func (p *Planner) configFile(name string) (string, error) {
 	if lp, ok := p.libraryFile(name); ok {
 		return utils.ResolveInside(p.library, lp)
 	}
+	if bp, ok := utils.BuiltinUpgrade(p.confine, name); ok { // an unedited older built-in copy follows the current one
+		return bp, nil
+	}
 	return utils.ResolveInside(p.confine, name)
 }
 
@@ -1372,6 +1375,9 @@ func (p *Planner) abs(rel string) string {
 	}
 	if lp, ok := p.libraryFile(rel); ok {
 		return filepath.Join(p.library, lp)
+	}
+	if bp, ok := utils.BuiltinUpgrade(p.benchRoot, rel); ok { // an unedited older built-in copy follows the current one
+		return bp
 	}
 	return filepath.Join(p.benchRoot, rel)
 }
