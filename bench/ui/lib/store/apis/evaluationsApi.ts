@@ -167,6 +167,8 @@ export interface FailoverReport {
 	failover: FailoverArmStats;
 	no_failover: FailoverArmStats;
 	failover_worked: boolean;
+	/** At least one call or run was answered by the fallback model; absent in reports made before it existed. */
+	fallback_reached?: boolean;
 	extra_latency_ms: number;
 	cost_change_usd?: number;
 	success_with_failover: boolean;

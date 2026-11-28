@@ -274,9 +274,9 @@ sequenceDiagram
   models and writes the winning choice as Bifrost routing config, downloadable
   as a `config.json` fragment or applied to the org's own Bifrost. This is how a result in
   Heimdall becomes a change in production Bifrost. A model switch evaluation is
-  started from the command line (`heimdall eval run --mode model_switch`) or
-  `POST /api/bench/evaluations`; the website's Evaluate wizard does not offer
-  the mode yet. The Gateway page's "Use this in Bifrost" button is different: it
+  started from the Evaluate wizard ("Find the best model", 3 to 6 models), from
+  the command line (`heimdall eval run --mode model_switch`) or with
+  `POST /api/bench/evaluations`. The Gateway page's "Use this in Bifrost" button is different: it
   shows settings to paste and does not change your Bifrost.
 
 ## 7. Budgets per evaluation and failover

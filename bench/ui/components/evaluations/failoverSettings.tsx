@@ -83,8 +83,8 @@ export function FailoverSection({ report }: { report: FailoverReport }) {
 			<h3 className="text-base font-semibold">Provider failover</h3>
 			<p>{report.summary}</p>
 			<dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
-				<dt className="text-muted-foreground">Failover worked</dt>
-				<dd data-testid="failover-worked">{report.failover_worked ? "Yes" : "No"}</dd>
+				<dt className="text-muted-foreground">Fallback reached</dt>
+				<dd data-testid="failover-worked">{(report.fallback_reached ?? report.failover_worked) ? "Yes" : "No"}</dd>
 				<dt className="text-muted-foreground">Extra latency{per}</dt>
 				<dd>{ms(report.extra_latency_ms)}</dd>
 				<dt className="text-muted-foreground">Cost change{per}</dt>

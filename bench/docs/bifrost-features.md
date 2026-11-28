@@ -176,8 +176,8 @@ arm unless the provider's Bifrost config has a `prompt_cache` block (Bifrost
 ignores the header otherwise: it "cannot manufacture opt-in"), and refuses it
 for scripted controls that send no headers. Configure the block once,
 gateway-wide, as `{"auto_inject": false}`, so arms without the header are
-unchanged. No form on the website sets this arm yet: put it in a spec run
-from the command line (`heimdall run`) or posted to the API. Two limits: a client that sends its own `cache_control` markers is
+unchanged. On the website it is the "Prompt caching" choice under "Change"
+for Setup B on the New comparison form. Two limits: a client that sends its own `cache_control` markers is
 forwarded unchanged ("caller markers always win"; Claude Code does), so the
 arm tests nothing for it; and an agent that does not forward the headers does
 not get the feature, which `cache_read_share` then shows as 0.
