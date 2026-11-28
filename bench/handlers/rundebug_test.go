@@ -165,7 +165,7 @@ func TestHoldsAndRelease(t *testing.T) {
 	if ctx := dbgDo(r, "POST", "/runs/r_1/holds/release", `{"call":3,"action":"jump"}`); ctx.Response.StatusCode() != 400 {
 		t.Fatalf("bad action: %d", ctx.Response.StatusCode())
 	}
-	if ctx := dbgDo(r, "POST", "/runs/r_1/debug", `{"breakpoints":{"calls":[2]}}`); ctx.Response.StatusCode() != 201 {
+	if ctx := dbgDo(r, "POST", "/runs/r_1/debug", `{"breakpoints":{"calls":[2]},"budget_usd":0.5}`); ctx.Response.StatusCode() != 201 {
 		t.Fatalf("debug run %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 	if d := l.planned.Debug; d.Mode != schemas.DebugStep || d.Cassette != nil || d.Breakpoints.Calls[0] != 2 {
