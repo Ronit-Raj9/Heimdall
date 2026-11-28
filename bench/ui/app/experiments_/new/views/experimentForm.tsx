@@ -929,7 +929,7 @@ function ArmBChange({
 				)}
 			</Field>
 			{kind === "routing" && (
-				<div className="grid gap-3 sm:grid-cols-2">
+				<div className="grid gap-3">
 					<Field label={t("change.strategy")} name="routingStrategy">
 						{(id) => (
 							<select id={id} className={NATIVE_SELECT} data-testid="experiment-routing-strategy" {...register("routingStrategy")}>
@@ -995,7 +995,7 @@ function AdvancedSpec({ register, errors }: { register: UseFormRegister<Experime
 				<div className="grid gap-4 sm:grid-cols-3">
 					<Field label={t("advanced.alpha")} error={errors.alpha} name="alpha">
 						{(id, d) => (
-							<Input id={id} aria-describedby={d} type="number" step="0.01" min={0} max={1} data-testid="experiment-adv-alpha" {...register("alpha", { valueAsNumber: true })} />
+							<Input id={id} aria-describedby={d} type="number" step="0.01" min={0} max={1} className="h-9" data-testid="experiment-adv-alpha" {...register("alpha", { valueAsNumber: true })} />
 						)}
 					</Field>
 					<Field label={t("advanced.realism")} name="realism">
