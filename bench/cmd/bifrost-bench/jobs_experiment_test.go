@@ -153,7 +153,7 @@ func TestProbeJobCatalogFaults(t *testing.T) {
 	if err != nil || len(want) != 0 || strings.Join(allowed, ",") != "p1" {
 		t.Fatalf("no faults: want %v allowed %v err %v", want, allowed, err)
 	}
-	raw := json.RawMessage(`{"exp_id":"e_parent","faults":["model-brownout","no-such-fault"]}`)
+	raw := json.RawMessage(`{"exp_id":"e_parent","faults":["model-brownout","no-such-fault"],"budget_usd":0.5}`)
 	if _, _, err := validateProbeJob(context.Background(), jobEnv{}, raw); !errors.Is(err, jobs.ErrInvalidParams) || !strings.Contains(err.Error(), "no-such-fault") {
 		t.Fatalf("unknown fault: want ErrInvalidParams naming it, got %v", err)
 	}
