@@ -98,10 +98,12 @@ func validateFindingsInvestigate(ctx context.Context, env jobEnv, raw json.RawMe
 	if err != nil {
 		return nil, "", err
 	}
-	if idx := env.Services.Index; idx != nil {
-		if _, ok := idx.Manifest(p.ExpID); !ok {
-			return nil, "", invalidInvestigate(fmt.Sprintf("No evaluation named %s was found.", p.ExpID))
-		}
+	idx := env.Services.Index
+	if idx == nil { // refused before anything is spent (K4)
+		return nil, "", invalidInvestigate("This server cannot read runs, so nothing was started or spent.")
+	}
+	if _, ok := idx.Manifest(p.ExpID); !ok {
+		return nil, "", invalidInvestigate(fmt.Sprintf("No evaluation named %s was found.", p.ExpID))
 	}
 	return p, p.ExpID, nil
 }

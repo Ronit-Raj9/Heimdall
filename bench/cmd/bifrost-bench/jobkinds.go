@@ -101,12 +101,27 @@ func registerJobKind(s jobKindSpec) {
 	jobKinds = append(jobKinds, s)
 }
 
-// jobEnvFor builds the env of a job of the launcher's org.
+// jobEnvFor builds the env of a job of the launcher's org. It starts from
+// the org's request-path services (launcher.services), so a job sees the
+// same run index, suites, agents and job API as the org's handlers; before
+// K4 it ran the service hooks over an empty Services, so Index, Suites and
+// Agents were nil and every run-reading job failed ("this server cannot
+// read runs"). A launcher whose deps were never bound still gets its own
+// run index.
 func (h *jobsHub) jobEnvFor(l *launcher) jobEnv {
 	env := jobEnv{App: l.a, OrgID: l.org, ProjectRoot: l.a.cfg.Root, Hosted: h.hosted}
-	s := handlers.Services{OrgID: l.org, Hosted: h.hosted, Launcher: l}
-	for _, hook := range serviceHooks {
-		hook(l.a, &s)
+	var s handlers.Services
+	if l.services != nil {
+		s = *l.services
+	} else {
+		s = handlers.Services{OrgID: l.org, Hosted: h.hosted}
+		for _, hook := range serviceHooks {
+			hook(l.a, &s)
+		}
+	}
+	s.OrgID, s.Hosted, s.Launcher = l.org, h.hosted, l
+	if s.Index == nil && l.ix != nil && l.a.store != nil {
+		s.Index = indexAdapter{ix: l.ix, root: l.a.store.Root()}
 	}
 	env.Services = s
 	return env

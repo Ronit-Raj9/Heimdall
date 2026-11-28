@@ -58,4 +58,15 @@ func applyServiceHooks(a *app, deps *server.Deps, orgID string, hosted bool) {
 		h(a, &s)
 	}
 	deps.Services = s
+	bindJobServices(deps.Launcher, &deps.Services)
+}
+
+// bindJobServices hands an org's services to its launcher, so the jobs of
+// that org run with the request path's services (jobEnvFor). s is the
+// deps field itself: fields set after applyServiceHooks (the hosted jobs
+// API) reach the jobs too.
+func bindJobServices(l handlers.Launcher, s *handlers.Services) {
+	if b := baseLauncher(l); b != nil {
+		b.services = s
+	}
 }
