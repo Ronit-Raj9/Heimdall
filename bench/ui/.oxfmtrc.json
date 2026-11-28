@@ -7,5 +7,5 @@
 	"tabWidth": 2,
 	"trailingComma": "all",
 	"sortTailwindcss": true,
-	"ignorePatterns": ["dist/**", "node_modules/**", "app/routeTree.gen.ts"]
+	"ignorePatterns": ["dist/**", "node_modules/**", "app/routeTree.gen.ts", "**/testdata/**"]
 }
