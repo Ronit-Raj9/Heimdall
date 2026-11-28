@@ -1,4 +1,5 @@
 import "@/lib/types/modelSwitchI18n";
+import "@/components/reportcard/uff5I18n";
 import { ParetoChart } from "@/components/migration/paretoChart";
 import { costText, formatShare, observed } from "@/components/migration/pareto.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
@@ -31,19 +32,24 @@ export function ModelSwitchReportView({ evaluationId }: { evaluationId: string }
 
 function Report({ report }: { report: ModelSwitchReport }) {
 	const { t } = useTranslation("modelSwitch");
+	const { t: tu } = useTranslation("uff5");
 	const locale = getLocale();
 	const unknown = t("report.unknown");
 	const share = (v: Value) => formatShare(observed(v), locale) ?? unknown;
 	const usd = (v: Value) => costText(v, locale) ?? unknown;
 	const ms = (v: Value) => (observed(v) === null ? unknown : `${Math.round(observed(v) as number)} ms`);
 	const rec = report.recommendation;
+	// Only a keep or switch answer names a model: nothing solved or too few runs recommend none (F5).
+	const decided = rec.action === "keep" || rec.action === "switch";
+	const actionText = (rec.action as string) === "nothing_solved" ? tu("switch.nothing_solved") : t(`report.action.${rec.action}` as "report.action.keep");
 	const vsBest = new Map(report.comparisons.map((c) => [c.label, c]));
 	return (
 		<>
 			<Section title={t("report.recommendation")} description={t("report.description")} testId="model-switch-recommendation">
 				<p className="text-sm font-medium" data-testid="model-switch-action">
-					{t(`report.action.${rec.action}`)}
-					{rec.model ? `: ${rec.model}` : ""} ({t(`report.strength.${rec.strength}`)})
+					{actionText}
+					{decided && rec.model ? `: ${rec.model}` : ""}
+					{decided ? ` (${t(`report.strength.${rec.strength}`)})` : ""}
 				</p>
 				<p className="text-sm">{rec.summary}</p>
 				{rec.reasons.length > 0 && <TextList title={t("report.reasons")} items={rec.reasons} testId="model-switch-reasons" />}
@@ -71,7 +77,7 @@ function Report({ report }: { report: ModelSwitchReport }) {
 								const tags = [
 									m.label === report.current && t("report.current"),
 									m.label === report.best && t("report.best"),
-									m.label === rec.model && t("report.recommended"),
+									decided && m.label === rec.model && t("report.recommended"),
 									m.open && t("report.open"),
 								].filter(Boolean);
 								return (

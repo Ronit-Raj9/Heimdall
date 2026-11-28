@@ -1,0 +1,35 @@
+{
+	"switch": {
+		"nothing_solved": "Nothing to recommend",
+		"tooFew": "Too few runs to recommend"
+	},
+	"capability": {
+		"changeVsFirst": "Change against {{a}}"
+	},
+	"compare": {
+		"name": "Name",
+		"nameHint": "Shown in lists. Empty: named by its id.",
+		"budget": "Budget (USD)"
+	},
+	"cap": {
+		"label": "Cap ($)",
+		"estimate": "Expected about {{usd}}. It stops at the cap.",
+		"unknown": "Cost not known yet. It stops at the cap.",
+		"needCap": "Set a cap above $0."
+	},
+	"cheat": {
+		"confirm": "Runs each agent once on every impossible copy of the tasks, on your model keys.",
+		"builtin": "Built-in benchmarks have no impossible copies, so a cheat check cannot run on them. Run one on your own benchmark.",
+		"ownBefore": "Make impossible copies first:",
+		"ownLink": "open the benchmark's Quality tab"
+	},
+	"judge": {
+		"badge": "Judged, not verified",
+		"judged": "Judged by a model, not verified.",
+		"cost_one": "Judge cost {{usd}} for {{count}} judged run, apart from the agent's cost.",
+		"cost_other": "Judge cost {{usd}} for {{count}} judged runs, apart from the agent's cost.",
+		"costUnknown_one": "Judge cost not known: {{priced}} of {{count}} judged run priced.",
+		"costUnknown_other": "Judge cost not known: {{priced}} of {{count}} judged runs priced.",
+		"noReuse": "Judge votes are not reused on the shared worker."
+	}
+}

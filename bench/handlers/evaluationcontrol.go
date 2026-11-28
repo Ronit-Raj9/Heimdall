@@ -15,6 +15,15 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// EvaluationRerunRequest is the body of POST /evaluations/{id}/rerun-failures:
+// the experiment rerun's fields plus the spend cap of the whole rerun.
+type EvaluationRerunRequest struct {
+	RerunFailuresRequest
+	// BudgetUSD caps the whole rerun (round 4, F5), split evenly over the
+	// benchmarks it reruns. 0 keeps each benchmark's old cap (older clients).
+	BudgetUSD float64 `json:"budget_usd,omitempty"`
+}
+
 // EvaluationRerunResult is POST /evaluations/{id}/rerun-failures.
 type EvaluationRerunResult struct {
 	Evaluation *schemas.Evaluation    `json:"evaluation"`
@@ -143,8 +152,12 @@ func (h *evaluationsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	var req RerunFailuresRequest
-	if !decodeOptional(ctx, h.env.Mode, &req, `{"outcomes"?, "reason"?}`) {
+	var req EvaluationRerunRequest
+	if !decodeOptional(ctx, h.env.Mode, &req, `{"outcomes"?, "reason"?, "budget_usd"?}`) {
+		return
+	}
+	if req.BudgetUSD < 0 || req.BudgetUSD > EvaluationMaxBudget {
+		h.fail(ctx, fasthttp.StatusBadRequest, "The spending cap must be between $0 and $1000.")
 		return
 	}
 	h.refresh(ev)
@@ -167,6 +180,7 @@ func (h *evaluationsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 	work, cancel := workContext(ctx, evaluationLaunchTimeout)
 	defer cancel()
 	var benches []string
+	share := rerunShare(ev, req.BudgetUSD)
 	for _, c := range ev.Children {
 		if c.ExperimentID == "" || c.Status == schemas.EvaluationChildSkipped {
 			continue
@@ -186,6 +200,10 @@ func (h *evaluationsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		exp.EvaluationID = child.ID
+		if share > 0 {
+			exp.Budget.TotalUSD = share
+			exp.Budget.ReserveUSD = min(exp.Budget.ReserveUSD, share)
+		}
 		res, err := launchRerun(work, ctx, s.Launcher, m, exp, n)
 		if err != nil {
 			out.Skipped[c.Benchmark] = err.Error()
@@ -197,13 +215,16 @@ func (h *evaluationsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 		if !res.Started {
 			status = string(schemas.ExperimentCreatedState)
 		}
-		child.Children = append(child.Children, schemas.EvaluationChild{Benchmark: c.Benchmark, ExperimentID: res.ExperimentID, Status: status})
+		child.Children = append(child.Children, schemas.EvaluationChild{Benchmark: c.Benchmark, ExperimentID: res.ExperimentID, Status: status, BudgetUSD: share})
 	}
 	if len(child.Children) == 0 {
 		h.fail(ctx, fasthttp.StatusConflict, "evaluation "+ev.ID+" has no benchmark with a failure to rerun")
 		return
 	}
 	child.Spec.Benchmarks = benches
+	if req.BudgetUSD > 0 {
+		child.Spec.BudgetUSD = share * float64(len(child.Children))
+	}
 	child.Spec.Pack = ""
 	child.Status = evaluationStatus(&schemas.Evaluation{Status: schemas.EvaluationRunning, Children: child.Children})
 	if err := h.store().Save(child); err != nil {
@@ -214,6 +235,21 @@ func (h *evaluationsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 		out.Skipped = nil
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, out)
+}
+
+// rerunShare is each rerun benchmark's cap: budget split over the
+// benchmarks that can have failures, never under a cent; 0 without budget.
+func rerunShare(ev *schemas.Evaluation, budget float64) float64 {
+	if budget <= 0 {
+		return 0
+	}
+	n := 0
+	for _, c := range ev.Children {
+		if c.ExperimentID != "" && c.Status != schemas.EvaluationChildSkipped {
+			n++
+		}
+	}
+	return max(budget/float64(max(n, 1)), EvaluationMinBenchmarkBudget)
 }
 
 // principalOf is the request principal's email or user id.

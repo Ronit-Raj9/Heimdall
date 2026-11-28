@@ -29,6 +29,33 @@ type Totals struct {
 	// the evaluation's cost into normal and fault runs.
 	FaultCostUSD  *float64 `json:"fault_cost_usd,omitempty"`
 	FaultCostRuns int      `json:"fault_cost_runs,omitempty"`
+	// JudgeRuns counts the clean runs a model judge graded (judge_cost_usd
+	// applies); JudgeCostUSD is what those judge calls cost, apart from
+	// CostUSD (the agent's), nil when any of them is not priced;
+	// JudgeCostRuns counts the priced ones (round 4, F5, PH3-2).
+	JudgeRuns     int      `json:"judge_runs,omitempty"`
+	JudgeCostUSD  *float64 `json:"judge_cost_usd,omitempty"`
+	JudgeCostRuns int      `json:"judge_cost_runs,omitempty"`
+}
+
+// judgeCost sums judge_cost_usd over the runs a judge graded: the judged
+// run count, the priced count and the sum (nil unless every one is priced).
+func judgeCost(runs []graded) (judged, priced int, cost *float64) {
+	var judgedRuns []graded
+	for _, r := range runs {
+		if v, ok := r.metrics[metricJudgeCostUSD]; ok && v.State != schemas.ValueNotApplicable {
+			judgedRuns = append(judgedRuns, r)
+		}
+	}
+	if len(judgedRuns) == 0 {
+		return 0, 0, nil
+	}
+	total, known, _ := sumKnown(judgedRuns, metricJudgeCostUSD)
+	if known == len(judgedRuns) {
+		c := round(total)
+		cost = &c
+	}
+	return len(judgedRuns), known, cost
 }
 
 // totals computes Totals per arm label.
@@ -68,6 +95,7 @@ func totals(children []childRuns, labels []string, faultOf func(childRuns, strin
 					t.CostPerSolved = &v
 				}
 			}
+			t.JudgeRuns, t.JudgeCostRuns, t.JudgeCostUSD = judgeCost(clean)
 			if fc := observed(clean, metricFalseCompletion); len(fc) > 0 {
 				s := 0.0
 				for _, x := range fc {

@@ -4,6 +4,11 @@ import { okQuery, render } from "@/lib/testing/render";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@/components/evaluations/paidCaps", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/evaluations/paidCaps")>()),
+	useRerunEvaluationFailuresCappedMutation: () => [async () => ({}), { isLoading: false }],
+	useStartCheatCheckCappedMutation: () => [async () => ({}), { isLoading: false }],
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/reportcard/evaluationReportCard", () => ({
 	EvaluationReportCard: ({ evaluationId }: { evaluationId: string }) => <div data-testid="report-card-mock">{evaluationId}</div>,

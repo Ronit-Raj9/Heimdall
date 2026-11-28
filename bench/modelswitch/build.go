@@ -119,7 +119,9 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		rep.Models = append(rep.Models, m)
 	}
 	rank(rep.Models)
-	if rep.Models[0].Runs > 0 {
+	// A best model needs a solved task: when every model with runs solved
+	// none, no model is best and none is recommended (nothingSolved).
+	if rep.Models[0].Runs > 0 && !nothingSolved(rep.Models) {
 		rep.Best = rep.Models[0].Label
 	}
 
@@ -141,6 +143,9 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 
 	// Benchmarks and segments against the default model.
 	def := rep.Recommendation.Model
+	if def == "" {
+		def = rep.Current
+	}
 	for _, br := range benches {
 		g := Group{Key: "benchmark", Value: br.child.Benchmark, Models: map[string]GroupModel{}, Default: def}
 		byLabel := map[string][]run{}

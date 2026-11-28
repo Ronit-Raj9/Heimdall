@@ -29,6 +29,10 @@ type CheatCheck struct {
 	Evaluation string              `json:"evaluation,omitempty"` // the newest finished child with cheat_check_of = this evaluation
 	PerArm     map[string]CheatArm `json:"per_arm,omitempty"`
 	State      string              `json:"state"`
+	// EstRuns is about how many runs a cheat check would start: every arm
+	// once on each twin, at most the evaluation's tasks per benchmark
+	// (state not_measured, when the twin count is known).
+	EstRuns int `json:"est_runs,omitempty"`
 }
 
 // CheatArm is one arm's result on the impossible twins.
@@ -75,7 +79,36 @@ func cheatCheck(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluat
 			return &CheatCheck{State: CheatNoTwins}
 		}
 	}
-	return &CheatCheck{State: CheatNotMeasured}
+	return &CheatCheck{State: CheatNotMeasured, EstRuns: cheatEstRuns(ev, opt)}
+}
+
+// cheatEstRuns is the run count a cheat check of ev would start: arms
+// times twins per benchmark, capped by the tasks per benchmark the child
+// keeps from ev's spec; 0 when the twin count is not known.
+func cheatEstRuns(ev *schemas.Evaluation, opt Options) int {
+	if opt.TwinCount == nil {
+		return 0
+	}
+	seen := map[string]bool{}
+	arms := max(len(ev.Spec.Arms), 1)
+	n := 0
+	benches := slices.Clone(ev.Spec.Benchmarks)
+	for _, c := range ev.Children {
+		benches = append(benches, c.Benchmark)
+	}
+	for _, b := range benches {
+		id := BenchmarkID(b)
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		k := opt.TwinCount(id)
+		if t := ev.Spec.TasksPerBenchmark; t > 0 && k > t {
+			k = t
+		}
+		n += arms * k
+	}
+	return n
 }
 
 // measureCheat counts the clean graded runs of a finished cheat check per

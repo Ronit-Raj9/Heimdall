@@ -26,6 +26,13 @@ func recommend(rep *Report, ev *schemas.Evaluation, benches []benchRuns) Recomme
 	for _, m := range rep.Models {
 		byLabel[m.Label] = m
 	}
+	if nothingSolved(rep.Models) {
+		r.Action, r.Strength, r.Summary = ActionNothingSolved, StrengthWeak, NothingSolvedSummary
+		for _, m := range rep.Models {
+			r.Reasons = append(r.Reasons, qualityLine(m))
+		}
+		return finish(r, ev)
+	}
 	if rep.Best == "" {
 		r.Action, r.Strength = ActionNotEnough, StrengthWeak
 		r.Summary = "No model has a graded run yet, so there is nothing to compare. Wait for the evaluation to finish, or check why its benchmarks were skipped."
@@ -57,7 +64,10 @@ func recommend(rep *Report, ev *schemas.Evaluation, benches []benchRuns) Recomme
 	}
 	r.Model = def
 	chosen := byLabel[def]
+	fewest := fewestRuns(rep.Models)
 	switch {
+	case fewest.Runs < MinRunsPerModel:
+		r.Action, r.Strength = ActionNotEnough, StrengthWeak
 	case best.Tasks < MinSegmentTasks:
 		r.Action, r.Strength = ActionNotEnough, StrengthWeak
 	case def == rep.Current:
@@ -76,6 +86,10 @@ func recommend(rep *Report, ev *schemas.Evaluation, benches []benchRuns) Recomme
 	// Summary.
 	switch r.Action {
 	case ActionNotEnough:
+		if fewest.Runs < MinRunsPerModel {
+			r.Summary = fmt.Sprintf("%s: %s has %d graded run(s). Run at least %d per model before choosing.", TooFewRunsSummary, display(fewest), fewest.Runs, MinRunsPerModel)
+			break
+		}
 		r.Summary = fmt.Sprintf("Not enough evidence yet: the best model, %s, has graded runs on %d task(s). Run at least %d tasks per model before choosing.", display(best), best.Tasks, MinSegmentTasks)
 	case ActionKeep:
 		if r.Strength == StrengthStrong {
@@ -135,6 +149,33 @@ func recommend(rep *Report, ev *schemas.Evaluation, benches []benchRuns) Recomme
 	}
 	r.Caveats = append(r.Caveats, fmt.Sprintf("Measured on %d task(s) over %d benchmark(s) with %d trial(s) each: only differences of a size these tasks can show are called significant.", best.Tasks, benchesRun, ev.Spec.Trials))
 	return finish(r, ev)
+}
+
+// nothingSolved is true when at least one model has graded runs and no
+// model solved a task: then no model is best and none is recommended.
+func nothingSolved(models []Model) bool {
+	graded := false
+	for _, m := range models {
+		if m.Runs == 0 {
+			continue
+		}
+		graded = true
+		if q, ok := m.Quality.Float(); !ok || q > 0 {
+			return false
+		}
+	}
+	return graded
+}
+
+// fewestRuns is the model with the fewest graded runs.
+func fewestRuns(models []Model) Model {
+	var out Model
+	for i, m := range models {
+		if i == 0 || m.Runs < out.Runs {
+			out = m
+		}
+	}
+	return out
 }
 
 // finish marks a report of an evaluation that is still running.

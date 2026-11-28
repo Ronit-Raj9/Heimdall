@@ -6,6 +6,9 @@ import { VersionPicker } from "@/app/evaluate/views/step1Agent";
 import { estimateText } from "@/app/evaluate/views/step4Setup";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import "@/components/reportcard/uff5I18n";
 import { PaidButton } from "@/components/ui/paidButton";
 import { notify } from "@/lib/notify";
 import {
@@ -19,6 +22,9 @@ import { evalArmLabel } from "@/lib/evaluationArms";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/** Tasks per benchmark a new comparison starts with. */
+export const COMPARE_DEFAULT_TASKS = 3;
 
 /** The most models one comparison takes (schemas.EvaluationModelSwitchMaxArms). */
 export const MODEL_SWITCH_MAX = 6;
@@ -36,6 +42,8 @@ export interface CompareModelsInput {
 	tasks: number;
 	trials: number;
 	budget: number;
+	/** The evaluation's name; empty lets the server name it by its id. */
+	name?: string;
 }
 
 /** The rows with a model picked; the form starts with two empty rows, which never count (M4-82). */
@@ -56,7 +64,7 @@ export function compareModelsProblem(i: CompareModelsInput): "needBenchmark" | "
 /** The evaluation spec of mode model_switch: one arm per model, same agent and version. */
 export function compareModelsSpec(i: CompareModelsInput): EvaluationSpec {
 	return {
-		name: "",
+		name: (i.name ?? "").trim(),
 		mode: "model_switch" as EvaluationSpec["mode"],
 		arms: filledModels(i.models).map((m, n) => ({
 			label: evalArmLabel(n), // N211: the server takes only A, B, C ... (evalArmIDRe)
@@ -106,14 +114,17 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 		if (!touched) setModels((ms) => prefillCurrent(ms, agentModel));
 	}, [agentModel, touched]);
 	const [benchmarks, setBenchmarks] = useState<string[]>([]);
-	const [tasks, setTasks] = useState(5);
-	const [trials, setTrials] = useState(2);
+	// Small defaults (F5, PH4-7): a first comparison is 3 tasks, one try each.
+	const [tasks, setTasks] = useState(COMPARE_DEFAULT_TASKS);
+	const [trials, setTrials] = useState(1);
+	const [name, setName] = useState("");
+	const { t: tf } = useTranslation("uff5");
 	const [budget, setBudget] = useState(0);
 	const [budgetTouched, setBudgetTouched] = useState(false);
 	const { t: tu } = useTranslation("uf4b");
 	const { t: tt } = useTranslation("toast");
 	const [create, created] = useCreateEvaluationMutation();
-	const input: CompareModelsInput = { agent: agentId, version, models, benchmarks, tasks, trials, budget };
+	const input: CompareModelsInput = { agent: agentId, version, models, benchmarks, tasks, trials, budget, name };
 	const problem = compareModelsProblem(input);
 	const spec = compareModelsSpec(input);
 	const estimate = useGetEvaluationEstimateQuery(spec, { skip: problem !== null });
@@ -147,6 +158,9 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			<div className="flex flex-col gap-1">
 				<h2 className="text-base font-semibold">{t("form.title")}</h2>
 			</div>
+			<Field label={tf("compare.name")} optional hint={tf("compare.nameHint")} testId="compare-models-name-field">
+				<Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} data-testid="compare-models-name" />
+			</Field>
 			<VersionPicker agent={agentId} value={version} onChange={setVersion} testId="compare-models-version" />
 			<div className="flex flex-col gap-2">
 				<span className="text-sm font-medium">{t("form.models")}</span>
@@ -202,7 +216,7 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 				<NumberField label={t("form.tasks")} value={tasks} min={1} onChange={setTasks} testId="compare-models-tasks" />
 				<NumberField label={t("form.trials")} value={trials} min={1} onChange={setTrials} testId="compare-models-trials" />
 				<NumberField
-					label={t("form.budget")}
+					label={tf("compare.budget")}
 					value={budget}
 					min={0.01}
 					onChange={(n) => {

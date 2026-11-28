@@ -40,9 +40,25 @@ func cheatCheckParent(t *testing.T) (string, string) {
 	return root, ev.ID
 }
 
+// cheatCheckWebBody is the body the report card's cheat check sends
+// (components/evaluations/paidCaps.ts startCheatCheckCapped).
+const cheatCheckWebBody = `{"yes":true,"budget_usd":0.5}`
+
+// TestCheatCheckRefusesWithoutCap: the round 3 web body had no cap and the
+// child ran on the parent's whole budget; a start without one is refused.
+func TestCheatCheckRefusesWithoutCap(t *testing.T) {
+	root, id := cheatCheckParent(t)
+	for _, body := range []string{`{"yes":true}`, `{"yes":true,"budget_usd":0}`, `{"yes":true,"budget_usd":-1}`} {
+		code, out := cheatCheckServe(t, root, id, body)
+		if code != 400 || !strings.Contains(string(out), cheatCheckNoBudgetMsg) {
+			t.Fatalf("%s: %d %s", body, code, out)
+		}
+	}
+}
+
 func TestCheatCheckRefusesWithoutTwins(t *testing.T) {
 	root, id := cheatCheckParent(t)
-	code, body := cheatCheckServe(t, root, id, `{"yes":true}`)
+	code, body := cheatCheckServe(t, root, id, cheatCheckWebBody)
 	if code != 409 || !strings.Contains(string(body), cheatCheckNoTwinsMsg) {
 		t.Fatalf("%d %s", code, body)
 	}
@@ -67,11 +83,11 @@ func TestCheatCheckChildIsExploratory(t *testing.T) {
 		return ev, evalstore.Open(root).Save(ev)
 	}
 	defer func() { cheatCheckLaunch = old }()
-	code, body := cheatCheckServe(t, root, id, `{"yes":true}`)
+	code, body := cheatCheckServe(t, root, id, cheatCheckWebBody)
 	if code != 202 {
 		t.Fatalf("%d %s", code, body)
 	}
-	if len(got.Benchmarks) != 1 || got.Benchmarks[0] != "s-twins" || got.Trials != 1 || got.Name != "nightly (cheat check)" {
+	if len(got.Benchmarks) != 1 || got.Benchmarks[0] != "s-twins" || got.Trials != 1 || got.Name != "nightly (cheat check)" || got.BudgetUSD != 0.5 {
 		t.Fatalf("spec %+v", got)
 	}
 	child, err := evalstore.Open(root).Load("ev_20261127_000001_def456")

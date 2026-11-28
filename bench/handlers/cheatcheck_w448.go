@@ -29,7 +29,13 @@ const (
 // CheatCheckRequest is the body of POST /evaluations/{id}/cheat-check.
 type CheatCheckRequest struct {
 	Yes bool `json:"yes"`
+	// BudgetUSD is the spend cap of the whole cheat check (round 4, F5):
+	// required, so a cheat check never runs on the parent's budget unseen.
+	BudgetUSD float64 `json:"budget_usd"`
 }
+
+// cheatCheckNoBudgetMsg refuses a cheat check without a spend cap.
+const cheatCheckNoBudgetMsg = "Set a spending cap for the cheat check (budget_usd, more than 0)."
 
 func init() {
 	RegisterOrgArea("cheatcheck", func(env OrgEnv, r *router.Router) {
@@ -68,6 +74,29 @@ func twinBenchmarks(root string, benches []string) []string {
 	return out
 }
 
+// admittedTwins counts the admitted impossible twins of benchmark (a
+// suite id, without the twin suffix); 0 when it has none or no root.
+func admittedTwins(root, benchmark string) int {
+	if root == "" {
+		return 0
+	}
+	raw, err := os.ReadFile(filepath.Join(root, string(projectfs.AreaBenchmarks), benchmark+twins.SuiteSuffix, "suite.lock"))
+	if err != nil {
+		return 0
+	}
+	var lock schemas.SuiteLock
+	if json.Unmarshal(raw, &lock) != nil {
+		return 0
+	}
+	n := 0
+	for _, t := range lock.Tasks {
+		if t.Status == schemas.TaskAdmitted {
+			n++
+		}
+	}
+	return n
+}
+
 func (h *evaluationsHandler) cheatCheck(ctx *fasthttp.RequestCtx) {
 	var req CheatCheckRequest
 	if err := decodeJSONStrict(ctx.PostBody(), &req); err != nil {
@@ -76,6 +105,10 @@ func (h *evaluationsHandler) cheatCheck(ctx *fasthttp.RequestCtx) {
 	}
 	if !req.Yes {
 		h.fail(ctx, fasthttp.StatusBadRequest, `a cheat check runs your agents on your model keys: send {"yes": true} to start it`)
+		return
+	}
+	if !(req.BudgetUSD > 0) || req.BudgetUSD > EvaluationMaxBudget {
+		h.fail(ctx, fasthttp.StatusBadRequest, cheatCheckNoBudgetMsg)
 		return
 	}
 	ev, ok := h.load(ctx)
@@ -95,6 +128,7 @@ func (h *evaluationsHandler) cheatCheck(ctx *fasthttp.RequestCtx) {
 	}
 	spec := ev.Spec
 	spec.Benchmarks, spec.Pack, spec.Trials = tw, "", 1
+	spec.BudgetUSD = req.BudgetUSD
 	spec.Name = strings.TrimSuffix(ev.Spec.Name, cheatCheckSuffix) + cheatCheckSuffix
 	// cheat_check_of is set before the child's first save, in the same
 	// write that creates it: a status refresh can never drop it.

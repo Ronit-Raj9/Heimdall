@@ -71,6 +71,11 @@ func TestQuickRunEndToEnd(t *testing.T) {
 	if got := exp.Conditions[0].Tasks.IDs; strings.Join(got, ",") != "t01,t02,t03" {
 		t.Fatalf("tasks %v", got)
 	}
+	// The web dialog's promise (PAID-16): with no compare model the same
+	// setup runs twice, each task 2 times on the one arm.
+	if exp.Conditions[0].Trials != 2 {
+		t.Fatalf("one model, 1 trial asked: trials %d, want 2", exp.Conditions[0].Trials)
+	}
 	// One model is one arm scored on its own: no hidden repeat arm B.
 	if len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-5.4-mini" || exp.Arms["A"].Set["gateway.provider"] != "openai" {
 		t.Fatalf("arms %+v", exp.Arms)

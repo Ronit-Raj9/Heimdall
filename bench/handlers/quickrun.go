@@ -40,8 +40,11 @@ const (
 	QuickRunDefaultBudget = 5.0
 	QuickRunMaxTasks      = 50
 	QuickRunMaxTrials     = 5
-	QuickRunMaxBudget     = 100.0
-	quickRunPolicy        = "policies/default.yaml"
+	// QuickRunSoloRepeat is how many times a run with no compare model
+	// repeats each trial on its one arm, to show variance.
+	QuickRunSoloRepeat = 2
+	QuickRunMaxBudget  = 100.0
+	quickRunPolicy     = "policies/default.yaml"
 )
 
 // QuickRunModel is the UI's ModelRef: a provider, a model and optionally the
@@ -398,6 +401,12 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 	}
 	if req.Trials < 1 || req.Trials > QuickRunMaxTrials {
 		return nil, "", badf("trials must be between 1 and %d", QuickRunMaxTrials)
+	}
+	// One model: the same setup runs twice per trial asked, on the one arm,
+	// so the dialog's promise "the same setup runs twice to show variance"
+	// and its estimate (tasks x trials x 2) hold (round 4, F5, PAID-16).
+	if req.CompareModel == nil {
+		req.Trials *= QuickRunSoloRepeat
 	}
 	if req.BudgetUSD < 0 || req.BudgetUSD > QuickRunMaxBudget {
 		return nil, "", badf("budget_usd must be between 0 and %v", QuickRunMaxBudget)

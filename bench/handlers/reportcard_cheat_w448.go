@@ -30,6 +30,15 @@ func (h *reportCardHandler) withCheatCheck(ctx context.Context, opt *reportcard.
 		}
 		return out
 	}
+	counts := map[string]int{}
+	opt.TwinCount = func(benchmark string) int {
+		n, seen := counts[benchmark]
+		if !seen {
+			n = admittedTwins(root, benchmark)
+			counts[benchmark] = n
+		}
+		return n
+	}
 	twinsOf := map[string]bool{}
 	opt.HasTwins = func(benchmark string) bool {
 		ok, seen := twinsOf[benchmark]

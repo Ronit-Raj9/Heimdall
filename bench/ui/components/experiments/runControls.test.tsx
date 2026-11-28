@@ -7,6 +7,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvaluationRunActions, PauseControls, RunActions, RunControlsPanel } from "./runControls";
 
 const api = vi.hoisted(() => ({ controls: undefined as unknown }));
+vi.mock("@/components/evaluations/paidCaps", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/evaluations/paidCaps")>()),
+	useRerunEvaluationFailuresCappedMutation: () => [async () => ({}), { isLoading: false }],
+	useStartCheatCheckCappedMutation: () => [async () => ({}), { isLoading: false }],
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/runControlApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/runControlApi")>()),
@@ -194,7 +199,9 @@ describe("Rerun failures only where it can work (fix wave 3, N183 and N285)", ()
 		const tag = tagOf(html, "evaluation-rerun-failures") ?? "";
 		expect(tag).toContain('data-paid="true"');
 		expect(tag).toContain('title="About 2 runs."');
-		expect(html).toContain("(uses your model key)");
+		// Round 4 (F5, PAID-6): the rerun has its own cap and the label names it.
+		expect(html).toContain("Rerun failures, up to $1.00");
+		expect(html).toContain('data-testid="evaluation-rerun-failures-cap"');
 	});
 	it("keeps the rerun notice out of the actions row (N193)", () => {
 		const html = render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, hostedSession("member"));

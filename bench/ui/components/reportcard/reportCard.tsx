@@ -1,3 +1,4 @@
+import "./uff5I18n";
 import { printExport } from "@/components/share/shareDialog";
 import { Badge } from "@/components/ui/badge";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
@@ -13,6 +14,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { BifrostTable, hasBifrost } from "./bifrostSection";
 import { CheatRateRow } from "./cheatRateRow";
+import { JudgeCostLine } from "./judgeCostLine";
 import "./fw09I18n";
 import "./hw08I18n";
 import "./reportCardI18n";
@@ -126,6 +128,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 							{cost}
 						</p>
 					)}
+					<JudgeCostLine report={report} />
 					{brokenChild?.experiment_id && !readOnly && (
 						<Link
 							to="/experiments/$expId"
@@ -413,6 +416,10 @@ function CapabilityTable({ report }: { report: Report }) {
 	const rows = capabilityRows(report);
 	const { t } = useTranslation("hw08");
 	const { t: tr } = useTranslation("reportCard");
+	const { t: tu } = useTranslation("uff5");
+	// Three or more setups (a model switch): every setup gets its row, each compared with the first (F5, PH4-5).
+	const many = ab && report.arms.length > 2;
+	const changeHead = many ? tu("capability.changeVsFirst", { a: a.label }) : ab ? tr("columns.change", { b: b.label, a: a.label }) : "";
 	const untested = rows.filter((r) => !r.tested).map((r) => capabilityName(r.capability));
 	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
@@ -427,7 +434,7 @@ function CapabilityTable({ report }: { report: Report }) {
 							{tr(`columns.metric.${h}`)}
 						</TableHead>
 					))}
-					{ab && <TableHead scope="col" className="text-right">{tr("columns.change", { b: b.label, a: a.label })}</TableHead>}
+					{ab && <TableHead scope="col" className="text-right">{changeHead}</TableHead>}
 					{ab && <TableHead scope="col">{tr("columns.winner")}</TableHead>}
 				</TableRow>
 			</TableHeader>
@@ -443,6 +450,32 @@ function CapabilityTable({ report }: { report: Report }) {
 								</TableHead>
 								<MetricCells metrics={data.arms[a.label]} />
 							</TableRow>
+						);
+					}
+					if (many) {
+						return (
+							<React.Fragment key={capability}>
+								{report.arms.map((arm, i) => {
+									const vs = i === 0 ? undefined : compareArms(data.arms, a.label, arm.label);
+									return (
+										<TableRow key={arm.label} data-testid={i === 0 ? `capability-${capability}` : `capability-${capability}-${arm.label}`}>
+											{i === 0 && (
+												<TableHead scope="rowgroup" rowSpan={report.arms.length} className="align-top font-medium">
+													{name}
+												</TableHead>
+											)}
+											<TableCell className="font-semibold">{arm.label}</TableCell>
+											<MetricCells metrics={data.arms[arm.label]} ab />
+											<TableCell label={changeHead} className="text-right tabular-nums">
+												{vs ? points(vs.delta) : "-"}
+											</TableCell>
+											<TableCell label={tr("columns.winner")}>
+												{vs ? <WinnerMark result={vs} name={armName(report, vs.winner)} /> : "-"}
+											</TableCell>
+										</TableRow>
+									);
+								})}
+							</React.Fragment>
 						);
 					}
 					const cmp = compareArms(data.arms, a.label, b.label);
@@ -497,6 +530,7 @@ function BenchmarkList({ report, readOnly }: { report: Report; readOnly: boolean
 }
 
 function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBenchmark; readOnly: boolean }) {
+	const { t: tu } = useTranslation("uff5");
 	const ab = isAB(report);
 	const [a, b] = report.arms;
 	const result = ab ? benchmarkWinner(row, a.label, b.label) : undefined;
@@ -525,6 +559,11 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				/>
 				<span className="text-foreground min-w-0 flex-1 truncate font-medium max-sm:w-[calc(100%-2rem)] max-sm:flex-none">{row.benchmark}</span>
 				<span className="text-muted-foreground text-xs">{capabilityName(row.capability)}</span>
+				{judge && (
+					<Badge variant="outline" data-testid={`benchmark-judged-${row.benchmark}`}>
+						{tu("judge.badge")}
+					</Badge>
+				)}
 				{judge && (
 					<Badge variant={judge.tone} title={judge.title} data-testid={`benchmark-judge-${row.benchmark}`}>
 						{judge.text}

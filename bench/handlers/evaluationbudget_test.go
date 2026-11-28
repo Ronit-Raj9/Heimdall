@@ -80,7 +80,7 @@ func TestEstimateBudget(t *testing.T) {
 		if b.RunsSkippedHigh != 11+6 || b.RunsSkippedLow != 0 || b.Fit != BudgetMayExceed {
 			t.Fatalf("skipped %+v", b)
 		}
-		if b.SuggestedUSD != 30 || b.MaxUSD != EvaluationBudgetMaxDefault { // ceil(24 * 1.25)
+		if b.SuggestedUSD != 72 || b.MaxUSD != EvaluationBudgetMaxDefault { // 3 * 24, the high estimate (round 4, F5)
 			t.Fatalf("suggested %+v", b)
 		}
 	})
@@ -109,10 +109,27 @@ func TestEstimateBudget(t *testing.T) {
 		est := estimateOf(EvalBenchmarkEstimate{Benchmark: "a", Runs: 10})
 		est.EstCostUSD.Known = false
 		b := estimateBudget(est, 0, 0)
-		if b.Fit != BudgetUnknown || b.SuggestedUSD != 5 || b.RunsSkippedHigh != 0 || b.Note == "" {
+		if b.Fit != BudgetUnknown || b.SuggestedUSD != 0 || b.RunsSkippedHigh != 0 || b.Note == "" {
 			t.Fatalf("unknown %+v", b)
 		}
 	})
+}
+
+// TestSuggestBudgetFollowsTheEstimate: round 3 suggested $5 for a 3 task
+// run that costs cents (PH1-4); the suggestion is about 3 times the
+// estimate, at least $0.25, rounded.
+func TestSuggestBudgetFollowsTheEstimate(t *testing.T) {
+	for _, tc := range []struct{ est, want float64 }{
+		{0, 0.25}, {0.0016, 0.25}, {0.16, 0.5}, {0.4, 1.25}, {2.1, 6.5}, {24, 72}, {33.3, 100},
+	} {
+		if got := SuggestBudget(tc.est); got != tc.want {
+			t.Errorf("SuggestBudget(%v) = %v, want %v", tc.est, got, tc.want)
+		}
+	}
+	est := estimateOf(EvalBenchmarkEstimate{Benchmark: "a", Runs: 3, EstCostUSD: EvalCostRange{Low: 0.0012, High: 0.16, Known: true}})
+	if b := estimateBudget(est, 0.4, 0); b.SuggestedUSD != 0.5 {
+		t.Fatalf("3 task run: suggested %v, want 0.50", b.SuggestedUSD)
+	}
 }
 
 func TestRunsPast(t *testing.T) {

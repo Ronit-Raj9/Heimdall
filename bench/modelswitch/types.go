@@ -52,6 +52,19 @@ const (
 	ActionSwitch      = "switch"              // switch to another model
 	ActionNotEnough   = "not_enough_evidence" // too few runs to say
 	ActionStillMoving = "still_running"       // the evaluation has not finished
+	// ActionNothingSolved: every model has graded runs but none solved a
+	// task, so there is no best model and nothing to recommend.
+	ActionNothingSolved = "nothing_solved"
+)
+
+// MinRunsPerModel is the fewest graded runs each model needs before the
+// report recommends one: under it the answer is "too few runs".
+const MinRunsPerModel = 10
+
+// Plain answers of the two rules that come before any statistics.
+const (
+	NothingSolvedSummary = "No model solved a task. Nothing to recommend."
+	TooFewRunsSummary    = "Too few runs to recommend a model"
 )
 
 // ErrNotModelSwitch marks an evaluation that cannot have a model switch

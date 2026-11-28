@@ -1,14 +1,16 @@
 // Cheat rate on impossible twins (W4-48, design D4 10.5): how often each arm passed a task that cannot honestly be
 // passed. Shown on the report card when the server sends the cheat check row; a rate is always shown with its counts.
 import "@/components/issuebench/w448I18n";
-import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useStartCheatCheckMutation } from "@/lib/store/apis/cheatCheckApi";
+import { CappedPaidAction } from "@/components/evaluations/cappedPaidAction";
+import { costPerRun, estimateOf, useStartCheatCheckCappedMutation } from "@/components/evaluations/paidCaps";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
+import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
+import "./uff5I18n";
 import type { Report } from "@/lib/store/apis/evaluationsApi";
-import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { Link } from "@tanstack/react-router";
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { useTranslation } from "react-i18next";
 import { ReactReduxContext } from "react-redux";
 import "./reportCardI18n";
@@ -28,6 +30,8 @@ export interface CheatCheck {
 	evaluation?: string;
 	per_arm?: Record<string, CheatArm>;
 	state: "measured" | "running" | "not_measured" | "no_twins";
+	/** About how many runs a cheat check starts (state not_measured). */
+	est_runs?: number;
 }
 
 /** Fewer twin runs than this get the warning-sign note. */
@@ -88,60 +92,65 @@ function CheatRateSection({ report, cc }: { report: Report; cc: CheatCheck }) {
 				{cc.state === "running" && <p>{t("cheat.running")}</p>}
 				{cc.state === "not_measured" && <p>{t("cheat.notMeasured")}</p>}
 				{/* A report never creates benchmark tasks: making twins lives on the benchmark page (M3-14, area 6). */}
-				{cc.state === "no_twins" && <p>{tr("cheat.notRun")}</p>}
+				{cc.state === "no_twins" && (store ? <NoTwinsNote report={report} notRun={tr("cheat.notRun")} /> : <p>{tr("cheat.notRun")}</p>)}
 				{store && cc.state === "not_measured" && <CheatActions report={report} cc={cc} />}
 			</div>
 		</Section>
 	);
 }
 
+/** Where a cheat check can be set up (F5, PH2-4): built-in benchmarks cannot get twins; an own benchmark makes them on its page. */
+function NoTwinsNote({ report, notRun }: { report: Report; notRun: string }) {
+	const { t } = useTranslation("uff5");
+	const suite = report.benchmarks.map((b) => b.benchmark.split("@")[0]).find((b) => !b.endsWith("-twins"));
+	const q = useGetSuiteQuery(suite ?? "", { skip: !suite });
+	const builtin = q.data ? isBuiltinSuite(q.data) : undefined;
+	return (
+		<div className="flex flex-col gap-1" data-testid="cheat-no-twins">
+			<p>{notRun}</p>
+			{builtin === true && <p className="text-muted-foreground">{t("cheat.builtin")}</p>}
+			{builtin === false && suite && (
+				<p className="text-muted-foreground">
+					{t("cheat.ownBefore")}{" "}
+					<Link to="/suites/$suiteId" params={{ suiteId: suite }} search={{ tab: "quality" } as never} className="underline" data-testid="cheat-open-benchmark">
+						{t("cheat.ownLink")}
+					</Link>
+				</p>
+			)}
+		</div>
+	);
+}
+
+/** The cheat check start: its own cap (default from the estimate), the estimate and a confirm that names the amount (F5, PH2-3). */
 function CheatActions({ report, cc }: { report: Report; cc: CheatCheck }) {
 	const { t } = useTranslation("w448");
-	const [start, started] = useStartCheatCheckMutation();
-	const [makeJob, made] = useCreateJobMutation();
-	const [confirm, setConfirm] = useState(false);
-	const suites = [...new Set(report.benchmarks.map((b) => b.benchmark.split("@")[0]))].filter((b) => !b.endsWith("-twins"));
-	const error = started.error ?? made.error;
-	if (cc.state === "no_twins") {
-		return (
-			<div className="flex flex-col gap-1">
-				<Button
-					size="sm"
-					variant="outline"
-					className="w-fit"
-					disabled={made.isLoading || made.isSuccess || suites.length === 0}
-					dataTestId="cheat-make-twins"
-					onClick={() => suites.forEach((suite) => void makeJob({ kind: "twins.make", params: { suite, max: 50 } }))}
-				>
-					{t("cheat.makeTwins")}
-				</Button>
-				{made.isSuccess && <p className="text-muted-foreground">{t("cheat.twinsStarted")}</p>}
-				{error && <p className="text-destructive">{getBenchErrorMessage(error)}</p>}
-			</div>
-		);
-	}
+	const { t: tu } = useTranslation("uff5");
+	const [start, started] = useStartCheatCheckCappedMutation();
+	const runs = cc.est_runs && cc.est_runs > 0 ? cc.est_runs : undefined;
+	const estimate = runs ? estimateOf(runs, costPerRun(report.totals)) : null;
 	return (
 		<div className="flex flex-col gap-1">
-			{!confirm ? (
-				<Button size="sm" variant="outline" className="w-fit" dataTestId="cheat-check" onClick={() => setConfirm(true)}>
-					{t("cheat.check")}
-				</Button>
-			) : (
-				<>
-					<p>{t("cheat.confirm")}</p>
-					<Button
-						size="sm"
-						className="w-fit"
-						disabled={started.isLoading || started.isSuccess}
-						dataTestId="cheat-check-start"
-						onClick={() => void start(report.evaluation)}
-					>
-						{t("cheat.start")}
-					</Button>
-				</>
-			)}
+			<CappedPaidAction
+				variant="outline"
+				size="sm"
+				kind="form"
+				verb={t("cheat.check")}
+				estimateUsd={estimate}
+				estimateRuns={runs}
+				confirmText={tu("cheat.confirm")}
+				disabled={started.isLoading || started.isSuccess}
+				isLoading={started.isLoading}
+				onConfirm={async (cap) => {
+					try {
+						await start({ evalId: report.evaluation, budgetUsd: cap }).unwrap();
+					} catch {
+						// Shown below from the mutation state.
+					}
+				}}
+				testId="cheat-check"
+			/>
 			{started.isSuccess && <p className="text-muted-foreground">{t("cheat.checkStarted")}</p>}
-			{error && <p className="text-destructive">{getBenchErrorMessage(error)}</p>}
+			{started.error && <p className="text-destructive">{getBenchErrorMessage(started.error)}</p>}
 		</div>
 	);
 }

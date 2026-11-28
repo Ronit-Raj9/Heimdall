@@ -4,6 +4,11 @@ import { okQuery, render } from "@/lib/testing/render";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@/components/evaluations/paidCaps", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/evaluations/paidCaps")>()),
+	useRerunEvaluationFailuresCappedMutation: vi.fn(() => [async () => ({}), { isLoading: false }]),
+	useStartCheatCheckCappedMutation: () => [async () => ({}), { isLoading: false }],
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/reportcard/evaluationReportCard", () => ({
 	EvaluationReportCard: ({ evaluationId, evaluation }: { evaluationId: string; evaluation?: { id: string } }) => (
@@ -335,7 +340,8 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 
 	it("puts the rerun notice below the header, full width (N193)", async () => {
 		const { hostedSession } = await import("@/lib/testing/platformFixtures");
-		const { useRerunEvaluationFailuresMutation } = await import("@/lib/store/apis/runControlApi");
+		// Round 4 (F5): the capped rerun endpoint feeds the notice.
+		const { useRerunEvaluationFailuresCappedMutation: useRerunEvaluationFailuresMutation } = await import("@/components/evaluations/paidCaps");
 		vi.mocked(useRerunEvaluationFailuresMutation).mockReturnValue([
 			() => undefined,
 			{ isLoading: false, data: { evaluation: { id: "ev_2" }, children: [{}, {}] } },

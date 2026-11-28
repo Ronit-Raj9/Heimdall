@@ -16,7 +16,6 @@ import {
 	usePauseEvaluationMutation,
 	usePauseExperimentMutation,
 	useRequeueRunMutation,
-	useRerunEvaluationFailuresMutation,
 	useRerunFailuresMutation,
 	useResumeEvaluationMutation,
 	useUnpauseExperimentMutation,
@@ -37,6 +36,8 @@ import { PaidButton } from "@/components/ui/paidButton";
 import "@/components/reportcard/reportCardI18n";
 import "./ufc2I18n";
 import { notify } from "@/lib/notify";
+import { CappedPaidAction } from "@/components/evaluations/cappedPaidAction";
+import { estimateOf, evaluationCostPerRun, useRerunEvaluationFailuresCappedMutation } from "@/components/evaluations/paidCaps";
 
 /** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
 type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
@@ -596,7 +597,7 @@ export function rerunCacheKey(evalId: string): string {
  */
 export function EvaluationRerunNotice({ evalId }: { evalId: string }) {
 	const { t } = useTranslation("runControl");
-	const [, state] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evalId) });
+	const [, state] = useRerunEvaluationFailuresCappedMutation({ fixedCacheKey: rerunCacheKey(evalId) });
 	const res = state.data;
 	if (!res) return null;
 	return (
@@ -634,7 +635,8 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 	const { t: tc } = useTranslation("ufc2");
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
-	const [rerun, rerunState] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
+	const [rerun, rerunState] = useRerunEvaluationFailuresCappedMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
+	const failedRuns = (evaluation as EvaluationWithFailures).failed_runs;
 	const running = evaluation.status === "running";
 	const finished = evaluation.status === "done" || evaluation.status === "failed" || evaluation.status === "cancelled";
 	const paused = Boolean(evaluation.paused);
@@ -684,26 +686,18 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 					</>
 				)}
 				{finished && !evaluation.rerun_of && hasFailedRuns(evaluation) && (
-					// Rerunning costs money: the shared paid button always asks first (M3-11, M4-41). The server sets no new
-					// cap for a rerun, so the label says it uses the model key.
-					<PaidButton
+					// Rerunning costs money: it has its own cap, sent to the server, and always asks with the amount (F5, PAID-6).
+					<CappedPaidAction
 						variant="outline"
 						size="sm"
 						verb={t("rerun.button")}
-						capUsd={null}
-						confirm="auto"
-						kind="retry"
-						estimateAt="title"
-						estimateRuns={(evaluation as EvaluationWithFailures).failed_runs}
-						confirmText={
-							typeof (evaluation as EvaluationWithFailures).failed_runs === "number"
-								? tu("rerun.confirmN", { count: (evaluation as EvaluationWithFailures).failed_runs })
-								: tu("rerun.confirm")
-						}
+						estimateUsd={estimateOf(failedRuns ?? 0, evaluationCostPerRun(evaluation))}
+						estimateRuns={failedRuns}
+						confirmText={typeof failedRuns === "number" ? tu("rerun.confirmN", { count: failedRuns }) : tu("rerun.confirm")}
 						isLoading={rerunState.isLoading}
-						onConfirm={async () => {
+						onConfirm={async (cap) => {
 							try {
-								await rerun({ evalId: evaluation.id }).unwrap();
+								await rerun({ evalId: evaluation.id, budgetUsd: cap }).unwrap();
 							} catch {
 								// Shown below from the mutation state.
 							}

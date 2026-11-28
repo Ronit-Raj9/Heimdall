@@ -31,6 +31,7 @@ import (
 // Run-level metric ids read from metrics.json (metrics/builtin.go).
 const (
 	metricCostUSD        = "cost_usd"
+	metricJudgeCostUSD   = "judge_cost_usd" // metrics.JudgeCostUSD
 	metricTokens         = "tokens"
 	metricSteps          = "steps"
 	metricToolCalls      = "tool_calls"
@@ -313,6 +314,9 @@ type Options struct {
 	// row out (cheatcheck_w448.go).
 	CheatChecks func(evaluation string) []*schemas.Evaluation
 	HasTwins    func(benchmark string) bool
+	// TwinCount is the number of admitted impossible twins of a benchmark
+	// (suite id); with it a not_measured row carries est_runs.
+	TwinCount func(benchmark string) int
 }
 
 // graded is one counted, sealed, scored run.

@@ -156,6 +156,10 @@ func Routing(rep *Report, opt RoutingOptions) Export {
 	for _, m := range rep.Models {
 		byLabel[m.Label] = m
 	}
+	if rep.Recommendation.Action == ActionNothingSolved {
+		ex.Notes = append(ex.Notes, NothingSolvedSummary+" No routing rule is offered.")
+		return ex
+	}
 	def, ok := byLabel[rep.Recommendation.Model]
 	if !ok || def.Runs == 0 {
 		ex.Notes = append(ex.Notes, "No model has graded runs, so no routing rule can be measured. Run the evaluation first.")

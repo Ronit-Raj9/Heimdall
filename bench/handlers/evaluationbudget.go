@@ -109,6 +109,28 @@ var evalRunCostSource = func(env OrgEnv) ForecastSource {
 // childReserveCache keeps the forecasts childReserve asked for.
 var childReserveCache = newForecastCache()
 
+// Suggested budget rule (round 4, F5): about SuggestFactor times the
+// estimate, at least SuggestMinUSD, rounded up to 5 cents under $1, to 25
+// cents under $10 and to whole dollars above. The UI's suggestedBudget
+// (components/evaluations/paidCaps.ts) is the same rule.
+const (
+	SuggestFactor = 3.0
+	SuggestMinUSD = 0.25
+)
+
+// SuggestBudget is the suggested cap for an estimated cost in USD.
+func SuggestBudget(estimateUSD float64) float64 {
+	raw := max(SuggestMinUSD, estimateUSD*SuggestFactor)
+	step := 1.0
+	switch {
+	case raw < 1:
+		step = 0.05
+	case raw < 10:
+		step = 0.25
+	}
+	return math.Round(math.Ceil(raw/step-1e-9)*step*100) / 100
+}
+
 // microDollars rounds down to whole micro-dollars.
 func microDollars(v float64) float64 { return math.Floor(v*1e6+1e-6) / 1e6 }
 
@@ -205,8 +227,6 @@ func estimateBudget(est *EvalEstimate, requested, dailyCap float64) EvalBudget {
 		b.Default, b.PerBenchmarkUSD = true, EvaluationDefaultBenchmarkBudget
 		b.BudgetUSD = EvaluationDefaultBenchmarkBudget * float64(n)
 	}
-	floor := EvaluationDefaultBenchmarkBudget * float64(n)
-	b.SuggestedUSD = min(floor, b.MaxUSD)
 	known := true
 	for _, be := range est.PerBenchmark {
 		if be.Skipped != "" || be.Runs == 0 {
@@ -220,8 +240,11 @@ func estimateBudget(est *EvalEstimate, requested, dailyCap float64) EvalBudget {
 		b.RunsSkippedHigh += runsPast(be.Runs, be.EstCostUSD.High, b.PerBenchmarkUSD)
 	}
 	if known && est.EstCostUSD.Known {
-		want := math.Ceil(est.EstCostUSD.High * EvaluationSuggestHeadroom) // whole dollars
-		b.SuggestedUSD = min(max(want, floor), b.MaxUSD)
+		// Round 4 (F5): the suggestion follows the estimate, about 3 times
+		// its high end, at least $0.25 (and a cent per benchmark), rounded;
+		// never the $5 per benchmark default for a small run.
+		want := max(SuggestBudget(est.EstCostUSD.High), EvaluationMinBenchmarkBudget*float64(n))
+		b.SuggestedUSD = min(want, b.MaxUSD)
 		switch {
 		case b.RunsSkippedHigh == 0:
 			b.Fit = BudgetFits
@@ -234,7 +257,9 @@ func estimateBudget(est *EvalEstimate, requested, dailyCap float64) EvalBudget {
 			b.Note = fmt.Sprintf("the expected cost is above this organization's maximum suggested budget of %s; type a larger budget to run every task", usd(b.MaxUSD))
 		}
 	} else {
-		b.Note = fmt.Sprintf("the cost is not known yet, so the suggestion is the default of %s per benchmark", usd(EvaluationDefaultBenchmarkBudget))
+		// An unknown cost suggests nothing: the cap the person sets is the
+		// most it spends (PH1-4: no nudge to $5 when nothing is known).
+		b.Note = "the cost is not known yet, so there is no suggestion: the cap you set is the most it can spend"
 	}
 	return b
 }
