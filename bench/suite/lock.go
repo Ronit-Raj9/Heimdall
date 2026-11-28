@@ -113,6 +113,11 @@ func lock(s *schemas.Suite, now time.Time, opts *FingerprintOptions) (*schemas.S
 		if old, ok := prevTask(prev, t.ID); ok && imageSame && sameContent(old, tl) && sameFingerprint(prev, fps, t.ID) {
 			tl.Status = old.Status
 			tl.Admission = old.Admission
+		} else if ok && imageSame && sameContent(old, tl) {
+			if rec := carriedAdmission(old.Admission, fps, t.ID); rec != nil {
+				tl.Status = old.Status
+				tl.Admission = rec
+			}
 		}
 		l.Tasks[t.ID] = tl
 	}
@@ -146,6 +151,25 @@ func sameFingerprint(prev *schemas.SuiteLock, fps *schemas.LockFingerprints, id 
 		return true
 	}
 	return AdmissionFingerprint(prev.Fingerprints, id) == AdmissionFingerprint(fps, id) && AdmissionFingerprint(fps, id) != ""
+}
+
+// carriedAdmission keeps an unchanged task's admission when only suite
+// settings that do not change how it is graded changed (carryIgnored: the
+// tasks list, id, description, canary), as when a second task is added: the
+// record's carry fingerprint must equal the one under fps. The copy gets the
+// new admission fingerprint, so AdmissionCurrent holds. Nil when it does
+// not carry.
+func carriedAdmission(rec *schemas.AdmissionRecord, fps *schemas.LockFingerprints, id string) *schemas.AdmissionRecord {
+	if rec == nil || fps == nil || rec.CarryFingerprint == "" || rec.CarryFingerprint != CarryFingerprint(fps, id) {
+		return nil
+	}
+	fp := AdmissionFingerprint(fps, id)
+	if fp == "" {
+		return nil
+	}
+	c := *rec
+	c.Fingerprint = fp
+	return &c
 }
 
 // withoutFingerprints is a shallow copy of l with no fingerprints section.
