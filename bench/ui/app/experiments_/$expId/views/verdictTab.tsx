@@ -332,6 +332,8 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					naive={payload.naive}
 					armMetrics={diagnostics.data?.arm_metrics}
 					onCompare={() => void navigate({ to: "/evaluate" })}
+					partial={partial}
+					stopped={status.data?.state === "cancelled"}
 				/>
 			) : (
 				<VerdictSummary
@@ -339,6 +341,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					arms={arms}
 					names={names}
 					partial={partial}
+					stopped={status.data?.state === "cancelled"}
 					naive={payload.naive}
 					armMetrics={diagnostics.data?.arm_metrics}
 					metricsStatus={diagnostics.isError ? "error" : diagnostics.isLoading ? "loading" : undefined}

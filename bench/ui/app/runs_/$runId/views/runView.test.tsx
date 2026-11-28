@@ -67,3 +67,17 @@ describe("stepParam (N51)", () => {
 		for (const bad of [0, -1, 1.5, "x", "3a", undefined]) expect(stepParam({ step: bad })).toBeUndefined();
 	});
 });
+describe("run time labels (K3)", () => {
+	it("names agent time and the whole run, as the runs list measures it", () => {
+		const d = {
+			sealed: true,
+			slot: { exp_id: "e_1", pair_id: "p_1", condition: "clean", arm: "A", task: "t1" },
+			run: { run_id: "r_1", timing: { started: "2026-11-28T10:00:00Z", sealed: "2026-11-28T10:01:24Z" } },
+			metrics: { wall_time_s: { state: "observed", v: 20, evidence: "harness" } },
+		} as unknown as RunDetail;
+		const html = render(<RunStatCards detail={d} />);
+		expect(html).toContain("Agent time");
+		expect(html).toMatch(/Whole run 1\s?m(in)?\s?24\s?s/);
+		expect(html).not.toContain("Time taken");
+	});
+});

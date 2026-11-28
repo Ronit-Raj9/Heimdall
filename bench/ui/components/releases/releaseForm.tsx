@@ -73,7 +73,7 @@ export function ReleaseForm(props: ReleaseFormProps) {
 	// M7-81: the approver starts as the signed-in person, so it is not retyped (and not lost) each time.
 	const [values, setValues] = useState<ReleaseFormValues>(() => ({
 		...EMPTY_RELEASE_FORM,
-		...(session.user?.email ? { approver: session.user.email } : {}),
+		...(session.user?.name || session.user?.email ? { approver: session.user?.name || session.user?.email?.split("@")[0] || "" } : {}),
 		...props.initialValues,
 	}));
 	const evaluations = useListEvaluationsQuery();

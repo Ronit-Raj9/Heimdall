@@ -284,7 +284,7 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 							<Input
 								value={approver}
 								onChange={(e) => setApprover(e.target.value)}
-								placeholder={session.user?.email ?? t("promote.approverPlaceholder")}
+								placeholder={session.user?.name ?? t("promote.approverPlaceholder")}
 								data-testid="evaluation-promote-approver"
 							/>
 						</label>

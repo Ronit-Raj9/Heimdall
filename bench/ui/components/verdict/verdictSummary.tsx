@@ -1,3 +1,4 @@
+import "@/components/releases/ufk3I18n";
 import { DEFAULT_MIN_RUNS } from "@/components/leaderboard/agentBoard.utils";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,8 @@ export interface VerdictSummaryProps {
 	names?: Record<string, string>;
 	/** True while the comparison still runs (the verdict payload's partial): no decision is shown yet. */
 	partial?: boolean;
+	/** K3: the comparison was stopped by hand (state cancelled): a broken-test verdict reads "Stopped". */
+	stopped?: boolean;
 	/** arm -> raw passes over runs. */
 	naive: Record<string, Ratio>;
 	/** arm -> metric -> median per run, from the diagnostics; tokens (and the median cost) come from here. */
@@ -84,6 +87,7 @@ export function VerdictSummary({
 	arms,
 	names,
 	partial,
+	stopped,
 	naive,
 	armMetrics,
 	metricsStatus,
@@ -94,6 +98,7 @@ export function VerdictSummary({
 }: VerdictSummaryProps) {
 	const { t } = useTranslation("experimentPage");
 	const { t: tr } = useTranslation("ufrc");
+	const { t: k3 } = useTranslation("ufk3");
 	const locale = getLocale();
 	// No clear winner is not a warning (M4-12): the panel stays grey.
 	const tone: Tone = partial || verdict.decision === "inconclusive" ? "neutral" : (DECISION_TONE[verdict.decision] ?? "neutral");
@@ -104,7 +109,9 @@ export function VerdictSummary({
 	const costs = costNumbers(panels, armCost, armMetrics);
 	const cheaper = !partial && !setups ? cheaperArm(panels, costs) : null;
 	const detail = !partial && !setups ? headlineDetail(panels, naive, costs, names, locale, t) : null;
-	const hintText = hint(verdict, partial, t, tr as unknown as (k: string, o?: Record<string, unknown>) => string);
+	const hintText = stoppedByHand(verdict, partial, stopped)
+		? k3("verdict.stoppedHint")
+		: hint(verdict, partial, t, tr as unknown as (k: string, o?: Record<string, unknown>) => string);
 
 	return (
 		<section
@@ -116,7 +123,7 @@ export function VerdictSummary({
 				<Icon className={cn("mt-0.5 size-8 shrink-0", INK[tone])} strokeWidth={2.25} aria-hidden="true" />
 				<div className="flex flex-col gap-1">
 					<h2 className={cn("text-xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
-						{headline(verdict, arms, { names, partial, costs, naive }, locale, t)}
+						{stoppedByHand(verdict, partial, stopped) ? k3("verdict.stopped") : headline(verdict, arms, { names, partial, costs, naive }, locale, t)}
 					</h2>
 					{detail && (
 						<p className="text-foreground text-sm" data-testid="verdict-summary-detail">
@@ -399,6 +406,11 @@ function safetyLines(verdict: Verdict, t: TFn): string[] {
 		.sort()
 		.filter((arm) => (safety[arm] ?? []).length > 0)
 		.map((arm) => t("summary.safetyLine", { setup: arm, tasks: safety[arm].join(", ") }));
+}
+
+/** K3: a comparison stopped by hand whose verdict is "broken" (too few graded runs) reads "Stopped", not "Test was broken". Pure. */
+export function stoppedByHand(verdict: Pick<Verdict, "decision">, partial: boolean | undefined, stopped: boolean | undefined): boolean {
+	return !partial && stopped === true && verdict.decision === "invalid";
 }
 
 function hint(

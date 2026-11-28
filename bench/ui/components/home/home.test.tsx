@@ -273,12 +273,13 @@ describe("Running now and Recent comparisons", () => {
 
 describe("humanExperimentName", () => {
 	const labels = { check: "Readiness check", untitled: "Untitled comparison" };
-	it("labels system checks and spaces out internal names", () => {
+	it("labels system checks and shows other names as typed (K3)", () => {
 		expect(isSystemCheck({ name: "admit-coding-core", exp_id: "e_x" })).toBe(true);
 		expect(isSystemCheck({ name: "nightly", exp_id: "e_admit_acme_5e8q" })).toBe(true);
 		expect(isSystemCheck({ name: "nightly", exp_id: "e_nightly" })).toBe(false);
 		expect(humanExperimentName({ name: "admit-coding-core", exp_id: "e_x" }, labels)).toBe("Readiness check: coding-core");
-		expect(humanExperimentName({ name: "codex-vs-claude_nightly", exp_id: "e_x" }, labels)).toBe("Codex vs claude nightly");
+		expect(humanExperimentName({ name: "codex-vs-claude_nightly", exp_id: "e_x" }, labels)).toBe("codex-vs-claude_nightly");
+		expect(humanExperimentName({ name: "Mini SWE agent vs Codex (gpt-6-luna)", exp_id: "e_x" }, labels)).toBe("Mini SWE agent vs Codex (gpt-6-luna)");
 		expect(humanExperimentName({ name: "", exp_id: "e_x" }, labels)).toBe("Untitled comparison");
 	});
 });

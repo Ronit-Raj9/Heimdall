@@ -1,3 +1,4 @@
+import "@/components/releases/ufk3I18n";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
@@ -16,6 +17,10 @@ export interface ScoreSummaryProps {
 	armMetrics?: Record<string, Record<string, Value>>;
 	/** Opens a comparison with another setup. */
 	onCompare?: () => void;
+	/** K3: still running (the verdict payload's partial); a broken-test hint waits until the runs are done. */
+	partial?: boolean;
+	/** K3: stopped by hand (state cancelled). */
+	stopped?: boolean;
 	className?: string;
 }
 
@@ -23,11 +28,13 @@ export interface ScoreSummaryProps {
  * A one-setup experiment's result: its score with a 95% range, how many runs were graded, and cost
  * and tokens. There is no second setup, so there is no better or worse and no release decision.
  */
-export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className }: ScoreSummaryProps) {
+export function ScoreSummary({ verdict, naive, armMetrics, onCompare, partial, stopped, className }: ScoreSummaryProps) {
 	const { t } = useTranslation("experimentPage");
+	const { t: k3 } = useTranslation("ufk3");
 	const locale = getLocale();
 	const s = verdict.score;
-	const invalid = verdict.decision === "invalid";
+	// K3 (R1): a run still pending is not a broken run; the "broken" hint shows only once the runs are done.
+	const invalid = verdict.decision === "invalid" && !partial;
 	const Icon = invalid ? Ban : Gauge;
 	const value = (x: number | undefined) => (x === undefined ? t("summary.score.unknown") : formatScoreValue(s.metric, x, locale));
 	const bounds = scoreBounds(s);
@@ -130,7 +137,7 @@ export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className 
 
 			<div className="bg-muted/40 flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 				<p className="text-sm" data-testid="score-summary-hint">
-					{invalid ? t("summary.score.invalidHint") : t("summary.score.hint")}
+					{invalid && stopped ? k3("verdict.stoppedHint") : invalid ? t("summary.score.invalidHint") : t("summary.score.hint")}
 				</p>
 				{onCompare && (
 					<Button size="sm" variant="outline" onClick={onCompare} dataTestId="score-summary-compare">

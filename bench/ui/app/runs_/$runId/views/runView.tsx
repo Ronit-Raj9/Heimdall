@@ -20,6 +20,7 @@ import { RunEvidenceStatus } from "@/components/runs/runEvidenceStatus";
 import { RunOutput, runOutputKind } from "@/components/runs/runOutput";
 import { ServicesList, SessionsTimeline, ToolCallTable } from "@/components/runs/runScenario";
 import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
+import "@/components/releases/ufk3I18n";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { runExportItems } from "@/components/runs/runExportMenu";
 import { OverflowMenu, type OverflowMenuItem } from "@/components/agents/overflowMenu";
@@ -516,6 +517,7 @@ function metricText(value: Value | undefined, unit?: "usd"): string {
 export function RunStatCards({ detail, others = [] }: { detail: RunDetail; others?: readonly PairRun[] }) {
 	const { t: tt } = useTranslation("runTrace");
 	const { t: tu } = useTranslation("uf5a");
+	const { t: k3 } = useTranslation("ufk3");
 	// M5-21: with the pair loaded, each number shows the other setups' value under it as a muted line.
 	// Round 3 rule 9: setups with the same value share one line ("Setup B, C, D: 0"), so eight equal lines become one.
 	const beside = (value: (o: PairRun) => string) => groupBeside(others.map((o) => ({ arm: o.arm, value: value(o) }))).map((g) => tu("page.setupB", { arm: g.arms.join(", "), value: g.value }));
@@ -543,11 +545,16 @@ export function RunStatCards({ detail, others = [] }: { detail: RunDetail; other
 				beside={beside((o) => metricText(o.metrics.cost_usd, "usd"))}
 				testId="run-stat-cost"
 			/>
+			{/* K3: agent time (wall_time_s, metrics/walltime.go) and the whole run from start to seal (what the runs list shows), each named. */}
 			<StatCard
 				icon={Timer}
-				label={tt("overview.time")}
+				label={k3("run.agentTime")}
+				hint={k3("run.agentTimeHint")}
 				value={wallText(detail.metrics, detail.run.timing)}
-				beside={beside((o) => wallText(o.metrics, o.run.timing))}
+				beside={[
+					...(detail.run.timing?.sealed ? [k3("run.wholeRun", { value: wallText({}, detail.run.timing) })] : []),
+					...beside((o) => wallText(o.metrics, o.run.timing)),
+				]}
 				testId="run-stat-time"
 			/>
 		</>

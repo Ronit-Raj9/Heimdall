@@ -197,7 +197,7 @@ export function humanExperimentName(
 	const system = /^(admit|check)-(.+)$/.exec(name);
 	if (system) return `${labels.check}: ${system[2]}`;
 	if (/^e_(admit|check)_/.test(exp.exp_id)) return labels.check;
-	if (name) return name.replace(/[-_]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+	if (name) return name; // shown as typed, as on its own page (K3)
 	return labels.untitled;
 }
 

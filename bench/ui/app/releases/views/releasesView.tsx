@@ -18,6 +18,9 @@ import { releaseLinkMissing } from "@/components/releases/releases.utils";
 import "@/components/livescore/ufl9I18n";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
+import { releaseAgent } from "@/components/govern/releaseAgent";
+import "@/components/releases/ufk3I18n";
 import { ChainBadge, ReleaseCards } from "./releaseCards";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -40,6 +43,12 @@ export function noComparisonYet(q: { isSuccess: boolean; data?: { experiments?: 
 	return q.isSuccess && (q.data?.experiments ?? []).length === 0;
 }
 
+/** True for a release of a test agent (zz-test names, the shared rule other lists use). Exported for tests. */
+export function isTestRelease(r: ReleaseRecord): boolean {
+	const a = releaseAgent(r);
+	return isTestObject(a?.agent) || isTestObject(r.agent_config_id) || isTestObject(r.exp_id);
+}
+
 /** The releases screen: the hash-chained release log as a timeline, newest first; "New release" opens the record dialog. */
 export default function ReleasesView() {
 	const { t } = useTranslation("bench");
@@ -49,7 +58,11 @@ export default function ReleasesView() {
 	// ?exp=<id>: "Promote this version" on a verdict opens the form with that comparison picked.
 	const [expParam, setExpParam] = useQueryState("exp", parseAsString);
 	const [open, setOpen] = useState(Boolean(expParam));
-	const list = releases.data?.releases ?? [];
+	const all = releases.data?.releases ?? [];
+	// Releases of test agents stay in the chained log, hidden here unless asked for (K3).
+	const [showTests, setShowTests] = useShowTests();
+	const { shown: list, hidden: hiddenTests } = withoutTests(all, isTestRelease, showTests);
+	const { t: k3 } = useTranslation("ufk3");
 	const { t: m } = useTranslation("uf7b");
 	const experiments = useListExperimentsQuery();
 	// X-110: with no comparison at all, "Record a release" leads nowhere, so the empty state points to an evaluation.
@@ -94,7 +107,14 @@ export default function ReleasesView() {
 				<div className="flex min-w-0 flex-col gap-4">
 					<div className="flex flex-wrap items-center justify-between gap-2">
 						<h2 className="text-sm font-semibold">{tu("releases.timeline")}</h2>
-						{releases.data && <ChainBadge ok={releases.data.chain_ok} />}
+						<div className="flex items-center gap-2">
+							{hiddenTests > 0 && (
+								<Button variant="ghost" size="sm" onClick={() => setShowTests(!showTests)} data-testid="releases-show-tests">
+									{showTests ? k3("releases.hideTests") : k3("releases.showTests", { count: hiddenTests })}
+								</Button>
+							)}
+							{releases.data && <ChainBadge ok={releases.data.chain_ok} />}
+						</div>
 					</div>
 					{releases.isLoading ? (
 						<div className="flex flex-col gap-4" data-testid="release-timeline-loading">

@@ -1,0 +1,18 @@
+{
+	"releases": {
+		"showTests": "Show test releases ({{count}})",
+		"hideTests": "Hide test releases"
+	},
+	"run": {
+		"agentTime": "Agent time",
+		"agentTimeHint": "Time the agent ran. The whole run adds setup and grading.",
+		"wholeRun": "Whole run {{value}}"
+	},
+	"runs": {
+		"wholeRun": "Whole run"
+	},
+	"verdict": {
+		"stopped": "Stopped",
+		"stoppedHint": "You stopped this before enough runs were graded. Finished runs are kept."
+	}
+}

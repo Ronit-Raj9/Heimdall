@@ -1,3 +1,4 @@
+import "@/components/releases/ufk3I18n";
 import { faultName } from "@/components/reportcard/reportCard.utils";
 import { EmptyState } from "@/components/shell/emptyState";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
@@ -236,6 +237,7 @@ export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
 	const { t: t5 } = useTranslation("uf5b");
+	const { t: k3 } = useTranslation("ufk3");
 	const tone = runTone(row);
 	return (
 		<span
@@ -295,6 +297,7 @@ export function RunsTable() {
 		if (typeof window !== "undefined") saveRunsSearch(window.location.search);
 	}, [search]);
 	const { t: t5 } = useTranslation("uf5b");
+	const { t: k3 } = useTranslation("ufk3");
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const agentsQuery = useGetAgentsQuery();
 	const sorted = parseRunSort(search.sort, search.dir) !== null;
@@ -603,7 +606,7 @@ export function RunsTable() {
 										{tu("runs.col.fault")}
 									</th>
 									<SortHeader
-										label={tu("runs.col.duration")}
+										label={k3("runs.wholeRun")}
 										sortKey="duration"
 										current={search}
 										onSort={onSort}
