@@ -13,6 +13,9 @@ import { RunThroughBifrost } from "@/components/runs/bifrost/throughBifrost"; //
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
+import { RunA2APanel } from "@/components/runs/a2a/runA2APanel";
+import { RunFileDownloads } from "@/components/runs/runFileDownloads";
+import { CompareWithRun } from "@/components/runs/compareWithRun";
 import { RunEvidenceStatus } from "@/components/runs/runEvidenceStatus";
 import { RunOutput, runOutputKind } from "@/components/runs/runOutput";
 import { ServicesList, SessionsTimeline, ToolCallTable } from "@/components/runs/runScenario";
@@ -711,6 +714,7 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 	return (
 		<div className="flex flex-col gap-8" data-testid="run-timeline">
 			<RunRemoteCoverage runId={runId} arm={arm} />
+			<RunA2APanel runId={runId} />
 			<RunGatewayPolicy runId={runId} />
 			{!detail.sealed && <HoldPanel runId={runId} />}
 			<RunTraceView
@@ -742,6 +746,9 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 				)}
 			</Section>
 			<ThroughBifrostSection runId={detail.run.run_id} arm={arm} />
+			<Section title={t("compare.title", { ns: "ufl4" })} testId="run-compare-other">
+				<CompareWithRun runId={runId} task={detail.slot.task} />
+			</Section>
 		</div>
 	);
 }
@@ -775,6 +782,9 @@ function EvidenceTab({ detail }: { detail: RunDetail }) {
 					<RunReceiptPanel runId={runId} probeId={detail.slot.condition} onClose={() => undefined} />
 				</Section>
 			)}
+			<Section title={t("files.title", { ns: "ufl4" })} testId="run-downloads">
+				<RunFileDownloads runId={runId} sealed={detail.sealed} />
+			</Section>
 		</div>
 	);
 }

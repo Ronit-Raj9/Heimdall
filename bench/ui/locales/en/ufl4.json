@@ -1,0 +1,39 @@
+{
+	"a2a": {
+		"title": "Agent hops",
+		"strength": {
+			"witnessed": "Witnessed",
+			"partial": "Partly witnessed",
+			"unwitnessed": "Not witnessed"
+		},
+		"loadError": "Could not load the agent hops.",
+		"hops": "Hops",
+		"noHops": "No agent called another agent.",
+		"linked": "Linked rows",
+		"onRunKey": "on run key",
+		"otherKey": "other key",
+		"agreement": "Answer",
+		"agrees": "Matches the gateway",
+		"differs": "Differs from the gateway",
+		"unknown": "Not compared",
+		"states": "Bench {{launcher}}, gateway {{gateway}}",
+		"gateway": "Gateway {{version}}"
+	},
+	"runs": {
+		"replay": "Replay on a new model"
+	},
+	"files": {
+		"title": "Downloads",
+		"runFiles": "Run files",
+		"raw": "Raw evidence",
+		"unsealed": "Raw evidence downloads open once the run is sealed.",
+		"failed": "{{name}}: {{reason}}"
+	},
+	"compare": {
+		"title": "Compare with another run",
+		"pick": "Pick a run of this task",
+		"none": "No other run of this task yet.",
+		"listError": "Could not list runs of this task.",
+		"error": "Could not compare the two runs."
+	}
+}
