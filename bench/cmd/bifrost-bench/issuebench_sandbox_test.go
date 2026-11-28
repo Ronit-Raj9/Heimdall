@@ -91,7 +91,7 @@ func TestIssuebenchEgressSandboxArgv(t *testing.T) {
 		t.Fatalf("network name: %s", nc)
 	}
 	pc := strings.Join(f.find("create"), " ")
-	for _, w := range []string{"--name " + net + "-egress", "--network " + net, "--network-alias egress", "--read-only", "--cap-drop ALL", "--security-opt no-new-privileges", "--memory 256m", "--pids-limit 128",
+	for _, w := range []string{"--name " + net + "-egress", "--network " + net, "--network-alias egress", "--read-only", "--cap-drop ALL", "--security-opt no-new-privileges", "--memory 256m", "--pids-limit 512", // under runsc: at least utils.GVisorMinPids
 		"-e HEIMDALL_EGRESS_MODE=live-allowlisted", "-e HEIMDALL_EGRESS_ALLOW=pypi.org,example.org", "--runtime runsc", "bench/egress:1 -ca /egress/ca.pem -log "} {
 		if !strings.Contains(pc, w) {
 			t.Fatalf("proxy create lacks %q: %s", w, pc)
