@@ -23,6 +23,7 @@ import { SkillImportAction } from "./skillImport";
 import "./uf7cI18n";
 import "./uff4I18n";
 import "./w4p6I18n";
+import "@/components/gateway/ufg1I18n";
 
 // The shared status pill: On green, Off and Not known neutral grey.
 export const IN_USE_TONE: Record<GwCardLine["enabled"], StatusTone> = {
@@ -92,6 +93,7 @@ export function GatewayCardLineRow({
 	const { t: u } = useTranslation("uf7c");
 	const what = u(`line.what.${line.feature}` as "line.what.batch", { defaultValue: "" });
 	const { t: f } = useTranslation("uff4");
+	const { t: g } = useTranslation("ufg1");
 	const blocked = !connected && NEEDS_SOURCE.has(line.feature);
 	// The server says why this test cannot run on this gateway (round 4, lane F4).
 	const cannotRun = !blocked && Boolean(line.blocked);
@@ -120,7 +122,7 @@ export function GatewayCardLineRow({
 							{u("line.notTested")}
 						</span>
 					)}
-					{line.result && <span className={cn("font-medium", RESULT_TONE[line.result])}>{t(`line.result.${line.result}`)}</span>}
+					{line.result && line.state === "measured" && <span className={cn("font-medium", RESULT_TONE[line.result])}>{t(`line.result.${line.result}`)}</span>}
 				</div>
 				{what && <p className="text-muted-foreground">{what}</p>}
 				{connected && line.enabled === "unknown" && line.enabled_source && (
@@ -129,6 +131,11 @@ export function GatewayCardLineRow({
 					</p>
 				)}
 				{!notTested && <p>{line.state === "not_enough_data" && !line.headline ? t("line.notEnough") : line.headline}</p>}
+				{line.older && (
+					<p className="text-muted-foreground text-sm" data-testid={`gateway-line-${line.feature}-older`}>
+						{g("older", { date: line.older.measured_at.slice(0, 10), headline: line.older.headline })}
+					</p>
+				)}
 				{from && <p className="text-muted-foreground text-xs">{from}</p>}
 				{line.feature === "skill_version" && <SkillImportAction />}
 			</div>

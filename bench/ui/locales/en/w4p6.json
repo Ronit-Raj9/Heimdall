@@ -72,8 +72,9 @@
 		"state": {
 			"measured": "Measured",
 			"not_enough_data": "Not enough data yet",
-			"not_applied": "The setting was not applied",
-			"unknown": "Unknown"
+			"not_applied": "Broken",
+			"unknown": "No result",
+			"running": "Running"
 		},
 		"setup": "Setup",
 		"runs": "Runs",

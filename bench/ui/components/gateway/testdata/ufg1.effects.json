@@ -1,0 +1,181 @@
+{
+	"e_broken": {
+		"arms": [
+			{
+				"arm": "A",
+				"label": "A",
+				"runs": 10,
+				"solve_rate": 0.5,
+				"tasks": 10
+			},
+			{
+				"arm": "B",
+				"label": "B",
+				"runs": 10,
+				"solve_rate": 0.5,
+				"tasks": 10
+			}
+		],
+		"control": "A",
+		"exp_id": "e_broken",
+		"feature": "budget_curve",
+		"fingerprint": "48d9f2b05884ede1cabc33442eced8a83b89cea59bdbd32f12831383b79961d1",
+		"headline": "Broken: the MCP log and the ledger disagree. Fix it and run it again.",
+		"mode": "recorded",
+		"reason": "the test was broken: the MCP log and the ledger disagree",
+		"source": {
+			"exp_id": "e_broken",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 20,
+			"text": "comparison e_broken: 20 runs, 0 gateway calls"
+		},
+		"state": "not_applied",
+		"tasks": 0
+	},
+	"e_few": {
+		"arms": [
+			{
+				"arm": "A",
+				"label": "A",
+				"runs": 3,
+				"solve_rate": 0.5,
+				"tasks": 3
+			},
+			{
+				"arm": "B",
+				"label": "B",
+				"runs": 3,
+				"solve_rate": 0.5,
+				"tasks": 3
+			}
+		],
+		"control": "A",
+		"exp_id": "e_few",
+		"feature": "budget_curve",
+		"fingerprint": "f15dd9681d4deb515446d2ac59b69e87a42ffb7e12d96aa676fd8da940f09a4e",
+		"headline": "Too few runs to tell. Nothing is recommended yet.",
+		"mode": "recorded",
+		"reason": "too few runs to tell: setup A has 3 runs, 10 are needed",
+		"source": {
+			"exp_id": "e_few",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 6,
+			"text": "comparison e_few: 6 runs, 0 gateway calls"
+		},
+		"state": "not_enough_data",
+		"tasks": 0
+	},
+	"e_none": {
+		"arms": [
+			{
+				"arm": "A",
+				"label": "A",
+				"runs": 10,
+				"solve_rate": 0,
+				"tasks": 10
+			},
+			{
+				"arm": "B",
+				"label": "B",
+				"runs": 10,
+				"solve_rate": 0,
+				"tasks": 10
+			}
+		],
+		"control": "A",
+		"exp_id": "e_none",
+		"feature": "budget_curve",
+		"fingerprint": "a2f123c8d8caaf11200a585ee5b2a16c85c1e6ff5172598fb5c82715620c7da3",
+		"headline": "No setup solved a task, so nothing can be recommended.",
+		"mode": "recorded",
+		"reason": "no setup solved a task",
+		"source": {
+			"exp_id": "e_none",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 20,
+			"text": "comparison e_none: 20 runs, 0 gateway calls"
+		},
+		"state": "not_enough_data",
+		"tasks": 0
+	},
+	"e_refused": {
+		"arms": [],
+		"control": "A",
+		"exp_id": "e_refused",
+		"feature": "budget_curve",
+		"fingerprint": "c484f6533cc4852a003778bf36b45a622442b9f5dc4427eb6a268ccf8de7f42c",
+		"headline": "No result: no run started: the agent's image could not be built",
+		"mode": "recorded",
+		"reason": "no run started: the agent's image could not be built",
+		"source": {
+			"exp_id": "e_refused",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 0,
+			"text": "comparison e_refused: no runs read"
+		},
+		"state": "unknown",
+		"tasks": 0
+	},
+	"e_result": {
+		"arms": [
+			{
+				"arm": "A",
+				"label": "A",
+				"runs": 10,
+				"solve_rate": 0.5,
+				"tasks": 10
+			},
+			{
+				"arm": "B",
+				"label": "B",
+				"runs": 10,
+				"solve_rate": 0.6,
+				"tasks": 10
+			}
+		],
+		"control": "A",
+		"exp_id": "e_result",
+		"feature": "budget_curve",
+		"fingerprint": "01c2f4b973778d46ff30504d9d3d40f3c29b44cc196edbc533c573f16f275582",
+		"headline": "Best value: 0.01 USD.",
+		"mode": "recorded",
+		"result": "saved",
+		"source": {
+			"exp_id": "e_result",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 20,
+			"text": "comparison e_result: 20 runs, 0 gateway calls"
+		},
+		"state": "measured",
+		"tasks": 0
+	},
+	"e_running": {
+		"arms": [],
+		"control": "A",
+		"exp_id": "e_running",
+		"feature": "budget_curve",
+		"fingerprint": "",
+		"headline": "Running, 1 of 3 runs graded.",
+		"mode": "recorded",
+		"source": {
+			"exp_id": "e_running",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 1,
+			"text": "comparison e_running: 1 of 3 runs graded"
+		},
+		"state": "running",
+		"tasks": 0
+	}
+}

@@ -77,6 +77,12 @@ export function noVerdictReason(effect: Pick<GwEffect, "arms">): "fewRuns" | "no
 	return null;
 }
 
+/** Whether the effect's reason adds a line: never for a running or measured test, nor when the headline already says it. Pure. */
+export function reasonLine(effect: Pick<GwEffect, "state" | "reason" | "headline">): boolean {
+	const reason = (effect.reason ?? "").replace(/^the test was broken: /, "");
+	return effect.state !== "measured" && effect.state !== "running" && reason !== "" && !effect.headline.includes(reason);
+}
+
 const signed = (v: number, fmt: (x: number) => string) => (v > 0 ? `+${fmt(v)}` : v < 0 ? `-${fmt(-v)}` : fmt(0));
 const DIFF_FMT = {
 	solve: (x: number) => `${Math.round(x * 1000) / 10} pts`,
@@ -192,16 +198,16 @@ export function GatewayEffectView({
 					<span className="bg-muted rounded-full px-2 py-0.5 text-xs" data-testid="gateway-effect-state">
 						{t(`effect.state.${effect.state}`)}
 					</span>
-					{effect.result && !noVerdict && <span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>}
+					{effect.result && effect.state === "measured" && !noVerdict && <span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>}
 					<span data-testid="gateway-effect-headline">{effect.headline}</span>
 				</div>
-				{effect.reason && effect.state !== "measured" && (
+				{reasonLine(effect) && (
 					<p className="text-muted-foreground text-sm" data-testid="gateway-effect-reason">
 						{effect.state === "unknown" ? u("effect.unknownNext", { reason: effect.reason }) : t("line.unknown", { reason: effect.reason })}
 					</p>
 				)}
 				<p className="text-muted-foreground text-xs">{t("line.fromNoDate", { source: effect.source.text })}</p>
-				{noVerdict && effect.state !== "unknown" && (
+				{noVerdict && effect.state === "measured" && (
 					<p className="text-muted-foreground text-sm" data-testid="gateway-effect-no-verdict">
 						{l("diff.noVerdict", { reason: l(`diff.${noVerdict}`) })}
 					</p>

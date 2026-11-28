@@ -73,7 +73,7 @@ describe("GatewayEffectCard", () => {
 				effect={{ ...effect, state: "not_applied", result: undefined, reason: "the agent did not open the skill in any run" }}
 			/>,
 		);
-		expect(html).toContain("The setting was not applied");
+		expect(html).toContain("Broken");
 		expect(html).toContain("Unknown: the agent did not open the skill in any run");
 	});
 

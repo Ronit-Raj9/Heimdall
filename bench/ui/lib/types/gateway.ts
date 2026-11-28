@@ -31,7 +31,7 @@ export interface GwArmResult {
 	cost_per_run?: number;
 	latency_ms?: number;
 }
-export type GwState = "measured" | "not_enough_data" | "not_applied" | "unknown";
+export type GwState = "measured" | "not_enough_data" | "not_applied" | "unknown" | "running";
 export type GwResult = "saved" | "lost" | "worked" | "failed";
 export interface GwEffect {
 	feature: string;
@@ -104,6 +104,15 @@ export interface GwCardLine {
 	start?: string;
 	/** Why the test cannot run here and what to do; absent when it can. */
 	blocked?: string;
+	/** An older test's result that still holds, shown when the newest test has none. */
+	older?: GwCardOlder;
+}
+export interface GwCardOlder {
+	result: GwResult;
+	headline: string;
+	exp_id: string;
+	/** When that older test was made. */
+	measured_at: string;
 }
 export interface GwReportCard {
 	gateway: GwGatewayInfo;

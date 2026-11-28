@@ -1,0 +1,46 @@
+{
+	"older_holds": {
+		"enabled": "on",
+		"enabled_source": "governance is always loaded",
+		"exp_id": "e_new",
+		"feature": "budget_curve",
+		"headline": "No result: no run started: the agent's image could not be built",
+		"measured_at": "2026-11-27T09:00:00Z",
+		"name": "Budgets",
+		"older": {
+			"exp_id": "e_old",
+			"headline": "Best value: 0.01 USD.",
+			"measured_at": "2026-11-12T09:00:00Z",
+			"result": "saved"
+		},
+		"source": {
+			"exp_id": "e_new",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 0,
+			"text": "comparison e_new: no runs read"
+		},
+		"start": "budget_curve",
+		"state": "unknown"
+	},
+	"older_void": {
+		"enabled": "on",
+		"enabled_source": "governance is always loaded",
+		"exp_id": "e_new",
+		"feature": "budget_curve",
+		"headline": "No result: no run started: the agent's image could not be built",
+		"measured_at": "2026-11-27T09:00:00Z",
+		"name": "Budgets",
+		"source": {
+			"exp_id": "e_new",
+			"kind": "experiment",
+			"raw_rows": 0,
+			"rows": 0,
+			"runs": 0,
+			"text": "comparison e_new: no runs read"
+		},
+		"start": "budget_curve",
+		"state": "unknown"
+	}
+}
