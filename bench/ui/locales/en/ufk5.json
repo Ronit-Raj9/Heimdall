@@ -1,0 +1,19 @@
+{
+	"resume": {
+		"verb": "Resume",
+		"left": "{{left}} of the {{cap}} cap is left. Runs stop at the cap."
+	},
+	"fork": {
+		"budget": "Spend cap for the fork, USD",
+		"budgetHelp": "The fork stops when it reaches this amount.",
+		"budgetBad": "Set a cap from $0.01 to $100."
+	},
+	"probe": {
+		"budget": "Spend cap, USD",
+		"budgetHelp": "The fault test stops when it reaches this amount.",
+		"budgetBad": "Set a cap from $0.01 to $100."
+	},
+	"retry": {
+		"capHelp": "Retry runs under the same cap as before: {{cap}}."
+	}
+}

@@ -3849,6 +3849,7 @@ class DebugEdit(TypedDict, total=False):
 
 class DebugRunRequest(TypedDict, total=False):
     breakpoints: Optional[Breakpoints]
+    budget_usd: float
     call: int
     message: str
     on_divergence: str
