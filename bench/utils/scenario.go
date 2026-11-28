@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -190,4 +191,48 @@ func MCPServersJSON(services []schemas.ServiceHandle) (string, error) {
 		return "", fmt.Errorf("encode mcp servers: %w", err)
 	}
 	return string(b), nil
+}
+
+// VariantCheck is one named wrong-agent control of a task as admission runs
+// it, locally (suite) and on a worker (the hosted readiness arms and the
+// scripted variant control): the check name variant_<name>, its position
+// (1-based, the scripted.index of its arm), its file, and why it cannot run
+// (an invalid name or a file outside controls/), which fails the check.
+type VariantCheck struct {
+	Name  string
+	Index int
+	File  string
+	Err   string
+}
+
+// TaskVariantChecks is the one list of a task's variant checks, in the
+// order task.yaml declares them. Local and hosted admission both read it.
+func TaskVariantChecks(t *schemas.Task) []VariantCheck {
+	if t == nil {
+		return nil
+	}
+	out := make([]VariantCheck, 0, len(t.Controls.Variants))
+	for i, v := range t.Controls.Variants {
+		c := VariantCheck{Name: "variant_" + v.Name, Index: i + 1, File: v.File}
+		switch {
+		case !validVariantName(v.Name):
+			c.Err = "variant name must be lowercase letters, digits, - or _"
+		case !strings.HasPrefix(path.Clean(filepath.ToSlash(v.File)), "controls/"):
+			c.Err = "variant " + v.Name + ": file must be under controls/"
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func validVariantName(n string) bool {
+	if n == "" || len(n) > 64 {
+		return false
+	}
+	for _, r := range n {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' && r != '_' {
+			return false
+		}
+	}
+	return true
 }

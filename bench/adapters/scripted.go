@@ -29,6 +29,7 @@ const (
 	ScriptedEmpty       = "empty"        // the task's empty control (controls.empty)
 	ScriptedMutant      = "mutant"       // mutant number scripted.index (controls.mutants)
 	ScriptedWrongAnswer = "wrong_answer" // wrong answer number scripted.index of the hidden answer spec
+	ScriptedVariant     = "variant"      // variant number scripted.index (controls.variants, utils.TaskVariantChecks)
 )
 
 // ScriptedNoControl is what a mutant or wrong_answer control prints when the
@@ -191,7 +192,7 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 			return nil, fmt.Errorf("plan run %s: mcploop: %w", rc.Run.RunID, err)
 		}
 		argv = []string{"python3", "-I", mcpLoopFile}
-	case ScriptedEmpty, ScriptedMutant, ScriptedWrongAnswer:
+	case ScriptedEmpty, ScriptedMutant, ScriptedWrongAnswer, ScriptedVariant:
 		var err error
 		argv, err = controlPlan(rc, kind, rc.Agent.Scripted.Index, files)
 		if err != nil {

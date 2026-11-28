@@ -12,6 +12,7 @@ package main
 //	reference_2,3  reference_2,3 the reference again: determinism
 //	empty          empty_control (empty_patch on a patch task)
 //	mutant_N       mutant_N      the task's Nth mutant
+//	variant_N      variant_<name> the task's Nth variant (controls.variants)
 //	wrong_answer_N wrong_answer_N the Nth wrong answer of the answer spec
 //	exploit        exploit
 //	B              null_noop     changes nothing
@@ -98,6 +99,17 @@ func readinessTaskChecks(s *schemas.Suite, t *schemas.Task) []readinessCheck {
 		}
 		out = append(out, c)
 	}
+	// The variants: the same list local admission runs (utils.TaskVariantChecks).
+	for _, v := range utils.TaskVariantChecks(t) {
+		c := readinessCheck{Name: v.Name, Arm: fmt.Sprintf("variant_%d", v.Index), Want: suite.GotFail}
+		switch {
+		case v.Err != "":
+			c.Arm, c.NotRun = "", v.Err
+		case v.Index > readinessMaxIndexed:
+			c.Arm, c.NotRun = "", fmt.Sprintf("not run on this worker: at most %d variants are checked per task; remove some, or run heimdall suite admit", readinessMaxIndexed)
+		}
+		out = append(out, c)
+	}
 	if kind == utils.ControlAnswer {
 		wrong, err := utils.TaskWrongAnswers(t)
 		if err != nil {
@@ -131,7 +143,7 @@ func referenceArm(i int) string {
 
 // readinessArms is the arm set covering every check of tasks.
 func readinessArms(s *schemas.Suite, tasks []*schemas.Task) []readinessArm {
-	mutants, wrong := 0, 0
+	mutants, wrong, variants := 0, 0, 0
 	for _, t := range tasks {
 		for _, c := range readinessTaskChecks(s, t) {
 			var n int
@@ -140,6 +152,10 @@ func readinessArms(s *schemas.Suite, tasks []*schemas.Task) []readinessArm {
 			case strings.HasPrefix(c.Arm, "mutant_"):
 				fmt.Sscanf(c.Arm, "mutant_%d", &n)
 				mutants = max(mutants, n)
+			case strings.HasPrefix(c.Arm, "variant_"):
+				if _, err := fmt.Sscanf(c.Arm, "variant_%d", &n); err == nil {
+					variants = max(variants, n)
+				}
 			case strings.HasPrefix(c.Arm, "wrong_answer_"):
 				fmt.Sscanf(c.Arm, "wrong_answer_%d", &n)
 				wrong = max(wrong, n)
@@ -153,6 +169,9 @@ func readinessArms(s *schemas.Suite, tasks []*schemas.Task) []readinessArm {
 	out = append(out, readinessArm{ID: readinessArmEmpty, Kind: adapters.ScriptedEmpty, Label: "empty answer"})
 	for i := 1; i <= mutants; i++ {
 		out = append(out, readinessArm{ID: fmt.Sprintf("mutant_%d", i), Kind: adapters.ScriptedMutant, Index: i, Label: fmt.Sprintf("near miss %d", i)})
+	}
+	for i := 1; i <= variants; i++ {
+		out = append(out, readinessArm{ID: fmt.Sprintf("variant_%d", i), Kind: adapters.ScriptedVariant, Index: i, Label: fmt.Sprintf("wrong agent %d", i)})
 	}
 	for i := 1; i <= wrong; i++ {
 		out = append(out, readinessArm{ID: fmt.Sprintf("wrong_answer_%d", i), Kind: adapters.ScriptedWrongAnswer, Index: i, Label: fmt.Sprintf("wrong answer %d", i)})
@@ -321,6 +340,8 @@ func readinessReason(c schemas.AdmissionCheck) string {
 		what = "the right answer (" + strings.ReplaceAll(c.Name, "_", " ") + ")"
 	case strings.HasPrefix(c.Name, "mutant_"):
 		what = "near miss " + strings.TrimPrefix(c.Name, "mutant_")
+	case strings.HasPrefix(c.Name, "variant_"):
+		what = "the wrong agent " + strings.TrimPrefix(c.Name, "variant_")
 	case strings.HasPrefix(c.Name, "wrong_answer_"):
 		what = "wrong answer " + strings.TrimPrefix(c.Name, "wrong_answer_")
 	case what == "":

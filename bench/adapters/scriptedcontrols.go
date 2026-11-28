@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -61,6 +62,19 @@ func controlText(t *schemas.Task, kind string, index int) (string, bool, error) 
 			return "", false, nil
 		}
 		s, err := readTaskFile(t, t.Controls.Mutants[index-1])
+		return s, err == nil, err
+	case ScriptedVariant:
+		if index < 1 {
+			return "", false, fmt.Errorf("scripted.index must be 1 or more")
+		}
+		vs := utils.TaskVariantChecks(t)
+		if index > len(vs) {
+			return "", false, nil
+		}
+		if v := vs[index-1]; v.Err != "" {
+			return "", false, errors.New(v.Err)
+		}
+		s, err := readTaskFile(t, vs[index-1].File)
 		return s, err == nil, err
 	case ScriptedWrongAnswer:
 		if index < 1 {
