@@ -176,7 +176,8 @@ arm unless the provider's Bifrost config has a `prompt_cache` block (Bifrost
 ignores the header otherwise: it "cannot manufacture opt-in"), and refuses it
 for scripted controls that send no headers. Configure the block once,
 gateway-wide, as `{"auto_inject": false}`, so arms without the header are
-unchanged. Two limits: a client that sends its own `cache_control` markers is
+unchanged. No form on the website sets this arm yet: put it in a spec run
+from the command line (`heimdall run`) or posted to the API. Two limits: a client that sends its own `cache_control` markers is
 forwarded unchanged ("caller markers always win"; Claude Code does), so the
 arm tests nothing for it; and an agent that does not forward the headers does
 not get the feature, which `cache_read_share` then shows as 0.
@@ -219,7 +220,8 @@ has two arms: the spec's own arm with the cache off, and arm `cache`
 (handlers/evaluations.go, `cacheOnArm`). Both arms run the same tasks,
 trials and faults, and the estimate counts both. The planner still refuses
 the cache arm unless the gateway is Bifrost with the `semantic_cache` plugin
-loaded and no `default_cache_key`, so the child is skipped with that reason
+loaded and no `default_cache_key` (the hosted built-in gateway does not load
+the plugin, so there the box only works with your own Bifrost connected), so the child is skipped with that reason
 on a gateway without the cache. The option cannot be combined with memory
 carried from task to task, nor with an A/B mode.
 
