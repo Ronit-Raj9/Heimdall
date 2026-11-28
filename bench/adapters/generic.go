@@ -17,7 +17,6 @@ const genericParserVersion = "1.1.0"
 const (
 	ParserCustomPython = "custom-python"
 	ParserGeminiCLI    = "gemini-cli"
-	ParserMiniSWE      = "mini-swe-agent"
 )
 
 type genericJSONParser struct{ name string }

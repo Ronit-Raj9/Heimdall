@@ -26,7 +26,7 @@ func BuiltinParsers() []schemas.Parser {
 		newOpenCodeParser(),
 		newGenericJSONParser(ParserCustomPython),
 		newGenericJSONParser(ParserGeminiCLI),
-		newGenericJSONParser(ParserMiniSWE),
+		newMiniSWEParser(),      // mini-swe-agent trajectory block on stdout (miniswe.go)
 		newGenericJSONLParser(), // Agent events area: native agent events on stdout (genericjsonl.go)
 	}
 }

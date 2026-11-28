@@ -8,7 +8,7 @@ import (
 )
 
 func TestGenericJSONParsersNormalizeCommonEvents(t *testing.T) {
-	for _, name := range []string{ParserCustomPython, ParserGeminiCLI, ParserMiniSWE} {
+	for _, name := range []string{ParserCustomPython, ParserGeminiCLI} {
 		t.Run(name, func(t *testing.T) {
 			parser := newGenericJSONParser(name)
 			result, err := parser.Parse(context.Background(), &schemas.RunContext{Run: &schemas.Run{RunID: "r_1"}}, []byte(

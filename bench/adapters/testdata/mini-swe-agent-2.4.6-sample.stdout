@@ -1,0 +1,232 @@
+
+@@heimdall-mswea-trajectory begin bytes=5961
+{
+  "info": {
+    "model_stats": {
+      "instance_cost": 0.0,
+      "api_calls": 3
+    },
+    "config": {
+      "agent": {
+        "step_limit": 0,
+        "cost_limit": 0.0,
+        "output_path": "/tmp/bench/mini.traj.json"
+      },
+      "agent_type": "minisweagent.agents.interactive.InteractiveAgent",
+      "model": {
+        "model_name": "openai/gpt-6-luna",
+        "model_kwargs": {},
+        "cost_tracking": "ignore_errors"
+      },
+      "model_type": "minisweagent.models.litellm_model.LitellmModel",
+      "environment": {
+        "cwd": "",
+        "env": {
+          "PAGER": "cat"
+        },
+        "timeout": 30
+      },
+      "environment_type": "minisweagent.environments.local.LocalEnvironment"
+    },
+    "mini_version": "2.4.6",
+    "exit_status": "Submitted",
+    "submission": ""
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant that can interact with a computer."
+    },
+    {
+      "role": "user",
+      "content": "Please solve this issue: fix add() in calc.py"
+    },
+    {
+      "content": "Run the tests first.",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"command\": \"python -m pytest -q\"}",
+            "name": "bash"
+          },
+          "id": "call_1",
+          "type": "function"
+        }
+      ],
+      "function_call": null,
+      "extra": {
+        "actions": [
+          {
+            "command": "python -m pytest -q",
+            "tool_call_id": "call_1"
+          }
+        ],
+        "response": {
+          "id": "chatcmpl-call_1",
+          "created": 1764320000,
+          "model": "gpt-6-luna",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": "Run the tests first.",
+                "role": "assistant"
+              }
+            }
+          ],
+          "usage": {
+            "completion_tokens": 40,
+            "prompt_tokens": 1200,
+            "total_tokens": 1240,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            }
+          }
+        },
+        "cost": 0.0,
+        "timestamp": 1764320000.25
+      }
+    },
+    {
+      "content": "{\n  \"returncode\": 1,\n  \"output\": \"F\\n1 failed in 0.01s\\n\"\n}",
+      "extra": {
+        "raw_output": "F\n1 failed in 0.01s\n",
+        "returncode": 1,
+        "timestamp": 1764320001.5,
+        "exception_info": ""
+      },
+      "tool_call_id": "call_1",
+      "role": "tool"
+    },
+    {
+      "role": "user",
+      "content": "Tool call error:\n\n<error>\nNo tool calls found in the response. Every response MUST include at least one tool call.\n</error>",
+      "extra": {
+        "interrupt_type": "FormatError",
+        "cost": 0.0
+      }
+    },
+    {
+      "content": "Fix the sign in add().",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"command\": \"sed -i 's/a - b/a + b/' calc.py && python -m pytest -q\"}",
+            "name": "bash"
+          },
+          "id": "call_2",
+          "type": "function"
+        }
+      ],
+      "function_call": null,
+      "extra": {
+        "actions": [
+          {
+            "command": "sed -i 's/a - b/a + b/' calc.py && python -m pytest -q",
+            "tool_call_id": "call_2"
+          }
+        ],
+        "response": {
+          "id": "chatcmpl-call_2",
+          "created": 1764320003,
+          "model": "gpt-6-luna",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": "Fix the sign in add().",
+                "role": "assistant"
+              }
+            }
+          ],
+          "usage": {
+            "completion_tokens": 60,
+            "prompt_tokens": 1500,
+            "total_tokens": 1560,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024
+            }
+          }
+        },
+        "cost": 0.0,
+        "timestamp": 1764320003.0
+      }
+    },
+    {
+      "content": "{\n  \"returncode\": 0,\n  \"output\": \"1 passed in 0.01s\\n\"\n}",
+      "extra": {
+        "raw_output": "1 passed in 0.01s\n",
+        "returncode": 0,
+        "timestamp": 1764320004.0,
+        "exception_info": ""
+      },
+      "tool_call_id": "call_2",
+      "role": "tool"
+    },
+    {
+      "content": "Tests pass. Submitting.",
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"command\": \"echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\"}",
+            "name": "bash"
+          },
+          "id": "call_3",
+          "type": "function"
+        }
+      ],
+      "function_call": null,
+      "extra": {
+        "actions": [
+          {
+            "command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT",
+            "tool_call_id": "call_3"
+          }
+        ],
+        "response": {
+          "id": "chatcmpl-call_3",
+          "created": 1764320005,
+          "model": "gpt-6-luna",
+          "object": "chat.completion",
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": "Tests pass. Submitting.",
+                "role": "assistant"
+              }
+            }
+          ],
+          "usage": {
+            "completion_tokens": 20,
+            "prompt_tokens": 1700,
+            "total_tokens": 1720,
+            "prompt_tokens_details": {
+              "cached_tokens": 1408
+            }
+          }
+        },
+        "cost": 0.0,
+        "timestamp": 1764320005.0
+      }
+    },
+    {
+      "role": "exit",
+      "content": "",
+      "extra": {
+        "exit_status": "Submitted",
+        "submission": ""
+      }
+    }
+  ],
+  "trajectory_format": "mini-swe-agent-1.1"
+}
+@@heimdall-mswea-trajectory end
