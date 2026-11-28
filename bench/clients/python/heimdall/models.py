@@ -7125,6 +7125,7 @@ class _IssueRunStartRequired(TypedDict):
 
 
 class IssueRunStart(_IssueRunStartRequired, total=False):
+    budget_usd: float
     key_id: str
     model: str
     provider: str

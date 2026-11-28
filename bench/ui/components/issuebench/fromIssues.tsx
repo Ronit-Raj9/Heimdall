@@ -24,6 +24,7 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./w446I18n";
+import "./uft5I18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -33,11 +34,19 @@ declare module "@/lib/i18n/resources" {
 
 type T = ReturnType<typeof useTranslation<"issuebench">>["t"];
 
-/** The start body: consent, plus the builder model when both fields are filled (empty uses the server's default). */
-export function startBody(consent: boolean, provider: string, model: string) {
+/** The start body: consent, plus the builder model when both fields are filled (empty uses the server's default), plus the cap per issue when given. */
+export function startBody(consent: boolean, provider: string, model: string, budgetUSD?: number) {
 	const p = provider.trim();
 	const m = model.trim();
-	return p && m ? { consent, provider: p, model: m } : { consent };
+	const body: { consent: boolean; provider?: string; model?: string; budget_usd?: number } = p && m ? { consent, provider: p, model: m } : { consent };
+	if (budgetUSD !== undefined && budgetUSD > 0) body.budget_usd = budgetUSD;
+	return body;
+}
+
+/** The cap the person typed, or null when it is not a number from 0.01 to 50 (the server's range). */
+export function parseCap(input: string): number | null {
+	const n = Number(input.trim());
+	return input.trim() !== "" && Number.isFinite(n) && n >= 0.01 && n <= 50 ? n : null;
 }
 
 /** The body of a retry with the fix the person chose; null when they cancelled the prompt. */
@@ -198,6 +207,9 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 	// M6-27: provider and model come from the shared model picker (your model keys), not two free text boxes.
 	const [picked, setPicked] = useState<PickedModel | null>(null);
 	const { t: tf } = useTranslation("uf6a");
+	const { t: t5 } = useTranslation("uft5");
+	const [capText, setCapText] = useState("1.00");
+	const cap = parseCap(capText);
 	const keyState = usePickedKeyState(picked);
 	const provider = isPicked(picked) && keyState === "ok" ? picked.provider : "";
 	const model = isPicked(picked) && keyState === "ok" ? picked.model : "";
@@ -216,12 +228,14 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 			? t(blocked === "worker" ? "readiness.startNoWorker" : "readiness.startNoGateway")
 			: !consent
 				? tf("issues.whyConsent")
-				: "";
+				: cap === null
+					? t5("capBad")
+					: "";
 
 	const onStart = async () => {
 		setError("");
 		try {
-			await start({ id, ...startBody(consent, provider, model) }).unwrap();
+			await start({ id, ...startBody(consent, provider, model, cap ?? undefined) }).unwrap();
 			setPoll(RUN_POLL_MS);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
@@ -249,13 +263,27 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 							testId="issuebench-model"
 						/>
 					</div>
+					<label className="flex flex-col gap-1 text-sm">
+						<span>{t5("capLabel")}</span>
+						<input
+							type="number"
+							min="0.01"
+							max="50"
+							step="0.01"
+							inputMode="decimal"
+							className="border-input bg-background w-28 rounded-md border px-2 py-1"
+							value={capText}
+							onChange={(e) => setCapText(e.target.value)}
+							data-testid="issuebench-cap"
+						/>
+					</label>
 					<label className="flex items-center gap-2">
 						<input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} data-testid="issuebench-consent" />
 						<span>{t("consent")}</span>
 					</label>
 					<Button
 						size="sm"
-						disabled={!writable || !consent || running || startState.isLoading || blocked !== ""}
+						disabled={!writable || !consent || cap === null || running || startState.isLoading || blocked !== ""}
 						title={blocked ? t(blocked === "worker" ? "readiness.startNoWorker" : "readiness.startNoGateway") : undefined}
 						aria-describedby={startWhy ? "issuebench-start-why" : undefined}
 						onClick={onStart}
@@ -266,9 +294,16 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 					<span className="text-muted-foreground text-xs" data-testid="issuebench-cost">
 						{t("cost", { cost: data.cost_usd.toFixed(2) })}
 					</span>
-				</div>
-			)}
-			{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
+					</div>
+					)}
+					{items.length > 0 && (
+						<div className="text-muted-foreground flex flex-col gap-1 text-sm" data-testid="issuebench-start-info">
+							<p>{t5("what")}</p>
+							<p>{t5("paid", { cap: (cap ?? 1).toFixed(2) })}</p>
+							<p>{t5("time")}</p>
+						</div>
+					)}
+					{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
 			{error && (
 				<p className="text-destructive" role="alert">
 					{error}

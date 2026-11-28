@@ -1,0 +1,7 @@
+{
+	"capLabel": "Cap per issue (USD)",
+	"capBad": "Enter a cap from 0.01 to 50.",
+	"what": "For each issue a worker builds a test setup with the builder model, then checks that the fix's tests fail before the fix and pass after it. Model checks run on the server. You review each task before it joins the benchmark.",
+	"paid": "You pick the builder model. It is paid with your organization's model key, at most {{cap}} USD per issue.",
+	"time": "A build usually takes several minutes per issue."
+}
