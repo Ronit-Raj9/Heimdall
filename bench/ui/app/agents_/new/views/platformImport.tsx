@@ -61,11 +61,17 @@ export function missingImportFields(
  * secrets; Read shows what Heimdall found (prompt, first message, tools, voice, warnings) and the
  * config it will save; Create saves it and opens the agent.
  */
-export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
+export function PlatformImportCard({ returnTo, openSignal = 0 }: { returnTo?: string | null; openSignal?: number }) {
 	const { t } = useTranslation("agentImport");
 	const canWrite = canUse(useSession(), "member");
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
+	// The page's top "Import from a platform" button: each press opens the form and brings it into view.
+	useEffect(() => {
+		if (!openSignal) return;
+		setOpen(true);
+		document.getElementById("platform-import")?.scrollIntoView({ behavior: "smooth", block: "start" });
+	}, [openSignal]);
 	const platforms = useGetAgentPlatformsQuery(undefined, { skip: !open });
 	const secretList = useListSecretsQuery(undefined, { skip: !open });
 	const list = useMemo(() => platforms.data?.platforms ?? [], [platforms.data]);

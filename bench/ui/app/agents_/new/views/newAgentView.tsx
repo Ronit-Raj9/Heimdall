@@ -192,6 +192,7 @@ export default function NewAgentView() {
 	const tpl = templates.find((x) => x.id === templateId) ?? null;
 	// The template under the pointer or focus: its description shows in the side panel.
 	const [hovered, setHovered] = useState<AgentTemplate | null>(null);
+	const [importAsk, setImportAsk] = useState(0);
 	const formRef = useRef<HTMLDivElement>(null);
 	const models = useGetModelsQuery();
 	const keyed = useMemo(() => keyedProviders(models.data?.keys ?? []), [models.data]);
@@ -370,11 +371,16 @@ export default function NewAgentView() {
 							{tx("agent.bandEndpoint")}
 						</Link>
 					</Button>
-					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
-						<a href="#platform-import" data-testid="agents-new-import">
-							<CloudDownload className="size-4" aria-hidden="true" />
-							{tx("agent.bandImport")}
-						</a>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						className="max-sm:h-10"
+						onClick={() => setImportAsk((n) => n + 1)}
+						data-testid="agents-new-import"
+					>
+						<CloudDownload className="size-4" aria-hidden="true" />
+						{tx("agent.bandImport")}
 					</Button>
 					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
 						<Link to="/agents/from-traces" data-testid="agents-new-from-traces">
@@ -429,7 +435,7 @@ export default function NewAgentView() {
 							);
 						})}
 						{/* Import sits under the gallery, so the first template is near the top (Q-89); the band links here. */}
-						<PlatformImportCard returnTo={returnTo} />
+						<PlatformImportCard returnTo={returnTo} openSignal={importAsk} />
 					</div>
 					<div
 						ref={formRef}

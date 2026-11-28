@@ -103,3 +103,11 @@ describe("platform import", () => {
 		expect(html).toContain("adapter: voice_platform");
 	});
 });
+
+describe("PlatformImportCard opened from the page's top button", () => {
+	it("takes an open signal without changing the closed first render", () => {
+		const html = renderToStaticMarkup(<PlatformImportCard openSignal={0} />);
+		expect(html).toContain('id="platform-import"');
+		expect(html).not.toContain('data-testid="platform-import-form"');
+	});
+});
