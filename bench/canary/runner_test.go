@@ -304,7 +304,7 @@ func TestDailyCapRefusesBeforePlanningSpend(t *testing.T) {
 	}
 	plannedBefore := ex.planned
 	recs, err := r.Run(context.Background(), d, RunOptions{})
-	if err != nil || recs[0].Outcome != OutcomeRefused || !strings.Contains(recs[0].Reason, "daily cap") {
+	if err != nil || recs[0].Outcome != OutcomeRefused || !strings.Contains(recs[0].Reason, "limit is used") {
 		t.Fatalf("fourth run of the day = %+v, %v", recs, err)
 	}
 	if ex.planned != plannedBefore {

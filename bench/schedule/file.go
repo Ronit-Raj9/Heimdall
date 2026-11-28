@@ -51,6 +51,9 @@ type Schedule struct {
 	// Paused keeps the schedule in the file but stops its cron triggers
 	// (the server ticker skips it); Run now still works.
 	Paused bool `json:"paused,omitempty" yaml:"paused,omitempty"`
+	// PausedReason says why the schedule paused by itself (after
+	// PauseAfterFailures failed firings in a row); empty when a person paused it.
+	PausedReason string `json:"paused_reason,omitempty" yaml:"paused_reason,omitempty"`
 	// NewModels is W4 feature 3: start the evaluation only for a model
 	// Bifrost's catalog did not list before (newmodels.go).
 	NewModels *NewModelWatch `json:"new_models,omitempty" yaml:"new_models,omitempty"`
@@ -327,9 +330,9 @@ func (s Schedule) Location() (*time.Location, error) {
 	if s.Timezone == "" {
 		return time.Local, nil
 	}
-	loc, err := time.LoadLocation(s.Timezone)
+	loc, err := LoadZone(s.Timezone)
 	if err != nil {
-		return nil, fmt.Errorf("timezone %q: %w", s.Timezone, err)
+		return nil, fmt.Errorf("time zone %q is not known: pick another zone, for example UTC (%w)", s.Timezone, err)
 	}
 	return loc, nil
 }

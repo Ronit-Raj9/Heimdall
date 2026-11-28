@@ -252,7 +252,7 @@ func (d *Definition) Validate() error {
 			errs = append(errs, fmt.Errorf("schedule: %w", err))
 		}
 		if d.Schedule.Timezone != "" {
-			if _, err := time.LoadLocation(d.Schedule.Timezone); err != nil {
+			if _, err := schedule.LoadZone(d.Schedule.Timezone); err != nil {
 				errs = append(errs, fmt.Errorf("schedule timezone %q: %w", d.Schedule.Timezone, err))
 			}
 		}
@@ -353,7 +353,7 @@ func (d *Definition) Problems() []Problem {
 			add("schedule", "The schedule is not a valid cron line: "+err.Error())
 		}
 		if d.Schedule.Timezone != "" {
-			if _, err := time.LoadLocation(d.Schedule.Timezone); err != nil {
+			if _, err := schedule.LoadZone(d.Schedule.Timezone); err != nil {
 				add("schedule", fmt.Sprintf("The time zone %q is not known.", d.Schedule.Timezone))
 			}
 		}

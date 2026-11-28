@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/alerts"
+	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -175,6 +177,7 @@ func (r *Runner) Baseline(ctx context.Context, d *Definition, opts BaselineOptio
 		if reason := r.capRefusal(d, records); reason != "" {
 			return finish(OutcomeRefused, reason, alerts.EventScheduleFailed)
 		}
+		d = r.runDefinition(d, records)
 	}
 	plan, err := r.Exec.Plan(ctx, d, "")
 	if err != nil {
@@ -252,6 +255,7 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 			return finish(OutcomeRefused, prevState, deferred(reason), alerts.EventScheduleFailed)
 		}
 	}
+	d = r.runDefinition(d, records)
 	plan, err := r.Exec.Plan(ctx, d, inject)
 	if err != nil {
 		return finish(OutcomeError, prevState, "Could not plan the check: "+err.Error(), alerts.EventScheduleFailed)
@@ -322,6 +326,9 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 		reason = "flagged once on " + strings.Join(cmp.Flagged, ", ") + "; a second consecutive flag on the same target and metric confirms a drift"
 	default:
 		reason = "no drift detected"
+		if rec.Runs < MinRunsToTell { // F2, PH5-7: a quiet look on a few runs is not a clean result
+			reason = fmt.Sprintf("Too few runs to tell (%d runs, %d needed); nothing moved beyond noise", rec.Runs, MinRunsToTell)
+		}
 		if age := r.now().Sub(base.CreatedAt); !base.CreatedAt.IsZero() && age > d.MaxBaselineAge() {
 			state = StateBaselineStale
 			reason = fmt.Sprintf("no drift detected, but the baseline is %d days old (max %d): re-pin it so slow changes are measured from a recent known-good run", int(age.Hours()/24), int(d.MaxBaselineAge().Hours()/24))
@@ -347,10 +354,34 @@ func (r *Runner) capRefusal(d *Definition, records []Record) string {
 	loc := d.Location()
 	day := r.now().In(loc).Format(time.DateOnly)
 	spent := SpentOn(records, day, loc)
-	if d.Budget.PerDayUSD > 0 && spent+d.Budget.PerRunUSD > d.Budget.PerDayUSD+1e-9 {
-		return fmt.Sprintf("daily cap: spent %.4f USD today plus the per-run cap %.2f USD would pass per_day_usd %.2f USD", spent, d.Budget.PerRunUSD, d.Budget.PerDayUSD)
+	if d.Budget.PerDayUSD > 0 && spent >= d.Budget.PerDayUSD-1e-9 {
+		return fmt.Sprintf("Today's limit is used: %.4f USD spent of %.2f USD a day. It runs again tomorrow, or raise the daily limit.", spent, d.Budget.PerDayUSD)
 	}
 	return ""
+}
+
+// MinRunsToTell is how many runs a look needs before "no change" means
+// anything; under it the look says "too few runs to tell", as the report
+// card does.
+const MinRunsToTell = 10
+
+// runDefinition is d with this run's spend cap: the per-run cap, or less
+// when the day has less left (F2, PH5-6: a per-day limit equal to the
+// per-check limit must still let a check run after a cheap baseline). The
+// engine stops at this cap, so the day's spend never passes per_day_usd;
+// the cap is not part of the fingerprint, so the baseline still matches.
+func (r *Runner) runDefinition(d *Definition, records []Record) *Definition {
+	if d.Budget.PerDayUSD <= 0 || d.Budget.PerRunUSD <= 0 {
+		return d
+	}
+	loc := d.Location()
+	left := d.Budget.PerDayUSD - SpentOn(records, r.now().In(loc).Format(time.DateOnly), loc)
+	if left >= d.Budget.PerRunUSD {
+		return d
+	}
+	dd := *d
+	dd.Budget.PerRunUSD = math.Floor(left*1e4) / 1e4
+	return &dd
 }
 
 // forecastRefusal returns why a planned run may not start: its forecast is
@@ -528,7 +559,7 @@ func successText(ps []ArmPoint) string {
 // Location is the timezone of the canary's schedule and spend day.
 func (d *Definition) Location() *time.Location {
 	if d.Schedule != nil && d.Schedule.Timezone != "" {
-		if loc, err := time.LoadLocation(d.Schedule.Timezone); err == nil {
+		if loc, err := schedule.LoadZone(d.Schedule.Timezone); err == nil {
 			return loc
 		}
 	}

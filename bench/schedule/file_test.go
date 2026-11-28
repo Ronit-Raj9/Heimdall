@@ -58,7 +58,7 @@ func TestScheduleValidate(t *testing.T) {
 		{"bad name", func(s *Schedule) { s.Name = "Bad Name" }, "name must be"},
 		{"bad cron", func(s *Schedule) { s.Cron = "0 2 * *" }, "want 5 fields"},
 		{"never fires", func(s *Schedule) { s.Cron = "0 0 30 2 *" }, "never fires"},
-		{"bad tz", func(s *Schedule) { s.Timezone = "Mars/Olympus" }, "timezone"},
+		{"bad tz", func(s *Schedule) { s.Timezone = "Mars/Olympus" }, "time zone"},
 		{"missing experiment", func(s *Schedule) { s.Experiment = "experiments/none.yaml" }, "experiment file"},
 		{"missing policy", func(s *Schedule) { s.Policy = "nope.yaml" }, "policy file"},
 		{"non-smoke without daily cap", func(s *Schedule) { s.MaxUSDPerDay = 0 }, "max_usd_per_day is required"},

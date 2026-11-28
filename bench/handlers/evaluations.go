@@ -90,6 +90,9 @@ type evaluationsHandler struct {
 	// prepare, when set, fills fields of a new evaluation before its first
 	// save (a cheat check's cheat_check_of), so no later write can lose them.
 	prepare func(*schemas.Evaluation)
+	// planOnly stops launchChild after the plan check: nothing is written
+	// or started (lane F2, a schedule's save-time check, schedules_check.go).
+	planOnly bool
 }
 
 // evalCompat is the compatibility check; tests replace it. An agent whose
@@ -1129,6 +1132,10 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 	}
 	if plan := BuildPlan(m); len(plan.Errors) > 0 {
 		return skip("%s", planSentences(plan.Errors))
+	}
+	if h.planOnly {
+		child.Status = "planned"
+		return child
 	}
 	if err := os.MkdirAll(filepath.Join(s.Projects.Root(), "experiments"), 0o755); err != nil {
 		return skip("create the experiments folder: %v", err)

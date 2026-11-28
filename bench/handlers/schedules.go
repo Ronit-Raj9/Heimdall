@@ -143,6 +143,9 @@ type ScheduleRow struct {
 	Last     *schedule.Record `json:"last,omitempty"`    // last trigger
 	Problem  string           `json:"problem,omitempty"` // why it would not run now
 	SpentUSD float64          `json:"spent_today_usd"`
+	// FailuresInARow counts the newest firings in a row that did not start
+	// or ended in an error; at schedule.PauseAfterFailures it pauses itself.
+	FailuresInARow int `json:"failures_in_a_row,omitempty"`
 }
 
 // SchedulesResponse is GET /schedules.
@@ -214,6 +217,7 @@ func (h *schedulesHandler) get(ctx *fasthttp.RequestCtx) {
 		ScheduleExtras(root, full)
 	}
 	last, _ := schedule.LastRecords(ScheduleStateDir(root))
+	streaks, _, _ := schedule.FailureStreaks(ScheduleStateDir(root))
 	now := time.Now()
 	for i, s := range full.Schedules {
 		row := ScheduleRow{Schedule: s, Kind: scheduleKind(s), Source: "web"}
@@ -232,6 +236,7 @@ func (h *schedulesHandler) get(ctx *fasthttp.RequestCtx) {
 			row.Last = &rec
 		}
 		row.SpentUSD, _ = schedule.SpentToday(ScheduleStateDir(root), s, now)
+		row.FailuresInARow = streaks[s.Name]
 		if err := s.Validate(root, ScheduleExperimentLoader); err != nil {
 			row.Problem = err.Error()
 		} else if resp.Hosted {
@@ -302,7 +307,20 @@ func (h *schedulesHandler) put(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
 		return
 	}
+	for i := range f.Schedules { // browsers still report old zone names such as Asia/Calcutta
+		if f.Schedules[i].Timezone != "" {
+			f.Schedules[i].Timezone = schedule.CanonicalZone(f.Schedules[i].Timezone)
+		}
+		if !f.Schedules[i].Paused {
+			f.Schedules[i].PausedReason = ""
+		}
+	}
 	if err := f.Validate(h.root(), ScheduleExperimentLoader); err != nil {
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
+		return
+	}
+	old, _ := LoadWebSchedules(h.root())
+	if err := checkEvaluationSchedules(ctx, h.env, old, f); err != nil { // F2: the readiness and plan check its firing would run
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
 		return
 	}

@@ -301,7 +301,24 @@ func fireWebScheduleWith(ctx context.Context, env jobEnv, name string, log jobs.
 	if err != nil {
 		return schedule.Record{}, err
 	}
-	return d.Trigger(ctx, name)
+	rec, err := d.Trigger(ctx, name)
+	if err == nil && schedule.FailedFiring(rec) && !s.Paused {
+		pauseAfterFailures(env.ProjectRoot, state, name, env.App.logger)
+	}
+	return rec, err
+}
+
+// pauseAfterFailures pauses a web schedule by itself once its newest
+// schedule.PauseAfterFailures firings in a row failed (lane F2), so a
+// repeat that can never start stops firing every day.
+func pauseAfterFailures(root, state, name string, logger schemas.Logger) {
+	n, why, err := schedule.FailureStreaks(state)
+	if err != nil || n[name] < schedule.PauseAfterFailures {
+		return
+	}
+	if err := handlers.PauseWebSchedule(root, name, schedule.PauseReason(n[name], why[name])); err != nil && logger != nil {
+		logger.Warn("schedule not paused after failed firings", "schedule", name, "error", err.Error())
+	}
 }
 
 // tickEvery is how often the ticker looks for due schedules.

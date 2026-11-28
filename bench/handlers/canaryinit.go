@@ -16,6 +16,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/canary"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -107,7 +108,13 @@ func checkCanaryDefinition(ctx *fasthttp.RequestCtx, env OrgEnv, d *canary.Defin
 	if msg := canaryBenchmarkProblem(ctx, env.Services.Suites, d.Suite); msg != "" {
 		problems = append(problems, canary.Problem{Field: "suite", Message: msg})
 	}
+	if d.Schedule != nil && d.Schedule.Timezone != "" { // browsers still report old zone names such as Asia/Calcutta
+		d.Schedule.Timezone = schedule.CanonicalZone(d.Schedule.Timezone)
+	}
 	problems = append(problems, d.Problems()...)
+	if len(problems) == 0 {
+		problems = append(problems, canaryFitProblems(ctx, env, d)...) // F2: the wizard's agent rule, ready tasks only
+	}
 	if len(problems) == 0 {
 		// Problems refuses at least what Validate refuses; this keeps the
 		// CLI rule as the last word should the two ever differ.

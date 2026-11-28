@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -58,8 +59,18 @@ func runEvaluationSchedule(ctx context.Context, a *app, svc *handlers.Services, 
 	}
 	res := &schedule.Result{EvaluationID: ev.ID, CostUSD: capUSD,
 		Summary: fmt.Sprintf("evaluation %s started on %d of %d benchmarks, budget %.2f USD", ev.ID, started, len(ev.Children), capUSD)}
-	if started == 0 {
-		return res, fmt.Errorf("evaluation %s started no benchmark: see its page for why each was skipped", ev.ID)
+	if started == 0 { // nothing started, nothing spent: the reserved budget is freed (F2, PH5-13)
+		res.CostUSD = 0
+		var why []string
+		for _, c := range ev.Children {
+			if c.Skipped != "" {
+				why = append(why, c.Benchmark+": "+c.Skipped)
+			}
+		}
+		if len(why) == 0 {
+			return res, fmt.Errorf("evaluation %s started no benchmark: see its page for why each was skipped", ev.ID)
+		}
+		return res, fmt.Errorf("evaluation %s started no benchmark. %s", ev.ID, strings.Join(why, " "))
 	}
 	return res, nil
 }
