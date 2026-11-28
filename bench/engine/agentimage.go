@@ -225,7 +225,7 @@ func (p *Planner) buildTaskAgents(ctx context.Context, suite *schemas.Suite, con
 		if !ok {
 			continue
 		}
-		img, err := ResolveTaskAgentImage(&cfg, suite, suite.TaskByID(id), taskTag, p.benchRoot)
+		img, err := ResolveTaskAgentImage(&cfg, suite, suite.TaskByID(id), taskTag, p.benchRoot, p.library)
 		if err != nil {
 			return fmt.Errorf("task %s: %w", id, err)
 		}

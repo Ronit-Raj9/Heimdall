@@ -15,12 +15,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
+	benchagents "github.com/maximhq/bifrost/bench/agents"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
+	"gopkg.in/yaml.v3"
 )
 
 // taskImageBaseArg is the Dockerfile ARG the agent templates and the
@@ -90,7 +93,7 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 	set := map[string]any{"build.base_arg": taskImageBaseArg}
 	b := *cfg.Build
 	b.BaseArg = taskImageBaseArg
-	if lib := agents["agents/"+cfg.ID+"-task.yaml"]; lib != nil && lib.Build != nil && lib.Build.BaseArg != "" && lib.Build.Dockerfile != "" {
+	if lib := taskVariantConfig(cfg.ID, agents); lib != nil && lib.Build != nil && lib.Build.BaseArg != "" && lib.Build.Dockerfile != "" {
 		b = *lib.Build
 		set = map[string]any{"build.base_arg": b.BaseArg, "build.dockerfile": b.Dockerfile, "build.tag": b.Tag}
 		if b.Context != "" {
@@ -102,18 +105,48 @@ func deriveTaskImageAgent(cfg *schemas.AgentConfig, st *schemas.Suite, taskIDs [
 	} else if cfg.Image != b.Tag {
 		set["image"] = b.Tag
 	}
-	if root != "" && !dockerfileUsesArg(filepath.Join(root, b.Dockerfile), b.BaseArg) {
-		return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile does not start FROM ${%s})", cfg.ID, b.BaseArg)}
+	if root != "" {
+		// The worker resolves the Dockerfile the same way (engine
+		// ResolveAgentImageIn): the project, then the library, then the
+		// build files shipped with the binary. Missing from all of them, the
+		// worker would refuse every slot, so the benchmark is skipped here.
+		path, found := utils.AgentBuildPath(root, suite.LibraryDir(), b.Dockerfile)
+		if !found {
+			return taskImageVariant{Skip: fmt.Sprintf("agent %s cannot run here: its task-image build file %s is not in the organization's project, the library or the built-in agents", cfg.ID, b.Dockerfile)}
+		}
+		if !dockerfileUsesArg(path, b.BaseArg) {
+			return taskImageVariant{Skip: taskImageSkipReason + fmt.Sprintf(" (agent %s's Dockerfile does not start FROM ${%s})", cfg.ID, b.BaseArg)}
+		}
 	}
 	return taskImageVariant{Set: set, Note: fmt.Sprintf("agent %s is built on each task's own image here", cfg.ID)}
+}
+
+// taskVariantConfig is the task-image variant agents/<id>-task.yaml of an
+// agent: the organization's or the library's (agents holds both), else the
+// one shipped with the binary (bench/agents/codex-task.yaml). The shipped
+// variants are not listed as agents of their own; a user picks the base id.
+func taskVariantConfig(id string, agents map[string]*schemas.AgentConfig) *schemas.AgentConfig {
+	if cfg := agents["agents/"+id+"-task.yaml"]; cfg != nil {
+		return cfg
+	}
+	b, err := fs.ReadFile(benchagents.Files, id+"-task.yaml")
+	if err != nil {
+		return nil
+	}
+	var cfg schemas.AgentConfig
+	if err := yaml.Unmarshal(b, &cfg); err != nil {
+		return nil
+	}
+	return &cfg
 }
 
 // scriptedAdapterName runs in the task image already.
 const scriptedAdapterName = "scripted"
 
 // dockerfileUsesArg reports whether the Dockerfile at path declares ARG name
-// before a FROM that uses it. A Dockerfile that cannot be read (hosted
-// library, other worker) is given the benefit of the doubt.
+// before a FROM that uses it. The caller checks first that the file exists
+// (utils.AgentBuildPath); one that exists but cannot be read from here is
+// given the benefit of the doubt.
 func dockerfileUsesArg(path, name string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {

@@ -726,7 +726,7 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 			return am, fmt.Errorf("adapter %s does not support adapter fault hooks", cfg.Adapter)
 		}
 	}
-	img, err := ResolveAgentImage(&cfg, suite, p.benchRoot)
+	img, err := ResolveAgentImageIn(&cfg, suite, p.benchRoot, p.library)
 	if err != nil {
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 	}

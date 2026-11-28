@@ -66,16 +66,22 @@ func TestDeriveTaskImageAgent(t *testing.T) {
 			t.Fatalf("%s: %+v", cfg.ID, v)
 		}
 	}
-	// A Dockerfile that does not build FROM the argument is refused honestly.
+	// A Dockerfile that does not build FROM the argument is refused honestly
+	// (an agent without a shipped -task variant).
+	acme := func() *schemas.AgentConfig {
+		c := codexLike()
+		c.ID = "acme"
+		return c
+	}
 	root := t.TempDir()
 	df := filepath.Join(root, "agents/images/codex/Dockerfile")
 	_ = os.MkdirAll(filepath.Dir(df), 0o755)
 	_ = os.WriteFile(df, []byte("FROM bench/coding-core-base:1\n"), 0o644)
-	if v := deriveTaskImageAgent(codexLike(), st, nil, nil, root); !strings.HasPrefix(v.Skip, taskImageSkipReason) {
+	if v := deriveTaskImageAgent(acme(), st, nil, nil, root); !strings.HasPrefix(v.Skip, taskImageSkipReason) {
 		t.Fatalf("fixed FROM: %+v", v)
 	}
 	_ = os.WriteFile(df, []byte("ARG BASE_IMAGE=bench/coding-core-base:1\nFROM ${BASE_IMAGE}\n"), 0o644)
-	if v := deriveTaskImageAgent(codexLike(), st, nil, nil, root); v.Skip != "" || v.Set == nil {
+	if v := deriveTaskImageAgent(acme(), st, nil, nil, root); v.Skip != "" || v.Set == nil {
 		t.Fatalf("ARG FROM: %+v", v)
 	}
 }

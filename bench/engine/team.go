@@ -99,7 +99,7 @@ func (p *Planner) resolveTeam(ctx context.Context, cfg *schemas.AgentConfig, sui
 				return fmt.Errorf("team member %s: agent config %s uses adapter %q, the arm uses %q; every member of a team runs the arm's adapter (docs/multi-agent.md)",
 					m.ID, m.Agent, mc.Adapter, cfg.Adapter)
 			}
-			img, err := ResolveAgentImage(&mc, suite, p.benchRoot)
+			img, err := ResolveAgentImageIn(&mc, suite, p.benchRoot, p.library)
 			if err != nil {
 				return fmt.Errorf("team member %s: agent config %s: %w", m.ID, m.Agent, err)
 			}

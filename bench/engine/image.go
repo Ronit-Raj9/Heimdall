@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // maxTagLength is the longest tag part docker accepts after the colon.
@@ -59,6 +60,14 @@ type ImageInspector interface {
 // (name:tag) and equals image, and a suite with a base image, because the
 // derived tag is appended to that tag part.
 func ResolveAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, benchRoot string) (AgentImage, error) {
+	return ResolveAgentImageIn(cfg, suite, benchRoot, "")
+}
+
+// ResolveAgentImageIn is ResolveAgentImage with the agent library layered
+// under benchRoot: an agents/ build path the project does not hold resolves
+// in library, then in the build files shipped in this binary
+// (utils.AgentBuildPath), as the agent's yaml does (Planner.libraryFile).
+func ResolveAgentImageIn(cfg *schemas.AgentConfig, suite *schemas.Suite, benchRoot, library string) (AgentImage, error) {
 	if cfg == nil {
 		return AgentImage{}, errors.New("resolve agent image: no agent config")
 	}
@@ -68,11 +77,11 @@ func ResolveAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, benchRoot
 		return out, nil
 	}
 	if b.Dockerfile != "" {
-		out.Dockerfile = benchPath(benchRoot, b.Dockerfile)
+		out.Dockerfile, _ = utils.AgentBuildPath(benchRoot, library, b.Dockerfile)
 		out.Context = filepath.Dir(out.Dockerfile)
 	}
 	if b.Context != "" {
-		out.Context = benchPath(benchRoot, b.Context)
+		out.Context, _ = utils.AgentBuildPath(benchRoot, library, b.Context)
 	}
 	if b.BaseArg == "" {
 		return out, nil
@@ -92,8 +101,9 @@ func ResolveAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, benchRoot
 // on the task image (the ARG receives taskImage) and tagged
 // "<build.tag>-<suite id>-<task id>", so the agent runs inside the task's own
 // environment; an agent without base_arg keeps its own image (OwnImage).
-func ResolveTaskAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, task *schemas.Task, taskImage, benchRoot string) (AgentImage, error) {
-	img, err := ResolveAgentImage(cfg, suite, benchRoot)
+// library is the agent library layered under benchRoot ("" for none).
+func ResolveTaskAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, task *schemas.Task, taskImage, benchRoot, library string) (AgentImage, error) {
+	img, err := ResolveAgentImageIn(cfg, suite, benchRoot, library)
 	if err != nil || taskImage == "" || task == nil {
 		return img, err
 	}
@@ -149,12 +159,4 @@ func hasTagPart(ref string) bool {
 	last := ref[strings.LastIndex(ref, "/")+1:]
 	_, tag, ok := strings.Cut(last, ":")
 	return ok && tag != ""
-}
-
-// benchPath resolves a bench-relative path.
-func benchPath(root, p string) string {
-	if filepath.IsAbs(p) {
-		return filepath.Clean(p)
-	}
-	return filepath.Join(root, filepath.FromSlash(p))
 }
