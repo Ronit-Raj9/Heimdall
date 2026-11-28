@@ -102,9 +102,12 @@ bench_unlock() {
 	bench_locked=
 }
 
-# bench_next_call: increment the shared counter and set bench_call. Fails when
-# the counter cannot be stored, and the caller then passes through: a shim
-# that cannot count must not break the tool forever.
+# bench_next_call: number this invocation and set bench_call. The number is
+# claimed by an atomic mkdir of log/<tool>.call.<n>, so two calls never share
+# one even when the lock was lost or broken; the count file only says where to
+# start looking. Leaves bench_call at 0 when the log folder cannot be written,
+# and the caller then passes through: a shim that cannot count must not break
+# the tool forever.
 bench_next_call() {
 	bench_count_file=$bench_log_dir/$bench_tool.count
 	bench_call=
@@ -112,7 +115,16 @@ bench_next_call() {
 		IFS= read -r bench_call <"$bench_count_file" || :
 	fi
 	case $bench_call in '' | *[!0-9]*) bench_call=0 ;; esac
-	bench_call=$((bench_call + 1))
+	while :; do
+		bench_call=$((bench_call + 1))
+		if mkdir "$bench_log_dir/$bench_tool.call.$bench_call" 2>/dev/null; then
+			break
+		fi
+		if [ ! -d "$bench_log_dir/$bench_tool.call.$bench_call" ]; then
+			bench_call=0
+			return 1
+		fi
+	done
 	{ printf '%s\n' "$bench_call" >"$bench_count_file"; } 2>/dev/null
 }
 
