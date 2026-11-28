@@ -237,7 +237,7 @@ func (c *Coordinator) loadLeases() {
 		c.pending[rec.ID] = &pendingLease{rec: rec, lastBeat: now}
 		w, ok := c.workers[rec.WorkerID]
 		if !ok {
-			w = &remoteWorker{refused: map[string]*leaseRefusal{}, info: rec.Worker, parts: copyStrings(rec.Parts), scope: rec.Scope}
+			w = &remoteWorker{refused: map[string]*leaseRefusal{}, info: rec.Worker, parts: copyStrings(rec.Parts), scope: rec.Scope, restored: true}
 			w.info.Running = nil
 			w.info.Rejected = 0
 			c.workers[rec.WorkerID] = w
@@ -345,6 +345,50 @@ func (c *Coordinator) expirePendingLocked(p *pendingLease, why string) {
 		w.info.State = stateOf(w)
 	}
 	c.logger.Warn("kept lease given up", "lease", p.rec.ID, "experiment", p.rec.ExpID, "slot", p.rec.SlotID, "why", why)
+	c.dropPlaceholderLocked(p.rec.WorkerID)
+}
+
+// dropPlaceholderLocked removes a worker entry restored from kept leases
+// when none of them is left and no runner registered the name, so a stale
+// entry never holds the name. Hosted only: a local coordinator has no
+// token to lock a name with. The caller holds mu.
+func (c *Coordinator) dropPlaceholderLocked(workerID string) {
+	w := c.workers[workerID]
+	if w == nil || !w.restored || !c.hosted() {
+		return
+	}
+	for _, p := range c.pending {
+		if p.rec.WorkerID == workerID && !p.expired {
+			return
+		}
+	}
+	for _, l := range c.leases {
+		if l.worker == workerID {
+			return
+		}
+	}
+	delete(c.workers, workerID)
+	for i, id := range c.order {
+		if id == workerID {
+			c.order = append(c.order[:i:i], c.order[i+1:]...)
+			break
+		}
+	}
+	c.logger.Info("worker entry restored from a kept lease removed: its leases are gone and no runner registered the name", "worker", workerID)
+}
+
+// refusedNameLocked logs a register refused because the name is held by
+// another token, once per worker and token. The caller holds mu.
+func (c *Coordinator) refusedNameLocked(workerID, tokenID, heldBy string) {
+	if c.refusedNames == nil {
+		c.refusedNames = map[string]string{}
+	}
+	if c.refusedNames[workerID] == tokenID {
+		return
+	}
+	c.refusedNames[workerID] = tokenID
+	c.logger.Warn("remote worker register refused: the name is registered with another runner token; that runner must be removed, or this one started under another name",
+		"worker", workerID, "token", tokenID, "registered_token", heldBy)
 }
 
 // pendingCall answers an upload, complete or release of a kept lease that

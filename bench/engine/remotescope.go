@@ -51,6 +51,7 @@ func (c *Coordinator) workerLocked(workerID string, scope schemas.RunnerScope) (
 	if c.hosted() && w.scope.TokenID != scope.TokenID {
 		return nil, fmt.Errorf("worker %s: %w: it registered with another runner token", workerID, schemas.ErrWorkerScope)
 	}
+	w.restored = false // its old token called: the old process is alive (remote.go)
 	return w, nil
 }
 
