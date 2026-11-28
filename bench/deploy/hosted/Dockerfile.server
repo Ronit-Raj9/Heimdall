@@ -25,6 +25,7 @@ COPY ui/ ./
 # ../../../handlers/testdata/livescore/*.json), so they sit at the same
 # relative path here. Only this stage sees them. (S1-fix)
 COPY handlers/testdata/livescore /src/handlers/testdata/livescore
+COPY handlers/testdata/tracetask_result_t3.json /src/handlers/testdata/tracetask_result_t3.json
 RUN npm run build
 
 # --- Go: static binary with the built UI embedded ---------------------------

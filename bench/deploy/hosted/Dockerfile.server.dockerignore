@@ -35,6 +35,7 @@ examples/**/checks
 # The UI stage typechecks the live scoring fixtures against these golden
 # files (see Dockerfile.server). (S1-fix)
 !handlers/testdata/livescore
+!handlers/testdata/tracetask_result_t3.json
 **/*_test.go
 
 # Docs and VCS.
