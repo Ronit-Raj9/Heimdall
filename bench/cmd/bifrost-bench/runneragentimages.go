@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -80,6 +82,13 @@ func (x *sharedAgentImages) ensure(ctx context.Context, m *schemas.Manifest, s *
 		img, err := engine.ResolveAgentImageIn(&cfg, s, root, suite.LibraryDir()) // library and built-in build files, as the planner resolves them
 		if err != nil || img.PerSuite != perSuite || img.Dockerfile == "" || img.Tag == "" || seen[img.Tag] {
 			return // an image that cannot be resolved is left to its run, as before
+		}
+		if !perSuite && !orgOwnedFile(root, img.Dockerfile) {
+			// A built-in agent keeps its Dockerfile outside the project and its
+			// plain image is built when the worker is installed: only an agent
+			// made in the web agent builder (its Dockerfile is in the org's
+			// project) is built here.
+			return
 		}
 		seen[img.Tag] = true
 		key := am.ConfigHash + "|" + s.ID + "|" + img.Tag + "|" + fileDigest(img.Dockerfile)
@@ -150,6 +159,20 @@ func armRunsSuiteImage(m *schemas.Manifest, slotArm string, am *schemas.ArmManif
 		}
 	}
 	return false
+}
+
+// orgOwnedFile reports whether path is a regular file inside the org's
+// project folder root.
+func orgOwnedFile(root, path string) bool {
+	if root == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return false
+	}
+	fi, err := os.Lstat(path)
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // fileDigest is the sha256 of a file's bytes, or "" when it cannot be read:
