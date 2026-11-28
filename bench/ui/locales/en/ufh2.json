@@ -1,0 +1,18 @@
+{
+	"need": {
+		"runs": "Needs {{runs}} runs per setup: {{tasks}} tasks, {{trials}} trials.",
+		"runsOneTrial": "Needs {{runs}} runs per setup: {{tasks}} tasks, 1 trial.",
+		"calls": "Needs about {{calls}} model calls: about {{tasks}} tasks with this agent.",
+		"callsHistory": "{{perRun}} calls per run measured.",
+		"callsDefault": "{{perRun}} calls per run assumed, no history yet.",
+		"tooFewTasks": "{{tasks}} tasks cannot give a result: {{need}} are needed.",
+		"tooFewRuns": "{{runs}} runs per setup cannot give a result: {{need}} are needed.",
+		"fewCalls": "{{tasks}} tasks make about {{expected}} of the {{need}} model calls needed. Pick {{pick}} tasks.",
+		"fewPoison": "The poison rate needs {{need}} tasks, {{tasks}} are picked."
+	},
+	"images": {
+		"first": "First run in about {{minutes}} minutes: its task image is built first.",
+		"total": "Up to {{count}} task images, about {{total}} minutes in all.",
+		"building": "Building task images"
+	}
+}

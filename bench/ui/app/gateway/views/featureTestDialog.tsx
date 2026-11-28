@@ -13,7 +13,7 @@ import {
 	usePlanExperimentMutation,
 	useStartExperimentMutation,
 } from "@/lib/store/apis/benchApi";
-import { useDraftGatewayTestMutation } from "@/lib/store/apis/gatewayApi";
+import { useDraftGatewayTestMutation, useGetGatewayFeaturesQuery } from "@/lib/store/apis/gatewayApi";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import type { Experiment, ExperimentPlan, Forecast } from "@/lib/types/bench";
@@ -27,6 +27,9 @@ import { useTranslation } from "react-i18next";
 import "./uf7cI18n";
 import "./w4p6I18n";
 import "./uff4I18n";
+import "@/components/estimate/ufh2I18n";
+import { NeedView, needState } from "./featureNeed";
+import { imageWaitText } from "@/components/estimate/imageWait";
 import { PromptPick, PromptVersionPick } from "./promptPicker";
 
 /** How a setting is entered: a model picker, a number, free text, a comma list, yes or no, or one of the budgets typed above. */
@@ -264,6 +267,8 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 	const { t: u } = useTranslation("uf7c");
 	const { t: r } = useTranslation("ufrj");
 	const { notes } = prepared.draft;
+	const { t: h } = useTranslation("ufh2");
+	const images = imageWaitText((k, o) => String(h(k as never, o)), prepared.draft.image_wait);
 	const { plan } = prepared;
 	const { t: f } = useTranslation("uff4");
 	const est = planEstimate(plan);
@@ -283,6 +288,7 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 						? r("gw.estimateUnknownCost", { minutes })
 						: r("gw.estimateUnknownBoth")}
 			</p>
+			{images && <p data-testid="feature-test-image-wait">{images}</p>}
 			{over && (
 				<p className="text-chart-warning-ink" data-testid="feature-test-over-budget">
 					{r("gw.overBudget", over)}
@@ -373,7 +379,7 @@ export function errorDetail(e: unknown): string {
 }
 
 // A suggested budget, so the estimate shows before anything is typed (the server caps it at MAX_DRAFT_USD).
-// Small defaults (3 tasks, 1 trial) so a first test is cheap; the server caps the budget at MAX_DRAFT_USD.
+// 3 tasks, 1 trial until the feature's need arrives; then the smallest size that reaches it (lane H2).
 const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", budget: "1", trials: "1", taskCount: "3", name: "", options: {} };
 
 /** The wait after the last change before the estimate is worked out. */
@@ -448,9 +454,20 @@ export function FeatureTestDialog({
 		setTouched((s) => new Set(s).add(field));
 	};
 	const setOption = (key: string, value: string) => set({ options: { ...form.options, [key]: value } }, key);
+	// What the result needs (bench/gwfeature/need.go); the default size is set to one that reaches it until the user types a size.
+	const features = useGetGatewayFeaturesQuery(form.base || undefined, { skip: !open });
+	const need = features.currentData?.features.find((x) => x.id === feature)?.need;
+	useEffect(() => {
+		if (!need || !(need.default_tasks > 0) || touched.has("taskCount") || touched.has("trials")) return;
+		const tasks = String(need.default_tasks);
+		const trials = String(need.default_trials);
+		setForm((x) => (x.taskCount === tasks && x.trials === trials ? x : { ...x, taskCount: tasks, trials }));
+	}, [need, touched]);
+	const needNow = needState(need, Number(form.taskCount) || 0, Number(form.trials) || 0, Boolean(form.options.poison_probe?.trim()));
 	const built = draftRequest(feature, form);
 	const missing = new Set(missingFields(feature, form));
-	const reqKey = built.req ? JSON.stringify(built.req) : "";
+	// A size that can never reach the need is not drafted; the server refuses it too.
+	const reqKey = built.req && needNow.status !== "impossible" ? JSON.stringify(built.req) : "";
 	// Draft and plan save nothing and spend nothing: they run on their own once the form is complete.
 	useEffect(() => {
 		setPrepared(null);
@@ -741,6 +758,7 @@ export function FeatureTestDialog({
 						{needed("trials", u("dialog.trialsMin"))}
 					</label>
 				</div>
+				<NeedView state={needNow} />
 				{estimating && (
 					<p className="text-muted-foreground" role="status" data-testid="feature-test-estimating">
 						{u("dialog.estimating")}

@@ -1,4 +1,6 @@
 import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
+import { imageWaitText } from "@/components/estimate/imageWait";
+import type { TaskImageWait } from "@/lib/types/gateway";
 import {
 	type EvaluationArm,
 	type EvaluationEstimate,
@@ -171,6 +173,7 @@ export function estimateLines(
 				est_minutes?: { low: number; high: number };
 				est_cost_usd?: { low: number; high: number; known?: boolean };
 				per_benchmark?: readonly object[] | null;
+				image_wait?: TaskImageWait | null;
 		  }
 		| undefined,
 ): string[] {
@@ -181,6 +184,9 @@ export function estimateLines(
 		// "1 min", never "1 to 1 min" (Q-11): the same rounding as step 4.
 		out.push(min === max ? t("launch.runsTimeOne", { runs: est.runs, min }) : t("launch.runsTime", { runs: est.runs, min, max }));
 	}
+	// Task images are built before any run starts (lane H2): the same estimate answer, no second request.
+	const images = est && est.runs > 0 ? imageWaitText(t, est.image_wait) : null;
+	if (images) out.push(images);
 	// A rough list price guess is labelled as rough (G1 estimate_basis, M3-28).
 	if (est?.est_cost_usd && isRoughEstimate(est)) {
 		out.push(t("launch.rough", { low: formatUsd(est.est_cost_usd.low), high: formatUsd(est.est_cost_usd.high) }));

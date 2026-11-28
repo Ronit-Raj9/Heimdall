@@ -53,9 +53,42 @@ export interface GwEffect {
 	fingerprint: string;
 	computed_at: string;
 }
+/** handlers.ImageWait: the wait before the first run while task images are built. up_to: the server cannot see which already exist. */
+export interface TaskImageWait {
+	images: number;
+	/** Before the first run: one image. */
+	minutes: number;
+	/** Every image, built before each task's first run. */
+	total_minutes?: number;
+	up_to: boolean;
+}
+/** What a feature test's result needs, and the smallest size that reaches it (bench/gwfeature/need.go). */
+export interface GwNeed {
+	feature: string;
+	runs_per_setup?: number;
+	paired_tasks?: number;
+	model_calls?: number;
+	poison_runs?: number;
+	fixed_trials?: number;
+	max_tasks?: number;
+	calls_per_run?: number;
+	calls_from?: "history" | "default";
+	default_tasks: number;
+	default_trials: number;
+}
+/** A need against the chosen size. */
+export interface GwNeedCheck extends GwNeed {
+	tasks: number;
+	trials: number;
+	expected_calls?: number;
+	status: "ok" | "unlikely" | "impossible";
+	line: string;
+	problem?: string;
+}
 export interface GwFeature {
 	id: string;
 	name: string;
+	need: GwNeed;
 }
 export interface GwDraftRequest {
 	feature: string;
@@ -75,6 +108,10 @@ export interface GwDraftRequest {
 export interface GwDraftResponse {
 	experiment: Experiment;
 	notes: string[];
+	/** Absent or null when the number of tasks is not known on the server. */
+	need?: GwNeedCheck | null;
+	/** Absent or null when the benchmark brings no task images. */
+	image_wait?: TaskImageWait | null;
 }
 export interface GwSourceInfo {
 	connected: boolean;
