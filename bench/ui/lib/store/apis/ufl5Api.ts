@@ -40,51 +40,53 @@ export function harvestRequest(evaluation: string) {
 }
 
 /** Round 5 lane L5: the MCP server report and the rows of a question-and-answer benchmark. */
-export const ufl5Api = benchApi.enhanceEndpoints({ addTagTypes: ["BenchData", "BenchSuites", "IssueRun", "BenchRedTeam"] }).injectEndpoints({
-	endpoints: (builder) => ({
-		getMcpServerReport: builder.query<McpServerReport, string>({
-			query: (benchmark) => mcpServerReportPath(benchmark),
+export const ufl5Api = benchApi
+	.enhanceEndpoints({ addTagTypes: ["BenchData", "BenchSuites", "IssueRun", "BenchRedTeam"] })
+	.injectEndpoints({
+		endpoints: (builder) => ({
+			getMcpServerReport: builder.query<McpServerReport, string>({
+				query: (benchmark) => mcpServerReportPath(benchmark),
+			}),
+			listDatasetTasks: builder.query<DatasetTaskList, { suite: string; offset: number; limit: number }>({
+				query: ({ suite, offset, limit }) => datasetTasksRequest(suite, offset, limit),
+				providesTags: (_r, _e, a) => [{ type: "BenchData", id: `${a.suite}/rows` }],
+			}),
+			writeDatasetTasks: builder.mutation<DatasetTasksResult, { suite: string } & DatasetTasksRequest>({
+				query: ({ suite, ...body }) => datasetWriteRequest(suite, body),
+				invalidatesTags: (_r, _e, a) => [
+					{ type: "BenchData", id: `${a.suite}/rows` },
+					{ type: "BenchData", id: `${a.suite}/versions` },
+					{ type: "BenchSuites", id: "LIST" },
+				],
+			}),
+			deleteDatasetTask: builder.mutation<unknown, { suite: string; task: string }>({
+				query: ({ suite, task }) => datasetDeleteRequest(suite, task),
+				invalidatesTags: (_r, _e, a) => [
+					{ type: "BenchData", id: `${a.suite}/rows` },
+					{ type: "BenchData", id: `${a.suite}/versions` },
+					{ type: "BenchSuites", id: "LIST" },
+				],
+			}),
+			getDatasetVersion: builder.query<DatasetVersionDetail, { suite: string; n: number }>({
+				query: ({ suite, n }) => datasetVersionPath(suite, n),
+			}),
+			listIssueRuns: builder.query<{ runs: IssueRun[] | null }, void>({
+				query: () => "/issuebench/runs",
+				providesTags: [{ type: "IssueRun", id: "LIST" }],
+			}),
+			cancelIssueRun: builder.mutation<IssueRun, string>({
+				query: (id) => issueCancelRequest(id),
+				invalidatesTags: (_r, _e, id) => [
+					{ type: "IssueRun", id },
+					{ type: "IssueRun", id: "LIST" },
+				],
+			}),
+			harvestRedTeam: builder.mutation<{ evaluation: string; broken: number; added: { task: string }[] | null }, string>({
+				query: (evaluation) => harvestRequest(evaluation),
+				invalidatesTags: ["BenchRedTeam"],
+			}),
 		}),
-		listDatasetTasks: builder.query<DatasetTaskList, { suite: string; offset: number; limit: number }>({
-			query: ({ suite, offset, limit }) => datasetTasksRequest(suite, offset, limit),
-			providesTags: (_r, _e, a) => [{ type: "BenchData", id: `${a.suite}/rows` }],
-		}),
-		writeDatasetTasks: builder.mutation<DatasetTasksResult, { suite: string } & DatasetTasksRequest>({
-			query: ({ suite, ...body }) => datasetWriteRequest(suite, body),
-			invalidatesTags: (_r, _e, a) => [
-				{ type: "BenchData", id: `${a.suite}/rows` },
-				{ type: "BenchData", id: `${a.suite}/versions` },
-				{ type: "BenchSuites", id: "LIST" },
-			],
-		}),
-		deleteDatasetTask: builder.mutation<unknown, { suite: string; task: string }>({
-			query: ({ suite, task }) => datasetDeleteRequest(suite, task),
-			invalidatesTags: (_r, _e, a) => [
-				{ type: "BenchData", id: `${a.suite}/rows` },
-				{ type: "BenchData", id: `${a.suite}/versions` },
-				{ type: "BenchSuites", id: "LIST" },
-			],
-		}),
-		getDatasetVersion: builder.query<DatasetVersionDetail, { suite: string; n: number }>({
-			query: ({ suite, n }) => datasetVersionPath(suite, n),
-		}),
-		listIssueRuns: builder.query<{ runs: IssueRun[] | null }, void>({
-			query: () => "/issuebench/runs",
-			providesTags: [{ type: "IssueRun", id: "LIST" }],
-		}),
-		cancelIssueRun: builder.mutation<IssueRun, string>({
-			query: (id) => issueCancelRequest(id),
-			invalidatesTags: (_r, _e, id) => [
-				{ type: "IssueRun", id },
-				{ type: "IssueRun", id: "LIST" },
-			],
-		}),
-		harvestRedTeam: builder.mutation<{ evaluation: string; broken: number; added: { task: string }[] | null }, string>({
-			query: (evaluation) => harvestRequest(evaluation),
-			invalidatesTags: ["BenchRedTeam"],
-		}),
-	}),
-});
+	});
 
 export const {
 	useGetMcpServerReportQuery,

@@ -89,7 +89,12 @@ export default function ReleasesView() {
 				)}
 				{/* Q-312: with no comparison there is nothing to record; say why and where to start. */}
 				<div className="flex flex-col items-end gap-1">
-					<Button onClick={() => setOpen(true)} disabled={noComparison} aria-describedby={noComparison ? "release-new-reason" : undefined} data-testid="release-new">
+					<Button
+						onClick={() => setOpen(true)}
+						disabled={noComparison}
+						aria-describedby={noComparison ? "release-new-reason" : undefined}
+						data-testid="release-new"
+					>
 						<Plus className="size-4" aria-hidden="true" />
 						{tu("releases.new")}
 					</Button>
@@ -175,7 +180,7 @@ export default function ReleasesView() {
 				closeLabel={tu("releases.close")}
 				testId="release-dialog"
 			>
-				<div className="[&_[data-slot=card-header]]:hidden [&>[data-testid=release-panel]]:border-0 [&>[data-testid=release-panel]]:bg-transparent [&>[data-testid=release-panel]]:py-0 [&_[data-slot=card-content]]:px-0">
+				<div className="[&_[data-slot=card-content]]:px-0 [&_[data-slot=card-header]]:hidden [&>[data-testid=release-panel]]:border-0 [&>[data-testid=release-panel]]:bg-transparent [&>[data-testid=release-panel]]:py-0">
 					<ReleasePanel initialExpId={expParam ?? undefined} />
 				</div>
 			</GovDialog>

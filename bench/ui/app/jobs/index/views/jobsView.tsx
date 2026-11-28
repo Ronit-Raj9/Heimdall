@@ -111,7 +111,15 @@ export default function JobsView() {
 	const cancelSelected = async () => {
 		const picked = jobs.filter((j) => selected.has(j.id) && isActiveJob(j) && !j.cancel_requested);
 		if (picked.length === 0) return;
-		if (!(await confirm(t("bulk.confirm", { count: picked.length }), { title: i18n.t("confirm.cancelJobs", { ns: "ufint", count: picked.length }), confirmLabel: t("confirm"), cancelLabel: t("keep"), destructive: true }))) return;
+		if (
+			!(await confirm(t("bulk.confirm", { count: picked.length }), {
+				title: i18n.t("confirm.cancelJobs", { ns: "ufint", count: picked.length }),
+				confirmLabel: t("confirm"),
+				cancelLabel: t("keep"),
+				destructive: true,
+			}))
+		)
+			return;
 		for (const job of picked) await doCancel(job);
 		setSelected(new Set());
 	};
@@ -125,10 +133,7 @@ export default function JobsView() {
 		});
 
 	return (
-		<section
-			className={cn("flex w-full min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")}
-			data-testid="jobs-screen"
-		>
+		<section className={cn("flex w-full min-w-0 flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="jobs-screen">
 			<PageHeader title={t("title")} />
 
 			<div className="flex flex-wrap items-end gap-3" data-testid="jobs-filters">

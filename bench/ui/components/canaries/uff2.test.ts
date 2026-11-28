@@ -17,7 +17,15 @@ describe("drift monitor and zone rules (lane F2)", () => {
 	});
 
 	it("offers only ready tasks and counts the hidden ones", () => {
-		const suite = { id: "b", version: "1", tasks: [{ id: "r1", admitted: true }, { id: "n1", admitted: false }, { id: "n2", admitted: false }] } as unknown as SuiteSummary;
+		const suite = {
+			id: "b",
+			version: "1",
+			tasks: [
+				{ id: "r1", admitted: true },
+				{ id: "n1", admitted: false },
+				{ id: "n2", admitted: false },
+			],
+		} as unknown as SuiteSummary;
 		expect(suiteTaskPick([suite], "b@1")).toEqual({ ready: ["r1"], hidden: 2 });
 	});
 

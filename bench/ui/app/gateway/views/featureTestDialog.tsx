@@ -98,7 +98,10 @@ export function pickableSuites<T extends { id: string; description?: string | nu
 }
 
 /** The agents a feature test can pick: test agents (by id, file path or description) are left out unless shown. Pure. */
-export function pickableAgents<T extends { id: string; path?: string; description?: string | null }>(agents: readonly T[], showTests = false) {
+export function pickableAgents<T extends { id: string; path?: string; description?: string | null }>(
+	agents: readonly T[],
+	showTests = false,
+) {
 	return withoutTests(agents, (a) => isTestObject(a.id, a) || isTestObject(a.path?.split("/").pop()), showTests);
 }
 
@@ -194,10 +197,7 @@ export interface FeatureTestCalls {
 }
 
 /** Step one: draft, then plan the drafted comparison (the usual estimate and refusals). */
-export async function prepareFeatureTest(
-	calls: FeatureTestCalls,
-	req: GwDraftRequest,
-): Promise<Prepared> {
+export async function prepareFeatureTest(calls: FeatureTestCalls, req: GwDraftRequest): Promise<Prepared> {
 	const draft = await calls.draft(req);
 	const plan = await calls.plan(draft.experiment);
 	let forecast: Forecast | undefined;
@@ -253,7 +253,11 @@ export function planEstimate(plan: ExperimentPlan): { usd: number; minutes: numb
 }
 
 /** The confirmation sentence: the estimate and the cap, or the cap alone when the estimate is not known. Pure. */
-export function confirmText(t: (key: "dialog.confirm" | "dialog.confirmUnknown", o: { est?: string; budget: string }) => string, plan: ExperimentPlan, budget: number) {
+export function confirmText(
+	t: (key: "dialog.confirm" | "dialog.confirmUnknown", o: { est?: string; budget: string }) => string,
+	plan: ExperimentPlan,
+	budget: number,
+) {
 	const est = planEstimate(plan);
 	// The same format as the button's "up to $5.00" (one helper for every amount here).
 	return est
@@ -285,8 +289,8 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 							? f("form.estimateUpper", { high: formatUsd(cost.usd).slice(1) })
 							: f("form.estimate", { usd: formatUsd(cost.usd).slice(1), high: formatUsd(cost.high ?? cost.usd).slice(1) })
 						: minutes !== null
-						? r("gw.estimateUnknownCost", { minutes })
-						: r("gw.estimateUnknownBoth")}
+							? r("gw.estimateUnknownCost", { minutes })
+							: r("gw.estimateUnknownBoth")}
 			</p>
 			{images && <p data-testid="feature-test-image-wait">{images}</p>}
 			{over && (
@@ -326,7 +330,10 @@ export function PreparedView({ prepared, budget, confirming }: { prepared: Prepa
 }
 
 /** The text of a benchmark option: its display name (as on /failure-tests) and task count. Pure. */
-export function suiteLabel(u: (key: "dialog.suiteOption", o: { name: string; count: number }) => string, s: { id: string; task_count?: number }) {
+export function suiteLabel(
+	u: (key: "dialog.suiteOption", o: { name: string; count: number }) => string,
+	s: { id: string; task_count?: number },
+) {
 	return u("dialog.suiteOption", { name: suiteDisplayName(s.id), count: s.task_count ?? 0 });
 }
 
@@ -380,7 +387,17 @@ export function errorDetail(e: unknown): string {
 
 // A suggested budget, so the estimate shows before anything is typed (the server caps it at MAX_DRAFT_USD).
 // 3 tasks, 1 trial until the feature's need arrives; then the smallest size that reaches it (lane H2).
-const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", budget: "1", trials: "1", taskCount: "3", name: "", options: {} };
+const EMPTY: FeatureTestForm = {
+	suite: "",
+	base: "",
+	model: "",
+	provider: "",
+	budget: "1",
+	trials: "1",
+	taskCount: "3",
+	name: "",
+	options: {},
+};
 
 /** The wait after the last change before the estimate is worked out. */
 export const ESTIMATE_DELAY_MS = 500;
@@ -549,14 +566,25 @@ export function FeatureTestDialog({
 			}
 		>
 			<div className="flex flex-col gap-3 text-sm">
-				<ShowTestsChip count={suiteList.hidden + agentList.hidden} on={showTests} onChange={setShowTests} testId="feature-test-show-tests" />
+				<ShowTestsChip
+					count={suiteList.hidden + agentList.hidden}
+					on={showTests}
+					onChange={setShowTests}
+					testId="feature-test-show-tests"
+				/>
 				<label className="flex flex-col gap-1">
 					<span>
 						{t("dialog.benchmark")}
 						<span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>
 					</span>
 					<Select value={form.suite || undefined} onValueChange={(v) => set({ suite: v }, "suite")}>
-						<SelectTrigger ref={firstField} className="w-full" aria-required aria-label={t("dialog.benchmark")} data-testid="feature-test-suite">
+						<SelectTrigger
+							ref={firstField}
+							className="w-full"
+							aria-required
+							aria-label={t("dialog.benchmark")}
+							data-testid="feature-test-suite"
+						>
 							<SelectValue placeholder={t("dialog.pick")} />
 						</SelectTrigger>
 						<SelectContent>
@@ -667,7 +695,9 @@ export function FeatureTestDialog({
 									/>
 								) : o.kind === "model" ? (
 									<GroupedModelPicker
-										value={form.options[o.key] ? { provider: form.options[`${o.key}_provider`] || "openai", model: form.options[o.key] } : null}
+										value={
+											form.options[o.key] ? { provider: form.options[`${o.key}_provider`] || "openai", model: form.options[o.key] } : null
+										}
 										onChange={(v) => set({ options: { ...form.options, [o.key]: v.model, [`${o.key}_provider`]: v.provider } }, o.key)}
 										label={opt(o.key, "label")}
 										testId={`feature-test-opt-${o.key}-input`}

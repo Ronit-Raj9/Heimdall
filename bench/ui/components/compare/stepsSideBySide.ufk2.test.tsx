@@ -33,7 +33,12 @@ const stepsB: RunSteps = {
 	run_id: "r_b",
 	available: true,
 	observers: [],
-	steps: [step(1, "model_turn", "model answered: 1 tool call"), step(2, "tool_request", "shell: ls", { tool_name: "shell" }), step(3, "tool_execution", "ls exited 0"), step(4, "tool_request", "edit: setup.py", { tool_name: "edit" })],
+	steps: [
+		step(1, "model_turn", "model answered: 1 tool call"),
+		step(2, "tool_request", "shell: ls", { tool_name: "shell" }),
+		step(3, "tool_execution", "ls exited 0"),
+		step(4, "tool_request", "edit: setup.py", { tool_name: "edit" }),
+	],
 };
 const div = {
 	pair_id: "p1",
@@ -63,7 +68,12 @@ describe("alignSteps (K2)", () => {
 describe("StepsSideBySideView (K2)", () => {
 	it("renders both step lists from the handlers' JSON with the divergence marked and long output folded", () => {
 		const html = render(
-			<StepsSideBySideView labels={["A", "B"]} details={[detail("r_a", "pass", 5), detail("r_b", "fail", 4)]} steps={[stepsA, stepsB]} divergence={div} />,
+			<StepsSideBySideView
+				labels={["A", "B"]}
+				details={[detail("r_a", "pass", 5), detail("r_b", "fail", 4)]}
+				steps={[stepsA, stepsB]}
+				divergence={div}
+			/>,
 		);
 		expect(html).toContain('data-testid="steps-sbs-diverge"');
 		expect(html.indexOf("edit: setup.py")).toBeGreaterThan(html.indexOf("steps-sbs-diverge"));

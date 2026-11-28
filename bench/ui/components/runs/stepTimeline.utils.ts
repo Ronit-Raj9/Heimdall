@@ -181,9 +181,7 @@ const KEY_SHAPED =
 
 /** Text with key-shaped strings masked; a known prefix is kept so a reader sees a key was there. */
 export function maskKeys(text: string): string {
-	return text.replace(KEY_SHAPED, (_m, bf?: string, bearer?: string) =>
-		bf ? `${bf}[masked]` : bearer ? `${bearer}[masked]` : "[masked]",
-	);
+	return text.replace(KEY_SHAPED, (_m, bf?: string, bearer?: string) => (bf ? `${bf}[masked]` : bearer ? `${bearer}[masked]` : "[masked]"));
 }
 
 /**
@@ -193,7 +191,9 @@ export function maskKeys(text: string): string {
  */
 export function clipText(text: string | undefined, max = MAX_TEXT): string {
 	if (!text) return "";
-	const flat = maskKeys(text).replace(UNSAFE_CHARS, "�").replace(/[\r\n\t]+/g, " ");
+	const flat = maskKeys(text)
+		.replace(UNSAFE_CHARS, "�")
+		.replace(/[\r\n\t]+/g, " ");
 	const chars = Array.from(flat);
 	return chars.length <= max ? flat : `${chars.slice(0, max - 1).join("")}…`;
 }

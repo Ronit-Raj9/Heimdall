@@ -20,7 +20,10 @@ export interface EditFields {
 
 const pct = (v: unknown) => (typeof v === "number" && v > 0 ? String(Math.round(v * 1000) / 10) : "");
 
-export function editFieldsOf(d: Pick<MonitorDetailResponse, "name" | "tasks" | "interval_min" | "budget_usd_per_day" | "rule">, taskCount: number): EditFields {
+export function editFieldsOf(
+	d: Pick<MonitorDetailResponse, "name" | "tasks" | "interval_min" | "budget_usd_per_day" | "rule">,
+	taskCount: number,
+): EditFields {
 	return {
 		name: d.name,
 		tasks: String(taskCount),
@@ -103,7 +106,13 @@ export function EditLiveMonitor({ d, minInterval, onClose }: { d: MonitorDetailR
 			<p className="text-muted-foreground text-xs">{body ? t("liveEdit.fixed") : t("liveEdit.bad", { min: minInterval })}</p>
 			<InlineError error={state.error} testId="live-monitor-edit-error" />
 			<div className="flex flex-wrap gap-2">
-				<Button size="sm" disabled={!body || state.isLoading} isLoading={state.isLoading} onClick={() => void submit()} data-testid="live-monitor-edit-save">
+				<Button
+					size="sm"
+					disabled={!body || state.isLoading}
+					isLoading={state.isLoading}
+					onClick={() => void submit()}
+					data-testid="live-monitor-edit-save"
+				>
 					{t("liveEdit.save")}
 				</Button>
 				<Button size="sm" variant="ghost" onClick={onClose}>

@@ -64,16 +64,16 @@ export function LiveBody({ status, actions, hosted }: LiveBodyProps) {
 		return (
 			<div className="flex min-w-0 flex-col gap-4">
 				{!repeatsHero && (
-				<EmptyNote testId="live-unconfigured">
-					{status.problem ? (
-						<span title={status.problem}>{t("live.problem")}</span>
-					) : (
-						<>
-							{t("live.unconfigured")}
-							{!hosted && <> {g("live.terminal")}</>}
-						</>
-					)}
-				</EmptyNote>
+					<EmptyNote testId="live-unconfigured">
+						{status.problem ? (
+							<span title={status.problem}>{t("live.problem")}</span>
+						) : (
+							<>
+								{t("live.unconfigured")}
+								{!hosted && <> {g("live.terminal")}</>}
+							</>
+						)}
+					</EmptyNote>
 				)}
 				<SimulatedTry />
 			</div>

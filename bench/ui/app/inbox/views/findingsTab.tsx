@@ -50,12 +50,7 @@ export default function FindingsTab() {
 	const nothingToAnalyse = experiments !== undefined && defaultInvestigation(experiments) === "";
 	const bothEmpty = !list.isLoading && !list.error && all.length === 0 && noInvestigations;
 	const findOut = (
-		<Button
-			size="sm"
-			variant="outline"
-			onClick={() => setInvestigating(true)}
-			data-testid="findings-find-out-why"
-		>
+		<Button size="sm" variant="outline" onClick={() => setInvestigating(true)} data-testid="findings-find-out-why">
 			{t("investigations.findOut")}
 		</Button>
 	);

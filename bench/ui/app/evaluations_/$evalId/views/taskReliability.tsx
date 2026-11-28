@@ -59,15 +59,38 @@ export function taskReliability(rows: readonly RunListRow[], trials: number): Re
 }
 
 /** One benchmark's reliability on the evaluation page: a headline and "solved 2 of 3" per task, live while tries run. */
-export function TaskReliability({ expId, trials, active, multiArm }: { expId: string; trials: number; active: boolean; multiArm: boolean }) {
+export function TaskReliability({
+	expId,
+	trials,
+	active,
+	multiArm,
+}: {
+	expId: string;
+	trials: number;
+	active: boolean;
+	multiArm: boolean;
+}) {
 	const { t } = useTranslation("ufk2");
 	const q = useListRunsQuery({ exp: expId, limit: 500 }, { pollingInterval: active ? POLL_MS : 0, skipPollingIfUnfocused: true });
-	if (q.error) return <LoadError title={t("rel.error")} error={q.error} onRetry={() => void q.refetch()} testId={`reliability-error-${expId}`} />;
+	if (q.error)
+		return <LoadError title={t("rel.error")} error={q.error} onRetry={() => void q.refetch()} testId={`reliability-error-${expId}`} />;
 	if (!q.data) return null;
-	return <TaskReliabilityView rel={taskReliability(q.data.runs, trials)} active={active} multiArm={multiArm} testId={`reliability-${expId}`} />;
+	return (
+		<TaskReliabilityView rel={taskReliability(q.data.runs, trials)} active={active} multiArm={multiArm} testId={`reliability-${expId}`} />
+	);
 }
 
-export function TaskReliabilityView({ rel, active, multiArm, testId }: { rel: Reliability; active: boolean; multiArm: boolean; testId: string }) {
+export function TaskReliabilityView({
+	rel,
+	active,
+	multiArm,
+	testId,
+}: {
+	rel: Reliability;
+	active: boolean;
+	multiArm: boolean;
+	testId: string;
+}) {
 	const { t } = useTranslation("ufk2");
 	const counted = rel.always + rel.some + rel.never;
 	return (
@@ -93,7 +116,11 @@ export function TaskReliabilityView({ rel, active, multiArm, testId }: { rel: Re
 											: "text-muted-foreground shrink-0 tabular-nums"
 								}
 							>
-								{e.done === 0 ? t("rel.taskNone", { left: e.left }) : e.left > 0 ? t("rel.taskPending", { solved: e.solved, done: e.done, left: e.left }) : t("rel.task", { solved: e.solved, done: e.done })}
+								{e.done === 0
+									? t("rel.taskNone", { left: e.left })
+									: e.left > 0
+										? t("rel.taskPending", { solved: e.solved, done: e.done, left: e.left })
+										: t("rel.task", { solved: e.solved, done: e.done })}
 							</span>
 						</li>
 					))}

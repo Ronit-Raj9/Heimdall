@@ -316,11 +316,16 @@ export function tasksText(
 	est: Pick<EvaluationEstimate, "power"> | undefined,
 ): string {
 	const ready = readyTasks(spec, est);
-	return ready === null ? t("step4.tasksN", { count: spec.tasks_per_benchmark }) : t("step4.tasksReady", { n: spec.tasks_per_benchmark, ready });
+	return ready === null
+		? t("step4.tasksN", { count: spec.tasks_per_benchmark })
+		: t("step4.tasksReady", { n: spec.tasks_per_benchmark, ready });
 }
 
 /** Ready tasks over all benchmarks when some benchmark has fewer than asked; null when every one has enough or it is not known. */
-export function readyTasks(spec: Pick<EvaluationSpec, "tasks_per_benchmark">, est: Pick<EvaluationEstimate, "power"> | undefined): number | null {
+export function readyTasks(
+	spec: Pick<EvaluationSpec, "tasks_per_benchmark">,
+	est: Pick<EvaluationEstimate, "power"> | undefined,
+): number | null {
 	const per = est?.power?.per_benchmark ?? [];
 	if (per.length === 0 || !per.some((b) => b.tasks < spec.tasks_per_benchmark)) return null;
 	return per.reduce((n, b) => n + Math.min(b.tasks, spec.tasks_per_benchmark), 0);
@@ -587,7 +592,12 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									testId={`step4-model-${arm.label}`}
 									label={te("step4.modelFor", { agent: arm.agent || te("step4.yourAgentLower") })}
 								/>
-								<KeyLines rows={keys.rows.filter((k) => k.label === arm.label)} returnTo="/evaluate?step=4" okOnly testId={`step4-key-${arm.label}`} />
+								<KeyLines
+									rows={keys.rows.filter((k) => k.label === arm.label)}
+									returnTo="/evaluate?step=4"
+									okOnly
+									testId={`step4-key-${arm.label}`}
+								/>
 								{owns.has(arm.agent) && (
 									<button
 										type="button"
@@ -630,7 +640,9 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 						>
 							{ufl3("models.add")}
 						</button>
-						<span className="text-muted-foreground text-xs">{ufl3("models.count", { count: spec.arms.length, max: MODEL_SWITCH_MAX })}</span>
+						<span className="text-muted-foreground text-xs">
+							{ufl3("models.count", { count: spec.arms.length, max: MODEL_SWITCH_MAX })}
+						</span>
 					</div>
 				)}
 			</section>
@@ -649,169 +661,169 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					<span className="text-muted-foreground">{moreSummary}</span>
 				</summary>
 				<div className="flex flex-col gap-6 border-t px-3 py-4">
-			<section className="flex flex-wrap gap-8">
-				<Choices
-					label={te("step4.tasks")}
-					value={spec.tasks_per_benchmark}
-					options={TASK_CHOICES}
-					onPick={(n) => onChange({ ...spec, tasks_per_benchmark: n, preset: undefined })}
-					testId="step4-tasks"
-				/>
-				<Choices
-					label={te("step4.tries")}
-					value={spec.trials}
-					options={TRIAL_CHOICES}
-					onPick={(n) => onChange({ ...spec, trials: n, preset: undefined })}
-					testId="step4-trials"
-				/>
-				<div className="flex flex-col gap-1.5">
-					<Choices
-						label={te("step4.parallel")}
-						value={concurrency}
-						options={CONCURRENCY_CHOICES}
-						onPick={(n) => onChange({ ...spec, concurrency: n })}
-						testId="step4-concurrency"
-					/>
-					{overWorker && (
-						<p className="text-muted-foreground max-w-xs text-xs" data-testid="step4-concurrency-note">
-							{overWorker}
-						</p>
-					)}
-				</div>
-			</section>
+					<section className="flex flex-wrap gap-8">
+						<Choices
+							label={te("step4.tasks")}
+							value={spec.tasks_per_benchmark}
+							options={TASK_CHOICES}
+							onPick={(n) => onChange({ ...spec, tasks_per_benchmark: n, preset: undefined })}
+							testId="step4-tasks"
+						/>
+						<Choices
+							label={te("step4.tries")}
+							value={spec.trials}
+							options={TRIAL_CHOICES}
+							onPick={(n) => onChange({ ...spec, trials: n, preset: undefined })}
+							testId="step4-trials"
+						/>
+						<div className="flex flex-col gap-1.5">
+							<Choices
+								label={te("step4.parallel")}
+								value={concurrency}
+								options={CONCURRENCY_CHOICES}
+								onPick={(n) => onChange({ ...spec, concurrency: n })}
+								testId="step4-concurrency"
+							/>
+							{overWorker && (
+								<p className="text-muted-foreground max-w-xs text-xs" data-testid="step4-concurrency-note">
+									{overWorker}
+								</p>
+							)}
+						</div>
+					</section>
 
-			<section className="flex flex-col gap-2">
-				<h3 className="text-base font-semibold">Faults</h3>
-				<p className="text-muted-foreground text-sm">
-					Every evaluation runs clean. Add faults to see how the agent copes when things go wrong.
-				</p>
-				{chosenNotApplying.length > 0 && (
-					<p
-						className="border-chart-warning/40 bg-chart-warning/10 text-chart-warning-ink rounded-md border px-3 py-2 text-sm"
-						data-testid="step4-faults-na"
-					>
-						{t("step4.faultsNotApplying", { faults: chosenNotApplying.join(", ") })}
-					</p>
-				)}
-				{faultGroups.map((g) => (
-					<fieldset key={g.group} className="flex flex-col gap-2" data-testid={`step4-fault-group-${g.group}`}>
-						<legend className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">{g.group}</legend>
-						{g.faults.map((f) => (
-							<label key={f.id} className="flex items-start gap-2 text-sm" data-testid={`step4-fault-${f.id}`}>
+					<section className="flex flex-col gap-2">
+						<h3 className="text-base font-semibold">Faults</h3>
+						<p className="text-muted-foreground text-sm">
+							Every evaluation runs clean. Add faults to see how the agent copes when things go wrong.
+						</p>
+						{chosenNotApplying.length > 0 && (
+							<p
+								className="border-chart-warning/40 bg-chart-warning/10 text-chart-warning-ink rounded-md border px-3 py-2 text-sm"
+								data-testid="step4-faults-na"
+							>
+								{t("step4.faultsNotApplying", { faults: chosenNotApplying.join(", ") })}
+							</p>
+						)}
+						{faultGroups.map((g) => (
+							<fieldset key={g.group} className="flex flex-col gap-2" data-testid={`step4-fault-group-${g.group}`}>
+								<legend className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">{g.group}</legend>
+								{g.faults.map((f) => (
+									<label key={f.id} className="flex items-start gap-2 text-sm" data-testid={`step4-fault-${f.id}`}>
+										<input
+											type="checkbox"
+											className="mt-1 size-4"
+											checked={spec.faults.includes(f.id)}
+											onChange={(e) =>
+												onChange({
+													...spec,
+													faults: toggleFault(spec.faults, f.id, e.target.checked),
+													preset: undefined,
+												})
+											}
+										/>
+										<span>
+											<span className="font-medium">{f.label}</span>
+											<span className="text-muted-foreground block">{f.help}</span>
+											{notApplying.has(f.id) && (
+												<span className="text-chart-warning-ink block text-xs" data-testid={`step4-fault-na-${f.id}`}>
+													{t("step4.faultNotApplying", { reason: notApplying.get(f.id) })}
+												</span>
+											)}
+										</span>
+									</label>
+								))}
+							</fieldset>
+						))}
+					</section>
+
+					{spec.mode === "score" ? (
+						<section className="flex flex-col gap-2">
+							<h3 className="text-base font-semibold">Bifrost cache</h3>
+							<label className="flex items-start gap-2 text-sm" data-testid="step4-bifrost-cache">
 								<input
 									type="checkbox"
 									className="mt-1 size-4"
-									checked={spec.faults.includes(f.id)}
-									onChange={(e) =>
-										onChange({
-											...spec,
-											faults: toggleFault(spec.faults, f.id, e.target.checked),
-											preset: undefined,
-										})
-									}
+									checked={Boolean(spec.bifrost_cache)}
+									onChange={(e) => {
+										const { bifrost_cache: _old, ...rest } = spec;
+										onChange(e.target.checked ? { ...rest, bifrost_cache: true } : rest);
+									}}
 								/>
 								<span>
-									<span className="font-medium">{f.label}</span>
-									<span className="text-muted-foreground block">{f.help}</span>
-									{notApplying.has(f.id) && (
-										<span className="text-chart-warning-ink block text-xs" data-testid={`step4-fault-na-${f.id}`}>
-											{t("step4.faultNotApplying", { reason: notApplying.get(f.id) })}
-										</span>
-									)}
+									<span className="font-medium">{te("step4.cache")}</span>
+									<span className="text-muted-foreground block">
+										Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows
+										the cache hit rate, the latency and cost saved, and any change in success. Doubles the runs.
+									</span>
+								</span>
+							</label>
+						</section>
+					) : null}
+
+					<section className="flex flex-col gap-2" data-testid="step4-mcp-route">
+						<h3 className="text-base font-semibold">MCP tools</h3>
+						<p className="text-muted-foreground text-sm">
+							How agents reach the task's MCP tool servers. Benchmarks with no MCP server, and agents that cannot reach Bifrost, are skipped
+							when routed through Bifrost.
+						</p>
+						{MCP_ROUTES.map((r) => (
+							<label key={r.id} className="flex items-start gap-2 text-sm" data-testid={`step4-mcp-route-${r.id}`}>
+								<input
+									type="radio"
+									name="step4-mcp-route"
+									className="mt-1"
+									checked={(spec.mcp_route ?? "direct") === r.id}
+									onChange={() => onChange(withMCPRoute(spec, r.id))}
+								/>
+								<span>
+									<span className="font-medium">{r.label}</span>
+									<span className="text-muted-foreground block">{r.help}</span>
+								</span>
+							</label>
+						))}
+					</section>
+
+					<fieldset className="flex flex-col gap-2" data-testid="step4-split">
+						<legend className="mb-1 text-base font-semibold">{ufl3("split.title")}</legend>
+						{(["public", "held_out"] as const).map((v) => (
+							<label key={v} className="flex items-start gap-2 text-sm" data-testid={`step4-split-${v}`}>
+								<input
+									type="radio"
+									name="step4-split"
+									className="mt-1"
+									checked={(spec.split === "held_out" ? "held_out" : "public") === v}
+									onChange={() => {
+										const { split: _old, ...rest } = spec;
+										onChange(v === "held_out" ? { ...rest, split: "held_out" } : rest);
+									}}
+								/>
+								<span>
+									<span className="font-medium">{v === "held_out" ? ufl3("split.heldOut") : ufl3("split.public")}</span>
+									{v === "held_out" && <span className="text-muted-foreground block">{ufl3("split.heldOutHelp")}</span>}
 								</span>
 							</label>
 						))}
 					</fieldset>
-				))}
-			</section>
 
-			{spec.mode === "score" ? (
-				<section className="flex flex-col gap-2">
-					<h3 className="text-base font-semibold">Bifrost cache</h3>
-					<label className="flex items-start gap-2 text-sm" data-testid="step4-bifrost-cache">
-						<input
-							type="checkbox"
-							className="mt-1 size-4"
-							checked={Boolean(spec.bifrost_cache)}
-							onChange={(e) => {
-								const { bifrost_cache: _old, ...rest } = spec;
-								onChange(e.target.checked ? { ...rest, bifrost_cache: true } : rest);
+					{spec.arms.length === 1 && (
+						<FailoverSettings
+							arm={spec.arms[0]}
+							value={spec.failover}
+							onChange={(failover) => {
+								const { failover: _old, ...rest } = spec;
+								onChange(failover ? { ...rest, failover } : rest);
 							}}
 						/>
-						<span>
-							<span className="font-medium">{te("step4.cache")}</span>
-							<span className="text-muted-foreground block">
-								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the
-								cache hit rate, the latency and cost saved, and any change in success. Doubles the runs.
-							</span>
-						</span>
-					</label>
-				</section>
-			) : null}
+					)}
 
-			<section className="flex flex-col gap-2" data-testid="step4-mcp-route">
-				<h3 className="text-base font-semibold">MCP tools</h3>
-				<p className="text-muted-foreground text-sm">
-					How agents reach the task's MCP tool servers. Benchmarks with no MCP server, and agents that cannot reach Bifrost, are skipped
-					when routed through Bifrost.
-				</p>
-				{MCP_ROUTES.map((r) => (
-					<label key={r.id} className="flex items-start gap-2 text-sm" data-testid={`step4-mcp-route-${r.id}`}>
-						<input
-							type="radio"
-							name="step4-mcp-route"
-							className="mt-1"
-							checked={(spec.mcp_route ?? "direct") === r.id}
-							onChange={() => onChange(withMCPRoute(spec, r.id))}
-						/>
-						<span>
-							<span className="font-medium">{r.label}</span>
-							<span className="text-muted-foreground block">{r.help}</span>
-						</span>
-					</label>
-				))}
-			</section>
-
-			<fieldset className="flex flex-col gap-2" data-testid="step4-split">
-				<legend className="mb-1 text-base font-semibold">{ufl3("split.title")}</legend>
-				{(["public", "held_out"] as const).map((v) => (
-					<label key={v} className="flex items-start gap-2 text-sm" data-testid={`step4-split-${v}`}>
-						<input
-							type="radio"
-							name="step4-split"
-							className="mt-1"
-							checked={(spec.split === "held_out" ? "held_out" : "public") === v}
-							onChange={() => {
-								const { split: _old, ...rest } = spec;
-								onChange(v === "held_out" ? { ...rest, split: "held_out" } : rest);
-							}}
-						/>
-						<span>
-							<span className="font-medium">{v === "held_out" ? ufl3("split.heldOut") : ufl3("split.public")}</span>
-							{v === "held_out" && <span className="text-muted-foreground block">{ufl3("split.heldOutHelp")}</span>}
-						</span>
-					</label>
-				))}
-			</fieldset>
-
-			{spec.arms.length === 1 && (
-				<FailoverSettings
-					arm={spec.arms[0]}
-					value={spec.failover}
-					onChange={(failover) => {
-						const { failover: _old, ...rest } = spec;
-						onChange(failover ? { ...rest, failover } : rest);
-					}}
-				/>
-			)}
-
-			<GateSettings
-				gate={spec.gate}
-				onChange={(gate) => {
-					const { gate: _old, ...rest } = spec;
-					onChange(gate ? { ...rest, gate } : rest);
-				}}
-			/>
+					<GateSettings
+						gate={spec.gate}
+						onChange={(gate) => {
+							const { gate: _old, ...rest } = spec;
+							onChange(gate ? { ...rest, gate } : rest);
+						}}
+					/>
 				</div>
 			</details>
 

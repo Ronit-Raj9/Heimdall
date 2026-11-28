@@ -41,7 +41,12 @@ export function parseExtraSpec(raw: string): Record<string, JsonValue> | null {
  * The agent-config overrides of arm B (engine.ResolveAgentConfig paths, spec/agent.schema.json).
  * routing: gateway.routing; failover: gateway.fallbacks; prompt caching and Code Mode: gateway.bifrost.
  */
-export function armBSet(v: Pick<ExperimentFormValues, "changeKind" | "overridePath" | "overrideValue" | "changeModels" | "routingStrategy" | "cacheMode" | "codeMode" | "teamSize">): Record<string, JsonValue> {
+export function armBSet(
+	v: Pick<
+		ExperimentFormValues,
+		"changeKind" | "overridePath" | "overrideValue" | "changeModels" | "routingStrategy" | "cacheMode" | "codeMode" | "teamSize"
+	>,
+): Record<string, JsonValue> {
 	const models = splitModels(v.changeModels);
 	switch (v.changeKind) {
 		case "routing": {
@@ -111,7 +116,10 @@ export const experimentFormSchema = z
 		codeMode: z.boolean(),
 		teamSize: z.number().int().min(2).max(4),
 		/** Advanced spec options (U2 section 2). */
-		alpha: z.number({ error: msg2("alphaRange") }).gt(0, msg2("alphaRange")).lt(1, msg2("alphaRange")),
+		alpha: z
+			.number({ error: msg2("alphaRange") })
+			.gt(0, msg2("alphaRange"))
+			.lt(1, msg2("alphaRange")),
 		allowUncalibratedJudge: z.boolean(),
 		heldOut: z.boolean(),
 		aa: z.boolean(),
@@ -268,7 +276,12 @@ export function toExperiment(v: ExperimentFormValues, ready?: ReadyTasks): Exper
 			...(v.heldOut ? { split: "held_out" as const } : {}),
 		})),
 		budget: { total_usd: v.totalUsd },
-		verdict: { policy: "paired_signflip", alpha: v.alpha, assumed_sd: 0.3, ...(v.allowUncalibratedJudge ? { allow_uncalibrated_judge: true } : {}) },
+		verdict: {
+			policy: "paired_signflip",
+			alpha: v.alpha,
+			assumed_sd: 0.3,
+			...(v.allowUncalibratedJudge ? { allow_uncalibrated_judge: true } : {}),
+		},
 		seed: v.seed,
 		concurrency: v.concurrency,
 		manifest_mode: "agent_exposure",

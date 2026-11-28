@@ -6,7 +6,16 @@ import { describe, expect, it } from "vitest";
 import { NeedView, needState } from "./featureNeed";
 
 // The needs GET /gateway/features sends (bench/handlers/gatewaytests_ufh2_test.go checks the server side).
-const overhead: GwNeed = { feature: "gateway_overhead", model_calls: 50, fixed_trials: 1, max_tasks: 25, calls_per_run: 4, calls_from: "default", default_tasks: 13, default_trials: 1 };
+const overhead: GwNeed = {
+	feature: "gateway_overhead",
+	model_calls: 50,
+	fixed_trials: 1,
+	max_tasks: 25,
+	calls_per_run: 4,
+	calls_from: "default",
+	default_tasks: 13,
+	default_trials: 1,
+};
 const router: GwNeed = { feature: "complexity_router", runs_per_setup: 10, paired_tasks: 5, default_tasks: 5, default_trials: 2 };
 const mcp: GwNeed = { feature: "mcp_tools", runs_per_setup: 10, paired_tasks: 5, poison_runs: 10, default_tasks: 10, default_trials: 1 };
 
@@ -22,7 +31,9 @@ describe("Feature test need", () => {
 	});
 
 	it("uses the agent's measured calls per run", () => {
-		const html = render(<NeedView state={needState({ ...overhead, calls_per_run: 10, calls_from: "history", default_tasks: 5 }, 5, 1, false)} />);
+		const html = render(
+			<NeedView state={needState({ ...overhead, calls_per_run: 10, calls_from: "history", default_tasks: 5 }, 5, 1, false)} />,
+		);
 		expect(html).toContain("about 5 tasks with this agent.");
 		expect(html).toContain("10 calls per run measured.");
 		expect(html).not.toContain("feature-test-need-unlikely");

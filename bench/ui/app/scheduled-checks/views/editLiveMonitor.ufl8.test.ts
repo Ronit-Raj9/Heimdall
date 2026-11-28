@@ -10,7 +10,9 @@ describe("edit live monitor", () => {
 	it("sends only what changed, the rule whole, as handlers/livemonitors_ufl8_test.go posts it", () => {
 		const body = monitorUpdateBody(d, before, { ...before, interval: "30", minDrop: "20", floor: "50" }, 15);
 		// Same literal as TestLiveMonitorEditFromWebBody.
-		expect(JSON.stringify(monitorUpdateRequest("m1", body!).body)).toBe('{"interval_min":30,"rule":{"window":6,"min_drop":0.2,"min_pass_rate":0.5}}');
+		expect(JSON.stringify(monitorUpdateRequest("m1", body!).body)).toBe(
+			'{"interval_min":30,"rule":{"window":6,"min_drop":0.2,"min_pass_rate":0.5}}',
+		);
 		expect(monitorUpdateRequest("m1", body!)).toMatchObject({ url: "/live-monitors/m1", method: "PUT" });
 	});
 

@@ -9,7 +9,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The study body for this monitor: its tasks, trials and sensitivity, the drop as a fraction. null when out of range. Exported for tests. */
-export function whatIfBody(def: Pick<CanaryDefinition, "tasks" | "trials" | "sensitivity">, tasksText: string, dropPct: string): CanarySimulateBody | null {
+export function whatIfBody(
+	def: Pick<CanaryDefinition, "tasks" | "trials" | "sensitivity">,
+	tasksText: string,
+	dropPct: string,
+): CanarySimulateBody | null {
 	const tasks = Array.isArray(def.tasks) ? def.tasks.length : Number(tasksText);
 	const drop = Number(dropPct);
 	if (!Number.isInteger(tasks) || tasks < 1 || tasks > 50 || !(drop >= 0 && drop <= 100)) return null;
@@ -48,14 +52,36 @@ export function WhatIf({ def }: { def: CanaryDefinition }) {
 					{!Array.isArray(def.tasks) && (
 						<label className="flex flex-col gap-1 text-xs">
 							<span className="text-muted-foreground">{t("whatIf.tasks")}</span>
-							<Input type="number" min={1} max={50} value={tasks} onChange={(e) => setTasks(e.target.value)} className="w-24" data-testid="what-if-tasks" />
+							<Input
+								type="number"
+								min={1}
+								max={50}
+								value={tasks}
+								onChange={(e) => setTasks(e.target.value)}
+								className="w-24"
+								data-testid="what-if-tasks"
+							/>
 						</label>
 					)}
 					<label className="flex flex-col gap-1 text-xs">
 						<span className="text-muted-foreground">{t("whatIf.drop")}</span>
-						<Input type="number" min={0} max={100} value={drop} onChange={(e) => setDrop(e.target.value)} className="w-24" data-testid="what-if-drop" />
+						<Input
+							type="number"
+							min={0}
+							max={100}
+							value={drop}
+							onChange={(e) => setDrop(e.target.value)}
+							className="w-24"
+							data-testid="what-if-drop"
+						/>
 					</label>
-					<Button size="sm" variant="outline" disabled={!body || state.isLoading} onClick={() => body && void run(body)} data-testid="what-if-run">
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={!body || state.isLoading}
+						onClick={() => body && void run(body)}
+						data-testid="what-if-run"
+					>
 						{t("whatIf.run")}
 					</Button>
 				</div>

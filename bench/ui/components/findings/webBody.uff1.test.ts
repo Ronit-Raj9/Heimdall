@@ -23,7 +23,17 @@ function goFields(file: string, struct: string): string[] {
 }
 
 const key = (provider: string, status: ModelKey["status"], models: string[]): ModelKey =>
-	({ id: provider + status, provider, label: "k", last4: "1234", status, models, budget_usd: 0, month_spent_usd: 0, over_budget: false }) as unknown as ModelKey;
+	({
+		id: provider + status,
+		provider,
+		label: "k",
+		last4: "1234",
+		status,
+		models,
+		budget_usd: 0,
+		month_spent_usd: 0,
+		over_budget: false,
+	}) as unknown as ModelKey;
 
 describe("Find out why sends what the server reads (PH2-1)", () => {
 	const fields = goFields("cmd/bifrost-bench/jobs_findings_w442.go", "investigateParams");
@@ -92,7 +102,8 @@ describe("plainJobError", () => {
 
 describe("failedExperiments (PH2-5)", () => {
 	it("lists only comparisons with failed runs", () => {
-		const e = (id: string, failed: number) => ({ exp_id: id, name: id, slots: { failed }, finished_at: "2026-11-01T00:00:00Z" }) as unknown as ExperimentStatus;
+		const e = (id: string, failed: number) =>
+			({ exp_id: id, name: id, slots: { failed }, finished_at: "2026-11-01T00:00:00Z" }) as unknown as ExperimentStatus;
 		expect(failedExperiments([e("a", 0), e("b", 2), e("c", 0)]).map((x) => x.exp_id)).toEqual(["b"]);
 	});
 });

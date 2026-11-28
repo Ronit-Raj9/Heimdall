@@ -8,7 +8,12 @@ import { useTranslation } from "react-i18next";
 /** The list of leftover apps, with the command that stops one (the server has no stop route for them). Exported for tests. */
 export function ModalAppsList({ apps }: { apps: ModalApp[] }) {
 	const { t } = useTranslation("ufl8");
-	if (apps.length === 0) return <p className="text-muted-foreground text-xs" data-testid="modal-apps-none">{t("modalApps.none")}</p>;
+	if (apps.length === 0)
+		return (
+			<p className="text-muted-foreground text-xs" data-testid="modal-apps-none">
+				{t("modalApps.none")}
+			</p>
+		);
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
 			<ul className="flex min-w-0 flex-col gap-1 text-xs" data-testid="modal-apps-list">

@@ -202,8 +202,8 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 							{recorded
 								? t("promote.liveNow", { name: versionName(recorded.agent, recorded.version) })
 								: p.live.version
-								? t("promote.liveNow", { name: versionName(p.agent, p.live.version) })
-								: t("promote.nothingLive", { agent: p.agent || "-" })}
+									? t("promote.liveNow", { name: versionName(p.agent, p.live.version) })
+									: t("promote.nothingLive", { agent: p.agent || "-" })}
 						</p>
 					</div>
 				</div>

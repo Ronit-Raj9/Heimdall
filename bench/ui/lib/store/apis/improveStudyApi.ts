@@ -31,7 +31,10 @@ export const improveStudyApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchI
 		}),
 		createImprovementStudy: builder.mutation<StudyView, StudySpecBody>({
 			query: (body) => ({ url: "/improvement-studies", method: "POST", body }),
-			invalidatesTags: [{ type: "BenchImprovementStudy", id: "LIST" }, { type: "BenchImprovement", id: "LIST" }],
+			invalidatesTags: [
+				{ type: "BenchImprovementStudy", id: "LIST" },
+				{ type: "BenchImprovement", id: "LIST" },
+			],
 		}),
 		stopImprovementStudy: builder.mutation<StudyView, string>({
 			query: (id) => ({ url: `${studyPath(id)}/stop`, method: "POST" }),

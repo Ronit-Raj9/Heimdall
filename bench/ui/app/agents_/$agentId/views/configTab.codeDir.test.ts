@@ -3,7 +3,8 @@ import { agentCodeDir } from "./configTab";
 
 describe("agentCodeDir: the folder the Setup tab's Edit code link opens", () => {
 	it("is the folder of build.dockerfile inside the agents area", () => {
-		const yaml = "id: my-custom-python\nbuild:\n  dockerfile: agents/images/my-custom-python/Dockerfile\n  tag: bench/agent-my-custom-python:1\n";
+		const yaml =
+			"id: my-custom-python\nbuild:\n  dockerfile: agents/images/my-custom-python/Dockerfile\n  tag: bench/agent-my-custom-python:1\n";
 		expect(agentCodeDir(yaml)).toBe("images/my-custom-python");
 	});
 	it("reads a quoted path with a trailing comment", () => {

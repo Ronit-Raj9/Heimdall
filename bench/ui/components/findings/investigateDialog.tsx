@@ -10,7 +10,15 @@ import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CAP_MAX, CAP_MIN, INVESTIGATION_START_CAP_USD, clampCap, defaultInvestigation, failedExperiments, investigationBody } from "./findingPlans";
+import {
+	CAP_MAX,
+	CAP_MIN,
+	INVESTIGATION_START_CAP_USD,
+	clampCap,
+	defaultInvestigation,
+	failedExperiments,
+	investigationBody,
+} from "./findingPlans";
 import { defaultJobModel, plainJobError } from "./jobModel";
 import "./uff1I18n";
 
@@ -22,7 +30,12 @@ const fieldClass = "border-border bg-background rounded-md border px-2 py-1.5 te
  * findings.investigate job (POST /jobs) only after the shared paid confirm. When the server does not know the job
  * yet, its own message is shown.
  */
-function optionLabel(u: (k: "investigate.option" | "investigate.optionNoDate", o: Record<string, unknown>) => string, name: string, count: number, at?: string): string {
+function optionLabel(
+	u: (k: "investigate.option" | "investigate.optionNoDate", o: Record<string, unknown>) => string,
+	name: string,
+	count: number,
+	at?: string,
+): string {
 	const d = at ? new Date(at) : null;
 	if (!d || Number.isNaN(d.getTime())) return u("investigate.optionNoDate", { name, count });
 	return u("investigate.option", { name, count, date: d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) });

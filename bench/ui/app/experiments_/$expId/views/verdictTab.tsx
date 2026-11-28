@@ -405,11 +405,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					<GateChecklist gates={payload.gates} />
 				</Disclosure>
 
-				<Disclosure
-					title={tPage("sections.diagnostics")}
-					icon={Activity}
-					testId="verdict-diagnostics"
-				>
+				<Disclosure title={tPage("sections.diagnostics")} icon={Activity} testId="verdict-diagnostics">
 					{diagnosticsBody("conditions")}
 				</Disclosure>
 
@@ -452,11 +448,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				</Disclosure>
 
 				{/* M4-8, M4-16: Measurements and Advanced statistics in one section at the end, for statisticians. */}
-				<Disclosure
-					title={tf("verdict.forStatisticians")}
-					icon={Sigma}
-					testId="verdict-statistics"
-				>
+				<Disclosure title={tf("verdict.forStatisticians")} icon={Sigma} testId="verdict-statistics">
 					<div className="flex flex-col gap-6">
 						<div className="flex flex-col gap-2" data-testid="verdict-meters">
 							<h4 className="text-sm font-medium">{tPage("sections.meters")}</h4>

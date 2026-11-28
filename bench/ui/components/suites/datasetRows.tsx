@@ -69,7 +69,12 @@ export function DatasetRowsSection({ suite, writable }: { suite: string; writabl
 			testId="suite-data-rows"
 			actions={
 				writable ? (
-					<Button size="sm" variant="outline" onClick={() => setEdit({ form: EMPTY_ROW, replace: false })} data-testid="suite-data-rows-add">
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => setEdit({ form: EMPTY_ROW, replace: false })}
+						data-testid="suite-data-rows-add"
+					>
 						{t("rows.add")}
 					</Button>
 				) : undefined
@@ -96,7 +101,13 @@ export function DatasetRowsSection({ suite, writable }: { suite: string; writabl
 							</thead>
 							<tbody>
 								{rows.map((r) => (
-									<RowLine key={r.id} r={r} writable={writable} onReplace={() => setEdit({ form: { ...EMPTY_ROW, id: r.id }, replace: true })} onDelete={() => setDel(r.id)} />
+									<RowLine
+										key={r.id}
+										r={r}
+										writable={writable}
+										onReplace={() => setEdit({ form: { ...EMPTY_ROW, id: r.id }, replace: true })}
+										onDelete={() => setDel(r.id)}
+									/>
 								))}
 							</tbody>
 						</table>
@@ -133,7 +144,13 @@ function RowLine({ r, writable, onReplace, onDelete }: { r: DatasetTaskRow; writ
 							<Button size="sm" variant="ghost" onClick={onReplace} data-testid={`suite-data-row-replace-${r.id}`}>
 								{t("rows.replace")}
 							</Button>
-							<Button size="sm" variant="ghost" className="text-danger-ink" onClick={onDelete} data-testid={`suite-data-row-delete-${r.id}`}>
+							<Button
+								size="sm"
+								variant="ghost"
+								className="text-danger-ink"
+								onClick={onDelete}
+								data-testid={`suite-data-row-delete-${r.id}`}
+							>
 								{t("rows.delete")}
 							</Button>
 						</span>
@@ -189,11 +206,21 @@ function RowDialog({ suite, form: form0, replace, onClose }: { suite: string; fo
 				)}
 				<label className="flex flex-col gap-1">
 					<span className="text-muted-foreground">{t("rows.question")}</span>
-					<Textarea rows={4} value={form.input} onChange={(e) => setForm({ ...form, input: e.target.value })} data-testid="suite-data-row-input" />
+					<Textarea
+						rows={4}
+						value={form.input}
+						onChange={(e) => setForm({ ...form, input: e.target.value })}
+						data-testid="suite-data-row-input"
+					/>
 				</label>
 				<label className="flex flex-col gap-1">
 					<span className="text-muted-foreground">{t("rows.expected")}</span>
-					<Textarea rows={3} value={form.expected} onChange={(e) => setForm({ ...form, expected: e.target.value })} data-testid="suite-data-row-expected" />
+					<Textarea
+						rows={3}
+						value={form.expected}
+						onChange={(e) => setForm({ ...form, expected: e.target.value })}
+						data-testid="suite-data-row-expected"
+					/>
 					<span className="text-muted-foreground text-xs">{t("rows.expectedHint")}</span>
 				</label>
 				{problem && (
@@ -253,7 +280,15 @@ export function DatasetVersionChanges({ suite, n }: { suite: string; n: number |
 	const q = useGetDatasetVersionQuery(n == null ? skipToken : { suite, n });
 	if (n == null) return null;
 	if (q.isLoading) return <BlockSkeleton rows={2} testId="suite-data-version-detail-loading" />;
-	if (q.error) return <LoadError title={t("versions.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="suite-data-version-detail-error" />;
+	if (q.error)
+		return (
+			<LoadError
+				title={t("versions.loadError")}
+				error={q.error}
+				onRetry={() => void q.refetch()}
+				testId="suite-data-version-detail-error"
+			/>
+		);
 	const v = q.data?.version;
 	if (!v) return null;
 	const parts: [string, string[] | null][] = [

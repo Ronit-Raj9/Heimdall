@@ -148,7 +148,8 @@ export function HowOften({
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className="flex min-w-0 flex-col gap-1">
 					<span className={label}>{t("howOften.label")}</span>
-					<NativeSelect wrapperClassName="w-full min-w-0"
+					<NativeSelect
+						wrapperClassName="w-full min-w-0"
 						value={value.when}
 						onChange={(e) => patch({ when: e.target.value as HowOftenWhen })}
 						data-testid={`${testIdPrefix}-when`}
@@ -163,7 +164,8 @@ export function HowOften({
 				{value.when !== "manual" && (
 					<label className="flex min-w-0 flex-col gap-1">
 						<span className={label}>{t("howOften.zone")}</span>
-						<NativeSelect wrapperClassName="w-full min-w-0"
+						<NativeSelect
+							wrapperClassName="w-full min-w-0"
 							value={value.timezone}
 							onChange={(e) => patch({ timezone: e.target.value })}
 							data-testid={`${testIdPrefix}-zone`}
@@ -179,7 +181,8 @@ export function HowOften({
 				{value.when === "weekly" && (
 					<label className="flex min-w-0 flex-col gap-1">
 						<span className={label}>{t("howOften.weekday")}</span>
-						<NativeSelect wrapperClassName="w-full min-w-0"
+						<NativeSelect
+							wrapperClassName="w-full min-w-0"
 							value={String(value.weekday)}
 							onChange={(e) => patch({ weekday: Number(e.target.value) })}
 							data-testid={`${testIdPrefix}-weekday`}
@@ -195,12 +198,7 @@ export function HowOften({
 				{(value.when === "daily" || value.when === "weekly") && (
 					<label className="flex min-w-0 flex-col gap-1">
 						<span className={label}>{t("howOften.time")}</span>
-						<Input
-							type="time"
-							value={value.time}
-							onChange={(e) => patch({ time: e.target.value })}
-							data-testid={`${testIdPrefix}-time`}
-						/>
+						<Input type="time" value={value.time} onChange={(e) => patch({ time: e.target.value })} data-testid={`${testIdPrefix}-time`} />
 					</label>
 				)}
 				{value.when === "custom" && (

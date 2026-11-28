@@ -63,7 +63,9 @@ describe("quick test dialog (fix wave 3, N229)", () => {
 });
 describe("QuickRunDialog paid start (Q-31, Q-32)", () => {
 	it("starts through the paid button with the cap and sits in the shared dialog", () => {
-		const html = render(<QuickRunDialog suite="s" agent="a" model={{ provider: "openai", model: "m" }} tasks={5} onClose={() => undefined} />);
+		const html = render(
+			<QuickRunDialog suite="s" agent="a" model={{ provider: "openai", model: "m" }} tasks={5} onClose={() => undefined} />,
+		);
 		const start = html.match(/<button[^>]*data-testid="quickrun-submit"[^>]*>/)?.[0] ?? "";
 		expect(start).toContain('data-paid="true"');
 		expect(start).toContain('type="button"');

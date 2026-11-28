@@ -21,7 +21,17 @@ const estimate = {
 	runs: 10,
 	est_cost_usd: { low: 0.04, high: 0.1, known: true },
 	est_minutes: { low: 10, high: 20, known: true },
-	budget: { budget_usd: 0.3, per_benchmark_usd: 0.3, default: false, default_per_benchmark_usd: 5, suggested_usd: 0.3, max_usd: 100, fit: "fits", runs_skipped_low: 0, runs_skipped_high: 0 },
+	budget: {
+		budget_usd: 0.3,
+		per_benchmark_usd: 0.3,
+		default: false,
+		default_per_benchmark_usd: 5,
+		suggested_usd: 0.3,
+		max_usd: 100,
+		fit: "fits",
+		runs_skipped_low: 0,
+		runs_skipped_high: 0,
+	},
 } as unknown as EvaluationEstimate;
 
 // The presets answer can be older (another request, cached apart): its Quick look range differs.
@@ -50,7 +60,9 @@ describe("one estimate for one draft", () => {
 	});
 
 	it("keeps a preset's own numbers when it is not the draft's size", () => {
-		const card = render(<PresetPicker spec={{ ...spec, tasks_per_benchmark: 30 }} presets={[quick]} onPick={() => undefined} draft={estimate} />);
+		const card = render(
+			<PresetPicker spec={{ ...spec, tasks_per_benchmark: 30 }} presets={[quick]} onPick={() => undefined} draft={estimate} />,
+		);
 		expect(card).toContain("$0.36 to $2.36");
 	});
 });

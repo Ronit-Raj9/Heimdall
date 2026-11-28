@@ -1,6 +1,6 @@
 import { NativeSelect } from "@/components/ui/select";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
-import { useGetAgentVersionsQuery, } from "@/lib/store/apis/evaluationsApi";
+import { useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/evaluateI18n";
 import { cn } from "@/lib/utils";
 import { BarChart3, Check, Cpu, GitCompare, ShieldAlert, Swords, Trophy } from "lucide-react";
@@ -97,12 +97,16 @@ export function Step2Learn() {
 						>
 							<Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
 							<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-								<span className={cn("text-sm font-medium", blocked && "text-muted-foreground")}>{m === "model_switch" ? t3("mode.label") : t(`learn.mode.${m}`)}</span>
-								<span className="text-muted-foreground text-sm">{blocked
+								<span className={cn("text-sm font-medium", blocked && "text-muted-foreground")}>
+									{m === "model_switch" ? t3("mode.label") : t(`learn.mode.${m}`)}
+								</span>
+								<span className="text-muted-foreground text-sm">
+									{blocked
 										? t("learn.needTwoVersions")
 										: m === "model_switch"
 											? t3("mode.help", { min: MODEL_SWITCH_MIN, max: MODEL_SWITCH_MAX })
-											: t(`learn.modeHelp.${m}`)}</span>
+											: t(`learn.modeHelp.${m}`)}
+								</span>
 							</span>
 							{on && <Check className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />}
 						</button>
@@ -133,7 +137,7 @@ export function Step2Learn() {
 					<span className="font-medium">{t("learn.opponent")}</span>
 					<NativeSelect
 						wrapperClassName="w-56"
-				className="w-full"
+						className="w-full"
 						value={draft.opponent ?? ""}
 						onChange={(e) => update({ opponent: e.target.value || null })}
 						data-testid="evaluate-opponent"
@@ -175,7 +179,11 @@ export function Step2Learn() {
 						{draft.arms.map((a, i) => (
 							<li key={a.label}>
 								{(draft.mode === "models" || draft.mode === "model_switch") && i > 0 && (!a.model || sameSetup(a, draft.arms[0])) ? (
-									draft.mode === "model_switch" ? t3("mode.modelLater") : t("learn.secondSetupLater")
+									draft.mode === "model_switch" ? (
+										t3("mode.modelLater")
+									) : (
+										t("learn.secondSetupLater")
+									)
 								) : (
 									<>
 										{a.agent || "?"}
@@ -199,6 +207,9 @@ export function Step2Learn() {
 export default Step2Learn;
 
 /** Whether two setups would run the same thing: same agent, version and model (Q-72, F2-9). */
-export function sameSetup(a: { agent?: string; version?: number | null; model?: string }, b: { agent?: string; version?: number | null; model?: string } | undefined): boolean {
+export function sameSetup(
+	a: { agent?: string; version?: number | null; model?: string },
+	b: { agent?: string; version?: number | null; model?: string } | undefined,
+): boolean {
 	return Boolean(b) && a.agent === b!.agent && (a.version ?? null) === (b!.version ?? null) && (a.model ?? "") === (b!.model ?? "");
 }

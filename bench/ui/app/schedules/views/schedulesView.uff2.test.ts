@@ -21,8 +21,14 @@ describe("repeat run confirms (lane F2)", () => {
 
 	it("Run now on a model watch does not say it restarts the evaluation", () => {
 		const row = {
-			name: "new-models-x", evaluation: "ev_20261127_214713_d1333f", cron: "0 6 * * *", kind: "evaluation", source: "web",
-			spent_today_usd: 0, max_usd_per_day: 0.5, new_models: { providers: ["openai"] },
+			name: "new-models-x",
+			evaluation: "ev_20261127_214713_d1333f",
+			cron: "0 6 * * *",
+			kind: "evaluation",
+			source: "web",
+			spent_today_usd: 0,
+			max_usd_per_day: 0.5,
+			new_models: { providers: ["openai"] },
 		} as RowF2 as ScheduleRow;
 		const text = runNowMessage(t, row);
 		expect(text).not.toContain("restarts");

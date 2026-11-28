@@ -168,7 +168,12 @@ export function storableParams(tpl: AgentTemplate, params: Record<string, string
 }
 
 /** True once the person typed a name or notes, or changed a field from its default. */
-export function agentFormDirty(tpl: AgentTemplate | null, typedName: string | null, notes: string, params: Record<string, string>): boolean {
+export function agentFormDirty(
+	tpl: AgentTemplate | null,
+	typedName: string | null,
+	notes: string,
+	params: Record<string, string>,
+): boolean {
 	if (!tpl) return false;
 	if (typedName !== null || notes !== "") return true;
 	const base = defaultParams(tpl);
@@ -364,31 +369,31 @@ export default function NewAgentView() {
 			<PageHeader
 				title={t("new.title")}
 				actions={
-				<div className="flex flex-wrap gap-2" role="group" aria-label={tx("agent.bandTitle")} data-testid="agents-new-band">
-					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
-						<Link to="/connect" data-testid="agents-new-connect">
-							<Plug className="size-4" aria-hidden="true" />
-							{tx("agent.bandEndpoint")}
-						</Link>
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						className="max-sm:h-10"
-						onClick={() => setImportAsk((n) => n + 1)}
-						data-testid="agents-new-import"
-					>
-						<CloudDownload className="size-4" aria-hidden="true" />
-						{tx("agent.bandImport")}
-					</Button>
-					<Button asChild size="sm" variant="outline" className="max-sm:h-10">
-						<Link to="/agents/from-traces" data-testid="agents-new-from-traces">
-							<Radio className="size-4" aria-hidden="true" />
-							{tx("agent.bandTraces")}
-						</Link>
-					</Button>
-				</div>
+					<div className="flex flex-wrap gap-2" role="group" aria-label={tx("agent.bandTitle")} data-testid="agents-new-band">
+						<Button asChild size="sm" variant="outline" className="max-sm:h-10">
+							<Link to="/connect" data-testid="agents-new-connect">
+								<Plug className="size-4" aria-hidden="true" />
+								{tx("agent.bandEndpoint")}
+							</Link>
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							className="max-sm:h-10"
+							onClick={() => setImportAsk((n) => n + 1)}
+							data-testid="agents-new-import"
+						>
+							<CloudDownload className="size-4" aria-hidden="true" />
+							{tx("agent.bandImport")}
+						</Button>
+						<Button asChild size="sm" variant="outline" className="max-sm:h-10">
+							<Link to="/agents/from-traces" data-testid="agents-new-from-traces">
+								<Radio className="size-4" aria-hidden="true" />
+								{tx("agent.bandTraces")}
+							</Link>
+						</Button>
+					</div>
 				}
 			/>
 			{query.isLoading ? (
@@ -488,7 +493,7 @@ export default function NewAgentView() {
 								<label className="flex flex-col gap-1 text-sm">
 									<span className="font-medium">{t("new.name")}</span>
 									<Input
-											value={typed}
+										value={typed}
 										onChange={(e) => setName(e.target.value)}
 										aria-invalid={!nameOk || nameTaken}
 										data-testid="agent-name"

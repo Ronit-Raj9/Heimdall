@@ -62,7 +62,8 @@ export function PlanInvalidAlert({ fields, onFocus }: { fields: readonly FormFie
 	const { t } = useTranslation("builder");
 	const { t: tb } = useTranslation("bench");
 	const { t: tl } = useTranslation("ufl2");
-	const label = (key: string) => (key.startsWith("ufl2.") ? tl(key.slice(5) as "advanced.alpha") : tb(key as "experiments.new.fields.name"));
+	const label = (key: string) =>
+		key.startsWith("ufl2.") ? tl(key.slice(5) as "advanced.alpha") : tb(key as "experiments.new.fields.name");
 	if (fields.length === 0) return null;
 	return (
 		<div role="alert" className="text-chart-error-ink flex flex-col gap-1 text-xs" data-testid="plan-invalid">

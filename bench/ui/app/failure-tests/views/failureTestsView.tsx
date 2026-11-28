@@ -142,18 +142,28 @@ export function runsBreakdown(e: Pick<Estimate, "runs" | "per_benchmark" | "arms
 	if (!e) return null;
 	const runs = Number(e.runs) || 0;
 	const total = `${runs} ${runs === 1 ? "run" : "runs"}`;
-	const per = (e.per_benchmark ?? []).filter((b) => !b.skipped).map((b: EstimateBenchmark) => ({ tasks: b.tasks ?? 0, conditions: b.conditions ?? [] }));
+	const per = (e.per_benchmark ?? [])
+		.filter((b) => !b.skipped)
+		.map((b: EstimateBenchmark) => ({ tasks: b.tasks ?? 0, conditions: b.conditions ?? [] }));
 	const arms = e.arms ?? 0;
 	const trials = e.trials ?? 0;
 	if (per.length === 0 || arms < 1 || trials < 1) return total;
 	const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
 	const part = (tasks: number, conds: number) =>
-		[n(tasks, "task", "tasks"), n(trials, "try", "tries"), n(conds, "condition", "conditions"), ...(arms > 1 ? [n(arms, "setup", "setups")] : [])].join(" x ");
+		[
+			n(tasks, "task", "tasks"),
+			n(trials, "try", "tries"),
+			n(conds, "condition", "conditions"),
+			...(arms > 1 ? [n(arms, "setup", "setups")] : []),
+		].join(" x ");
 	const sum = per.reduce((k, b) => k + b.tasks * b.conditions.length * trials * arms, 0);
 	if (sum !== runs) return total;
 	const sameConds = new Set(per.map((b) => b.conditions.length)).size === 1;
 	const line = sameConds
-		? part(per.reduce((k, b) => k + b.tasks, 0), per[0].conditions.length)
+		? part(
+				per.reduce((k, b) => k + b.tasks, 0),
+				per[0].conditions.length,
+			)
 		: per.map((b) => part(b.tasks, b.conditions.length)).join(" + ");
 	return `${line} = ${total}`;
 }
@@ -174,7 +184,11 @@ export function formProblem(
 }
 
 /** Why the fallback model cannot run as set (the wizard's own check); "" when none is set or it can. */
-export function fallbackProblem(f: FailureTestForm, agent?: Pick<AgentSummary, "model" | "gateway"> | null, catalog: readonly FaultInfo[] = FAULTS): string {
+export function fallbackProblem(
+	f: FailureTestForm,
+	agent?: Pick<AgentSummary, "model" | "gateway"> | null,
+	catalog: readonly FaultInfo[] = FAULTS,
+): string {
 	const spec = failureTestSpec(f, agent, catalog);
 	return spec.failover ? failoverProblem(spec.arms[0], spec.failover) : "";
 }
@@ -517,7 +531,11 @@ export default function FailureTestsView() {
 
 	return (
 		// On phones the Run bar is fixed to the bottom of the screen (Q-296): the padding keeps the page's end above it.
-		<section className={cn(pageWidthClass("read"), "flex flex-col gap-8 pb-40 sm:pb-0")} data-page-width="read" data-testid="failure-tests-screen">
+		<section
+			className={cn(pageWidthClass("read"), "flex flex-col gap-8 pb-40 sm:pb-0")}
+			data-page-width="read"
+			data-testid="failure-tests-screen"
+		>
 			<PageHeader title={t("ft.title")} />
 
 			{noAgents ? (
@@ -529,282 +547,295 @@ export default function FailureTestsView() {
 					testId="ft-no-agent"
 				/>
 			) : (
-			<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
-				{/* No nested card inside the section (BD-13): the fields sit on the page. */}
-				<div className="flex min-w-0 flex-col gap-6">
-					<div className="flex min-w-0 flex-wrap items-start gap-4">
-						<div className="w-full max-sm:[&_label]:w-full max-sm:[&_select]:w-full sm:w-auto">
-							<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
-						</div>
-						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
-						<label className="flex w-full flex-col gap-1.5 text-xs font-medium sm:w-auto">
-							{t("ft.version")}
-							<NativeSelect
-								className="min-w-40"
-								wrapperClassName="w-full sm:w-auto"
-								value={form.version}
-								onChange={(e) => setForm((f) => ({ ...f, version: Number(e.target.value) }))}
-								disabled={!form.agent}
-								data-testid="ft-version"
-							>
-								<option value={0}>{t("ft.currentConfig")}</option>
-								{versionList.map((v) => (
-									<option key={v.version} value={v.version}>
-										v{v.version}
-										{v.note ? ` - ${v.note}` : ""}
-									</option>
-								))}
-							</NativeSelect>
-						</label>
-						<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:w-auto sm:min-w-64">
-							{t("ft.model")}
-							<GroupedModelPicker
-								value={chosen.model || chosen.provider ? { provider: chosen.provider, model: chosen.model } : null}
-								onChange={(v) => setForm((f) => ({ ...f, provider: v.provider, model: v.model, modelTouched: true }))}
-								testId="ft-model"
-							/>
-							{chosen.fromDefault && form.agent && (
-								<span className="text-muted-foreground font-normal" data-testid="ft-model-default">
-									{t("ft.modelDefault", { agent: form.agent, model: chosen.model })}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<fieldset className="flex min-w-0 flex-col gap-2">
-						<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
-							{t("ft.faults")}
-							<span className="text-muted-foreground text-xs font-normal" data-testid="ft-faults-picked">
-								{tu("ft.faultsPicked", { count: form.faults.length })}
-							</span>
-						</legend>
-						<div className="flex flex-col gap-2">
-							{faultGroups.map((g) => {
-								const ids = g.faults.map((x) => x.id);
-								const all = ids.every((id) => form.faults.includes(id));
-								return (
-									<div key={g.group} className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3" data-testid={`ft-fault-group-${g.group}`}>
-										<div className="flex shrink-0 items-center gap-2 sm:w-24 sm:flex-col sm:items-start sm:gap-0 sm:pt-1.5">
-											<span className="text-muted-foreground text-xs font-medium">{g.group}</span>
-											<button
-												type="button"
-												className="text-primary text-xs underline-offset-4 hover:underline"
-												onClick={() =>
-													setForm((f) => ({
-														...f,
-														faults: all ? f.faults.filter((x) => !ids.includes(x)) : [...new Set([...f.faults, ...ids])],
-													}))
-												}
-												data-testid={`ft-fault-group-${g.group}-all`}
-											>
-												{all ? tu("ft.clearGroup") : tu("ft.selectAll")}
-											</button>
-										</div>
-										<div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 min-[420px]:grid-cols-2 md:grid-cols-4">
-											{g.faults.map((fault) => {
-												const helpId = `ft-fault-help-${fault.id}`;
-												const off = notApplicable.has(fault.id) && !form.faults.includes(fault.id);
-												return (
-													<label
-														key={fault.id}
-														title={fault.help}
-														className={cn(
-															"inline-flex min-h-7 min-w-0 cursor-pointer items-center gap-2 text-sm",
-															off && "text-muted-foreground opacity-60",
-														)}
-														data-not-applicable={off || undefined}
-													>
-														<input
-															type="checkbox"
-															className="accent-primary size-4 shrink-0"
-															checked={form.faults.includes(fault.id)}
-															disabled={off}
-															onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
-															aria-describedby={helpId}
-															data-testid={`ft-fault-${fault.id}`}
-														/>
-														<span className="truncate">{fault.label}</span>
-														<span id={helpId} className="sr-only">
-															{fault.help}
-														</span>
-													</label>
-												);
-											})}
-										</div>
-									</div>
-								);
-							})}
-						</div>
-						<p className="text-muted-foreground text-xs">{t("ft.cleanNote")}</p>
-						{offerFallback && (
-							<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:max-w-sm" data-testid="ft-fallback">
-								Fallback model (optional)
+				<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
+					{/* No nested card inside the section (BD-13): the fields sit on the page. */}
+					<div className="flex min-w-0 flex-col gap-6">
+						<div className="flex min-w-0 flex-wrap items-start gap-4">
+							<div className="w-full sm:w-auto max-sm:[&_label]:w-full max-sm:[&_select]:w-full">
+								<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
+							</div>
+							{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
+							<label className="flex w-full flex-col gap-1.5 text-xs font-medium sm:w-auto">
+								{t("ft.version")}
+								<NativeSelect
+									className="min-w-40"
+									wrapperClassName="w-full sm:w-auto"
+									value={form.version}
+									onChange={(e) => setForm((f) => ({ ...f, version: Number(e.target.value) }))}
+									disabled={!form.agent}
+									data-testid="ft-version"
+								>
+									<option value={0}>{t("ft.currentConfig")}</option>
+									{versionList.map((v) => (
+										<option key={v.version} value={v.version}>
+											v{v.version}
+											{v.note ? ` - ${v.note}` : ""}
+										</option>
+									))}
+								</NativeSelect>
+							</label>
+							<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:w-auto sm:min-w-64">
+								{t("ft.model")}
 								<GroupedModelPicker
-									value={form.fallback?.model ? form.fallback : null}
-									onChange={(v) => setForm((f) => ({ ...f, fallback: { provider: v.provider, model: v.model } }))}
-									testId="ft-fallback-model"
-									providers={armProvider(spec.arms[0]) ? [armProvider(spec.arms[0])] : []}
+									value={chosen.model || chosen.provider ? { provider: chosen.provider, model: chosen.model } : null}
+									onChange={(v) => setForm((f) => ({ ...f, provider: v.provider, model: v.model, modelTouched: true }))}
+									testId="ft-model"
 								/>
-								<span className="text-muted-foreground font-normal">Adds a run of the agent with this fallback in Bifrost.</span>
-								{fbProblem && (
-									<span className="text-destructive font-normal" data-testid="ft-fallback-problem">
-										{fbProblem}
+								{chosen.fromDefault && form.agent && (
+									<span className="text-muted-foreground font-normal" data-testid="ft-model-default">
+										{t("ft.modelDefault", { agent: form.agent, model: chosen.model })}
 									</span>
 								)}
 							</div>
-						)}
-					</fieldset>
+						</div>
 
-					<fieldset className="flex min-w-0 flex-col gap-2">
-						<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
-							{t("ft.benchmarks")}
-							{form.benchmarks.length > 0 && (
-								<span className="text-muted-foreground text-xs font-normal" data-testid="ft-benchmarks-picked">
-									{tu("ft.benchmarksPicked", { count: form.benchmarks.length })}
+						<fieldset className="flex min-w-0 flex-col gap-2">
+							<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
+								{t("ft.faults")}
+								<span className="text-muted-foreground text-xs font-normal" data-testid="ft-faults-picked">
+									{tu("ft.faultsPicked", { count: form.faults.length })}
+								</span>
+							</legend>
+							<div className="flex flex-col gap-2">
+								{faultGroups.map((g) => {
+									const ids = g.faults.map((x) => x.id);
+									const all = ids.every((id) => form.faults.includes(id));
+									return (
+										<div
+											key={g.group}
+											className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3"
+											data-testid={`ft-fault-group-${g.group}`}
+										>
+											<div className="flex shrink-0 items-center gap-2 sm:w-24 sm:flex-col sm:items-start sm:gap-0 sm:pt-1.5">
+												<span className="text-muted-foreground text-xs font-medium">{g.group}</span>
+												<button
+													type="button"
+													className="text-primary text-xs underline-offset-4 hover:underline"
+													onClick={() =>
+														setForm((f) => ({
+															...f,
+															faults: all ? f.faults.filter((x) => !ids.includes(x)) : [...new Set([...f.faults, ...ids])],
+														}))
+													}
+													data-testid={`ft-fault-group-${g.group}-all`}
+												>
+													{all ? tu("ft.clearGroup") : tu("ft.selectAll")}
+												</button>
+											</div>
+											<div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 min-[420px]:grid-cols-2 md:grid-cols-4">
+												{g.faults.map((fault) => {
+													const helpId = `ft-fault-help-${fault.id}`;
+													const off = notApplicable.has(fault.id) && !form.faults.includes(fault.id);
+													return (
+														<label
+															key={fault.id}
+															title={fault.help}
+															className={cn(
+																"inline-flex min-h-7 min-w-0 cursor-pointer items-center gap-2 text-sm",
+																off && "text-muted-foreground opacity-60",
+															)}
+															data-not-applicable={off || undefined}
+														>
+															<input
+																type="checkbox"
+																className="accent-primary size-4 shrink-0"
+																checked={form.faults.includes(fault.id)}
+																disabled={off}
+																onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
+																aria-describedby={helpId}
+																data-testid={`ft-fault-${fault.id}`}
+															/>
+															<span className="truncate">{fault.label}</span>
+															<span id={helpId} className="sr-only">
+																{fault.help}
+															</span>
+														</label>
+													);
+												})}
+											</div>
+										</div>
+									);
+								})}
+							</div>
+							<p className="text-muted-foreground text-xs">{t("ft.cleanNote")}</p>
+							{offerFallback && (
+								<div className="flex w-full min-w-0 flex-col gap-1.5 text-xs font-medium sm:max-w-sm" data-testid="ft-fallback">
+									Fallback model (optional)
+									<GroupedModelPicker
+										value={form.fallback?.model ? form.fallback : null}
+										onChange={(v) => setForm((f) => ({ ...f, fallback: { provider: v.provider, model: v.model } }))}
+										testId="ft-fallback-model"
+										providers={armProvider(spec.arms[0]) ? [armProvider(spec.arms[0])] : []}
+									/>
+									<span className="text-muted-foreground font-normal">Adds a run of the agent with this fallback in Bifrost.</span>
+									{fbProblem && (
+										<span className="text-destructive font-normal" data-testid="ft-fallback-problem">
+											{fbProblem}
+										</span>
+									)}
+								</div>
+							)}
+						</fieldset>
+
+						<fieldset className="flex min-w-0 flex-col gap-2">
+							<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
+								{t("ft.benchmarks")}
+								{form.benchmarks.length > 0 && (
+									<span className="text-muted-foreground text-xs font-normal" data-testid="ft-benchmarks-picked">
+										{tu("ft.benchmarksPicked", { count: form.benchmarks.length })}
+									</span>
+								)}
+							</legend>
+							{suites.isLoading ? (
+								<BlockSkeleton rows={2} testId="ft-suites-loading" />
+							) : suites.isError ? (
+								<LoadError
+									title={tu("ft.benchmarksLoadError")}
+									error={suites.error}
+									onRetry={() => void suites.refetch()}
+									testId="ft-suites-error"
+								/>
+							) : suiteList.length === 0 ? (
+								<p className="text-muted-foreground text-sm">
+									{t("ft.noBenchmarks")}{" "}
+									<Link to="/catalog" className="text-primary underline-offset-4 hover:underline">
+										{t("ft.addBenchmark")}
+									</Link>
+								</p>
+							) : !form.agent ? (
+								// Benchmarks wait for an agent: which ones it can run decides the list (M5-46).
+								<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-pick-agent">
+									{tg("ft.pickAgentFirst")}
+								</p>
+							) : (
+								<>
+									<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+										<input
+											type="search"
+											value={query}
+											onChange={(e) => setQuery(e.target.value)}
+											placeholder={tu("ft.searchBenchmarks")}
+											aria-label={tu("ft.searchBenchmarks")}
+											className="border-input bg-background h-9 w-full max-w-md min-w-0 rounded-md border px-2 text-sm"
+											data-testid="ft-benchmark-search"
+										/>
+										<label className="inline-flex items-center gap-2 py-1 text-sm">
+											<input
+												type="checkbox"
+												className="accent-primary size-4"
+												checked={onlyRunnable}
+												onChange={(e) => setOnlyRunnable(e.target.checked)}
+												data-testid="ft-only-runnable"
+											/>
+											{tu("ft.onlyRunnable")}
+										</label>
+									</div>
+									{shownSuites.length === 0 ? (
+										<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-no-match">
+											{tu("ft.noMatch")}
+										</p>
+									) : (
+										<div className="max-h-[28rem] min-w-0 overflow-y-auto rounded-md border p-1" data-testid="ft-benchmark-list">
+											<BenchmarkChecklist
+												suites={shownSuites}
+												compatibility={compatibility}
+												checking={checking}
+												selected={form.benchmarks}
+												onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
+												testIdPrefix="ft"
+											/>
+										</div>
+									)}
+								</>
+							)}
+						</fieldset>
+
+						<div className="flex min-w-0 flex-wrap items-start gap-4">
+							<NumberChoice
+								label={t("ft.tasks")}
+								value={form.tasks}
+								options={[1, 3, 5, 10]}
+								onPick={(n) => setForm((f) => ({ ...f, tasks: n }))}
+								testId="ft-tasks"
+							/>
+							<NumberChoice
+								label={t("ft.trials")}
+								value={form.trials}
+								options={[1, 2, 3]}
+								onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
+								testId="ft-trials"
+							/>
+							{/* The server's own count (the estimate), as one line to check; never a count made here. */}
+							{problem === null && runsBreakdown(estimate.currentData) && (
+								<span
+									className="flex h-(--control-h) items-center self-end text-sm font-medium tabular-nums sm:mt-[1.375rem] sm:self-start"
+									data-testid="ft-runs-planned"
+									aria-live="polite"
+								>
+									{runsBreakdown(estimate.currentData)}
 								</span>
 							)}
-						</legend>
-						{suites.isLoading ? (
-							<BlockSkeleton rows={2} testId="ft-suites-loading" />
-						) : suites.isError ? (
-							<LoadError title={tu("ft.benchmarksLoadError")} error={suites.error} onRetry={() => void suites.refetch()} testId="ft-suites-error" />
-						) : suiteList.length === 0 ? (
-							<p className="text-muted-foreground text-sm">
-								{t("ft.noBenchmarks")}{" "}
-								<Link to="/catalog" className="text-primary underline-offset-4 hover:underline">
-									{t("ft.addBenchmark")}
-								</Link>
-							</p>
-						) : !form.agent ? (
-							// Benchmarks wait for an agent: which ones it can run decides the list (M5-46).
-							<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-pick-agent">
-								{tg("ft.pickAgentFirst")}
-							</p>
-						) : (
-							<>
-								<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+							<label className="flex max-w-56 min-w-0 flex-col gap-1.5 text-xs font-medium">
+								{t("ft.budget")}
+								<span className="relative inline-flex w-32 items-center">
+									<span aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-2 text-sm">
+										$
+									</span>
 									<input
-										type="search"
-										value={query}
-										onChange={(e) => setQuery(e.target.value)}
-										placeholder={tu("ft.searchBenchmarks")}
-										aria-label={tu("ft.searchBenchmarks")}
-										className="border-input bg-background h-9 w-full max-w-md min-w-0 rounded-md border px-2 text-sm"
-										data-testid="ft-benchmark-search"
+										type="number"
+										inputMode="decimal"
+										min={0}
+										step={0.01}
+										className="border-input bg-card h-(--control-h) w-full rounded-md border pr-2 pl-5 text-sm shadow-xs"
+										value={form.budgetText ?? ""}
+										onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
+										aria-invalid={problem === "budget" || undefined}
+										data-testid="ft-budget"
 									/>
-									<label className="inline-flex items-center gap-2 py-1 text-sm">
-										<input
-											type="checkbox"
-											className="accent-primary size-4"
-											checked={onlyRunnable}
-											onChange={(e) => setOnlyRunnable(e.target.checked)}
-											data-testid="ft-only-runnable"
-										/>
-										{tu("ft.onlyRunnable")}
-									</label>
-								</div>
-								{shownSuites.length === 0 ? (
-									<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-no-match">
-										{tu("ft.noMatch")}
-									</p>
-								) : (
-									<div className="max-h-[28rem] min-w-0 overflow-y-auto rounded-md border p-1" data-testid="ft-benchmark-list">
-										<BenchmarkChecklist
-											suites={shownSuites}
-											compatibility={compatibility}
-											checking={checking}
-											selected={form.benchmarks}
-											onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
-											testIdPrefix="ft"
-										/>
-									</div>
-								)}
-							</>
-						)}
-					</fieldset>
-
-					<div className="flex min-w-0 flex-wrap items-start gap-4">
-						<NumberChoice
-							label={t("ft.tasks")}
-							value={form.tasks}
-							options={[1, 3, 5, 10]}
-							onPick={(n) => setForm((f) => ({ ...f, tasks: n }))}
-							testId="ft-tasks"
-						/>
-						<NumberChoice
-							label={t("ft.trials")}
-							value={form.trials}
-							options={[1, 2, 3]}
-							onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
-							testId="ft-trials"
-						/>
-						{/* The server's own count (the estimate), as one line to check; never a count made here. */}
-						{problem === null && runsBreakdown(estimate.currentData) && (
-							<span className="flex h-(--control-h) items-center self-end text-sm font-medium tabular-nums sm:mt-[1.375rem] sm:self-start" data-testid="ft-runs-planned" aria-live="polite">
-								{runsBreakdown(estimate.currentData)}
-							</span>
-						)}
-						<label className="flex max-w-56 min-w-0 flex-col gap-1.5 text-xs font-medium">
-							{t("ft.budget")}
-							<span className="relative inline-flex w-32 items-center">
-								<span aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-2 text-sm">
-									$
 								</span>
-								<input
-									type="number"
-									inputMode="decimal"
-									min={0}
-									step={0.01}
-									className="border-input bg-card h-(--control-h) w-full rounded-md border pr-2 pl-5 text-sm shadow-xs"
-									value={form.budgetText ?? ""}
-									onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
-									aria-invalid={problem === "budget" || undefined}
-									data-testid="ft-budget"
-								/>
-							</span>
-							<span className="text-muted-foreground font-normal">
-								{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}
-								{budgetTotal !== undefined && <> {tu("ft.budgetTotal", { amount: usd(budgetTotal) })}</>}
-							</span>
-						</label>
-					</div>
-					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} catalog={faultCatalog} />}
-					{createState.isError && (
-						<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
-							{getBenchErrorMessage(createState.error)}
-						</p>
-					)}
-					{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
-					<StickyFooter
-						phone="fixed"
-						className="bg-background min-w-0 flex-col items-stretch justify-start gap-x-4 gap-y-2 shadow-sm sm:flex-row sm:items-center sm:rounded-lg sm:border"
-						testId="ft-launch-bar"
-					>
-						<FailureTestEstimate
-							problem={problem}
-							estimate={{ data: estimate.currentData, isFetching: estimate.isFetching, isError: estimate.isError, error: estimate.error }}
-							pending={pending}
-							budgetTyped={budgetTyped}
-capUsd={cost.capUsd}
-						/>
-						{mayRun && (
-							<PaidButton
-								verb={tu("ft.runVerb")}
-								capUsd={cost.capUsd}
-								estimateUsd={cost.estimateUsd}
-								estimateRuns={cost.runs}
-								confirm="always"
-								kind="form"
-								estimateAt="title"
-								onConfirm={launch}
-								disabled={problem !== null}
-								isLoading={createState.isLoading}
-								testId="ft-launch"
-							/>
+								<span className="text-muted-foreground font-normal">
+									{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}
+									{budgetTotal !== undefined && <> {tu("ft.budgetTotal", { amount: usd(budgetTotal) })}</>}
+								</span>
+							</label>
+						</div>
+						{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} catalog={faultCatalog} />}
+						{createState.isError && (
+							<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
+								{getBenchErrorMessage(createState.error)}
+							</p>
 						)}
-					</StickyFooter>
-				</div>
-			</Section>
+						{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
+						<StickyFooter
+							phone="fixed"
+							className="bg-background min-w-0 flex-col items-stretch justify-start gap-x-4 gap-y-2 shadow-sm sm:flex-row sm:items-center sm:rounded-lg sm:border"
+							testId="ft-launch-bar"
+						>
+							<FailureTestEstimate
+								problem={problem}
+								estimate={{ data: estimate.currentData, isFetching: estimate.isFetching, isError: estimate.isError, error: estimate.error }}
+								pending={pending}
+								budgetTyped={budgetTyped}
+								capUsd={cost.capUsd}
+							/>
+							{mayRun && (
+								<PaidButton
+									verb={tu("ft.runVerb")}
+									capUsd={cost.capUsd}
+									estimateUsd={cost.estimateUsd}
+									estimateRuns={cost.runs}
+									confirm="always"
+									kind="form"
+									estimateAt="title"
+									onConfirm={launch}
+									disabled={problem !== null}
+									isLoading={createState.isLoading}
+									testId="ft-launch"
+								/>
+							)}
+						</StickyFooter>
+					</div>
+				</Section>
 			)}
 
 			<Section title={t("ft.pastTitle")} testId="ft-past">

@@ -123,9 +123,7 @@ export function factsCounts(pill: string): { tasks: boolean; ready: boolean } {
 }
 
 /** M6-10: the one facts line under the title, "3641 tasks, 36 ready, 103 runs so far". */
-export function headerFacts(
-	parts: { tasks?: string | null; ready?: string | null; probes?: string | null; runs?: string | null },
-): string {
+export function headerFacts(parts: { tasks?: string | null; ready?: string | null; probes?: string | null; runs?: string | null }): string {
 	return [parts.tasks, parts.ready, parts.probes, parts.runs].filter(Boolean).join(", ");
 }
 
@@ -212,7 +210,10 @@ function SuiteBody({
 				subtitle={
 					<span className="flex flex-col gap-0.5" data-testid="suite-plain-subtitle">
 						{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version) && (
-							<span className="text-muted-foreground hidden truncate font-mono text-xs font-normal sm:block" data-testid="suite-header-line">
+							<span
+								className="text-muted-foreground hidden truncate font-mono text-xs font-normal sm:block"
+								data-testid="suite-header-line"
+							>
 								{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version)}
 							</span>
 						)}
@@ -356,7 +357,11 @@ function SuiteBody({
 											<PolicyTab suite={suite} />
 										</section>
 									)}
-									<section id="suite-section-review" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="suite-section-review-title">
+									<section
+										id="suite-section-review"
+										className="flex scroll-mt-4 flex-col gap-3"
+										aria-labelledby="suite-section-review-title"
+									>
 										<h2 id="suite-section-review-title" className="text-foreground text-base font-semibold tracking-tight">
 											{tf("sections.review")}
 										</h2>
@@ -364,7 +369,12 @@ function SuiteBody({
 									</section>
 									{/* M3-14: the create action for cheat checks lives here, not on the report card. */}
 									{!builtin && !suite.id.endsWith("-twins") && suite.task_count > 0 && (
-										<section id="suite-section-cheat" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="suite-section-cheat-title" data-testid="suite-cheat-checks">
+										<section
+											id="suite-section-cheat"
+											className="flex scroll-mt-4 flex-col gap-3"
+											aria-labelledby="suite-section-cheat-title"
+											data-testid="suite-cheat-checks"
+										>
 											<h2 id="suite-section-cheat-title" className="text-foreground text-base font-semibold tracking-tight">
 												{tf("sections.cheat")}
 											</h2>

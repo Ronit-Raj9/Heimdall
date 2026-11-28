@@ -279,7 +279,9 @@ describe("humanExperimentName", () => {
 		expect(isSystemCheck({ name: "nightly", exp_id: "e_nightly" })).toBe(false);
 		expect(humanExperimentName({ name: "admit-coding-core", exp_id: "e_x" }, labels)).toBe("Readiness check: coding-core");
 		expect(humanExperimentName({ name: "codex-vs-claude_nightly", exp_id: "e_x" }, labels)).toBe("codex-vs-claude_nightly");
-		expect(humanExperimentName({ name: "Mini SWE agent vs Codex (gpt-6-luna)", exp_id: "e_x" }, labels)).toBe("Mini SWE agent vs Codex (gpt-6-luna)");
+		expect(humanExperimentName({ name: "Mini SWE agent vs Codex (gpt-6-luna)", exp_id: "e_x" }, labels)).toBe(
+			"Mini SWE agent vs Codex (gpt-6-luna)",
+		);
 		expect(humanExperimentName({ name: "", exp_id: "e_x" }, labels)).toBe("Untitled comparison");
 	});
 });

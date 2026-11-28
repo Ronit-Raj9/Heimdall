@@ -266,9 +266,9 @@ export function RunView({ id, writable, readiness, t }: { id: string; writable: 
 					<span className="text-muted-foreground text-xs" data-testid="issuebench-cost">
 						{t("cost", { cost: data.cost_usd.toFixed(2) })}
 					</span>
-					</div>
-					)}
-					{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
+				</div>
+			)}
+			{items.length > 0 && <WhyDisabled reason={startWhy || null} testId="issuebench-start-why" />}
 			{error && (
 				<p className="text-destructive" role="alert">
 					{error}

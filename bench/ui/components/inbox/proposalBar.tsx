@@ -39,7 +39,10 @@ export const DEFAULT_DRAFT_BUDGET = 0.5;
  * against the server's field list.
  */
 export function traceDraftJob(item: string, suite: string, kind: InboxTaskKind, model: PickedModel | null, budget: number) {
-	return { kind: "trace.draft", params: { item, suite, kind, provider: model?.provider ?? "", model: model?.model ?? "", budget_usd: budget, yes: true } };
+	return {
+		kind: "trace.draft",
+		params: { item, suite, kind, provider: model?.provider ?? "", model: model?.model ?? "", budget_usd: budget, yes: true },
+	};
 }
 
 /** The estimate line of the draft confirm, or null while it loads. */
@@ -374,54 +377,54 @@ function DraftPanel({
 	const est = useGetDraftEstimateQuery({ item: itemId, model, kind }, { skip: !model });
 	const estimate = draftEstimateText(u, est.data);
 	return (
-				<div
-					className="bg-muted flex flex-col gap-2 rounded-sm px-3 py-2"
-					role="dialog"
-					aria-label={t("proposal.draft")}
-					data-testid="proposal-confirm"
-					onKeyDown={blockEnterSubmit}
-				>
-					<p className="text-sm">{t("proposal.confirm", { budget: Number(budget).toFixed(2) })}</p>
-					{estimate ? (
-						<p className="text-muted-foreground text-xs" data-testid="proposal-estimate">
-							{estimate}
-						</p>
-					) : null}
-					<div className="flex flex-wrap items-end gap-2">
-						<div className="flex min-w-56 flex-col gap-0.5 text-xs">
-							<span>{u("model.label")}</span>
-							<GroupedModelPicker value={chosen} onChange={setPicked} label={u("model.label")} testId="proposal-model" />
-						</div>
-						<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-budget`}>
-							{t("proposal.budget")}
-							<Input
-								id={`${ids}-budget`}
-								className="h-8 w-24"
-								type="number"
-								min="0.01"
-								max="2"
-								step="0.01"
-								value={budget}
-								onChange={(e) => setBudget(e.target.value)}
-								data-testid="proposal-budget"
-							/>
-						</label>
-						{/* A paid model call: it always asks once more through the shared confirm, which opens on Cancel. */}
-						<PaidButton
-							size="sm"
-							verb={f("accept.draftVerb")}
-							capUsd={Number(budget) > 0 ? Number(budget) : null}
-							confirm="always"
-							kind="form"
-							confirmText={u("draft.ask", { model, estimate: estimate ?? "", cap: Number(budget) > 0 ? Number(budget).toFixed(2) : "" })}
-							disabled={starting || !provider || !model || !(Number(budget) > 0)}
-							onConfirm={() => onStart(chosen)}
-							testId="proposal-start"
-						/>
-						<Button type="button" size="sm" variant="ghost" onClick={onCancel} dataTestId="proposal-cancel">
-							{t("proposal.cancel")}
-						</Button>
-					</div>
+		<div
+			className="bg-muted flex flex-col gap-2 rounded-sm px-3 py-2"
+			role="dialog"
+			aria-label={t("proposal.draft")}
+			data-testid="proposal-confirm"
+			onKeyDown={blockEnterSubmit}
+		>
+			<p className="text-sm">{t("proposal.confirm", { budget: Number(budget).toFixed(2) })}</p>
+			{estimate ? (
+				<p className="text-muted-foreground text-xs" data-testid="proposal-estimate">
+					{estimate}
+				</p>
+			) : null}
+			<div className="flex flex-wrap items-end gap-2">
+				<div className="flex min-w-56 flex-col gap-0.5 text-xs">
+					<span>{u("model.label")}</span>
+					<GroupedModelPicker value={chosen} onChange={setPicked} label={u("model.label")} testId="proposal-model" />
 				</div>
+				<label className="flex flex-col gap-0.5 text-xs" htmlFor={`${ids}-budget`}>
+					{t("proposal.budget")}
+					<Input
+						id={`${ids}-budget`}
+						className="h-8 w-24"
+						type="number"
+						min="0.01"
+						max="2"
+						step="0.01"
+						value={budget}
+						onChange={(e) => setBudget(e.target.value)}
+						data-testid="proposal-budget"
+					/>
+				</label>
+				{/* A paid model call: it always asks once more through the shared confirm, which opens on Cancel. */}
+				<PaidButton
+					size="sm"
+					verb={f("accept.draftVerb")}
+					capUsd={Number(budget) > 0 ? Number(budget) : null}
+					confirm="always"
+					kind="form"
+					confirmText={u("draft.ask", { model, estimate: estimate ?? "", cap: Number(budget) > 0 ? Number(budget).toFixed(2) : "" })}
+					disabled={starting || !provider || !model || !(Number(budget) > 0)}
+					onConfirm={() => onStart(chosen)}
+					testId="proposal-start"
+				/>
+				<Button type="button" size="sm" variant="ghost" onClick={onCancel} dataTestId="proposal-cancel">
+					{t("proposal.cancel")}
+				</Button>
+			</div>
+		</div>
 	);
 }

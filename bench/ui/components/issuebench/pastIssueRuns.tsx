@@ -33,9 +33,15 @@ export function PastIssueRuns({ openId, onOpen, writable }: { openId: string; on
 			) : (
 				<ul className="bg-card flex min-w-0 flex-col rounded-xl border">
 					{runs.map((r) => (
-						<li key={r.id} className="flex flex-wrap items-center gap-3 border-b px-4 py-2 last:border-0" data-testid={`issuebench-past-${r.id}`}>
+						<li
+							key={r.id}
+							className="flex flex-wrap items-center gap-3 border-b px-4 py-2 last:border-0"
+							data-testid={`issuebench-past-${r.id}`}
+						>
 							<span className="min-w-0 flex-1 truncate font-mono text-xs">{r.repo}</span>
-							<span className="text-muted-foreground text-xs">{t(`issues.status.${r.status}` as "issues.status.done", { defaultValue: r.status })}</span>
+							<span className="text-muted-foreground text-xs">
+								{t(`issues.status.${r.status}` as "issues.status.done", { defaultValue: r.status })}
+							</span>
 							<span className="text-muted-foreground text-xs tabular-nums">{new Date(r.created).toLocaleString()}</span>
 							{r.id === openId ? (
 								<span className="text-xs font-medium">{t("issues.shown")}</span>

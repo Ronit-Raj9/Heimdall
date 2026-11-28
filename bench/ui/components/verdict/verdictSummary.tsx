@@ -123,7 +123,9 @@ export function VerdictSummary({
 				<Icon className={cn("mt-0.5 size-8 shrink-0", INK[tone])} strokeWidth={2.25} aria-hidden="true" />
 				<div className="flex flex-col gap-1">
 					<h2 className={cn("text-xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
-						{stoppedByHand(verdict, partial, stopped) ? k3("verdict.stopped") : headline(verdict, arms, { names, partial, costs, naive }, locale, t)}
+						{stoppedByHand(verdict, partial, stopped)
+							? k3("verdict.stopped")
+							: headline(verdict, arms, { names, partial, costs, naive }, locale, t)}
 					</h2>
 					{detail && (
 						<p className="text-foreground text-sm" data-testid="verdict-summary-detail">

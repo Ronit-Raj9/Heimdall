@@ -22,7 +22,11 @@ export const FOLD_CHARS = 240;
  * marker row, then the rest paired by position. seqA or seqB 0 means that side had no step there
  * (it ended). found false or no divergence: everything paired by position, no marker.
  */
-export function alignSteps(a: readonly StepRecord[], b: readonly StepRecord[], div: PairDivergenceResponse["divergence"] | undefined): SideRow[] {
+export function alignSteps(
+	a: readonly StepRecord[],
+	b: readonly StepRecord[],
+	div: PairDivergenceResponse["divergence"] | undefined,
+): SideRow[] {
 	const zip = (x: readonly StepRecord[], y: readonly StepRecord[]): SideRow[] =>
 		Array.from({ length: Math.max(x.length, y.length) }, (_, i) => ({ kind: "pair" as const, a: x[i] ?? null, b: y[i] ?? null }));
 	if (!div || !div.found) return zip(a, b);
@@ -66,17 +70,11 @@ export function StepsSideBySide({ a, b, labelA = "A", labelB = "B" }: { a: strin
 		[a, sa],
 		[b, sb],
 	] as const) {
-		if (q.error) return <LoadError title={t("steps.error", { id })} error={q.error} onRetry={() => void q.refetch()} testId="steps-sbs-error" />;
+		if (q.error)
+			return <LoadError title={t("steps.error", { id })} error={q.error} onRetry={() => void q.refetch()} testId="steps-sbs-error" />;
 	}
 	if (!ra.data || !rb.data || !sa.data || !sb.data || div.isLoading) return <BlockSkeleton rows={6} testId="steps-sbs-loading" />;
-	return (
-		<StepsSideBySideView
-			labels={[labelA, labelB]}
-			details={[ra.data, rb.data]}
-			steps={[sa.data, sb.data]}
-			divergence={div.data}
-		/>
-	);
+	return <StepsSideBySideView labels={[labelA, labelB]} details={[ra.data, rb.data]} steps={[sa.data, sb.data]} divergence={div.data} />;
 }
 
 /** The view of StepsSideBySide from the handlers' JSON; exported for tests. */
@@ -158,7 +156,10 @@ function Measures({ label, detail, testId }: { label: string; detail: RunDetail;
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="text-sm font-semibold">{label}</span>
 				<span
-					className={cn("rounded-sm px-1.5 py-0.5 text-xs font-medium", m.success ? "bg-chart-success/15 text-chart-success-ink" : "bg-muted text-muted-foreground")}
+					className={cn(
+						"rounded-sm px-1.5 py-0.5 text-xs font-medium",
+						m.success ? "bg-chart-success/15 text-chart-success-ink" : "bg-muted text-muted-foreground",
+					)}
 					data-testid={`${testId}-success`}
 				>
 					{m.success ? t("steps.solved") : t("steps.notSolved")}
@@ -190,7 +191,11 @@ function StepCell({ step, label }: { step: StepRecord | null; label: string }) {
 	const long = text.length > FOLD_CHARS || text.split("\n").length > 3;
 	const kind = t(`steps.kind.${step.kind}`, { defaultValue: t("steps.kind.other") });
 	return (
-		<div className={cn("min-w-0 rounded-md border px-3 py-2", step.is_error && "border-chart-error/50")} data-testid="steps-sbs-step" data-seq={step.seq}>
+		<div
+			className={cn("min-w-0 rounded-md border px-3 py-2", step.is_error && "border-chart-error/50")}
+			data-testid="steps-sbs-step"
+			data-seq={step.seq}
+		>
 			<div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
 				<span className="text-foreground font-semibold md:hidden">{label}</span>
 				<span className="font-medium">{kind}</span>

@@ -219,7 +219,13 @@ export function EvaluationMoreItems({ evaluation, name }: { evaluation: Evaluati
 	return (
 		<>
 			{done && <RepeatEvaluation evaluationId={evaluation.id} />}
-			<ArchiveButton kind="evaluation" id={evaluation.id} name={name} archivedAt={(evaluation as { archived_at?: string | null }).archived_at} testId="evaluation-more" />
+			<ArchiveButton
+				kind="evaluation"
+				id={evaluation.id}
+				name={name}
+				archivedAt={(evaluation as { archived_at?: string | null }).archived_at}
+				testId="evaluation-more"
+			/>
 			<DeleteEvaluationAction id={evaluation.id} active={isActiveStatus(evaluation.status)} />
 		</>
 	);
@@ -269,7 +275,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 		</>
 	);
 	return (
-		<div className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="evaluation-screen" data-status={evaluation.status}>
+		<div
+			className={cn(pageWidthClass("dash"), "flex flex-col gap-6")}
+			data-page-width="dash"
+			data-testid="evaluation-screen"
+			data-status={evaluation.status}
+		>
 			<PageHeader
 				title={spec.name || evaluation.id}
 				subtitle={evaluationSubtitle(t as never, evaluation, i18n.language, reportQ.data, tu as never)}
@@ -307,9 +318,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							testId="evaluation-more"
 							items={[]}
 							contentClassName="w-64 gap-2 p-2"
-							content={
-<EvaluationMoreItems evaluation={evaluation} name={name} />
-							}
+							content={<EvaluationMoreItems evaluation={evaluation} name={name} />}
 							trigger={(props) => (
 								<Button {...props} variant="outline" size="sm" data-testid="evaluation-more-button">
 									{t("detail.more")}
@@ -357,9 +366,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					<div className="flex flex-col">
 						<dt className="text-muted-foreground text-xs">{t("detail.faultLabel")}</dt>
 						<dd>
-							{faults.length > 0
-								? faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ")
-								: t("detail.noFaults")}
+							{faults.length > 0 ? faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ") : t("detail.noFaults")}
 						</dd>
 					</div>
 					<div className="flex flex-col">
@@ -395,11 +402,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					))}
 				</div>
 			</section>
-			<Section
-				title={t("detail.progressTitle")}
-				description={active ? t("detail.liveNote") : undefined}
-				testId="evaluation-progress"
-			>
+			<Section title={t("detail.progressTitle")} description={active ? t("detail.liveNote") : undefined} testId="evaluation-progress">
 				{note === "starting" ? (
 					<EmptyNote testId="evaluation-benchmarks-starting">{tw("benchmarksStarting")}</EmptyNote>
 				) : note === "none" ? (
@@ -492,16 +495,26 @@ function ReleaseSummaryLine({ evaluationId }: { evaluationId: string }) {
 	const preview = useGetEvaluationReleasePreviewQuery(evaluationId);
 	const p = preview.data;
 	if (!p || preview.isError) return null;
-	const live = p.live?.version ? tu("release.live", { name: versionName(p.agent, p.live.version) }) : tu("release.nothingLive", { agent: p.agent || "-" });
+	const live = p.live?.version
+		? tu("release.live", { name: versionName(p.agent, p.live.version) })
+		: tu("release.nothingLive", { agent: p.agent || "-" });
 	const open = () => {
 		const el = document.getElementById(RELEASE_ANCHOR) as HTMLDetailsElement | null;
 		if (el) el.open = true;
 	};
 	return (
-		<p className="bg-card flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm" data-testid="evaluation-release-line">
+		<p
+			className="bg-card flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm"
+			data-testid="evaluation-release-line"
+		>
 			<span>{live}</span>
 			{(p.blocked?.length ?? 0) > 0 && <span className="text-chart-warning-ink">{tu("release.blocked")}</span>}
-			<a href={`#${RELEASE_ANCHOR}`} onClick={open} className="text-primary font-medium hover:underline" data-testid="evaluation-release-open">
+			<a
+				href={`#${RELEASE_ANCHOR}`}
+				onClick={open}
+				className="text-primary font-medium hover:underline"
+				data-testid="evaluation-release-open"
+			>
 				{tu("release.open")}
 			</a>
 		</p>
@@ -558,7 +571,10 @@ function SkillScanProblems({ items }: { items: readonly EvaluationChild[] }) {
 export function ChildRow({ child, score = false }: { child: EvaluationChild; score?: boolean }) {
 	const { t } = useTranslation("evaluations");
 	const active = isActiveStatus(child.status);
-	const exp = useGetExperimentQuery(child.experiment_id, { pollingInterval: active ? EVALUATION_POLL_MS : 0, skipPollingIfUnfocused: true });
+	const exp = useGetExperimentQuery(child.experiment_id, {
+		pollingInterval: active ? EVALUATION_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+	});
 	const slots = exp.data?.slots;
 	// N180, N216: the worker refused the runs (for example an image it could not build) and none was counted.
 	const problem = exp.data?.problem && !(slots && slots.done > 0) ? exp.data.problem : undefined;
@@ -611,25 +627,27 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 					{childSpendLine(child)}
 				</span>
 			) : null}
-			{!(problem || (slots && slots.done === 0 && !active)) && <span className="ml-auto flex gap-3">
-				<Link
-					to="/experiments/$expId"
-					params={{ expId: child.experiment_id }}
-					className="text-primary hover:underline"
-					data-testid={`evaluation-child-open-${child.benchmark}`}
-				>
-					{t(score ? "detail.openResults" : "detail.openComparison")}
-				</Link>
-				<Link
-					to="/experiments/$expId"
-					params={{ expId: child.experiment_id }}
-					search={{ tab: "runs" } as never}
-					className="text-primary hover:underline"
-					data-testid={`evaluation-child-live-${child.benchmark}`}
-				>
-					{t("detail.watchRuns")}
-				</Link>
-			</span>}
+			{!(problem || (slots && slots.done === 0 && !active)) && (
+				<span className="ml-auto flex gap-3">
+					<Link
+						to="/experiments/$expId"
+						params={{ expId: child.experiment_id }}
+						className="text-primary hover:underline"
+						data-testid={`evaluation-child-open-${child.benchmark}`}
+					>
+						{t(score ? "detail.openResults" : "detail.openComparison")}
+					</Link>
+					<Link
+						to="/experiments/$expId"
+						params={{ expId: child.experiment_id }}
+						search={{ tab: "runs" } as never}
+						className="text-primary hover:underline"
+						data-testid={`evaluation-child-live-${child.benchmark}`}
+					>
+						{t("detail.watchRuns")}
+					</Link>
+				</span>
+			)}
 		</li>
 	);
 }

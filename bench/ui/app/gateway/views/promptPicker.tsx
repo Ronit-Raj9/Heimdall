@@ -35,7 +35,11 @@ export function PromptPick({ id, value, onChange }: { id: string; value: string;
 					))}
 				</SelectContent>
 			</Select>
-			{connect && <p className="text-muted-foreground text-xs" data-testid="feature-test-prompt-connect">{t("prompt.connect")}</p>}
+			{connect && (
+				<p className="text-muted-foreground text-xs" data-testid="feature-test-prompt-connect">
+					{t("prompt.connect")}
+				</p>
+			)}
 			{q.error && !connect && <InlineError error={q.error} onRetry={() => void q.refetch()} testId="feature-test-prompt-error" />}
 			{q.data && prompts.length === 0 && <p className="text-muted-foreground text-xs">{t("prompt.none")}</p>}
 		</>
@@ -61,7 +65,11 @@ export function PromptVersionPick({
 	const versions = q.data?.versions ?? [];
 	return (
 		<>
-			<Select value={value || undefined} onValueChange={(v) => onChange(v === "none" ? "" : v)} disabled={!promptId || q.isFetching || !!q.error}>
+			<Select
+				value={value || undefined}
+				onValueChange={(v) => onChange(v === "none" ? "" : v)}
+				disabled={!promptId || q.isFetching || !!q.error}
+			>
 				<SelectTrigger id={id} className="w-full" data-testid={`${id}-pick`}>
 					<SelectValue placeholder={!promptId ? t("prompt.pickFirst") : q.isFetching ? t("prompt.loading") : t("prompt.pickVersion")} />
 				</SelectTrigger>

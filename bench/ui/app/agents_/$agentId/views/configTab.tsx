@@ -327,7 +327,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 						<label className="flex flex-col gap-1 text-sm md:col-span-2">
 							<span className="font-medium">{ta("setup.description")}</span>
 							<textarea
-								className="placeholder:text-neutral-500 border-input bg-card field-sizing-content min-h-32 rounded-md border px-3 py-2 text-sm"
+								className="border-input bg-card field-sizing-content min-h-32 rounded-md border px-3 py-2 text-sm placeholder:text-neutral-500"
 								value={fields.description ?? ""}
 								onChange={(e) => set("description", e.target.value)}
 								data-testid="field-description"
@@ -397,7 +397,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{ta("setup.memoryPaths")}</span>
 								<textarea
-									className="placeholder:text-neutral-500 border-input bg-card min-h-20 rounded-md border px-3 py-2 font-mono text-xs"
+									className="border-input bg-card min-h-20 rounded-md border px-3 py-2 font-mono text-xs placeholder:text-neutral-500"
 									value={texts.memory}
 									onChange={(e) => setText("memory", e.target.value)}
 									placeholder="/root/.agent/memory"
@@ -497,7 +497,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{t("config.fields.env")}</span>
 								<textarea
-									className="placeholder:text-neutral-500 border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs"
+									className="border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs placeholder:text-neutral-500"
 									value={texts.env}
 									onChange={(e) => setText("env", e.target.value)}
 									spellCheck={false}
@@ -512,7 +512,7 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 				</div>
 			) : (
 				<textarea
-					className="placeholder:text-neutral-500 border-input bg-card min-h-[28rem] w-full rounded-md border px-3 py-2 font-mono text-xs"
+					className="border-input bg-card min-h-[28rem] w-full rounded-md border px-3 py-2 font-mono text-xs placeholder:text-neutral-500"
 					value={yamlText}
 					onChange={(e) => {
 						setYamlText(e.target.value);
@@ -546,7 +546,10 @@ function ConfigEditor({ doc, onReload, checkFailed }: { doc: AgentConfigDoc; onR
 			)}
 			<RoleNote min="member" />
 			{/* Stays in view at the bottom while the long form scrolls, and says why Save is off (M2-48). */}
-			<div className="bg-background/95 sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t py-3 backdrop-blur" data-testid="config-actions">
+			<div
+				className="bg-background/95 sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t py-3 backdrop-blur"
+				data-testid="config-actions"
+			>
 				<span className={cn("mr-auto text-sm", dirty ? "font-medium" : "text-muted-foreground")} data-testid="config-dirty">
 					{dirty ? tu("setup.unsaved") : tu("setup.noChanges")}
 				</span>

@@ -197,19 +197,19 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 				<legend className="font-medium">{t("form.benchmarks")}</legend>
 				{!compat.isLoading && runnable.length === 0 && <span className="text-muted-foreground">{t("form.noBenchmarks")}</span>}
 				<div className="mt-1 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-				{runnable.map((b) => (
-					<label key={b.id} className="flex min-h-8 min-w-0 items-center gap-2 sm:min-h-7">
-						<input
-							type="checkbox"
-							className="accent-primary size-4 shrink-0"
-							checked={benchmarks.includes(b.id)}
-							onChange={(e) => setBenchmarks((bs) => (e.target.checked ? [...bs, b.id] : bs.filter((x) => x !== b.id)))}
-						/>
-						<span className="truncate" title={b.id}>
-							{b.id}
-						</span>
-					</label>
-				))}
+					{runnable.map((b) => (
+						<label key={b.id} className="flex min-h-8 min-w-0 items-center gap-2 sm:min-h-7">
+							<input
+								type="checkbox"
+								className="accent-primary size-4 shrink-0"
+								checked={benchmarks.includes(b.id)}
+								onChange={(e) => setBenchmarks((bs) => (e.target.checked ? [...bs, b.id] : bs.filter((x) => x !== b.id)))}
+							/>
+							<span className="truncate" title={b.id}>
+								{b.id}
+							</span>
+						</label>
+					))}
 				</div>
 			</fieldset>
 			<div className="flex flex-wrap gap-4 text-sm">

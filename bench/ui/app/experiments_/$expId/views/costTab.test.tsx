@@ -9,7 +9,9 @@ vi.mock("nuqs", async (importOriginal) => ({
 	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/components/migration/migrationReport", () => ({ ExperimentParetoPanel: () => <div data-testid="pareto-stub" /> }));
-vi.mock("@/components/experiments/gatewayOverheadPanel", () => ({ GatewayOverheadPanel: () => <div data-testid="gateway-overhead-stub" /> }));
+vi.mock("@/components/experiments/gatewayOverheadPanel", () => ({
+	GatewayOverheadPanel: () => <div data-testid="gateway-overhead-stub" />,
+}));
 vi.mock("@/components/migration/costWaterfall", () => ({ CostExplainPanel: () => <div data-testid="cost-explain-stub" /> }));
 
 describe("CostTab (J7.cost)", () => {

@@ -53,12 +53,7 @@ import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
 import i18n, { getLocale } from "@/lib/i18n";
-import {
-	useGetExperimentQuery,
-	useGetPairQuery,
-	useGetRunEventsQuery,
-	useGetRunQuery,
-} from "@/lib/store/apis/benchApi";
+import { useGetExperimentQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
 import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { cn } from "@/lib/utils";
@@ -67,7 +62,19 @@ import { errorStatus } from "@/lib/store/apis/session";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
 import type { GateResult, Mode, PairRun, RunDetail, Value } from "@/lib/types/bench";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { AlertTriangle, Check, Coins, Copy, Footprints, GitCompareArrows, RotateCcw, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
+import {
+	AlertTriangle,
+	Check,
+	Coins,
+	Copy,
+	Footprints,
+	GitCompareArrows,
+	RotateCcw,
+	SearchX,
+	Timer,
+	Wrench,
+	type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RUN_TABS, hiddenRunTabs, runHasVoice, runTabFlags, type RunTabId } from "./runTabs";
@@ -84,10 +91,13 @@ export default function RunView({ runId }: { runId: string }) {
 	const [live, setLive] = useState(false);
 	// A live (unsealed) run is polled so new steps arrive and the page flips once it seals.
 	// M5-1: the same request carries the failure group ("the same failure in N runs") when the server can group it.
-	const detail = useGetRunQuery({ runId, failure: true }, {
-		pollingInterval: live ? 2000 : 0,
-		skipPollingIfUnfocused: true,
-	});
+	const detail = useGetRunQuery(
+		{ runId, failure: true },
+		{
+			pollingInterval: live ? 2000 : 0,
+			skipPollingIfUnfocused: true,
+		},
+	);
 	const sealedNow = detail.data?.sealed;
 	if (detail.data && live === Boolean(sealedNow)) setLive(!sealedNow);
 	const agents = useGetRunAgentsQuery(runId, { skip: !detail.data });
@@ -101,7 +111,13 @@ export default function RunView({ runId }: { runId: string }) {
 	const { t: tDebug } = useTranslation("runDebug");
 	// Archive is a hook, so it is read before the loading and error returns.
 	const archiveName = (detail.data as { task_title?: string } | undefined)?.task_title || detail.data?.slot.task || runId;
-	const archive = useArchiveItems({ kind: "run", id: detail.data ? runId : "", name: archiveName, archivedAt: (detail.data as { archived_at?: string | null } | undefined)?.archived_at, testId: "run" });
+	const archive = useArchiveItems({
+		kind: "run",
+		id: detail.data ? runId : "",
+		name: archiveName,
+		archivedAt: (detail.data as { archived_at?: string | null } | undefined)?.archived_at,
+		testId: "run",
+	});
 	const expId = detail.data?.slot.exp_id;
 	const exp = useGetExperimentQuery(expId ?? "", { skip: !expId });
 	const evaluationId = exp.data?.evaluation_id;
@@ -114,7 +130,12 @@ export default function RunView({ runId }: { runId: string }) {
 	);
 
 	// M5-18: the loading block holds about the height of the header and first panel.
-	if (detail.isLoading) return <div className="min-h-[70vh]"><BlockSkeleton rows={8} testId="run-loading" /></div>;
+	if (detail.isLoading)
+		return (
+			<div className="min-h-[70vh]">
+				<BlockSkeleton rows={8} testId="run-loading" />
+			</div>
+		);
 	if (detail.error || !detail.data) {
 		if (errorStatus(detail.error) === 404) {
 			return (
@@ -165,10 +186,21 @@ export default function RunView({ runId }: { runId: string }) {
 		runsSearch: savedRunsSearch(),
 	});
 
-	const compareItem = runCompareItem(d, exp.data?.arms?.length ?? 0, { compare: t("runs.page.compare"), source: tDebug("actions.compareSource") });
+	const compareItem = runCompareItem(d, exp.data?.arms?.length ?? 0, {
+		compare: t("runs.page.compare"),
+		source: tDebug("actions.compareSource"),
+	});
 	const moreItems: OverflowMenuItem[] = [
 		...(d.sealed && !run.debug
-			? [{ label: tu("page.rerun"), icon: RotateCcw, to: "/evaluate", search: rerunSearch(d, exp.data?.setups) as Record<string, unknown>, testId: "run-rerun" }]
+			? [
+					{
+						label: tu("page.rerun"),
+						icon: RotateCcw,
+						to: "/evaluate",
+						search: rerunSearch(d, exp.data?.setups) as Record<string, unknown>,
+						testId: "run-rerun",
+					},
+				]
 			: []),
 		...(compareItem ? [compareItem] : []),
 		...runExportItems(runId, Boolean(d.sealed), tTrace).map((item, i) => (i === 0 ? { ...item, separatorBefore: true } : item)),
@@ -176,7 +208,13 @@ export default function RunView({ runId }: { runId: string }) {
 	];
 
 	return (
-		<div className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="run-screen" data-run-id={runId} data-output={output}>
+		<div
+			className={cn(pageWidthClass("dash"), "flex flex-col gap-6")}
+			data-page-width="dash"
+			data-testid="run-screen"
+			data-run-id={runId}
+			data-output={output}
+		>
 			<PageHeader
 				breadcrumbs={crumbs}
 				title={<span className="text-balance">{tu("page.title", { task: taskName, arm: slot.arm })}</span>}
@@ -214,7 +252,10 @@ export default function RunView({ runId }: { runId: string }) {
 					</>
 				}
 				subtitle={
-					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs [&_a]:no-underline" data-testid="run-facts">
+					<span
+						className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs [&_a]:no-underline"
+						data-testid="run-facts"
+					>
 						<span>
 							{tu("page.facts", {
 								name: exp.data?.name ?? slot.exp_id,
@@ -357,9 +398,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 								{tt("overview.running")}
 							</span>
 						)}
-						{!plainVerified && (
-							<GradeSourceTag source={detail.grade_source} judged={Boolean(grade?.judged)} testId="run-grade-source" />
-						)}
+						{!plainVerified && <GradeSourceTag source={detail.grade_source} judged={Boolean(grade?.judged)} testId="run-grade-source" />}
 					</div>
 				)}
 				<dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4" data-testid="run-stats">
@@ -523,7 +562,10 @@ export function RunStatCards({ detail, others = [] }: { detail: RunDetail; other
 	const { t: k3 } = useTranslation("ufk3");
 	// M5-21: with the pair loaded, each number shows the other setups' value under it as a muted line.
 	// Round 3 rule 9: setups with the same value share one line ("Setup B, C, D: 0"), so eight equal lines become one.
-	const beside = (value: (o: PairRun) => string) => groupBeside(others.map((o) => ({ arm: o.arm, value: value(o) }))).map((g) => tu("page.setupB", { arm: g.arms.join(", "), value: g.value }));
+	const beside = (value: (o: PairRun) => string) =>
+		groupBeside(others.map((o) => ({ arm: o.arm, value: value(o) }))).map((g) =>
+			tu("page.setupB", { arm: g.arms.join(", "), value: g.value }),
+		);
 	return (
 		<>
 			<StatCard
@@ -619,10 +661,23 @@ export function runCompareItem(detail: RunDetail, armCount: number, labels: { co
 	const { slot, run } = detail;
 	if (run.debug) {
 		if (!run.debug.from_run) return null;
-		return { label: labels.source, icon: GitCompareArrows, to: "/runs/$runId", params: { runId: run.run_id }, search: { tab: "timeline" }, testId: "run-compare-source" };
+		return {
+			label: labels.source,
+			icon: GitCompareArrows,
+			to: "/runs/$runId",
+			params: { runId: run.run_id },
+			search: { tab: "timeline" },
+			testId: "run-compare-source",
+		};
 	}
 	if (!slot.pair_id || armCount < 2) return null;
-	return { label: labels.compare, icon: GitCompareArrows, to: "/compare", search: compareSearch(slot.pair_id, slot.exp_id) as Record<string, unknown>, testId: "run-compare" };
+	return {
+		label: labels.compare,
+		icon: GitCompareArrows,
+		to: "/compare",
+		search: compareSearch(slot.pair_id, slot.exp_id) as Record<string, unknown>,
+		testId: "run-compare",
+	};
 }
 
 /** One run number in the Overview strip: a plain dl item (X-40), not a card, since it does nothing on click. */

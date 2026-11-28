@@ -112,7 +112,13 @@ function NoTwinsNote({ report, notRun }: { report: Report; notRun: string }) {
 			{builtin === false && suite && (
 				<p className="text-muted-foreground">
 					{t("cheat.ownBefore")}{" "}
-					<Link to="/suites/$suiteId" params={{ suiteId: suite }} search={{ tab: "quality" } as never} className="underline" data-testid="cheat-open-benchmark">
+					<Link
+						to="/suites/$suiteId"
+						params={{ suiteId: suite }}
+						search={{ tab: "quality" } as never}
+						className="underline"
+						data-testid="cheat-open-benchmark"
+					>
 						{t("cheat.ownLink")}
 					</Link>
 				</p>

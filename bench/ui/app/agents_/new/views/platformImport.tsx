@@ -118,7 +118,11 @@ export function PlatformImportCard({ returnTo, openSignal = 0 }: { returnTo?: st
 	const error = createState.error ?? readState.error;
 
 	return (
-		<div id="platform-import" className="bg-card flex min-w-0 scroll-mt-4 flex-col gap-4 rounded-xl border p-4" data-testid="platform-import">
+		<div
+			id="platform-import"
+			className="bg-card flex min-w-0 scroll-mt-4 flex-col gap-4 rounded-xl border p-4"
+			data-testid="platform-import"
+		>
 			<div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
 				<div className="flex min-w-0 flex-1 items-start gap-3">
 					<span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">

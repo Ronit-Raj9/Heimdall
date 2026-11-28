@@ -75,9 +75,38 @@ describe("study routes and result", () => {
 
 	it("says the verdict only when the study has one", () => {
 		const t = (k: string, o?: Record<string, unknown>): string => String(i18n.t(k as never, { ns: "ufl7", ...o } as never));
-		const base = { id: "s", name: "s", agent: "a", suite: "x", status: "running", reason: "", loops: [], loops_max: 3, held_out: 20, created_at: "", updated_at: "", created_by: "", cost_usd: 0, running: true } as StudyView;
+		const base = {
+			id: "s",
+			name: "s",
+			agent: "a",
+			suite: "x",
+			status: "running",
+			reason: "",
+			loops: [],
+			loops_max: 3,
+			held_out: 20,
+			created_at: "",
+			updated_at: "",
+			created_by: "",
+			cost_usd: 0,
+			running: true,
+		} as StudyView;
 		expect(studyVerdictLine(t, base)).toBeUndefined();
-		const done = { ...base, final: { state: "claimable", headline: "Better.", n: 20, n_nonzero: 5, gain: 0.05, ci95: [0.01, 0.09] as [number, number], p_upper: 0.01, loop_gains: [], better: 2, loops: 3 } };
+		const done = {
+			...base,
+			final: {
+				state: "claimable",
+				headline: "Better.",
+				n: 20,
+				n_nonzero: 5,
+				gain: 0.05,
+				ci95: [0.01, 0.09] as [number, number],
+				p_upper: 0.01,
+				loop_gains: [],
+				better: 2,
+				loops: 3,
+			},
+		};
 		expect(studyVerdictLine(t, done)).toBe("Better. Gain +5.0 pts (95% range +1.0 pts to +9.0 pts), 2 of 3 loops better");
 	});
 });

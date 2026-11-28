@@ -49,7 +49,13 @@ export function runNowMessage(t: TFunction<"schedules">, r: ScheduleRow): string
 	const limit = r.max_usd_per_day ?? 0;
 	// Lane F2 (PT-4): a model watch only checks the catalog; it restarts nothing.
 	if ((r as RowF2).new_models && limit > 0)
-		return i18n.t("schedules.runNowWatch", { ns: "uff2", name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) });
+		return i18n.t("schedules.runNowWatch", {
+			ns: "uff2",
+			name: r.name,
+			evaluation: what,
+			left: Math.max(0, limit - r.spent_today_usd).toFixed(2),
+			limit: limit.toFixed(2),
+		});
 	return limit > 0
 		? t("runNowAsk", { name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) })
 		: t("runNowAskNoLimit", { name: r.name, evaluation: what });
@@ -106,7 +112,9 @@ export function evaluationOptions(
  * The repeat run picker's options (M7-52): finished evaluations only, grouped by agent, newest
  * first, each "codex score, 22 Nov, score 71%" (Q-84: never a bare number). Exported for tests.
  */
-export function finishedEvaluationGroups(evaluations: Evaluation[]): { agent: string; options: { id: string; label: string; cost?: number }[] }[] {
+export function finishedEvaluationGroups(
+	evaluations: Evaluation[],
+): { agent: string; options: { id: string; label: string; cost?: number }[] }[] {
 	const done = [...evaluations].filter((ev) => ev.status === "done").sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 	const groups = new Map<string, { id: string; label: string; cost?: number }[]>();
 	for (const ev of done) {
@@ -468,13 +476,20 @@ function ScheduleTable({
 											{r.name}
 										</span>
 										{isPaused(r) && (
-											<Pill tone={(r as RowF2).paused_reason ? "warn" : "muted"} testId={`schedule-paused-${r.name}`} title={(r as RowF2).paused_reason}>
+											<Pill
+												tone={(r as RowF2).paused_reason ? "warn" : "muted"}
+												testId={`schedule-paused-${r.name}`}
+												title={(r as RowF2).paused_reason}
+											>
 												{(r as RowF2).paused_reason ? i18n.t("schedules.pausedBySelf", { ns: "uff2" }) : t("paused")}
 											</Pill>
 										)}
 									</div>
 									{(r as RowF2).paused_reason && (
-										<div className="text-chart-error-ink text-xs break-words whitespace-normal" data-testid={`schedule-paused-reason-${r.name}`}>
+										<div
+											className="text-chart-error-ink text-xs break-words whitespace-normal"
+											data-testid={`schedule-paused-reason-${r.name}`}
+										>
 											{(r as RowF2).paused_reason}
 										</div>
 									)}
@@ -702,11 +717,7 @@ function AddScheduleForm({
 					</Field>
 					{what === "evaluation" ? (
 						<Field label={t("add.evaluation")}>
-							<NativeSelect
-								value={s.evaluation}
-								onChange={set("evaluation")}
-								data-testid="schedule-add-evaluation"
-							>
+							<NativeSelect value={s.evaluation} onChange={set("evaluation")} data-testid="schedule-add-evaluation">
 								<option value="">{t("add.evaluationPlaceholder")}</option>
 								{s.evaluation && !allOptions.some((o) => o.id === s.evaluation) && <option value={s.evaluation}>{s.evaluation}</option>}
 								{groups.map((g) => (
@@ -854,7 +865,8 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 			<div className="grid gap-3 md:grid-cols-3">
 				<Field label={t("alerts.urlEnv")}>
 					{secrets.length > 0 ? (
-						<NativeSelect wrapperClassName="w-full min-w-0"
+						<NativeSelect
+							wrapperClassName="w-full min-w-0"
 							value={draft.url_env}
 							onChange={(e) => setDraft({ ...draft, url_env: e.target.value })}
 							data-testid="alert-url-env"

@@ -97,17 +97,7 @@ export async function startDebugRun(
  * Confirms a replay before it starts (M5-2): says what it does, that it is free and never counted, and
  * that it creates a new debug run. Nothing starts until "Start replay"; Cancel starts nothing.
  */
-export function ReplayDialog({
-	open,
-	onClose,
-	onConfirm,
-	busy,
-}: {
-	open: boolean;
-	onClose(): void;
-	onConfirm(): unknown;
-	busy?: boolean;
-}) {
+export function ReplayDialog({ open, onClose, onConfirm, busy }: { open: boolean; onClose(): void; onConfirm(): unknown; busy?: boolean }) {
 	const { t } = useTranslation("runDebug");
 	return (
 		<Dialog

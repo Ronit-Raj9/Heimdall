@@ -33,7 +33,10 @@ export default function ImprovementsView() {
 	const [anyLive, setAnyLive] = useState(true);
 	// Archived runs are hidden unless ?archived=1 (phase D decision 6).
 	const [showArchived, setShowArchived] = useShowArchived();
-	const list = useGetImprovementsQuery(showArchived ? archivedParam(true) : undefined, { pollingInterval: listPollMs(anyLive), skipPollingIfUnfocused: true });
+	const list = useGetImprovementsQuery(showArchived ? archivedParam(true) : undefined, {
+		pollingInterval: listPollMs(anyLive),
+		skipPollingIfUnfocused: true,
+	});
 	useEffect(() => {
 		if (list.data) setAnyLive(list.data.improvements.some((r) => isLiveImprovement(r.status)));
 	}, [list.data]);
@@ -91,29 +94,29 @@ export default function ImprovementsView() {
 				</TabsList>
 				<TabsContent value="studies">{tab === "studies" && <StudiesTab admin={admin} onCreate={() => setCreating(true)} />}</TabsContent>
 				<TabsContent value="runs">
-			{list.isLoading ? (
-				<BlockSkeleton rows={4} testId="improvements-loading" />
-			) : list.error || !list.data ? (
-				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="improvements-error" />
-			) : (
-				<>
-					<ShowArchivedChip
-						count={
-							archivedCountOf(list.data) ??
-							(showArchived ? withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), true).archived : undefined)
-						}
-						on={showArchived}
-						onChange={setShowArchived}
-						className="self-start"
-						testId="improvements-show-archived"
-					/>
-					<ImprovementsTable
-						rows={withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), showArchived).shown}
-						admin={admin}
-						onCreate={() => setCreating(true)}
-					/>
-				</>
-			)}
+					{list.isLoading ? (
+						<BlockSkeleton rows={4} testId="improvements-loading" />
+					) : list.error || !list.data ? (
+						<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="improvements-error" />
+					) : (
+						<>
+							<ShowArchivedChip
+								count={
+									archivedCountOf(list.data) ??
+									(showArchived ? withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), true).archived : undefined)
+								}
+								on={showArchived}
+								onChange={setShowArchived}
+								className="self-start"
+								testId="improvements-show-archived"
+							/>
+							<ImprovementsTable
+								rows={withoutArchived(list.data.improvements, (r) => isArchived(r as ArchivedRow), showArchived).shown}
+								admin={admin}
+								onCreate={() => setCreating(true)}
+							/>
+						</>
+					)}
 				</TabsContent>
 			</Tabs>
 		</section>
@@ -121,7 +124,15 @@ export default function ImprovementsView() {
 }
 
 /** The loaded list, or the empty state. Exported for tests. */
-export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: ImprovementSummary[]; admin?: boolean; onCreate?: () => void }) {
+export function ImprovementsTable({
+	rows,
+	admin = false,
+	onCreate,
+}: {
+	rows: ImprovementSummary[];
+	admin?: boolean;
+	onCreate?: () => void;
+}) {
 	const { t } = useTranslation("improve");
 	const { t: tw } = useTranslation("w45imp");
 	const { t: ta } = useTranslation("ufd5");
@@ -205,7 +216,13 @@ export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: Imp
 							</td>
 							<td className="px-3 py-2 text-right tabular-nums">{usd(r.total_usd)}</td>
 							<td className="px-2 py-2 text-right">
-								<ArchiveRowMenu kind="improvement" id={r.id} name={r.name} archivedAt={(r as ArchivedRow).archived_at} testId={`improvement-row-${r.id}`} />
+								<ArchiveRowMenu
+									kind="improvement"
+									id={r.id}
+									name={r.name}
+									archivedAt={(r as ArchivedRow).archived_at}
+									testId={`improvement-row-${r.id}`}
+								/>
 							</td>
 						</tr>
 					))}
@@ -221,7 +238,10 @@ export function ImprovementsTable({ rows, admin = false, onCreate }: { rows: Imp
 export function ImprovementExample() {
 	const { t } = useTranslation("ufs1");
 	return (
-		<figure className="bg-muted/50 flex w-full max-w-md flex-col gap-1.5 rounded-lg border border-dashed p-3 text-left text-sm" data-testid="improvements-example">
+		<figure
+			className="bg-muted/50 flex w-full max-w-md flex-col gap-1.5 rounded-lg border border-dashed p-3 text-left text-sm"
+			data-testid="improvements-example"
+		>
 			<figcaption className="text-muted-foreground text-xs font-semibold">{t("improveExample.title")}</figcaption>
 			<p className="tabular-nums">{t("improveExample.rounds")}</p>
 			<p className="text-success-ink">{t("improveExample.kept")}</p>

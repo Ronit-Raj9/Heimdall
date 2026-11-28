@@ -142,7 +142,9 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 					testId="evaluation-raise-budget"
 				/>
 			</div>
-			{!valid && text.trim() !== "" && <span className="text-muted-foreground text-xs">{t("raise.limit", { current: dollars(current) })}</span>}
+			{!valid && text.trim() !== "" && (
+				<span className="text-muted-foreground text-xs">{t("raise.limit", { current: dollars(current) })}</span>
+			)}
 			{state.error ? (
 				<span className="text-chart-error-ink text-xs" role="alert" data-testid="evaluation-raise-budget-error">
 					{errorText(state.error)}

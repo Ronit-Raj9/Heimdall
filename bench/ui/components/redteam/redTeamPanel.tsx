@@ -31,7 +31,9 @@ export function planFrom(
 	if (!choice.model?.provider || !choice.model.model) return { plan: null, problem: "Pick the model that writes the attacks." };
 	if (choice.categories.length === 0 || choice.strategies.length === 0 || choice.channels.length === 0)
 		return { plan: null, problem: "Pick at least one attack, one strategy and one channel." };
-	const fits = catalog.categories.some((c) => choice.categories.includes(c.id) && (c.channels ?? []).some((ch) => choice.channels.includes(ch)));
+	const fits = catalog.categories.some(
+		(c) => choice.categories.includes(c.id) && (c.channels ?? []).some((ch) => choice.channels.includes(ch)),
+	);
 	if (!fits) return { plan: null, problem: "None of the attacks you picked is offered on the channels you picked." };
 	return {
 		plan: {
@@ -61,13 +63,31 @@ function toggle(xs: string[], id: string): string[] {
 	return xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id];
 }
 
-function Choices({ title, options, value, onChange, testId }: { title: string; options: RedTeamOption[]; value: string[]; onChange(v: string[]): void; testId: string }) {
+function Choices({
+	title,
+	options,
+	value,
+	onChange,
+	testId,
+}: {
+	title: string;
+	options: RedTeamOption[];
+	value: string[];
+	onChange(v: string[]): void;
+	testId: string;
+}) {
 	return (
 		<fieldset className="flex flex-col gap-1.5" data-testid={testId}>
 			<legend className="mb-1 text-sm font-medium">{title}</legend>
 			{options.map((o) => (
 				<label key={o.id} className="flex items-start gap-2 text-sm">
-					<input type="checkbox" className="mt-1" checked={value.includes(o.id)} onChange={() => onChange(toggle(value, o.id))} data-testid={`${testId}-${o.id}`} />
+					<input
+						type="checkbox"
+						className="mt-1"
+						checked={value.includes(o.id)}
+						onChange={() => onChange(toggle(value, o.id))}
+						data-testid={`${testId}-${o.id}`}
+					/>
 					<span className="flex flex-col">
 						<span className="font-medium">{o.label}</span>
 						<span className="text-muted-foreground text-xs">{o.description}</span>
@@ -97,8 +117,8 @@ export function RedTeamPanel({ selected, onAdd }: RedTeamPanelProps) {
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
 					<h3 className="text-sm font-semibold">Red-team my agent</h3>
 					<p className="text-muted-foreground text-sm">
-						An attacker model adapts to your agent's answers (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents and
-						emails. Every attack that gets through becomes a regression task for review.
+						An attacker model adapts to your agent's answers (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents
+						and emails. Every attack that gets through becomes a regression task for review.
 					</p>
 				</div>
 				<Button variant="outline" size="sm" onClick={() => setOpen(!open)} dataTestId="red-team-toggle" aria-expanded={open}>
@@ -159,12 +179,17 @@ export function RedTeamForm({ catalog, selected, onAdd }: { catalog: RedTeamCata
 				</label>
 			</div>
 			<p className="text-muted-foreground text-sm" data-testid="red-team-count">
-				{n} {n === 1 ? "task" : "tasks"} in benchmark {catalog.suite}. Readiness checks play fixed attacks and call no model; the evaluation runs the
-				adaptive attacker.
+				{n} {n === 1 ? "task" : "tasks"} in benchmark {catalog.suite}. Readiness checks play fixed attacks and call no model; the evaluation
+				runs the adaptive attacker.
 			</p>
 			{problem && <p className="text-chart-warning-ink text-sm">{problem}</p>}
 			<div className="flex flex-wrap items-center gap-2">
-				<Button disabled={!plan || state.isLoading} isLoading={state.isLoading} onClick={() => void send(false)} dataTestId="red-team-create">
+				<Button
+					disabled={!plan || state.isLoading}
+					isLoading={state.isLoading}
+					onClick={() => void send(false)}
+					dataTestId="red-team-create"
+				>
 					Create red-team benchmark
 				</Button>
 				{conflict && (
@@ -173,20 +198,24 @@ export function RedTeamForm({ catalog, selected, onAdd }: { catalog: RedTeamCata
 					</Button>
 				)}
 			</div>
-			{conflict && <p className="text-muted-foreground text-sm">A red-team benchmark already exists. Rewriting it runs its readiness checks again.</p>}
+			{conflict && (
+				<p className="text-muted-foreground text-sm">A red-team benchmark already exists. Rewriting it runs its readiness checks again.</p>
+			)}
 			{state.isError && !conflict && <p className="text-destructive text-sm">Could not write the red-team benchmark.</p>}
 			{done && (
 				<div className="flex flex-col gap-2 border-t pt-3" data-testid="red-team-created">
 					<p className="text-sm">
-						{done.replaced ? "Rewrote" : "Wrote"} <span className="font-medium">{done.suite}</span> with {done.tasks.length} tasks. Run its readiness check,
-						then add it to this evaluation.
+						{done.replaced ? "Rewrote" : "Wrote"} <span className="font-medium">{done.suite}</span> with {done.tasks.length} tasks. Run its
+						readiness check, then add it to this evaluation.
 					</p>
 					<div className="flex flex-wrap items-start gap-2">
 						<JobRunButton
 							kind={SUITE_OPS_KINDS.admit}
 							params={{ suite: done.suite }}
 							confirm={i18n.t("redTeam.admitConfirm", { ns: "ufint", suite: done.suite })}
-							label="Run readiness check" variant="outline" />
+							label="Run readiness check"
+							variant="outline"
+						/>
 						<Button disabled={added} onClick={() => onAdd(done.suite)} dataTestId="red-team-add">
 							{added ? "Added to this evaluation" : "Add to this evaluation"}
 						</Button>
@@ -206,13 +235,22 @@ export function RegressionsReview() {
 	return <RegressionsList items={items} busy={state.isLoading} onDecide={(task, decision) => void review({ task, decision })} />;
 }
 
-export function RegressionsList({ items, busy, onDecide }: { items: RedTeamReviewItem[]; busy?: boolean; onDecide(task: string, d: "accepted" | "rejected"): void }) {
+export function RegressionsList({
+	items,
+	busy,
+	onDecide,
+}: {
+	items: RedTeamReviewItem[];
+	busy?: boolean;
+	onDecide(task: string, d: "accepted" | "rejected"): void;
+}) {
 	const pending = items.filter((i) => i.state === "pending").length;
 	return (
 		<div className="flex flex-col gap-2 border-t pt-3" data-testid="red-team-regressions">
 			<h4 className="text-sm font-semibold">Regressions from successful attacks</h4>
 			<p className="text-muted-foreground text-xs">
-				{pending} waiting for review. An accepted regression joins the regressions benchmark and replays the exact attack on every later version.
+				{pending} waiting for review. An accepted regression joins the regressions benchmark and replays the exact attack on every later
+				version.
 			</p>
 			<ul className="flex flex-col gap-1.5">
 				{items.map((i) => (
@@ -228,12 +266,24 @@ export function RegressionsList({ items, busy, onDecide }: { items: RedTeamRevie
 						</span>
 						{i.attempts_to_break ? <span className="text-muted-foreground text-xs">broke after {i.attempts_to_break} attempts</span> : null}
 						{i.state !== "accepted" && (
-							<Button size="sm" variant="outline" disabled={busy} onClick={() => onDecide(i.task, "accepted")} dataTestId={`red-team-accept-${i.task}`}>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={busy}
+								onClick={() => onDecide(i.task, "accepted")}
+								dataTestId={`red-team-accept-${i.task}`}
+							>
 								Accept
 							</Button>
 						)}
 						{i.state !== "rejected" && (
-							<Button size="sm" variant="ghost" disabled={busy} onClick={() => onDecide(i.task, "rejected")} dataTestId={`red-team-reject-${i.task}`}>
+							<Button
+								size="sm"
+								variant="ghost"
+								disabled={busy}
+								onClick={() => onDecide(i.task, "rejected")}
+								dataTestId={`red-team-reject-${i.task}`}
+							>
 								Reject
 							</Button>
 						)}

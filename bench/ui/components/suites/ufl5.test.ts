@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { datasetDeleteRequest, datasetTasksRequest, datasetVersionPath, datasetWriteRequest, harvestRequest, issueCancelRequest, mcpServerReportPath } from "@/lib/store/apis/ufl5Api";
+import {
+	datasetDeleteRequest,
+	datasetTasksRequest,
+	datasetVersionPath,
+	datasetWriteRequest,
+	harvestRequest,
+	issueCancelRequest,
+	mcpServerReportPath,
+} from "@/lib/store/apis/ufl5Api";
 import { redTeamEvaluations } from "@/components/redteam/harvestForm";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import type { IssueRun } from "@/lib/types/issuebench";
@@ -14,7 +22,11 @@ const WEB_REPLACE = `{"tasks":[{"input":"What is 3+3?","id":"q-sum","expected":[
 
 describe("dataset rows requests (round 5, L5)", () => {
 	it("sends the body the Go handler is tested with", () => {
-		expect(JSON.stringify(datasetWriteRequest("qa", rowRequest({ id: " q-sum ", input: " What is 2+2? ", expected: "4\n\n four " }, false)).body)).toBe(WEB_ADD);
+		expect(
+			JSON.stringify(
+				datasetWriteRequest("qa", rowRequest({ id: " q-sum ", input: " What is 2+2? ", expected: "4\n\n four " }, false)).body,
+			),
+		).toBe(WEB_ADD);
 		expect(JSON.stringify(rowRequest({ id: "q-sum", input: "What is 3+3?", expected: "6" }, true))).toBe(WEB_REPLACE);
 	});
 	it("leaves out an empty id and empty answers", () => {
@@ -27,7 +39,14 @@ describe("dataset rows requests (round 5, L5)", () => {
 		expect(datasetVersionPath("qa", 3)).toBe("/suites/qa/dataset/versions/3");
 	});
 	it("turns the server's problems into one line", () => {
-		const r = { benchmark: "qa", version: null, added: null, updated: null, unchanged: null, problems: [{ index: 1, message: "id q-sum is taken" }] };
+		const r = {
+			benchmark: "qa",
+			version: null,
+			added: null,
+			updated: null,
+			unchanged: null,
+			problems: [{ index: 1, message: "id q-sum is taken" }],
+		};
 		expect(rowProblems(r)).toBe("id q-sum is taken");
 		expect(rowProblems({ ...r, problems: [] })).toBeNull();
 	});
@@ -38,7 +57,21 @@ describe("MCP server report (round 5, L5)", () => {
 		expect(mcpServerReportPath("acme-mcp")).toBe("/mcp-servers/benchmarks/acme-mcp/report");
 	});
 	it("orders tools by calls and shows no share without counts", () => {
-		const base = { runs: 0, picked: 0, calls: 0, valid: 0, succeeded: 0, passed: 0, pick_rate: 0, valid_rate: 0, success_rate: 0, p50_ms: 0, p95_ms: 0, by_agent: null, advice: null };
+		const base = {
+			runs: 0,
+			picked: 0,
+			calls: 0,
+			valid: 0,
+			succeeded: 0,
+			passed: 0,
+			pick_rate: 0,
+			valid_rate: 0,
+			success_rate: 0,
+			p50_ms: 0,
+			p95_ms: 0,
+			by_agent: null,
+			advice: null,
+		};
 		const rep: McpServerReport = {
 			benchmark: "b",
 			server: "s",
@@ -75,8 +108,14 @@ describe("red-team harvest (round 5, L5)", () => {
 		expect(harvestRequest("ev-1")).toEqual({ url: "/redteam/regressions/harvest", method: "POST", body: { evaluation: "ev-1" } });
 	});
 	it("offers finished red-team evaluations only, newest first", () => {
-		const e = (id: string, status: string, benchmarks: string[], created_at: string) => ({ id, status, spec: { benchmarks }, created_at }) as unknown as Evaluation;
-		const got = redTeamEvaluations([e("a", "done", ["red-team"], "1"), e("b", "running", ["red-team"], "2"), e("c", "done", ["swe"], "3"), e("d", "done", ["red-team-x"], "4")]);
+		const e = (id: string, status: string, benchmarks: string[], created_at: string) =>
+			({ id, status, spec: { benchmarks }, created_at }) as unknown as Evaluation;
+		const got = redTeamEvaluations([
+			e("a", "done", ["red-team"], "1"),
+			e("b", "running", ["red-team"], "2"),
+			e("c", "done", ["swe"], "3"),
+			e("d", "done", ["red-team-x"], "4"),
+		]);
 		expect(got.map((x) => x.id)).toEqual(["d", "a"]);
 	});
 });

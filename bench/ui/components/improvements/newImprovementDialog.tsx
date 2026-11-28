@@ -199,7 +199,9 @@ export function improvementConfirmText(f: ImprovementForm, e: ImprovementEstimat
 	const limit = limitUsd(f.limit);
 	const parts: string[] = [];
 	if (e && limit !== null) {
-		parts.push(i18n.t("estimate.confirm", { ns: "uff6", low: money(e.usd.low), high: money(e.usd.high), runs: e.runs.total, limit: money(limit) }));
+		parts.push(
+			i18n.t("estimate.confirm", { ns: "uff6", low: money(e.usd.low), high: money(e.usd.high), runs: e.runs.total, limit: money(limit) }),
+		);
 	} else if (limit !== null) {
 		parts.push(i18n.t("estimate.confirmUnknown", { ns: "uff6", limit: money(limit) }));
 	}
@@ -223,7 +225,10 @@ export function defaultImprovementName(agent: string, now: Date = new Date()): s
 	const y = now.getFullYear();
 	const m = String(now.getMonth() + 1).padStart(2, "0");
 	const d = String(now.getDate()).padStart(2, "0");
-	const slug = agent.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "");
+	const slug = agent
+		.toLowerCase()
+		.replace(/[^a-z0-9-]+/g, "-")
+		.replace(/^-+/, "");
 	const suffix = `-improve-${y}${m}${d}`;
 	return `${slug.slice(0, 63 - suffix.length).replace(/-+$/, "")}${suffix}`.replace(/^-+/, "");
 }
@@ -249,8 +254,7 @@ export function suiteChoices(
 	return suites
 		.map((s) => {
 			const name = (versions.get(s.id) ?? 0) > 1 ? `${s.id} ${s.version}` : s.id;
-			const label =
-				typeof s.task_count === "number" ? i18n.t("improve.suiteOption", { ns: "uf2b", name, count: s.task_count }) : name;
+			const label = typeof s.task_count === "number" ? i18n.t("improve.suiteOption", { ns: "uf2b", name, count: s.task_count }) : name;
 			const notReady = s.ready_known === true && (s.ready_task_ids ?? []).length === 0;
 			return { value: `${s.id}@${s.version}`, label, notReady };
 		})
@@ -532,9 +536,7 @@ export function NewImprovementForm({
 			)}
 			{ownSize(form.preset) && (
 				<span className="text-muted-foreground text-xs">
-					{trial
-						? t6("form.tasksHelp", { min: TRIAL_LIMITS.minTasks, max: TRIAL_LIMITS.maxTasks })
-						: t6("form.tasksHelpCustom")}
+					{trial ? t6("form.tasksHelp", { min: TRIAL_LIMITS.minTasks, max: TRIAL_LIMITS.maxTasks }) : t6("form.tasksHelpCustom")}
 				</span>
 			)}
 			{problems.includes("tasks") && <span className="text-chart-error-ink text-xs">{tasksError(form.preset)}</span>}
@@ -590,27 +592,27 @@ export function NewImprovementForm({
 			<div className="bg-card sticky bottom-0 -mx-5 -mb-5 flex flex-col gap-3 border-t px-5 pt-3 pb-5" data-testid="new-improvement-footer">
 				<EstimateCard estimate={estimate} loading={estimating} error={estimateError} model={model} waiting={problems.length > 0} />
 				<div className="flex flex-wrap items-center justify-end gap-2">
-				{block && (
-					<span className="text-muted-foreground mr-auto text-xs" data-testid="new-improvement-reason">
-						{block}
-					</span>
-				)}
-				<Button type="button" variant="ghost" onClick={onCancel} data-testid="new-improvement-cancel">
-					{t("create.cancel")}
-				</Button>
-				<PaidButton
-					verb={study ? t7("form.studyVerb") : tu("improve.startVerb")}
-					capUsd={limitUsd(form.limit)}
-					confirm="always"
-					kind="form"
-					estimateRuns={estimate?.runs.total}
-					confirmText={improvementConfirmText(form, estimate, tu("improve.confirmText"))}
-					disabled={block !== undefined || busy}
-					isLoading={busy}
-					title={block}
-					onConfirm={onSubmit}
-					testId="new-improvement-submit"
-				/>
+					{block && (
+						<span className="text-muted-foreground mr-auto text-xs" data-testid="new-improvement-reason">
+							{block}
+						</span>
+					)}
+					<Button type="button" variant="ghost" onClick={onCancel} data-testid="new-improvement-cancel">
+						{t("create.cancel")}
+					</Button>
+					<PaidButton
+						verb={study ? t7("form.studyVerb") : tu("improve.startVerb")}
+						capUsd={limitUsd(form.limit)}
+						confirm="always"
+						kind="form"
+						estimateRuns={estimate?.runs.total}
+						confirmText={improvementConfirmText(form, estimate, tu("improve.confirmText"))}
+						disabled={block !== undefined || busy}
+						isLoading={busy}
+						title={block}
+						onConfirm={onSubmit}
+						testId="new-improvement-submit"
+					/>
 				</div>
 			</div>
 		</form>

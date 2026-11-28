@@ -113,14 +113,24 @@ describe("Gateway report card", () => {
 		expect(reportedVersion("vunknown")).toBe("");
 		expect(reportedVersion("unknown")).toBe("");
 		expect(reportedVersion("v2.5.1")).toBe("v2.5.1");
-		const html = render(<GatewayHeaderLine gateway={{ configured: true, reachable: true, host: "bifrost:8080", version: "vunknown", plugins: [] }} />);
+		const html = render(
+			<GatewayHeaderLine gateway={{ configured: true, reachable: true, host: "bifrost:8080", version: "vunknown", plugins: [] }} />,
+		);
 		expect(html).toContain("Built-in gateway: bifrost:8080 (version not reported)");
 		expect(html).not.toContain("vunknown");
-		const prompt: GwCardLine = { ...lines[0], feature: "prompt_version", start: "prompt_version", state: "not_measured", result: undefined };
+		const prompt: GwCardLine = {
+			...lines[0],
+			feature: "prompt_version",
+			start: "prompt_version",
+			state: "not_measured",
+			result: undefined,
+		};
 		const blocked = render(<GatewayCardLineRow line={prompt} onStart={() => undefined} connected={false} />);
 		expect(blocked).toContain("Connect your Bifrost first");
 		expect(blocked).toContain("Not tested");
-		expect(render(<GatewayCardLineRow line={lines[0]} onStart={() => undefined} connected={false} />)).not.toContain("Connect your Bifrost first");
+		expect(render(<GatewayCardLineRow line={lines[0]} onStart={() => undefined} connected={false} />)).not.toContain(
+			"Connect your Bifrost first",
+		);
 	});
 
 	it("says why the gateway could not be reached", () => {

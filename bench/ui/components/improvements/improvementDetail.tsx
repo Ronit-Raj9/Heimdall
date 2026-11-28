@@ -283,7 +283,10 @@ function LineageTree({ data }: { data: ImprovementDetail }) {
 					{checked.isFetching ? t7("lineage.checking") : t7("lineage.check")}
 				</Button>
 				{checked.data && !checked.isFetching && (
-					<span className={cn("text-xs", checked.data.chain_ok ? "text-foreground" : "text-chart-error-ink")} data-testid="improvement-chain-result">
+					<span
+						className={cn("text-xs", checked.data.chain_ok ? "text-foreground" : "text-chart-error-ink")}
+						data-testid="improvement-chain-result"
+					>
 						{chainLine(checked.data)}
 					</span>
 				)}

@@ -7,7 +7,20 @@ import { taskReliability, TaskReliabilityView } from "./taskReliability";
 
 // Rows as GET /runs?exp=<id> answers them (handlers/runlist.go).
 const row = (task: string, trial: number, outcome: string, sealed = true, condition = "clean") =>
-	({ run_id: `r_${task}_${trial}`, exp_id: "e1", pair_id: "", suite: "s", task, arm: "A", condition, trial, attempt: 1, counted: true, sealed, outcome }) as unknown as RunListRow;
+	({
+		run_id: `r_${task}_${trial}`,
+		exp_id: "e1",
+		pair_id: "",
+		suite: "s",
+		task,
+		arm: "A",
+		condition,
+		trial,
+		attempt: 1,
+		counted: true,
+		sealed,
+		outcome,
+	}) as unknown as RunListRow;
 
 describe("taskReliability (K2)", () => {
 	it("counts mixed tries per task while some are still running", () => {
@@ -31,7 +44,9 @@ describe("taskReliability (K2)", () => {
 		expect(html).toContain("3 tries to go");
 	});
 	it("final: headline without the live words", () => {
-		const rows = ["t1", "t2", "t3", "t4", "t5"].flatMap((t, i) => [1, 2, 3].map((k) => row(t, k, i < 3 || (i === 3 && k === 1) ? "pass" : "fail")));
+		const rows = ["t1", "t2", "t3", "t4", "t5"].flatMap((t, i) =>
+			[1, 2, 3].map((k) => row(t, k, i < 3 || (i === 3 && k === 1) ? "pass" : "fail")),
+		);
 		const html = render(<TaskReliabilityView rel={taskReliability(rows, 3)} active={false} multiArm={false} testId="rel" />);
 		expect(html).toContain("Solved every time: 3 of 5 tasks; sometimes: 1; never: 1");
 		expect(html).toContain("solved 3 of 3");

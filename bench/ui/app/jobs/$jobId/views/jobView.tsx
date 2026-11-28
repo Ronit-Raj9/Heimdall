@@ -173,7 +173,12 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 			<dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border px-5 py-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="job-facts">
 				<Fact label={t("jobs.page.target")}>
 					{target.to ? (
-						<a href={target.to} className="text-primary block truncate text-sm underline-offset-2 hover:underline" title={job.target} data-testid="job-target">
+						<a
+							href={target.to}
+							className="text-primary block truncate text-sm underline-offset-2 hover:underline"
+							title={job.target}
+							data-testid="job-target"
+						>
 							{target.text}
 						</a>
 					) : (

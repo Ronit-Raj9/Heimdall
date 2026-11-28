@@ -6,7 +6,10 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { UNKNOWN_ESTIMATE_CAP_USD, suggestedBudget } from "./paidCaps";
 
-export interface CappedPaidActionProps extends Pick<PaidButtonProps, "verb" | "variant" | "size" | "isLoading" | "disabled" | "confirmText" | "kind"> {
+export interface CappedPaidActionProps extends Pick<
+	PaidButtonProps,
+	"verb" | "variant" | "size" | "isLoading" | "disabled" | "confirmText" | "kind"
+> {
 	/** The estimate in USD; null when not known (the cap then starts at $1.00 and the confirm says so). */
 	estimateUsd: number | null;
 	estimateRuns?: number;
@@ -18,7 +21,16 @@ export interface CappedPaidActionProps extends Pick<PaidButtonProps, "verb" | "v
  * A paid evaluation action with its own spending cap (round 4, F5): a cap field that starts at the suggested
  * budget for the estimate, and the shared PaidButton that names the cap and always confirms with the amount.
  */
-export function CappedPaidAction({ estimateUsd, estimateRuns, onConfirm, testId, verb, confirmText, kind = "retry", ...rest }: CappedPaidActionProps) {
+export function CappedPaidAction({
+	estimateUsd,
+	estimateRuns,
+	onConfirm,
+	testId,
+	verb,
+	confirmText,
+	kind = "retry",
+	...rest
+}: CappedPaidActionProps) {
 	const { t } = useTranslation("uff5");
 	const id = useId();
 	const [cap, setCap] = useState<number>(() => suggestedBudget(estimateUsd) ?? UNKNOWN_ESTIMATE_CAP_USD);

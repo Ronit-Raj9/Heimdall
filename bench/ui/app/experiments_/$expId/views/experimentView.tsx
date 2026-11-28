@@ -414,7 +414,12 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					...exportItems.items.map((item) => ({ ...item, label: menuLabel(item.label) })),
 					// Q-70: a summary a person can read and send on, built from what the page has.
 					...(verdict.data && !kind ? [{ label: tr("report.menu"), onSelect: () => downloadSummary(), testId: "experiment-summary" }] : []),
-					{ label: tu("header.copyId", { id: "" }).trim(), onSelect: () => void copyId(), separatorBefore: true, testId: "experiment-copy-id" },
+					{
+						label: tu("header.copyId", { id: "" }).trim(),
+						onSelect: () => void copyId(),
+						separatorBefore: true,
+						testId: "experiment-copy-id",
+					},
 					...archive.items.map((item) => ({ ...item, separatorBefore: true })),
 					deleteItem,
 				]}

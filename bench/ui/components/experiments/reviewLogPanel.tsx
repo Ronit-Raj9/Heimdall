@@ -14,7 +14,10 @@ export function ReviewLogPanel({ expId }: { expId: string }) {
 			<summary className="cursor-pointer text-sm font-semibold">
 				{t("reviews.title")}
 				{q.data && reviews.length > 0 && (
-					<span className={q.data.verified ? "text-muted-foreground ml-2 text-xs font-normal" : "text-chart-error-ink ml-2 text-xs font-normal"} data-testid="review-log-verified">
+					<span
+						className={q.data.verified ? "text-muted-foreground ml-2 text-xs font-normal" : "text-chart-error-ink ml-2 text-xs font-normal"}
+						data-testid="review-log-verified"
+					>
 						{q.data.verified ? t("reviews.verified") : t("reviews.broken")}
 					</span>
 				)}
@@ -50,7 +53,9 @@ export function ReviewLogPanel({ expId }: { expId: string }) {
 						</table>
 						{(q.data?.problems ?? []).length > 0 && (
 							<ul className="text-chart-error-ink mt-2 list-disc pl-4 text-xs">
-								{q.data?.problems?.map((p) => <li key={p}>{p}</li>)}
+								{q.data?.problems?.map((p) => (
+									<li key={p}>{p}</li>
+								))}
 							</ul>
 						)}
 					</div>

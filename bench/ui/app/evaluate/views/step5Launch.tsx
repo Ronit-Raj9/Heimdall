@@ -65,7 +65,8 @@ export function summaryLines(
 	else lines.push(fw05("summary.opponent", { a: armText(a), b: armText(b) }));
 
 	const n = spec.benchmarks.length;
-	if (n > 0) lines.push(fw05(n === 1 ? "summary.benchmarks_one" : "summary.benchmarks_other", { n: String(n), list: spec.benchmarks.join(", ") }));
+	if (n > 0)
+		lines.push(fw05(n === 1 ? "summary.benchmarks_one" : "summary.benchmarks_other", { n: String(n), list: spec.benchmarks.join(", ") }));
 	else if (spec.pack) lines.push(fw05("summary.pack", { pack: spec.pack }));
 
 	const trials = spec.trials === 1 ? fw05("summary.once") : fw05("summary.times", { n: String(spec.trials) });
@@ -252,7 +253,9 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 	const catalog = useGetBenchFaultsQuery();
 	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
 	// A bad budget is not the default budget: the summary leaves the budget line out until it is fixed.
-	const summary = budgetIssue ? summaryLines(spec, faultCatalog, estimate.data).slice(0, -1) : summaryLines(spec, faultCatalog, estimate.data);
+	const summary = budgetIssue
+		? summaryLines(spec, faultCatalog, estimate.data).slice(0, -1)
+		: summaryLines(spec, faultCatalog, estimate.data);
 	const draft = useDraftOrNull();
 	const [ownName, setOwnName] = useState("");
 	const nameValue = draft ? draft.draft.name : ownName;
@@ -298,7 +301,7 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 	const missingKey = firstMissingKey(keys.rows);
 	const agentsQ = useGetAgentsQuery();
 	// The free check panel only shows when a check can run for this agent (Q-38).
-	const freeCheckOk = freeCheckPlan(spec, ((agentsQ.data?.agents ?? []) as AgentWithCaps[])).ok;
+	const freeCheckOk = freeCheckPlan(spec, (agentsQ.data?.agents ?? []) as AgentWithCaps[]).ok;
 	const blocked = !ready ? problem : missingKey ? t("nextReason.needKey", { provider: missingKey.providerName }) : "";
 	const launch = async () => {
 		const typed = nameValue.trim();
@@ -331,25 +334,28 @@ export function Step5Launch({ spec, onChange, launchSlot }: Step5LaunchProps) {
 					{t("launch.budget")}
 				</label>
 				<span className="relative w-fit">
-				<span className="text-muted-foreground pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm" aria-hidden="true">
-					$
-				</span>
-				<input
-					id="step5-budget"
-					type="text"
-					inputMode="decimal"
-					aria-invalid={budgetIssue ? true : undefined}
-					aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
-					className="border-input bg-background h-(--control-h) w-40 rounded-md border pr-2 pl-6 text-sm"
-					placeholder={fw05("launch.budgetPlaceholder", { cap: String(DEFAULT_BENCHMARK_BUDGET) })}
-					value={budget}
-					onChange={(e) => {
-						setSeeded(true);
-						setBudget(e.target.value);
-						onChange({ ...spec, budget_usd: parseBudget(e.target.value) });
-					}}
-					data-testid="step5-budget"
-				/>
+					<span
+						className="text-muted-foreground pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm"
+						aria-hidden="true"
+					>
+						$
+					</span>
+					<input
+						id="step5-budget"
+						type="text"
+						inputMode="decimal"
+						aria-invalid={budgetIssue ? true : undefined}
+						aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
+						className="border-input bg-background h-(--control-h) w-40 rounded-md border pr-2 pl-6 text-sm"
+						placeholder={fw05("launch.budgetPlaceholder", { cap: String(DEFAULT_BENCHMARK_BUDGET) })}
+						value={budget}
+						onChange={(e) => {
+							setSeeded(true);
+							setBudget(e.target.value);
+							onChange({ ...spec, budget_usd: parseBudget(e.target.value) });
+						}}
+						data-testid="step5-budget"
+					/>
 				</span>
 				{budgetIssue && (
 					<span id="step5-budget-problem" className="text-destructive text-xs" role="alert" data-testid="step5-budget-problem">

@@ -8,10 +8,27 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Run files GET /runs/{id}/files/{name} serves (handlers/runs.go runFileTypes). */
-export const RUN_FILES = ["run.json", "grade.json", "metrics.json", "cost.json", "gates.json", "receipts.json", "events.jsonl", "workspace.diff", "seal.json"] as const;
+export const RUN_FILES = [
+	"run.json",
+	"grade.json",
+	"metrics.json",
+	"cost.json",
+	"gates.json",
+	"receipts.json",
+	"events.jsonl",
+	"workspace.diff",
+	"seal.json",
+] as const;
 
 /** Raw evidence GET /runs/{id}/evidence/{name} serves from a sealed run (handlers/runs.go rawEvidenceNameOK). */
-export const RAW_EVIDENCE = ["gateway.requests.jsonl", "gateway.raw.jsonl", "tools.jsonl", "proxy.ledger.jsonl", "agent.stream.jsonl", "agent.stderr.txt"] as const;
+export const RAW_EVIDENCE = [
+	"gateway.requests.jsonl",
+	"gateway.raw.jsonl",
+	"tools.jsonl",
+	"proxy.ledger.jsonl",
+	"agent.stream.jsonl",
+	"agent.stderr.txt",
+] as const;
 
 export function runFileUrl(runId: string, kind: "files" | "evidence", name: string): string {
 	return withOrgParam(`${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/${kind}/${encodeURIComponent(name)}`);
@@ -32,7 +49,14 @@ export function RunFileDownloads({ runId, sealed }: { runId: string; sealed: boo
 	const row = (kind: "files" | "evidence", names: readonly string[]) => (
 		<div className="flex flex-wrap gap-2">
 			{names.map((n) => (
-				<Button key={n} size="sm" variant="outline" disabled={busy !== null} onClick={() => void get(kind, n)} data-testid={`run-${kind}-${n}`}>
+				<Button
+					key={n}
+					size="sm"
+					variant="outline"
+					disabled={busy !== null}
+					onClick={() => void get(kind, n)}
+					data-testid={`run-${kind}-${n}`}
+				>
 					<Download className="size-3.5" aria-hidden="true" />
 					{n}
 				</Button>

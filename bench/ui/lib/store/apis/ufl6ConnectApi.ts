@@ -1,5 +1,11 @@
 import type { ConnectVerifyRequest } from "@/lib/types/connect";
-import type { AgentFileCheckRequest, GitHubAgentFile, AgentFileCheckResult, ConnectExplainRequest, ConnectExplainResponse } from "@/lib/types/ufl6Connect";
+import type {
+	AgentFileCheckRequest,
+	GitHubAgentFile,
+	AgentFileCheckResult,
+	ConnectExplainRequest,
+	ConnectExplainResponse,
+} from "@/lib/types/ufl6Connect";
 import { benchApi } from "./benchApi";
 
 /** What the Connect page's "Verify on" options hold. */

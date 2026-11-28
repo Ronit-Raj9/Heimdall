@@ -50,7 +50,9 @@ describe("arm B change controls (round 5 L2)", () => {
 	});
 
 	it("routing strategies other than weighted", () => {
-		expect(toExperiment({ ...base, changeKind: "routing", routingStrategy: "fallback_chain" }).arms.B.set).toEqual(fixture.arms.routing_fallback_chain);
+		expect(toExperiment({ ...base, changeKind: "routing", routingStrategy: "fallback_chain" }).arms.B.set).toEqual(
+			fixture.arms.routing_fallback_chain,
+		);
 	});
 
 	it("advanced options land as spec blocks and the extra JSON merges on top", () => {

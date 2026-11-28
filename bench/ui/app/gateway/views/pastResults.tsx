@@ -11,7 +11,9 @@ import "./w4p6I18n";
 /** The day of a computed_at time, or "" when it is not a date. Pure. */
 export function effectDate(iso: string): string {
 	const d = new Date(iso);
-	return Number.isNaN(d.getTime()) || d.getFullYear() < 2000 ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+	return Number.isNaN(d.getTime()) || d.getFullYear() < 2000
+		? ""
+		: d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** The table of saved feature results. Pure. */
@@ -34,7 +36,12 @@ export function PastResultsTable({ effects, names }: { effects: GwEffect[]; name
 						<tr key={`${e.exp_id}:${e.feature}`} className="border-t align-top" data-testid={`gateway-past-${e.exp_id}`}>
 							<td className="py-1 pr-3 sm:whitespace-nowrap">{names[e.feature] ?? e.feature}</td>
 							<td className="hidden max-w-56 py-1 pr-3 sm:table-cell">
-								<Link to="/experiments/$expId" params={{ expId: e.exp_id }} title={e.exp_id} className="text-primary block truncate hover:underline">
+								<Link
+									to="/experiments/$expId"
+									params={{ expId: e.exp_id }}
+									title={e.exp_id}
+									className="text-primary block truncate hover:underline"
+								>
 									{e.exp_id}
 								</Link>
 							</td>

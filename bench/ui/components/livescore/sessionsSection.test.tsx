@@ -52,7 +52,19 @@ describe("SessionsSection", () => {
 				evidence: "live",
 				total: 7,
 				sessions: [
-					{ seq: 1, id: "ls_ab", version: "v1", evidence: "live", grouping: "gap", started: "2026-11-01T00:00:00Z", ended: "2026-11-01T00:01:00Z", scored_at: "2026-11-01T00:02:00Z", requests: 3, signals: { abandoned: true }, flags: ["loop"] },
+					{
+						seq: 1,
+						id: "ls_ab",
+						version: "v1",
+						evidence: "live",
+						grouping: "gap",
+						started: "2026-11-01T00:00:00Z",
+						ended: "2026-11-01T00:01:00Z",
+						scored_at: "2026-11-01T00:02:00Z",
+						requests: 3,
+						signals: { abandoned: true },
+						flags: ["loop"],
+					},
 				],
 			},
 		};

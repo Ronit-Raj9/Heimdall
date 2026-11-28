@@ -116,7 +116,7 @@ export function MonitorTable({
 						{rows.map((r) => (
 							<tr
 								key={r.id}
-								className={`hover:bg-muted/40 focus-visible:ring-(--focus) cursor-pointer border-t outline-none focus-visible:ring-2 ${r.id === selected ? "bg-muted" : ""}`}
+								className={`hover:bg-muted/40 cursor-pointer border-t outline-none focus-visible:ring-2 focus-visible:ring-(--focus) ${r.id === selected ? "bg-muted" : ""}`}
 								onClick={() => onSelect(r.id)}
 								// M7-24: the row opens on Enter or Space too, so keyboard users can reach every monitor.
 								tabIndex={0}
@@ -197,11 +197,7 @@ export function MonitorAgentPicker({ value, agents, onChange }: { value: string;
 			<div className="flex flex-col gap-1 text-xs">
 				{t("form.agent")}
 				<span className="text-muted-foreground">
-					{notEndpointNote ?? (
-						<>
-							{t("form.noEndpointAgents")}{" "}
-						</>
-					)}
+					{notEndpointNote ?? <>{t("form.noEndpointAgents")} </>}
 					<Link
 						to="/connect"
 						className="text-primary font-medium underline-offset-4 hover:underline"
@@ -216,11 +212,7 @@ export function MonitorAgentPicker({ value, agents, onChange }: { value: string;
 	return (
 		<label className="flex flex-col gap-1 text-xs">
 			{t("form.agent")}
-			<NativeSelect
-				value={notEndpoint ? "" : value}
-				onChange={(e) => onChange(e.target.value)}
-				data-testid="live-monitor-form-agent"
-			>
+			<NativeSelect value={notEndpoint ? "" : value} onChange={(e) => onChange(e.target.value)} data-testid="live-monitor-form-agent">
 				<option value="">{t("form.pickAgent")}</option>
 				{agents.map((id) => (
 					<option key={id} value={id}>
@@ -248,9 +240,12 @@ export function liveMonitorProblems(
 	f: LiveMonitorFields,
 	agents: string[],
 	minInterval = 15,
-): { field: keyof LiveMonitorFields; key: "live.problem.name" | "live.problem.agent" | "live.problem.tasks" | "live.problem.interval" | "live.problem.budget" }[] {
+): {
+	field: keyof LiveMonitorFields;
+	key: "live.problem.name" | "live.problem.agent" | "live.problem.tasks" | "live.problem.interval" | "live.problem.budget";
+}[] {
 	const out: ReturnType<typeof liveMonitorProblems> = [];
-	const whole = (v: string) => /^\d+$/.test(v.trim()) ? Number(v) : NaN;
+	const whole = (v: string) => (/^\d+$/.test(v.trim()) ? Number(v) : NaN);
 	if (!f.name.trim()) out.push({ field: "name", key: "live.problem.name" });
 	if (!f.agent || !agents.includes(f.agent)) out.push({ field: "agent", key: "live.problem.agent" });
 	if (!(whole(f.tasks) >= 1)) out.push({ field: "tasks", key: "live.problem.tasks" });
@@ -492,7 +487,11 @@ function MonitorActions({ d, onEdit }: { d: MonitorDetailResponse; onEdit: () =>
 				kind="runNow"
 				confirmText={
 					known
-						? m("live.runAsk", { name: d.name, usd: usd2(d.check_budget_usd), left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)) })
+						? m("live.runAsk", {
+								name: d.name,
+								usd: usd2(d.check_budget_usd),
+								left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)),
+							})
 						: m("live.runAskUnknown", { name: d.name })
 				}
 				disabled={state.isLoading}

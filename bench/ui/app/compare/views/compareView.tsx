@@ -33,7 +33,13 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useGetCatalogQuery, useGetExperimentQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
+import {
+	useGetCatalogQuery,
+	useGetExperimentQuery,
+	useGetPairQuery,
+	useGetRunEventsQuery,
+	useGetRunQuery,
+} from "@/lib/store/apis/benchApi";
 import { frozenSuiteRef, type Pair, type PairResponse, type PairRun, type RunProvenance } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft, FlaskConical } from "lucide-react";
@@ -207,7 +213,11 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			{/* Q-145: a setup whose run has no grade is named, with a way to another run of the task. */}
 			{data.runs.length > 1 &&
 				ungradedArms(data.runs).map((arm) => (
-					<div key={arm} className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm" data-testid={`compare-no-graded-${arm}`}>
+					<div
+						key={arm}
+						className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm"
+						data-testid={`compare-no-graded-${arm}`}
+					>
 						<span className="min-w-0 flex-1">{tr("compare.noGraded", { arm })}</span>
 						<Button variant="outline" size="sm" onClick={onClear} dataTestId={`compare-no-graded-${arm}-other`}>
 							{tr("compare.pickOther")}
@@ -258,23 +268,22 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 
 			{/* Q-143, Q-144: proof and human reviews fold to one line each, so nine runs do not make a 6000 px page. */}
 			<DetailsDisclosure label={t("runs.evidence.title")} testId="runs-evidence-fold">
-			<div className="flex min-w-0 flex-col gap-3" data-testid="runs-evidence-section">
-				<div className="grid min-w-0 gap-6 xl:grid-cols-2">
-					{lanes.map((lane) => (
-						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
-							<CardContent className="space-y-2 px-4 py-4 text-sm">
-								<div className="font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
-								{lane.detail.data ? (
-									<RunEvidenceStatus detail={lane.detail.data} arm={lane.pairRun.arm} />
-								) : (
-									<BlockSkeleton rows={4} testId={`runs-evidence-${lane.pairRun.arm}-loading`} />
-								)}
-							</CardContent>
-						</Card>
-					))}
+				<div className="flex min-w-0 flex-col gap-3" data-testid="runs-evidence-section">
+					<div className="grid min-w-0 gap-6 xl:grid-cols-2">
+						{lanes.map((lane) => (
+							<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
+								<CardContent className="space-y-2 px-4 py-4 text-sm">
+									<div className="font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
+									{lane.detail.data ? (
+										<RunEvidenceStatus detail={lane.detail.data} arm={lane.pairRun.arm} />
+									) : (
+										<BlockSkeleton rows={4} testId={`runs-evidence-${lane.pairRun.arm}-loading`} />
+									)}
+								</CardContent>
+							</Card>
+						))}
+					</div>
 				</div>
-			</div>
-
 			</DetailsDisclosure>
 
 			<Section title={t("runs.claim.title")} description={t("runs.claim.description")} testId="runs-claim-section">
@@ -282,19 +291,19 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 			</Section>
 
 			<DetailsDisclosure label={t("review.runs.title")} testId="runs-reviews-fold">
-			<div className="flex min-w-0 flex-col gap-3" data-testid="runs-reviews-section">
-				<p className="text-muted-foreground text-sm">{t("review.runs.description")}</p>
-				<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
-					{lanes.map((lane) => (
-						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
-							<CardContent className="flex flex-col gap-2 px-4 py-4">
-								<div className="text-sm font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
-								<RunReviewsBlock runId={lane.pairRun.run.run_id} testId={`runs-reviews-${lane.pairRun.arm}`} />
-							</CardContent>
-						</Card>
-					))}
+				<div className="flex min-w-0 flex-col gap-3" data-testid="runs-reviews-section">
+					<p className="text-muted-foreground text-sm">{t("review.runs.description")}</p>
+					<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
+						{lanes.map((lane) => (
+							<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
+								<CardContent className="flex flex-col gap-2 px-4 py-4">
+									<div className="text-sm font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
+									<RunReviewsBlock runId={lane.pairRun.run.run_id} testId={`runs-reviews-${lane.pairRun.arm}`} />
+								</CardContent>
+							</Card>
+						))}
+					</div>
 				</div>
-			</div>
 			</DetailsDisclosure>
 
 			<Section title={t("runs.lanes.title")} description={t("runs.lanes.description")} testId="runs-lanes-section">
@@ -418,13 +427,15 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 			<p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 				<span>
 					{/* M4-65: the comparison by name; the id stays in the link's title. */}
-					{t("runs.experimentLabel")} <EntityLink kind="experiment" id={pair.exp_id}>{expName}</EntityLink>
+					{t("runs.experimentLabel")}{" "}
+					<EntityLink kind="experiment" id={pair.exp_id}>
+						{expName}
+					</EntityLink>
 				</span>
 				<span className="flex flex-wrap items-center gap-x-2">
 					{pair.runs.map((run) => (
 						<span key={run.run.run_id}>
-							{t("runs.arm", { arm: run.arm })}{" "}
-							{/* Q-162: the agent by name; the run id stays in the link's title and target. */}
+							{t("runs.arm", { arm: run.arm })} {/* Q-162: the agent by name; the run id stays in the link's title and target. */}
 							<EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`}>
 								{run.run.agent?.config_id || undefined}
 							</EntityLink>{" "}

@@ -37,7 +37,7 @@ describe("NewImprovementDialog benchmark picker", () => {
 		// Q-109: the shared Select renders its options only when opened; the sorted choices are pinned in
 		// newImprovementDialog.uf2b.test.ts. Here the styled trigger with its placeholder must show.
 		expect(html).toMatch(/<button[^>]*data-testid="new-improvement-suite"/);
-		expect(html).toContain("data-slot=\"select-value\"");
+		expect(html).toContain('data-slot="select-value"');
 	});
 });
 // Round 5 lane L7: the study create and chain check hooks, outside a store.

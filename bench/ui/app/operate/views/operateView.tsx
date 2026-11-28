@@ -308,11 +308,7 @@ export function OperatePanels({
 		<div className="flex min-w-0 flex-col gap-6">
 			<OperateTiles status={status} backupCount={backupCount} />
 			<div className="grid min-w-0 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
-				<Section
-					title={t("health.title")}
-					icon={Stethoscope}
-					testId="operate-health"
-				>
+				<Section title={t("health.title")} icon={Stethoscope} testId="operate-health">
 					{(status.gpu_mode || status.driver) && (
 						<p className="text-muted-foreground text-xs">
 							{status.gpu_mode && t("health.gpuMode", { mode: status.gpu_mode })}{" "}
@@ -342,11 +338,7 @@ export function OperatePanels({
 				</Section>
 
 				{showEvidence && (
-					<Section
-						title={t("evidence.title")}
-						icon={ShieldCheck}
-						testId="operate-evidence"
-					>
+					<Section title={t("evidence.title")} icon={ShieldCheck} testId="operate-evidence">
 						{hosted ? (
 							status.mirror ? (
 								<p className="text-muted-foreground text-xs" data-testid="operate-mirror">
@@ -507,7 +499,10 @@ export default function OperateView() {
 	// Q-54: inside Settings the frame already pads the page; a second padding shifted the heading 16 px.
 	const embedded = useEmbedded();
 	return (
-		<section className={cn(pageWidthClass(embedded ? "wide" : "dash"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")} data-testid="operate-screen">
+		<section
+			className={cn(pageWidthClass(embedded ? "wide" : "dash"), "flex flex-col gap-6", !embedded && "p-4 sm:p-6")}
+			data-testid="operate-screen"
+		>
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="operate-loading" />

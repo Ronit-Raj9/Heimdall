@@ -18,7 +18,12 @@ export function DoctorResult({ result }: { result: Doctor }) {
 			<p className="text-xs font-medium">{failed === 0 ? t("doctor.allPass") : t("doctor.failed", { count: failed })}</p>
 			<ul className="flex min-w-0 flex-col gap-1.5">
 				{result.checks.map((c, i) => (
-					<li key={`${c.id}-${i}`} className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-2 text-xs" data-testid="doctor-check" data-status={c.status}>
+					<li
+						key={`${c.id}-${i}`}
+						className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-2 text-xs"
+						data-testid="doctor-check"
+						data-status={c.status}
+					>
 						<StatusPill tone={tones[c.status] ?? "neutral"}>{t(`doctor.status.${c.status}`, { defaultValue: c.status })}</StatusPill>
 						<span className="min-w-0 break-words">
 							<span className="font-medium">{c.id}</span>

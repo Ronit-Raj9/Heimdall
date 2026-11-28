@@ -3,7 +3,12 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InlineError } from "@/components/runs/screenStates";
 import type { Incident, IncidentImpact, IncidentStatus } from "@/lib/store/apis/statusApi";
-import { type OpenIncidentBody, type UpdateIncidentBody, useOpenIncidentMutation, useUpdateIncidentMutation } from "@/lib/store/apis/statusIncidentsApi";
+import {
+	type OpenIncidentBody,
+	type UpdateIncidentBody,
+	useOpenIncidentMutation,
+	useUpdateIncidentMutation,
+} from "@/lib/store/apis/statusIncidentsApi";
 import "./ufl10I18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,10 +66,21 @@ export function IncidentAdmin({ open, onSaved }: { open: Incident[]; onSaved: ()
 					<Input value={title} maxLength={160} onChange={(e) => setTitle(e.target.value)} data-testid="incident-title" />
 				</Field>
 				<Field label={t("incident.message")}>
-					<textarea className={areaClass} value={message} maxLength={2000} onChange={(e) => setMessage(e.target.value)} data-testid="incident-message" />
+					<textarea
+						className={areaClass}
+						value={message}
+						maxLength={2000}
+						onChange={(e) => setMessage(e.target.value)}
+						data-testid="incident-message"
+					/>
 				</Field>
 				<Field label={t("incident.impact")}>
-					<select className={selectClass} value={impact} onChange={(e) => setImpact(e.target.value as IncidentImpact)} data-testid="incident-impact">
+					<select
+						className={selectClass}
+						value={impact}
+						onChange={(e) => setImpact(e.target.value as IncidentImpact)}
+						data-testid="incident-impact"
+					>
 						{IMPACTS.map((i) => (
 							<option key={i} value={i}>
 								{t(`incident.impacts.${i}`)}
@@ -97,7 +113,12 @@ export function IncidentAdmin({ open, onSaved }: { open: Incident[]; onSaved: ()
 							</select>
 						</Field>
 						<Field label={t("incident.status")}>
-							<select className={selectClass} value={status} onChange={(e) => setStatus(e.target.value as IncidentStatus)} data-testid="incident-status">
+							<select
+								className={selectClass}
+								value={status}
+								onChange={(e) => setStatus(e.target.value as IncidentStatus)}
+								data-testid="incident-status"
+							>
 								{STATUSES.map((s) => (
 									<option key={s} value={s}>
 										{t(`incident.statuses.${s}`)}
@@ -106,11 +127,23 @@ export function IncidentAdmin({ open, onSaved }: { open: Incident[]; onSaved: ()
 							</select>
 						</Field>
 						<Field label={t("incident.message")}>
-							<textarea className={areaClass} value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} data-testid="incident-note" />
+							<textarea
+								className={areaClass}
+								value={note}
+								maxLength={2000}
+								onChange={(e) => setNote(e.target.value)}
+								data-testid="incident-note"
+							/>
 						</Field>
 						<InlineError error={updating.error} title={t("incident.error")} testId="incident-note-error" />
 						<div>
-							<Button size="sm" variant="outline" disabled={!note.trim() || updating.isLoading} onClick={addNote} data-testid="incident-add-note">
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={!note.trim() || updating.isLoading}
+								onClick={addNote}
+								data-testid="incident-add-note"
+							>
 								{updating.isLoading ? t("incident.adding") : t("incident.addNote")}
 							</Button>
 						</div>

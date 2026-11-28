@@ -15,7 +15,17 @@ const parent: View = {
 		{ exp_id: "e_x1", name: "luna-ext", kind: "tasks", runs: 4, pooled: true },
 		{ exp_id: "e_x2", name: "luna-ext-2", kind: "tasks", runs: 4, pooled: false, reason: "arm B config hash differs" },
 	],
-	pooled: { condition: "clean", metric: "verified_success", tasks: 4, runs: 8, added_runs: 4, mean_a: 0.25, mean_b: 0.75, d_bar: 0.5, interval: [-0.2, 1] },
+	pooled: {
+		condition: "clean",
+		metric: "verified_success",
+		tasks: 4,
+		runs: 8,
+		added_runs: 4,
+		mean_a: 0.25,
+		mean_b: 0.75,
+		d_bar: 0.5,
+		interval: [-0.2, 1],
+	},
 };
 
 describe("ExtendPoolView", () => {
@@ -32,12 +42,18 @@ describe("ExtendPoolView", () => {
 	});
 
 	it("tells a follow-up where its runs count", () => {
-		const html = render(<ExtendPoolView view={{ exp_id: "e_x1", parent: "e_p", parent_pooled: true, extensions: [], pooled: null }} />).replace(/<!-- -->/g, "");
+		const html = render(
+			<ExtendPoolView view={{ exp_id: "e_x1", parent: "e_p", parent_pooled: true, extensions: [], pooled: null }} />,
+		).replace(/<!-- -->/g, "");
 		expect(html).toContain("Its runs count in");
 	});
 
 	it("says when a follow-up's runs do not count", () => {
-		const html = render(<ExtendPoolView view={{ exp_id: "e_x2", parent: "e_p", parent_pooled: false, parent_reason: "suites differ", extensions: [], pooled: null }} />).replace(/<!-- -->/g, "");
+		const html = render(
+			<ExtendPoolView
+				view={{ exp_id: "e_x2", parent: "e_p", parent_pooled: false, parent_reason: "suites differ", extensions: [], pooled: null }}
+			/>,
+		).replace(/<!-- -->/g, "");
 		expect(html).toContain("not counted in e_p: suites differ");
 	});
 });

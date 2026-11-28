@@ -28,19 +28,31 @@ export function needState(need: GwNeed | undefined, tasksIn: number, trialsIn: n
 		const s: NeedState = {
 			status: "ok",
 			line: { key: "need.calls", o: { calls: need.model_calls, tasks: need.default_tasks } },
-			perRun: { key: need.calls_from === "history" ? "need.callsHistory" : "need.callsDefault", o: { perRun: Math.round(perRun * 10) / 10 } },
+			perRun: {
+				key: need.calls_from === "history" ? "need.callsHistory" : "need.callsDefault",
+				o: { perRun: Math.round(perRun * 10) / 10 },
+			},
 		};
-		if (expected < need.model_calls) return { ...s, status: "unlikely", problem: { key: "need.fewCalls", o: { tasks, expected, need: need.model_calls, pick: need.default_tasks } } };
+		if (expected < need.model_calls)
+			return {
+				...s,
+				status: "unlikely",
+				problem: { key: "need.fewCalls", o: { tasks, expected, need: need.model_calls, pick: need.default_tasks } },
+			};
 		return s;
 	}
 	trials = Math.max(1, trials);
 	const runs = need.runs_per_setup ?? 0;
-	const line: { key: "need.runs" | "need.runsOneTrial"; o: Record<string, number> } = need.default_trials === 1
-		? { key: "need.runsOneTrial" as const, o: { runs, tasks: need.default_tasks } }
-		: { key: "need.runs" as const, o: { runs, tasks: need.default_tasks, trials: need.default_trials } };
-	if (need.paired_tasks && tasks < need.paired_tasks) return { status: "impossible", line, problem: { key: "need.tooFewTasks", o: { tasks, need: need.paired_tasks } } };
-	if (tasks * trials < runs) return { status: "impossible", line, problem: { key: "need.tooFewRuns", o: { tasks, trials, runs: tasks * trials, need: runs } } };
-	if (poison && need.poison_runs && tasks < need.poison_runs) return { status: "unlikely", line, problem: { key: "need.fewPoison", o: { need: need.poison_runs, tasks } } };
+	const line: { key: "need.runs" | "need.runsOneTrial"; o: Record<string, number> } =
+		need.default_trials === 1
+			? { key: "need.runsOneTrial" as const, o: { runs, tasks: need.default_tasks } }
+			: { key: "need.runs" as const, o: { runs, tasks: need.default_tasks, trials: need.default_trials } };
+	if (need.paired_tasks && tasks < need.paired_tasks)
+		return { status: "impossible", line, problem: { key: "need.tooFewTasks", o: { tasks, need: need.paired_tasks } } };
+	if (tasks * trials < runs)
+		return { status: "impossible", line, problem: { key: "need.tooFewRuns", o: { tasks, trials, runs: tasks * trials, need: runs } } };
+	if (poison && need.poison_runs && tasks < need.poison_runs)
+		return { status: "unlikely", line, problem: { key: "need.fewPoison", o: { need: need.poison_runs, tasks } } };
 	return { status: "ok", line };
 }
 

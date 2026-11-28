@@ -178,7 +178,11 @@ describe("Findings tab", () => {
 	it("shows the Show archived switch, and an archived finding with its pill and row menu", () => {
 		state.list = {
 			isLoading: false,
-			data: { mode: "live", findings: [base, { ...base, id: "fnd-000000000002", archived_at: "2026-11-20T10:00:00Z" }], counts: { open: 2 } },
+			data: {
+				mode: "live",
+				findings: [base, { ...base, id: "fnd-000000000002", archived_at: "2026-11-20T10:00:00Z" }],
+				counts: { open: 2 },
+			},
 		};
 		const html = renderToStaticMarkup(<FindingsTab />);
 		expect(html).toContain('data-testid="findings-show-archived"');

@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 import { costEstimate, defaultAgent, draftRequest, missingFields, suitePickable } from "./featureTestDialog";
 import type { ExperimentPlan, Forecast } from "@/lib/types/bench";
 
-const form = { suite: "s@1", base: "agents/mcploop.yaml", model: "", provider: "", budget: "1", trials: "1", taskCount: "3", name: " zz-test ", options: {} };
+const form = {
+	suite: "s@1",
+	base: "agents/mcploop.yaml",
+	model: "",
+	provider: "",
+	budget: "1",
+	trials: "1",
+	taskCount: "3",
+	name: " zz-test ",
+	options: {},
+};
 const plan = { errors: [], est_usd: { state: "unknown", v: null }, est_wall_s: { state: "unknown", v: null } } as unknown as ExperimentPlan;
 
 describe("feature test form, round 4", () => {
@@ -18,7 +28,10 @@ describe("feature test form, round 4", () => {
 		expect(suitePickable({ task_count: 5, admitted_count: 0 })).toBe(false);
 	});
 	it("starts with a tool-using agent, never bare-model", () => {
-		const agents = [{ id: "bare-model", path: "agents/bare-model.yaml" }, { id: "codex", path: "agents/codex.yaml" }];
+		const agents = [
+			{ id: "bare-model", path: "agents/bare-model.yaml" },
+			{ id: "codex", path: "agents/codex.yaml" },
+		];
 		expect(defaultAgent(agents)?.id).toBe("codex");
 		expect(defaultAgent([agents[0]])).toBeUndefined();
 	});

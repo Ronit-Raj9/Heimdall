@@ -16,7 +16,9 @@ describe("admin actions", () => {
 
 	it("lists leftover Modal apps from GET /open-models/modal-apps", () => {
 		expect(modalAppsRequest).toEqual({ url: "/open-models/modal-apps" });
-		const wire = JSON.parse('{"apps":[{"name":"heimdall-qwen","app_id":"ap-1","state":"deployed","tasks":"1"}]}') as { apps: Parameters<typeof ModalAppsList>[0]["apps"] };
+		const wire = JSON.parse('{"apps":[{"name":"heimdall-qwen","app_id":"ap-1","state":"deployed","tasks":"1"}]}') as {
+			apps: Parameters<typeof ModalAppsList>[0]["apps"];
+		};
 		const html = renderToStaticMarkup(<ModalAppsList apps={wire.apps} />);
 		expect(html).toContain("heimdall-qwen");
 		expect(html).toContain("modal app stop");

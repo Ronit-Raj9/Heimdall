@@ -19,7 +19,8 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetRunQuery: (id: string) => okQuery(runs.byId[id]),
 }));
 vi.mock("@/lib/store/apis/runStepsApi", () => ({
-	useGetRunStepsQuery: (id: string) => okQuery({ run_id: id, available: true, observers: [], steps: [{ seq: 1, kind: "tool_request", summary: `step of ${id}` }] }),
+	useGetRunStepsQuery: (id: string) =>
+		okQuery({ run_id: id, available: true, observers: [], steps: [{ seq: 1, kind: "tool_request", summary: `step of ${id}` }] }),
 }));
 vi.mock("@/lib/store/apis/runDivergenceApi", () => ({
 	useGetRunDivergenceQuery: () => okQuery({ available: true, divergence: { found: true, seq_a: 1, seq_b: 1, after: [] } }),

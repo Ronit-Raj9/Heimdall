@@ -87,6 +87,9 @@ export function evaluationCostPerRun(evaluation: {
 	const spent =
 		typeof stored === "number"
 			? stored
-			: (evaluation.children ?? []).reduce<number | null>((s, c) => (s === null || typeof c.spent_usd !== "number" ? null : s + c.spent_usd), 0);
+			: (evaluation.children ?? []).reduce<number | null>(
+					(s, c) => (s === null || typeof c.spent_usd !== "number" ? null : s + c.spent_usd),
+					0,
+				);
 	return spent === null ? null : spent / runs;
 }

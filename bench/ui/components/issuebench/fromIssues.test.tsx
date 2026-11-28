@@ -135,9 +135,7 @@ describe("repository field", () => {
 		api.github = { connected: false };
 		const out = render(<FromIssues writable />, hostedSession("member"));
 		expect(out).toContain('data-testid="ib-repo-input"');
-		expect(out).toContain(
-			"Connect GitHub in Settings &gt; GitHub. GitHub needs sign-in to list pull requests.",
-		);
+		expect(out).toContain("Connect GitHub in Settings &gt; GitHub. GitHub needs sign-in to list pull requests.");
 		expect(tagOf(out, "issuebench-scan") ?? "").toContain("disabled");
 	});
 });

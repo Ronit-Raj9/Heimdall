@@ -8,7 +8,9 @@ import { LEARN_GOALS } from "./step2Learn";
 import { addModelArm, advancedChanged, removeModelArm, specProblem } from "./step4Setup";
 
 // The body handlers/evaluations_l3wizard_test.go posts to POST /evaluations.
-const FIXTURE = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../handlers/testdata/l3_wizard_model_switch.json", import.meta.url)), "utf8"));
+const FIXTURE = JSON.parse(
+	readFileSync(fileURLToPath(new URL("../../../../handlers/testdata/l3_wizard_model_switch.json", import.meta.url)), "utf8"),
+);
 
 describe("Find the best model (mode model_switch)", () => {
 	it("is a step 2 goal and a link mode", () => {

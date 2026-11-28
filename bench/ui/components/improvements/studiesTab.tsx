@@ -4,7 +4,11 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/ui/statusPill";
-import { useGetImprovementStudiesQuery, useGetImprovementStudyQuery, useStopImprovementStudyMutation } from "@/lib/store/apis/improveStudyApi";
+import {
+	useGetImprovementStudiesQuery,
+	useGetImprovementStudyQuery,
+	useStopImprovementStudyMutation,
+} from "@/lib/store/apis/improveStudyApi";
 import type { ImprovementStatus } from "@/lib/types/improve";
 import type { StudyView } from "@/lib/types/improvementStudy";
 import { Link } from "@tanstack/react-router";
@@ -39,7 +43,8 @@ export function StudiesTab({ admin, onCreate }: { admin: boolean; onCreate?: () 
 		if (q.data) setPoll(live);
 	}, [q.data, live]);
 	if (q.isLoading) return <BlockSkeleton rows={3} testId="studies-loading" />;
-	if (q.error || !q.data) return <LoadError title={t("studies.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="studies-error" />;
+	if (q.error || !q.data)
+		return <LoadError title={t("studies.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="studies-error" />;
 	if (rows.length === 0) {
 		return (
 			<EmptyState

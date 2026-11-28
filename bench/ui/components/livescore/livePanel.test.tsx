@@ -73,7 +73,9 @@ describe("LiveBody", () => {
 			/>,
 		);
 		// M7-64: on a live server the setup hero says it already, so the note is not shown twice.
-		const live = renderToStaticMarkup(<LiveBody status={{ ...LIVE_STATUS_FIXTURE, configured: false, problem: undefined, compare: undefined }} />);
+		const live = renderToStaticMarkup(
+			<LiveBody status={{ ...LIVE_STATUS_FIXTURE, configured: false, problem: undefined, compare: undefined }} />,
+		);
 		expect(live).not.toContain('data-testid="live-unconfigured"');
 		expect(live).toContain('data-testid="live-simulate"');
 		expect(html).toContain('data-testid="live-unconfigured"');

@@ -91,7 +91,9 @@ const DIFF_FMT = {
 } as const;
 
 /** The difference rows (variant minus control) with their ranges: kind, difference, range. Pure. */
-export function diffRows(effect: Pick<GwEffect, "solve_delta" | "cost_delta" | "latency_delta">): { key: keyof typeof DIFF_FMT; diff: string; range: string }[] {
+export function diffRows(
+	effect: Pick<GwEffect, "solve_delta" | "cost_delta" | "latency_delta">,
+): { key: keyof typeof DIFF_FMT; diff: string; range: string }[] {
 	const out: { key: keyof typeof DIFF_FMT; diff: string; range: string }[] = [];
 	for (const [key, iv] of [
 		["solve", effect.solve_delta],
@@ -198,7 +200,9 @@ export function GatewayEffectView({
 					<span className="bg-muted rounded-full px-2 py-0.5 text-xs" data-testid="gateway-effect-state">
 						{t(`effect.state.${effect.state}`)}
 					</span>
-					{effect.result && effect.state === "measured" && !noVerdict && <span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>}
+					{effect.result && effect.state === "measured" && !noVerdict && (
+						<span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>
+					)}
 					<span data-testid="gateway-effect-headline">{effect.headline}</span>
 				</div>
 				{reasonLine(effect) && (
@@ -274,7 +278,11 @@ export function GatewayEffectCard({ expId }: { expId: string }) {
 	const card = useGetGatewayReportCardQuery(undefined, { skip: !again });
 	if (!effect) return null;
 	const name = card.data?.lines?.find((l) => l.feature === effect.feature)?.name ?? effect.feature;
-	const suite = exp.data?.suite?.includes("@") ? exp.data.suite : exp.data?.suite ? suiteOption({ id: exp.data.suite, version: exp.data.suite_version }) : "";
+	const suite = exp.data?.suite?.includes("@")
+		? exp.data.suite
+		: exp.data?.suite
+			? suiteOption({ id: exp.data.suite, version: exp.data.suite_version })
+			: "";
 	return (
 		<>
 			<GatewayEffectView effect={effect} setting={setting.data} onRunAgain={unknown ? () => setAgain(true) : undefined} />

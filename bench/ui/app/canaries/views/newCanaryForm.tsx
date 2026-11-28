@@ -17,7 +17,15 @@ import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suite
 import type { AgentSummary, CanaryDefinition, CanaryNoiseFloor, SuiteSummary } from "@/lib/types/bench";
 import type { AlertConfig, CanaryInitRequest } from "@/lib/types/schedules";
 import { useGetSchedulesQuery } from "@/lib/store/apis/schedulesApi";
-import { type CheckCost, checkCost, HowOften, howOftenCron, howOftenOf, howOftenProblem, newHowOften } from "@/components/canaries/howOften";
+import {
+	type CheckCost,
+	checkCost,
+	HowOften,
+	howOftenCron,
+	howOftenOf,
+	howOftenProblem,
+	newHowOften,
+} from "@/components/canaries/howOften";
 import { formatUsd } from "@/lib/money";
 import { runsPerDay } from "@/lib/utils/cron";
 import "@/components/canaries/uf7bI18n";
@@ -120,7 +128,9 @@ export function newCanaryFields(agent = ""): CanaryFormFields {
 }
 
 /** The cron line the form sends, or null for "Only when I press Check now". Exported for tests. */
-export function canaryCron(f: Pick<CanaryFormFields, "when" | "cron"> & Partial<Pick<CanaryFormFields, "time" | "weekday">>): string | null {
+export function canaryCron(
+	f: Pick<CanaryFormFields, "when" | "cron"> & Partial<Pick<CanaryFormFields, "time" | "weekday">>,
+): string | null {
 	return howOftenCron({ when: f.when, cron: f.cron, time: f.time ?? "06:00", weekday: f.weekday ?? 1 });
 }
 
@@ -202,7 +212,9 @@ export function buildCanaryRequest(input: CanaryFormFields | CanaryTextFields): 
 
 /** The form fields of an existing definition (the Edit button). Exported for tests. */
 export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
-	const how = d.schedule?.cron?.trim() ? howOftenOf(d.schedule.cron, d.schedule.timezone) : newHowOften({ when: d.schedule ? "custom" : "manual" });
+	const how = d.schedule?.cron?.trim()
+		? howOftenOf(d.schedule.cron, d.schedule.timezone)
+		: newHowOften({ when: d.schedule ? "custom" : "manual" });
 	const when = how.when;
 	return {
 		time: how.time,
@@ -210,7 +222,12 @@ export function canaryFormFields(d: CanaryDefinition): CanaryFormFields {
 		timezone: how.timezone,
 		sensitivity: d.sensitivity ?? "",
 		dropPoints: d.noise_floor?.success ? String(Math.round(d.noise_floor.success * 1000) / 10) : "",
-		alerts: (d.alerts ?? []).map((a) => ({ url_env: a.url_env, ...(a.secret_env ? { secret_env: a.secret_env } : {}), ...(a.events ? { events: a.events } : {}), ...(a.format ? { format: a.format as AlertConfig["format"] } : {}) })),
+		alerts: (d.alerts ?? []).map((a) => ({
+			url_env: a.url_env,
+			...(a.secret_env ? { secret_env: a.secret_env } : {}),
+			...(a.events ? { events: a.events } : {}),
+			...(a.format ? { format: a.format as AlertConfig["format"] } : {}),
+		})),
 		name: d.name,
 		agent: d.agent,
 		suite: d.suite,
@@ -270,7 +287,8 @@ export function suiteTaskPick(suites: readonly SuiteSummary[] | undefined, ref: 
 }
 
 /** The schedules keys of the form's own problems. */
-export type CanaryProblemKey = `canary.problem.${"name" | "agent" | "suite" | "tasks" | "targets" | "cron" | "cronInvalid" | "budget" | "budgetOrder"}`;
+export type CanaryProblemKey =
+	`canary.problem.${"name" | "agent" | "suite" | "tasks" | "targets" | "cron" | "cronInvalid" | "budget" | "budgetOrder"}`;
 
 /** Field keys of the form that a problem can sit under. */
 export type CanaryField = "name" | "agent" | "suite" | "tasks" | "targets" | "schedule" | "budget";
@@ -301,7 +319,6 @@ export function canaryFormProblems(
 	}
 	return out;
 }
-
 
 /** The largest number of task checkboxes shown at once; the filter narrows a bigger benchmark. */
 const TASKS_SHOWN = 200;
@@ -381,7 +398,11 @@ export function NewCanaryForm({
 			? t("canary.whenWords.manual")
 			: f.when === "custom"
 				? t("canary.whenWords.custom", { cron, zone: f.timezone })
-				: t(`canary.whenWords.${f.when}`, { time: f.time, zone: f.timezone, day: c(`howOften.day.${["sun", "mon", "tue", "wed", "thu", "fri", "sat"][f.weekday] as "mon"}`) });
+				: t(`canary.whenWords.${f.when}`, {
+						time: f.time,
+						zone: f.timezone,
+						day: c(`howOften.day.${["sun", "mon", "tue", "wed", "thu", "fri", "sat"][f.weekday] as "mon"}`),
+					});
 	};
 	const submit = async () => {
 		setMsg(null);
@@ -491,11 +512,7 @@ export function NewCanaryForm({
 	const suiteField = (
 		<label className="flex flex-col gap-1 text-xs">
 			<span className="text-foreground text-sm font-medium">{t("canary.suite")}</span>
-			<NativeSelect
-				value={f.suite}
-				onChange={(e) => patch({ suite: e.target.value, taskIds: [] })}
-				data-testid="canary-new-suite"
-			>
+			<NativeSelect value={f.suite} onChange={(e) => patch({ suite: e.target.value, taskIds: [] })} data-testid="canary-new-suite">
 				<option value="">{suites.isLoading ? t("canary.suitesLoading") : t("canary.suitePick")}</option>
 				{refs.map((r) => (
 					<option key={r} value={r}>
@@ -663,7 +680,7 @@ export function NewCanaryForm({
 				<span className="text-muted-foreground">{d("canary.dropHelp")}</span>
 			</label>
 			<fieldset className="flex flex-col gap-1">
-				<legend className="text-foreground text-sm font-medium mb-1">{c("canary.channel")}</legend>
+				<legend className="text-foreground mb-1 text-sm font-medium">{c("canary.channel")}</legend>
 				{hooks.isSuccess && hookList.length === 0 ? (
 					<span data-testid="canary-new-no-channel">
 						{c("canary.noChannel")}{" "}
@@ -677,10 +694,14 @@ export function NewCanaryForm({
 							<input
 								type="checkbox"
 								checked={picked(a)}
-								onChange={(e) => patch({ alerts: e.target.checked ? [...f.alerts, { ...a }] : f.alerts.filter((x) => x.url_env !== a.url_env) })}
+								onChange={(e) =>
+									patch({ alerts: e.target.checked ? [...f.alerts, { ...a }] : f.alerts.filter((x) => x.url_env !== a.url_env) })
+								}
 								data-testid={`canary-new-channel-${a.url_env}`}
 							/>
-							<span>{a.format === "slack" ? c("canary.channelSlack", { name: a.url_env }) : c("canary.channelHook", { name: a.url_env })}</span>
+							<span>
+								{a.format === "slack" ? c("canary.channelSlack", { name: a.url_env }) : c("canary.channelHook", { name: a.url_env })}
+							</span>
 						</label>
 					))
 				)}

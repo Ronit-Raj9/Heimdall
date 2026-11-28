@@ -19,7 +19,10 @@ export const liveMonitorEditApi = liveMonitorsApi.injectEndpoints({
 	endpoints: (builder) => ({
 		updateLiveMonitor: builder.mutation<MonitorDetailResponse, { id: string; body: MonitorUpdate }>({
 			query: ({ id, body }) => monitorUpdateRequest(id, body),
-			invalidatesTags: (_r, _e, { id }) => [{ type: "BenchLiveMonitor", id: "LIST" }, { type: "BenchLiveMonitor", id }],
+			invalidatesTags: (_r, _e, { id }) => [
+				{ type: "BenchLiveMonitor", id: "LIST" },
+				{ type: "BenchLiveMonitor", id },
+			],
 		}),
 	}),
 });

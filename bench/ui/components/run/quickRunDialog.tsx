@@ -235,7 +235,10 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 						{!agent && (
 							<label className="block space-y-1 text-sm">
 								<span className="font-medium">{t("agent")}</span>
-								<select className={fieldCls} value={agentV} onChange={(e) => {
+								<select
+									className={fieldCls}
+									value={agentV}
+									onChange={(e) => {
 										setAgent(e.target.value);
 										// The agent's own model, unless the caller fixed one (N2).
 										if (!model) setModel(agentModelRef(agentList.find((a) => a.path === e.target.value)?.model));

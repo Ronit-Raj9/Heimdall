@@ -40,7 +40,9 @@ vi.mock("@/lib/store", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useGetAgentsQuery: () => fx.ok(fx.agents),
 }));
-vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => fx.ok({ suites: [{ id: "longmemeval", description: "" }] }) }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => fx.ok({ suites: [{ id: "longmemeval", description: "" }] }),
+}));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useListEvaluationsQuery: () => fx.ok([]),
@@ -78,7 +80,9 @@ const estimate = {
 	trials: 1,
 	est_cost_usd: { low: 0.1, high: 0.3, known: true },
 	est_minutes: { low: 2, high: 5, known: true },
-	per_benchmark: [{ benchmark: "longmemeval", runs: 18, tasks: 3, conditions: ["clean", "model-outage", "primary-outage"], faults_skipped: [] }],
+	per_benchmark: [
+		{ benchmark: "longmemeval", runs: 18, tasks: 3, conditions: ["clean", "model-outage", "primary-outage"], faults_skipped: [] },
+	],
 } as unknown as Estimate;
 
 function withDraft(f: Form) {
@@ -127,7 +131,12 @@ describe("fallback model on the Failure tests form", () => {
 describe("run count from the estimate", () => {
 	it("breaks the server's count down in one line", () => {
 		expect(runsBreakdown(estimate)).toBe("3 tasks x 1 try x 3 conditions x 2 setups = 18 runs");
-		const plain = { ...estimate, runs: 18, arms: 1, per_benchmark: [{ ...estimate.per_benchmark[0], conditions: ["a", "b", "c", "d", "e", "f"] }] };
+		const plain = {
+			...estimate,
+			runs: 18,
+			arms: 1,
+			per_benchmark: [{ ...estimate.per_benchmark[0], conditions: ["a", "b", "c", "d", "e", "f"] }],
+		};
 		expect(runsBreakdown(plain as Estimate)).toBe("3 tasks x 1 try x 6 conditions = 18 runs");
 		// Parts that do not multiply to the server's count: only the count.
 		expect(runsBreakdown({ ...estimate, runs: 20 } as Estimate)).toBe("20 runs");

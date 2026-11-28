@@ -99,7 +99,16 @@ function useCheckName(): (gate: string) => string {
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere, headlineContext, belowHeadline, totals }: ReportCardProps) {
+export function ReportCard({
+	report: raw,
+	className,
+	actions,
+	readOnly = false,
+	onWhere,
+	headlineContext,
+	belowHeadline,
+	totals,
+}: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const checkName = useCheckName();
@@ -180,10 +189,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 
 			{(report.resilience?.length ?? 0) > 0 && (
-				<Section as="h3"
-					title={tr("sections.resilience")}
-					description={tr("sections.resilienceHelp")}
-				>
+				<Section as="h3" title={tr("sections.resilience")} description={tr("sections.resilienceHelp")}>
 					<ResilienceCard report={report} />
 				</Section>
 			)}
@@ -206,44 +212,35 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					testId="report-more-sections"
 				>
 					<div className="mt-3 flex min-w-0 flex-col gap-6">
-					{hasLearning(report) && (
-						<Section as="h3"
-							title={tr("sections.learning")}
-							description={tr("sections.learningHelp")}
-						>
-							<LearningTable report={report} />
-						</Section>
-					)}
+						{hasLearning(report) && (
+							<Section as="h3" title={tr("sections.learning")} description={tr("sections.learningHelp")}>
+								<LearningTable report={report} />
+							</Section>
+						)}
 
-					{hasVoice(report) && (
-						<Section as="h3" title={tr("sections.voice")} description={tr("sections.voiceHelp")}>
-							<VoiceTable report={report} />
-						</Section>
-					)}
+						{hasVoice(report) && (
+							<Section as="h3" title={tr("sections.voice")} description={tr("sections.voiceHelp")}>
+								<VoiceTable report={report} />
+							</Section>
+						)}
 
-					{hasPersistence(report) && (
-						<Section as="h3" title={tr("sections.persistence")} description={tr("sections.persistenceHelp")}>
-							<PersistenceTable report={report} />
-						</Section>
-					)}
+						{hasPersistence(report) && (
+							<Section as="h3" title={tr("sections.persistence")} description={tr("sections.persistenceHelp")}>
+								<PersistenceTable report={report} />
+							</Section>
+						)}
 
-					{hasVoiceCalls(report) && (
-						<Section as="h3"
-							title={tr("sections.voiceCalls")}
-							description={tr("sections.voiceCallsHelp")}
-						>
-							<VoiceCallsTable report={report} />
-						</Section>
-					)}
+						{hasVoiceCalls(report) && (
+							<Section as="h3" title={tr("sections.voiceCalls")} description={tr("sections.voiceCallsHelp")}>
+								<VoiceCallsTable report={report} />
+							</Section>
+						)}
 
-					{hasBifrost(report) && (
-						<Section as="h3"
-							title={tr("sections.bifrost")}
-							description={tr("sections.bifrostHelp")}
-						>
-							<BifrostTable report={report} />
-						</Section>
-					)}
+						{hasBifrost(report) && (
+							<Section as="h3" title={tr("sections.bifrost")} description={tr("sections.bifrostHelp")}>
+								<BifrostTable report={report} />
+							</Section>
+						)}
 					</div>
 				</DetailsDisclosure>
 			)}
@@ -256,19 +253,13 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			<CheatRateRow report={report} />
 
 			{hasRedTeam(report) && (
-				<Section as="h3"
-					title={tr("sections.redTeam")}
-					description={tr("sections.redTeamHelp")}
-				>
+				<Section as="h3" title={tr("sections.redTeam")} description={tr("sections.redTeamHelp")}>
 					<RedTeamSection report={report} />
 				</Section>
 			)}
 
 			{report.alignment && report.alignment.categories.length > 0 && (
-				<Section as="h3"
-					title={tr("sections.alignment")}
-					description={tr("sections.alignmentHelp")}
-				>
+				<Section as="h3" title={tr("sections.alignment")} description={tr("sections.alignmentHelp")}>
 					<AlignmentSection report={report} />
 				</Section>
 			)}
@@ -424,94 +415,110 @@ function CapabilityTable({ report }: { report: Report }) {
 	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
-		<Table stack data-testid="report-capabilities" aria-label={tr("columns.capabilityTable")}>
-			<TableHeader>
-				<TableRow>
-					<TableHead scope="col">{tr("columns.capability")}</TableHead>
-					{ab && <TableHead scope="col">{tr("columns.setup")}</TableHead>}
-					{METRIC_HEADS.map((h) => (
-						<TableHead key={h} scope="col" priority={METRIC_PRIORITY[h]} className={cn(h !== "Score" && "text-right", ab && (h === "Steps" || h === "Tool calls") && wideOnly)}>
-							{tr(`columns.metric.${h}`)}
-						</TableHead>
-					))}
-					{ab && <TableHead scope="col" className="text-right">{changeHead}</TableHead>}
-					{ab && <TableHead scope="col">{tr("columns.winner")}</TableHead>}
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rows.map(({ capability, data, tested }, i) => {
-					const name = capabilityName(capability);
-					if (!data || !tested) return null; // listed once under the table (M3-12)
-					if (!ab) {
-						return (
-							<TableRow key={capability} data-testid={`capability-${capability}`}>
-								<TableHead scope="row" className="font-medium">
-									{name}
-								</TableHead>
-								<MetricCells metrics={data.arms[a.label]} />
-							</TableRow>
-						);
-					}
-					if (many) {
+			<Table stack data-testid="report-capabilities" aria-label={tr("columns.capabilityTable")}>
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">{tr("columns.capability")}</TableHead>
+						{ab && <TableHead scope="col">{tr("columns.setup")}</TableHead>}
+						{METRIC_HEADS.map((h) => (
+							<TableHead
+								key={h}
+								scope="col"
+								priority={METRIC_PRIORITY[h]}
+								className={cn(h !== "Score" && "text-right", ab && (h === "Steps" || h === "Tool calls") && wideOnly)}
+							>
+								{tr(`columns.metric.${h}`)}
+							</TableHead>
+						))}
+						{ab && (
+							<TableHead scope="col" className="text-right">
+								{changeHead}
+							</TableHead>
+						)}
+						{ab && <TableHead scope="col">{tr("columns.winner")}</TableHead>}
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{rows.map(({ capability, data, tested }, i) => {
+						const name = capabilityName(capability);
+						if (!data || !tested) return null; // listed once under the table (M3-12)
+						if (!ab) {
+							return (
+								<TableRow key={capability} data-testid={`capability-${capability}`}>
+									<TableHead scope="row" className="font-medium">
+										{name}
+									</TableHead>
+									<MetricCells metrics={data.arms[a.label]} />
+								</TableRow>
+							);
+						}
+						if (many) {
+							return (
+								<React.Fragment key={capability}>
+									{report.arms.map((arm, i) => {
+										const vs = i === 0 ? undefined : compareArms(data.arms, a.label, arm.label);
+										return (
+											<TableRow
+												key={arm.label}
+												data-testid={i === 0 ? `capability-${capability}` : `capability-${capability}-${arm.label}`}
+											>
+												{i === 0 && (
+													<TableHead scope="rowgroup" rowSpan={report.arms.length} className="align-top font-medium">
+														{name}
+													</TableHead>
+												)}
+												<TableCell className="font-semibold">{arm.label}</TableCell>
+												<MetricCells metrics={data.arms[arm.label]} ab />
+												<TableCell label={changeHead} className="text-right tabular-nums">
+													{vs ? points(vs.delta) : "-"}
+												</TableCell>
+												<TableCell label={tr("columns.winner")}>
+													{vs ? <WinnerMark result={vs} name={armName(report, vs.winner)} /> : "-"}
+												</TableCell>
+											</TableRow>
+										);
+									})}
+								</React.Fragment>
+							);
+						}
+						const cmp = compareArms(data.arms, a.label, b.label);
 						return (
 							<React.Fragment key={capability}>
-								{report.arms.map((arm, i) => {
-									const vs = i === 0 ? undefined : compareArms(data.arms, a.label, arm.label);
-									return (
-										<TableRow key={arm.label} data-testid={i === 0 ? `capability-${capability}` : `capability-${capability}-${arm.label}`}>
-											{i === 0 && (
-												<TableHead scope="rowgroup" rowSpan={report.arms.length} className="align-top font-medium">
-													{name}
-												</TableHead>
-											)}
-											<TableCell className="font-semibold">{arm.label}</TableCell>
-											<MetricCells metrics={data.arms[arm.label]} ab />
-											<TableCell label={changeHead} className="text-right tabular-nums">
-												{vs ? points(vs.delta) : "-"}
-											</TableCell>
-											<TableCell label={tr("columns.winner")}>
-												{vs ? <WinnerMark result={vs} name={armName(report, vs.winner)} /> : "-"}
-											</TableCell>
-										</TableRow>
-									);
-								})}
+								{[a, b].map((arm, i) => (
+									<TableRow key={arm.label} data-testid={i === 0 ? `capability-${capability}` : `capability-${capability}-${arm.label}`}>
+										{i === 0 && (
+											<TableHead scope="rowgroup" rowSpan={2} className="align-top font-medium">
+												{name}
+											</TableHead>
+										)}
+										<TableCell className="font-semibold">{arm.label}</TableCell>
+										<MetricCells metrics={data.arms[arm.label]} ab />
+										{i === 0 && (
+											<>
+												<TableCell
+													rowSpan={2}
+													label={tr("columns.change", { b: b.label, a: a.label })}
+													className="text-right align-top tabular-nums"
+												>
+													{cmp ? points(cmp.delta) : "-"}
+												</TableCell>
+												<TableCell rowSpan={2} label={tr("columns.winner")} className="align-top">
+													<WinnerMark result={cmp} name={cmp ? armName(report, cmp.winner) : undefined} />
+												</TableCell>
+											</>
+										)}
+									</TableRow>
+								))}
 							</React.Fragment>
 						);
-					}
-					const cmp = compareArms(data.arms, a.label, b.label);
-					return (
-						<React.Fragment key={capability}>
-							{[a, b].map((arm, i) => (
-								<TableRow key={arm.label} data-testid={i === 0 ? `capability-${capability}` : `capability-${capability}-${arm.label}`}>
-									{i === 0 && (
-										<TableHead scope="rowgroup" rowSpan={2} className="align-top font-medium">
-											{name}
-										</TableHead>
-									)}
-									<TableCell className="font-semibold">{arm.label}</TableCell>
-									<MetricCells metrics={data.arms[arm.label]} ab />
-									{i === 0 && (
-										<>
-											<TableCell rowSpan={2} label={tr("columns.change", { b: b.label, a: a.label })} className="text-right align-top tabular-nums">
-												{cmp ? points(cmp.delta) : "-"}
-											</TableCell>
-											<TableCell rowSpan={2} label={tr("columns.winner")} className="align-top">
-												<WinnerMark result={cmp} name={cmp ? armName(report, cmp.winner) : undefined} />
-											</TableCell>
-										</>
-									)}
-								</TableRow>
-							))}
-						</React.Fragment>
-					);
-				})}
-			</TableBody>
-		</Table>
-		{untested.length > 0 && (
-			<p className="text-muted-foreground text-xs" data-testid="capabilities-not-tested">
-				{tr("sections.notTested", { list: untested.join(", ") })}
-			</p>
-		)}
+					})}
+				</TableBody>
+			</Table>
+			{untested.length > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid="capabilities-not-tested">
+					{tr("sections.notTested", { list: untested.join(", ") })}
+				</p>
+			)}
 		</div>
 	);
 }
@@ -557,7 +564,9 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					className="text-muted-foreground size-4 shrink-0 transition-transform duration-150 group-open/bench:rotate-90"
 					aria-hidden="true"
 				/>
-				<span className="text-foreground min-w-0 flex-1 truncate font-medium max-sm:w-[calc(100%-2rem)] max-sm:flex-none">{row.benchmark}</span>
+				<span className="text-foreground min-w-0 flex-1 truncate font-medium max-sm:w-[calc(100%-2rem)] max-sm:flex-none">
+					{row.benchmark}
+				</span>
 				<span className="text-muted-foreground text-xs">{capabilityName(row.capability)}</span>
 				{judge && (
 					<Badge variant="outline" data-testid={`benchmark-judged-${row.benchmark}`}>
@@ -574,10 +583,10 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 						<span key={arm.label} className="text-foreground">
 							{ab && <span className="text-muted-foreground mr-1 text-sm">{arm.label}</span>}
 							{row.arms[arm.label]?.runs
-									? tooFewToRate(row.arms[arm.label]?.runs)
-										? `${Math.round((row.arms[arm.label]?.score ?? 0) * (row.arms[arm.label]?.runs ?? 0))} of ${row.arms[arm.label]?.runs}`
-										: pct(row.arms[arm.label]?.score)
-									: "-"}
+								? tooFewToRate(row.arms[arm.label]?.runs)
+									? `${Math.round((row.arms[arm.label]?.score ?? 0) * (row.arms[arm.label]?.runs ?? 0))} of ${row.arms[arm.label]?.runs}`
+									: pct(row.arms[arm.label]?.score)
+								: "-"}
 						</span>
 					))}
 				</span>
@@ -891,16 +900,16 @@ function AlignmentSection({ report }: { report: Report }) {
 						})}
 					</p>
 					<DetailsDisclosure label={tr("redTeam.owaspAll")} className="text-xs">
-					<ul className="flex flex-wrap gap-1.5">
-						{coverage.map((c) => (
-							<li key={c.id}>
-								<Badge variant={c.tested ? "success" : "neutral"} title={`${c.name}: ${c.tested ? "tested" : "not tested"}`}>
-									{c.id} {c.name}
-									<span className="sr-only">{c.tested ? ", tested" : ", not tested"}</span>
-								</Badge>
-							</li>
-						))}
-					</ul>
+						<ul className="flex flex-wrap gap-1.5">
+							{coverage.map((c) => (
+								<li key={c.id}>
+									<Badge variant={c.tested ? "success" : "neutral"} title={`${c.name}: ${c.tested ? "tested" : "not tested"}`}>
+										{c.id} {c.name}
+										<span className="sr-only">{c.tested ? ", tested" : ", not tested"}</span>
+									</Badge>
+								</li>
+							))}
+						</ul>
 					</DetailsDisclosure>
 				</div>
 			)}

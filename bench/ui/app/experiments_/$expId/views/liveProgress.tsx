@@ -37,7 +37,10 @@ export function LiveProgress({ status }: { status: ExperimentStatus }) {
 	const slots = slotStates(grid.data?.rows.flatMap((row) => row.cells) ?? [], list);
 	const latest = list.slice(-MAX_EVENTS).reverse();
 	const building = imageBuilding(list);
-	const spent = live.spent_usd?.state === "observed" && typeof live.spent_usd.v === "number" ? formatValueNumber(live.spent_usd.v, "usd", locale) : null;
+	const spent =
+		live.spent_usd?.state === "observed" && typeof live.spent_usd.v === "number"
+			? formatValueNumber(live.spent_usd.v, "usd", locale)
+			: null;
 
 	return (
 		<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="experiment-progress" data-state={live.state}>
@@ -57,7 +60,13 @@ export function LiveProgress({ status }: { status: ExperimentStatus }) {
 				)}
 				{spent && <span className="text-muted-foreground ml-auto tabular-nums">{t("live.spent", { usd: spent })}</span>}
 			</div>
-			<div className="bg-muted h-2 w-full overflow-hidden rounded-full" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+			<div
+				className="bg-muted h-2 w-full overflow-hidden rounded-full"
+				role="progressbar"
+				aria-valuemin={0}
+				aria-valuemax={total}
+				aria-valuenow={done}
+			>
 				<div className="bg-chart-info h-full rounded-full transition-all" style={{ width: `${share}%` }} />
 			</div>
 			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">

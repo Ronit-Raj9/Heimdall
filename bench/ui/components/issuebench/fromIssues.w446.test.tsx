@@ -32,9 +32,7 @@ describe("FromIssues languages note", () => {
 	it("says which languages the builder handles, under the repository field", () => {
 		const out = render(<FromIssues writable />, hostedSession("member"));
 		expect(tagOf(out, "issuebench-languages")).toBeTruthy();
-		expect(out).toContain(
-			"Python (pytest), JavaScript and TypeScript (jest, vitest), Go. Others are skipped.",
-		);
+		expect(out).toContain("Python (pytest), JavaScript and TypeScript (jest, vitest), Go. Others are skipped.");
 		expect(out.indexOf('data-testid="issuebench-languages"')).toBeGreaterThan(out.indexOf('data-testid="issuebench-scan"'));
 	});
 });

@@ -203,10 +203,7 @@ export function realEarlierDraft(
 ): boolean {
 	if (!draft.agent && draft.benchmarks.length === 0 && !draft.pack) return false;
 	const same =
-		draft.agent === next.agent &&
-		draft.mode === next.mode &&
-		!draft.pack &&
-		draft.benchmarks.every((b) => next.benchmarks.includes(b));
+		draft.agent === next.agent && draft.mode === next.mode && !draft.pack && draft.benchmarks.every((b) => next.benchmarks.includes(b));
 	return !same;
 }
 
@@ -398,7 +395,11 @@ function EvaluateWizard() {
 		const kept: KeptLink =
 			plan.kind === "missing"
 				? { agent: null, mode: null, suite: null }
-				: keptLink(plan.kind === "replace" ? plan.draft : { ...draft, ...plan.patch }, { agent: link.agent, mode: link.mode, suite: link.suite });
+				: keptLink(plan.kind === "replace" ? plan.draft : { ...draft, ...plan.patch }, {
+						agent: link.agent,
+						mode: link.mode,
+						suite: link.suite,
+					});
 		const key = keptKey(kept);
 		writeApplied(key);
 		setApplied(key);

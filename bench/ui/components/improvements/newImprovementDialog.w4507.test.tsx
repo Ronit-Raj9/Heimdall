@@ -76,7 +76,13 @@ describe("NewImprovementForm (wave 4)", () => {
 	});
 
 	it("sends the preset, the improver task, the editable instructions and the spending limit", () => {
-		const body = improvementSpec({ ...filled, preset: "small", limit: "15", tasks: "", files: ["/home/agent/NOTES.md", "/home/agent/skills/"] });
+		const body = improvementSpec({
+			...filled,
+			preset: "small",
+			limit: "15",
+			tasks: "",
+			files: ["/home/agent/NOTES.md", "/home/agent/skills/"],
+		});
 		expect(body).toEqual({
 			kind: "improvement",
 			name: "notes-loop",

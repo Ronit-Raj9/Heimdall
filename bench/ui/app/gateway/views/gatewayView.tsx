@@ -118,11 +118,16 @@ export function GatewayCardLineRow({
 						</StatusPill>
 					)}
 					{notTested && (
-						<span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs" data-testid={`gateway-line-${line.feature}-nottested`}>
+						<span
+							className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
+							data-testid={`gateway-line-${line.feature}-nottested`}
+						>
 							{u("line.notTested")}
 						</span>
 					)}
-					{line.result && line.state === "measured" && <span className={cn("font-medium", RESULT_TONE[line.result])}>{t(`line.result.${line.result}`)}</span>}
+					{line.result && line.state === "measured" && (
+						<span className={cn("font-medium", RESULT_TONE[line.result])}>{t(`line.result.${line.result}`)}</span>
+					)}
 				</div>
 				{what && <p className="text-muted-foreground">{what}</p>}
 				{connected && line.enabled === "unknown" && line.enabled_source && (
@@ -279,19 +284,19 @@ export function SourceBox({ source, admin }: { source: GwSourceInfo; admin: bool
 					</label>
 					<div className="flex w-full flex-col gap-1.5 text-sm leading-5 sm:w-auto">
 						<label className="flex flex-col gap-1.5">
-						{t("source.secret")}
-						<Select value={secret || undefined} onValueChange={setSecret}>
-							<SelectTrigger className="w-full sm:w-56" data-testid="gateway-source-secret">
-								<SelectValue placeholder={t("source.pickSecret")} />
-							</SelectTrigger>
-							<SelectContent>
-								{(secrets.data?.secrets ?? []).map((s) => (
-									<SelectItem key={s.id} value={s.name}>
-										{s.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
+							{t("source.secret")}
+							<Select value={secret || undefined} onValueChange={setSecret}>
+								<SelectTrigger className="w-full sm:w-56" data-testid="gateway-source-secret">
+									<SelectValue placeholder={t("source.pickSecret")} />
+								</SelectTrigger>
+								<SelectContent>
+									{(secrets.data?.secrets ?? []).map((s) => (
+										<SelectItem key={s.id} value={s.name}>
+											{s.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 						</label>
 						<Link to="/settings" search={{ tab: "secrets" } as never} className="text-primary w-fit text-xs hover:underline">
 							{u("page.addSecret")}

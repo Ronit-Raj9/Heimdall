@@ -274,7 +274,9 @@ type ArchivedRun = { archived_at?: string | null };
 
 /** The row's Archive or Unarchive menu; a running run is refused by the server, and its reason shows. */
 function RunRowMenu({ row, testId }: { row: RunListRow; testId: string }) {
-	return <ArchiveRowMenu kind="run" id={row.run_id} name={runTaskLabel(row)} archivedAt={(row as ArchivedRun).archived_at} testId={testId} />;
+	return (
+		<ArchiveRowMenu kind="run" id={row.run_id} name={runTaskLabel(row)} archivedAt={(row as ArchivedRun).archived_at} testId={testId} />
+	);
 }
 
 export function RunsTable() {
@@ -287,7 +289,10 @@ export function RunsTable() {
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
 	// Poll while a run on the page is still running, like the evaluations list (X-84).
 	const [anyLive, setAnyLive] = useState(false);
-	const list = useListRunsQuery(runsRequest(search, search.page), { pollingInterval: anyLive ? RUNS_POLL_MS : 0, skipPollingIfUnfocused: true });
+	const list = useListRunsQuery(runsRequest(search, search.page), {
+		pollingInterval: anyLive ? RUNS_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+	});
 	useEffect(() => setAnyLive((list.data?.runs ?? []).some((r) => !r.sealed)), [list.data]);
 	useEffect(() => {
 		if (search.benchmark) void setSearch(benchmarkAlias(search));
@@ -312,7 +317,8 @@ export function RunsTable() {
 			),
 		[list.data, search.q, search.agent, sorted, showArchived],
 	);
-	const archivedCount = archivedCountOf(list.data) ?? (showArchived ? (list.data?.runs ?? []).filter((r) => isArchived(r as ArchivedRun)).length : undefined);
+	const archivedCount =
+		archivedCountOf(list.data) ?? (showArchived ? (list.data?.runs ?? []).filter((r) => isArchived(r as ArchivedRun)).length : undefined);
 	const onSort = (key: RunSortKey) => void setSearch({ ...nextRunSort(search, key), page: null });
 	const agents = useMemo(
 		() =>
@@ -428,7 +434,10 @@ export function RunsTable() {
 					</Button>
 					<div
 						id="runs-filters"
-						className={cn("w-full flex-col gap-2 md:flex md:w-auto md:flex-row md:flex-wrap md:items-center", filtersOpen ? "flex" : "hidden")}
+						className={cn(
+							"w-full flex-col gap-2 md:flex md:w-auto md:flex-row md:flex-wrap md:items-center",
+							filtersOpen ? "flex" : "hidden",
+						)}
 						data-testid="runs-filters"
 					>
 						{/* The trace search hint shows while its field has focus (M5-39). */}
@@ -546,7 +555,11 @@ export function RunsTable() {
 						{rows.map((row) => (
 							<li
 								key={row.run_id}
-								className={cn("hover:bg-muted/50 flex cursor-pointer flex-col gap-1 px-4 py-2", !row.sealed && "bg-chart-info/5", isArchived(row as ArchivedRun) && ARCHIVED_ROW_CLASS)}
+								className={cn(
+									"hover:bg-muted/50 flex cursor-pointer flex-col gap-1 px-4 py-2",
+									!row.sealed && "bg-chart-info/5",
+									isArchived(row as ArchivedRun) && ARCHIVED_ROW_CLASS,
+								)}
 								onClick={(e) => onRowClick(e, row)}
 								data-testid={`runs-mrow-${row.run_id}`}
 							>
@@ -563,7 +576,9 @@ export function RunsTable() {
 									<span className="tabular-nums">{costCell(row)}</span>
 									<span aria-hidden="true">·</span>
 									<span className="whitespace-nowrap">{timeAgo(row.started, locale)}</span>
-									{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-marchived-${row.run_id}`} />}
+									{isArchived(row as ArchivedRun) && (
+										<ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-marchived-${row.run_id}`} />
+									)}
 									<span className="ml-auto">
 										<RunRowMenu row={row} testId={`runs-mrow-${row.run_id}`} />
 									</span>
@@ -632,7 +647,9 @@ export function RunsTable() {
 									>
 										<td className="px-4 py-1.5">
 											<div className="max-w-44 truncate leading-5 font-medium lg:max-w-56 xl:max-w-64">{runLink(row)}</div>
-											{isArchived(row as ArchivedRun) && <ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-archived-${row.run_id}`} />}
+											{isArchived(row as ArchivedRun) && (
+												<ArchivedPill at={(row as ArchivedRun).archived_at} testId={`runs-archived-${row.run_id}`} />
+											)}
 											<div className="text-muted-foreground max-w-44 truncate text-xs leading-4 lg:max-w-56 xl:max-w-64" title={row.suite}>
 												{runSuiteLabel(row)}
 												{(row as RunListRowNamed).exp_name && (
@@ -645,7 +662,11 @@ export function RunsTable() {
 										</td>
 										<td className="px-3 py-2">
 											{/* The cell's width comes from this block: a table cell ignores max-width (V5-2). */}
-											<span className="block max-w-36 truncate xl:max-w-56" title={agentTitle(row)} data-testid={`runs-agent-${row.run_id}`}>
+											<span
+												className="block max-w-36 truncate xl:max-w-56"
+												title={agentTitle(row)}
+												data-testid={`runs-agent-${row.run_id}`}
+											>
 												<span className="font-medium">{runAgent(row)}</span>
 												{agentVersionLabel(row) && <span className="text-muted-foreground"> {agentVersionLabel(row)}</span>}
 												{row.model && <span className="text-muted-foreground hidden xl:inline"> · {row.model}</span>}

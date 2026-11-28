@@ -143,7 +143,9 @@ describe("EvaluationRunActions", () => {
 		expect(render(<EvaluationRunActions evaluation={ev("running")} />, m)).toContain('data-testid="evaluation-pause"');
 		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toContain('data-testid="evaluation-unpause"');
 		// Resume starts paid runs again, so it is the shared paid button (M4-41).
-		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toMatch(/data-testid="evaluation-unpause"[^>]*data-paid="true"|data-paid="true"[^>]*data-testid="evaluation-unpause"/);
+		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toMatch(
+			/data-testid="evaluation-unpause"[^>]*data-paid="true"|data-paid="true"[^>]*data-testid="evaluation-unpause"/,
+		);
 		expect(render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, m)).toContain(
 			'data-testid="evaluation-rerun-failures"',
 		);

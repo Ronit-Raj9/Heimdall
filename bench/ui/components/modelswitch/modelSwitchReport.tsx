@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { ApplyPanel } from "./applyPanel";
 import { LatencyChart } from "./latencyChart";
 import { getLocale } from "@/lib/i18n";
-import { useGetModelSwitchConfigQuery, useGetModelSwitchQuery, type ModelSwitchReport, type SwitchGroup } from "@/lib/store/apis/modelSwitchApi";
+import {
+	useGetModelSwitchConfigQuery,
+	useGetModelSwitchQuery,
+	type ModelSwitchReport,
+	type SwitchGroup,
+} from "@/lib/store/apis/modelSwitchApi";
 import type { Value } from "@/lib/types/bench";
 import { useTranslation } from "react-i18next";
 
@@ -21,7 +26,8 @@ export function ModelSwitchReportView({ evaluationId }: { evaluationId: string }
 	const { t } = useTranslation("modelSwitch");
 	const q = useGetModelSwitchQuery(evaluationId);
 	if (q.isLoading) return <BlockSkeleton testId="model-switch-loading" />;
-	if (q.error || !q.data) return <LoadError title={t("report.loadError")} error={q.error} onRetry={q.refetch} testId="model-switch-error" />;
+	if (q.error || !q.data)
+		return <LoadError title={t("report.loadError")} error={q.error} onRetry={q.refetch} testId="model-switch-error" />;
 	return (
 		<div className="flex flex-col gap-6" data-testid="model-switch-report">
 			<Report report={q.data} />
@@ -41,7 +47,8 @@ function Report({ report }: { report: ModelSwitchReport }) {
 	const rec = report.recommendation;
 	// Only a keep or switch answer names a model: nothing solved or too few runs recommend none (F5).
 	const decided = rec.action === "keep" || rec.action === "switch";
-	const actionText = (rec.action as string) === "nothing_solved" ? tu("switch.nothing_solved") : t(`report.action.${rec.action}` as "report.action.keep");
+	const actionText =
+		(rec.action as string) === "nothing_solved" ? tu("switch.nothing_solved") : t(`report.action.${rec.action}` as "report.action.keep");
 	const vsBest = new Map(report.comparisons.map((c) => [c.label, c]));
 	return (
 		<>
@@ -73,7 +80,9 @@ function Report({ report }: { report: ModelSwitchReport }) {
 						<tbody>
 							{report.models.map((m) => {
 								const c = vsBest.get(m.label);
-								const range = m.quality.bounds ? ` (${formatShare(m.quality.bounds[0], locale)} to ${formatShare(m.quality.bounds[1], locale)})` : "";
+								const range = m.quality.bounds
+									? ` (${formatShare(m.quality.bounds[0], locale)} to ${formatShare(m.quality.bounds[1], locale)})`
+									: "";
 								const tags = [
 									m.label === report.current && t("report.current"),
 									m.label === report.best && t("report.best"),
@@ -114,10 +123,19 @@ function Report({ report }: { report: ModelSwitchReport }) {
 				</Section>
 			)}
 			<Groups title={t("report.perBenchmark")} groups={report.benchmarks} testId="model-switch-benchmarks" share={share} />
-			<Groups title={t("report.perSegment")} description={t("report.segmentsDescription")} groups={report.segments} testId="model-switch-segments" share={share} empty={t("report.noSegments")} />
+			<Groups
+				title={t("report.perSegment")}
+				description={t("report.segmentsDescription")}
+				groups={report.segments}
+				testId="model-switch-segments"
+				share={share}
+				empty={t("report.noSegments")}
+			/>
 			{report.missing.length > 0 && <TextList title={t("report.missing")} items={report.missing} testId="model-switch-missing" />}
 			{report.notes.length > 0 && <TextList title={t("report.notes")} items={report.notes} testId="model-switch-notes" />}
-			{report.practice_runs ? <p className="text-muted-foreground text-sm">{t("report.practice", { count: report.practice_runs })}</p> : null}
+			{report.practice_runs ? (
+				<p className="text-muted-foreground text-sm">{t("report.practice", { count: report.practice_runs })}</p>
+			) : null}
 		</>
 	);
 }
@@ -172,7 +190,8 @@ function RoutingExport({ evaluationId }: { evaluationId: string }) {
 	const { t } = useTranslation("modelSwitch");
 	const q = useGetModelSwitchConfigQuery({ id: evaluationId, options: {} });
 	if (q.isLoading) return <BlockSkeleton testId="model-switch-config-loading" />;
-	if (q.error || !q.data) return <LoadError title={t("report.loadError")} error={q.error} onRetry={q.refetch} testId="model-switch-config-error" />;
+	if (q.error || !q.data)
+		return <LoadError title={t("report.loadError")} error={q.error} onRetry={q.refetch} testId="model-switch-config-error" />;
 	const ex = q.data;
 	const json = JSON.stringify(ex.config, null, 2);
 	const download = () => {
@@ -203,15 +222,22 @@ function RoutingExport({ evaluationId }: { evaluationId: string }) {
 					<ul className="flex flex-col gap-1 text-sm" data-testid="model-switch-rules">
 						{ex.rules.map((r) => (
 							<li key={r.name}>
-								<span className="font-medium">{t(`export.kind.${r.kind}`)}</span> {r.name} ({r.enabled ? t("export.enabled") : t("export.disabled")},{" "}
-								{t(`export.evidence.${r.evidence}`, { defaultValue: r.evidence })}): <span className="text-muted-foreground">{r.why}</span>
+								<span className="font-medium">{t(`export.kind.${r.kind}`)}</span> {r.name} (
+								{r.enabled ? t("export.enabled") : t("export.disabled")}, {t(`export.evidence.${r.evidence}`, { defaultValue: r.evidence })}
+								): <span className="text-muted-foreground">{r.why}</span>
 							</li>
 						))}
 					</ul>
 					{ex.headers.length > 0 && (
-						<TextList title={t("export.headers")} items={ex.headers.map((h) => `${h.header}: ${h.values.join(", ")}`)} testId="model-switch-headers" />
+						<TextList
+							title={t("export.headers")}
+							items={ex.headers.map((h) => `${h.header}: ${h.values.join(", ")}`)}
+							testId="model-switch-headers"
+						/>
 					)}
-					{ex.budget_hints.length > 0 && <TextList title={t("export.budget")} items={ex.budget_hints.map((b) => b.text)} testId="model-switch-budget" />}
+					{ex.budget_hints.length > 0 && (
+						<TextList title={t("export.budget")} items={ex.budget_hints.map((b) => b.text)} testId="model-switch-budget" />
+					)}
 					<ApplyPanel evaluationId={evaluationId} ruleCount={ex.config.governance.routing_rules.length} />
 					<pre className="bg-muted max-h-80 overflow-auto rounded p-3 text-xs" data-testid="model-switch-json">
 						{json}

@@ -5,7 +5,12 @@ import { InlineError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetGithubStatusQuery } from "@/lib/store/apis/githubApi";
-import { githubAgentFilePath, useCheckAgentFileMutation, useExplainConnectErrorMutation, useReadGithubAgentFileMutation } from "@/lib/store/apis/ufl6ConnectApi";
+import {
+	githubAgentFilePath,
+	useCheckAgentFileMutation,
+	useExplainConnectErrorMutation,
+	useReadGithubAgentFileMutation,
+} from "@/lib/store/apis/ufl6ConnectApi";
 import type { AgentFileCheckResult } from "@/lib/types/ufl6Connect";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,9 +36,22 @@ export function ExplainError({ disabled }: { disabled?: boolean }) {
 			<label htmlFor={id} className="text-sm font-medium">
 				{t("explain.label")}
 			</label>
-			<textarea id={id} className={areaClass} placeholder={t("explain.placeholder")} value={text} onChange={(e) => setText(e.target.value)} />
+			<textarea
+				id={id}
+				className={areaClass}
+				placeholder={t("explain.placeholder")}
+				value={text}
+				onChange={(e) => setText(e.target.value)}
+			/>
 			<div>
-				<Button type="submit" size="sm" variant="outline" disabled={disabled || !text.trim()} isLoading={state.isLoading} data-testid="connect-explain-button">
+				<Button
+					type="submit"
+					size="sm"
+					variant="outline"
+					disabled={disabled || !text.trim()}
+					isLoading={state.isLoading}
+					data-testid="connect-explain-button"
+				>
 					{t("explain.button")}
 				</Button>
 			</div>
@@ -115,7 +133,14 @@ export function AgentFileCheck({ disabled }: { disabled?: boolean }) {
 			</label>
 			<textarea id={id} className={areaClass} value={yaml} onChange={(e) => setYaml(e.target.value)} spellCheck={false} />
 			<div>
-				<Button type="submit" size="sm" variant="outline" disabled={disabled || !yaml.trim()} isLoading={state.isLoading} data-testid="connect-agent-file-button">
+				<Button
+					type="submit"
+					size="sm"
+					variant="outline"
+					disabled={disabled || !yaml.trim()}
+					isLoading={state.isLoading}
+					data-testid="connect-agent-file-button"
+				>
 					{t("file.button")}
 				</Button>
 			</div>

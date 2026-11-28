@@ -352,49 +352,54 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 									/>
 								)}
 							</Field>
-							<ArmBChange register={register} errors={formState.errors} kind={values.changeKind ?? "custom"} strategy={values.routingStrategy ?? "weighted"}>
-							<div className="grid gap-3">
-								<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath} name="overridePath">
-									{(id, describedBy) => (
-										<>
+							<ArmBChange
+								register={register}
+								errors={formState.errors}
+								kind={values.changeKind ?? "custom"}
+								strategy={values.routingStrategy ?? "weighted"}
+							>
+								<div className="grid gap-3">
+									<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath} name="overridePath">
+										{(id, describedBy) => (
+											<>
+												<Input
+													id={id}
+													aria-describedby={describedBy}
+													aria-invalid={Boolean(formState.errors.overridePath)}
+													placeholder={t("experiments.new.fields.overridePathPlaceholder")}
+													className="font-mono"
+													autoComplete="off"
+													spellCheck={false}
+													list={`${id}-keys`}
+													data-testid="experiment-override-path-input"
+													{...register("overridePath")}
+												/>
+												{/* M4-87: the config keys the catalog knows as suggestions; any other dotted path still types in. */}
+												<datalist id={`${id}-keys`} data-testid="experiment-override-path-keys">
+													{OVERRIDE_KEYS.map((k) => (
+														<option key={k} value={k} />
+													))}
+												</datalist>
+											</>
+										)}
+									</Field>
+									<Field label={t("experiments.new.fields.overrideValue")} error={formState.errors.overrideValue} name="overrideValue">
+										{(id, describedBy) => (
 											<Input
 												id={id}
 												aria-describedby={describedBy}
-												aria-invalid={Boolean(formState.errors.overridePath)}
-												placeholder={t("experiments.new.fields.overridePathPlaceholder")}
+												aria-invalid={Boolean(formState.errors.overrideValue)}
+												placeholder={t("experiments.new.fields.overrideValuePlaceholder")}
 												className="font-mono"
 												autoComplete="off"
 												spellCheck={false}
-												list={`${id}-keys`}
-												data-testid="experiment-override-path-input"
-												{...register("overridePath")}
+												data-testid="experiment-override-value-input"
+												{...register("overrideValue")}
 											/>
-											{/* M4-87: the config keys the catalog knows as suggestions; any other dotted path still types in. */}
-											<datalist id={`${id}-keys`} data-testid="experiment-override-path-keys">
-												{OVERRIDE_KEYS.map((k) => (
-													<option key={k} value={k} />
-												))}
-											</datalist>
-										</>
-									)}
-								</Field>
-								<Field label={t("experiments.new.fields.overrideValue")} error={formState.errors.overrideValue} name="overrideValue">
-									{(id, describedBy) => (
-										<Input
-											id={id}
-											aria-describedby={describedBy}
-											aria-invalid={Boolean(formState.errors.overrideValue)}
-											placeholder={t("experiments.new.fields.overrideValuePlaceholder")}
-											className="font-mono"
-											autoComplete="off"
-											spellCheck={false}
-											data-testid="experiment-override-value-input"
-											{...register("overrideValue")}
-										/>
-									)}
-								</Field>
-							</div>
-							<p className="text-muted-foreground text-xs">{t("experiments.new.fields.overrideHint")}</p>
+										)}
+									</Field>
+								</div>
+								<p className="text-muted-foreground text-xs">{t("experiments.new.fields.overrideHint")}</p>
 							</ArmBChange>
 						</div>
 					</div>
@@ -941,14 +946,35 @@ function ArmBChange({
 							</select>
 						)}
 					</Field>
-					<Field label={t("change.models")} error={errors.changeModels} hint={strategy === "fixed" ? undefined : t("change.routingHint")} name="changeModels">
-						{(id, d) => <Input id={id} aria-describedby={d} placeholder={t("change.modelsPlaceholder")} data-testid="experiment-change-models" {...register("changeModels")} />}
+					<Field
+						label={t("change.models")}
+						error={errors.changeModels}
+						hint={strategy === "fixed" ? undefined : t("change.routingHint")}
+						name="changeModels"
+					>
+						{(id, d) => (
+							<Input
+								id={id}
+								aria-describedby={d}
+								placeholder={t("change.modelsPlaceholder")}
+								data-testid="experiment-change-models"
+								{...register("changeModels")}
+							/>
+						)}
 					</Field>
 				</div>
 			)}
 			{kind === "failover" && (
 				<Field label={t("change.fallbacks")} error={errors.changeModels} name="changeModels">
-					{(id, d) => <Input id={id} aria-describedby={d} placeholder={t("change.modelsPlaceholder")} data-testid="experiment-change-models" {...register("changeModels")} />}
+					{(id, d) => (
+						<Input
+							id={id}
+							aria-describedby={d}
+							placeholder={t("change.modelsPlaceholder")}
+							data-testid="experiment-change-models"
+							{...register("changeModels")}
+						/>
+					)}
 				</Field>
 			)}
 			{kind === "prompt_cache" && (
@@ -970,7 +996,16 @@ function ArmBChange({
 			{kind === "team" && (
 				<Field label={t("change.teamSize")} hint={t("change.teamHint")} name="teamSize">
 					{(id, d) => (
-						<Input id={id} aria-describedby={d} type="number" min={2} max={4} className="w-24" data-testid="experiment-team-size" {...register("teamSize", { valueAsNumber: true })} />
+						<Input
+							id={id}
+							aria-describedby={d}
+							type="number"
+							min={2}
+							max={4}
+							className="w-24"
+							data-testid="experiment-team-size"
+							{...register("teamSize", { valueAsNumber: true })}
+						/>
 					)}
 				</Field>
 			)}
@@ -980,7 +1015,13 @@ function ArmBChange({
 }
 
 /** U2 section 2: spec options no other form sets. Folded; Plan checks them on the server. */
-function AdvancedSpec({ register, errors }: { register: UseFormRegister<ExperimentFormValues>; errors: FieldErrors<ExperimentFormValues> }) {
+function AdvancedSpec({
+	register,
+	errors,
+}: {
+	register: UseFormRegister<ExperimentFormValues>;
+	errors: FieldErrors<ExperimentFormValues>;
+}) {
 	const { t } = useTranslation("ufl2");
 	const box = (name: "allowUncalibratedJudge" | "heldOut" | "aa" | "fairness" | "sandbagging" | "attribution", label: string) => (
 		<label className="flex items-center gap-2 text-xs">
@@ -995,7 +1036,17 @@ function AdvancedSpec({ register, errors }: { register: UseFormRegister<Experime
 				<div className="grid gap-4 sm:grid-cols-3">
 					<Field label={t("advanced.alpha")} error={errors.alpha} name="alpha">
 						{(id, d) => (
-							<Input id={id} aria-describedby={d} type="number" step="0.01" min={0} max={1} className="h-9" data-testid="experiment-adv-alpha" {...register("alpha", { valueAsNumber: true })} />
+							<Input
+								id={id}
+								aria-describedby={d}
+								type="number"
+								step="0.01"
+								min={0}
+								max={1}
+								className="h-9"
+								data-testid="experiment-adv-alpha"
+								{...register("alpha", { valueAsNumber: true })}
+							/>
 						)}
 					</Field>
 					<Field label={t("advanced.realism")} name="realism">

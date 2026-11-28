@@ -85,7 +85,9 @@ describe("Auto-improve small trial (round 4 F6)", () => {
 	it("confirms with the estimate, the runs and the cap", () => {
 		const text = improvementConfirmText(filled, trialEstimate, "Spends keys.");
 		expect(text).toBe(`Estimated $0.21 to $0.60, about 30 runs. It stops at $3.00. ${TRIAL_NOTE} Spends keys.`);
-		expect(improvementConfirmText({ ...filled, preset: "small", limit: "15" }, undefined, "x")).toBe("No estimate yet. It stops at $15.00. x");
+		expect(improvementConfirmText({ ...filled, preset: "small", limit: "15" }, undefined, "x")).toBe(
+			"No estimate yet. It stops at $15.00. x",
+		);
 	});
 
 	it("never shows about 0 to 0 minutes (PAID-19)", () => {

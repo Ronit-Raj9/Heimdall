@@ -17,7 +17,11 @@ vi.mock("@tanstack/react-router", async (orig) => ({
 const read = <T,>(file: string): T => JSON.parse(fs.readFileSync(path.join(__dirname, "testdata", file), "utf8")) as T;
 const effects = read<Record<string, GwEffect>>("ufg1.effects.json");
 const lines = read<Record<string, GwCardLine>>("ufg1.cardlines.json");
-const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, " ");
+const text = (html: string) =>
+	html
+		.replace(/<[^>]+>/g, " ")
+		.replace(/&#x27;|&#39;/g, "'")
+		.replace(/\s+/g, " ");
 
 describe("feature test states, from the handler's answers", () => {
 	it.each([

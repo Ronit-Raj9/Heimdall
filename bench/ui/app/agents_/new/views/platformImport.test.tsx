@@ -38,11 +38,20 @@ describe("platform import", () => {
 	it("names the agent after the platform and the agent", () => {
 		expect(importedAgentName("vapi", "Support Line #2")).toBe("vapi-support-line-2");
 		expect(importedAgentName("copilot_studio", "")).toBe("copilot-studio-agent");
-		expect(importedAgentName("agentcore", "arn:aws:bedrock-agentcore:us-east-1:1:runtime/x-AbCdEf1234")).toMatch(/^[a-z0-9][a-z0-9._-]{0,62}$/);
+		expect(importedAgentName("agentcore", "arn:aws:bedrock-agentcore:us-east-1:1:runtime/x-AbCdEf1234")).toMatch(
+			/^[a-z0-9][a-z0-9._-]{0,62}$/,
+		);
 	});
 
 	it("builds the request without empty fields", () => {
-		const req = importRequest(agentcore, "core", " rt-1 ", { region: "us-east-1", qualifier: " " }, { access_key: "AK", secret_key: "SK", session_token: "" }, true);
+		const req = importRequest(
+			agentcore,
+			"core",
+			" rt-1 ",
+			{ region: "us-east-1", qualifier: " " },
+			{ access_key: "AK", secret_key: "SK", session_token: "" },
+			true,
+		);
 		expect(req).toEqual({
 			id: "core",
 			platform: "agentcore",

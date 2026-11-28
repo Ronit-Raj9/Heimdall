@@ -37,7 +37,16 @@ describe("incident form", () => {
 		expect(render(<IncidentAdmin open={[]} onSaved={() => {}} />)).toContain("No open incidents.");
 		const html = render(
 			<IncidentAdmin
-				open={[{ id: "inc_1", title: "Runs start late", status: "investigating", impact: "major", started_at: "2026-11-28T09:00:00Z", updates: [] }]}
+				open={[
+					{
+						id: "inc_1",
+						title: "Runs start late",
+						status: "investigating",
+						impact: "major",
+						started_at: "2026-11-28T09:00:00Z",
+						updates: [],
+					},
+				]}
 				onSaved={() => {}}
 			/>,
 		);

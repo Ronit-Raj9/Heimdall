@@ -50,11 +50,15 @@ export function comparisonNames(experiments: readonly { exp_id: string; name?: s
 function ComparisonLink({ id, names }: { id: string; names: Map<string, string> }) {
 	const name = names.get(id);
 	return (
-		<span className="flex min-w-0 max-w-80 flex-col">
+		<span className="flex max-w-80 min-w-0 flex-col">
 			<Link to="/experiments/$expId" params={{ expId: id }} className="text-primary truncate hover:underline" title={name ?? id}>
 				{name ?? id}
 			</Link>
-			{name && <span className="text-muted-foreground truncate font-mono text-xs" title={id}>{id}</span>}
+			{name && (
+				<span className="text-muted-foreground truncate font-mono text-xs" title={id}>
+					{id}
+				</span>
+			)}
 		</span>
 	);
 }

@@ -337,7 +337,12 @@ export function McpReportView({ report }: { report: McpReport }) {
 					</ul>
 				)}
 				{/* The scan reads the listing; whether an agent follows poisoned descriptions is the gate mcp_poisoning_followed (M7-110). */}
-				<Link to="/docs" search={{ doc: "tool-safety" } as never} className="text-primary text-sm underline-offset-4 hover:underline" data-testid="mcp-poisoning-link">
+				<Link
+					to="/docs"
+					search={{ doc: "tool-safety" } as never}
+					className="text-primary text-sm underline-offset-4 hover:underline"
+					data-testid="mcp-poisoning-link"
+				>
 					{t("result.poisoningLink")}
 				</Link>
 			</Section>
@@ -458,7 +463,12 @@ export function DraftEvaluateLink({ done }: { done: McpDraftResponse }) {
 			<p className="text-chart-warning-ink flex flex-wrap items-center gap-2 text-sm" data-testid="mcp-draft-no-key">
 				{t("draft.noKeyedAgent")}
 				{/* No single provider is named, so this opens Settings, Model keys, and comes back here (M8-12). */}
-				<Link to="/settings" search={keyMissingSearch("", "/mcp-test") as never} className="text-primary underline" data-testid="mcp-draft-models-link">
+				<Link
+					to="/settings"
+					search={keyMissingSearch("", "/mcp-test") as never}
+					className="text-primary underline"
+					data-testid="mcp-draft-models-link"
+				>
 					{t("draft.modelsKeys")}
 				</Link>
 			</p>
@@ -493,7 +503,12 @@ export function McpTestView() {
 	useEffect(() => setHistory(readHistory()), []);
 	const remember = (r: McpReport) =>
 		setHistory((h) => {
-			const next = addCheck(h, { url: r.url || form.url.trim(), at: r.checked_at || new Date().toISOString(), reached: r.reached, overall: r.scores?.overall });
+			const next = addCheck(h, {
+				url: r.url || form.url.trim(),
+				at: r.checked_at || new Date().toISOString(),
+				reached: r.reached,
+				overall: r.scores?.overall,
+			});
 			writeHistory(next);
 			return next;
 		});
@@ -592,7 +607,11 @@ export function McpTestView() {
 						)}
 						<span className="text-muted-foreground text-xs">
 							{listSecrets ? t("form.secretHint") : tf("mcp.secretNameHint")}{" "}
-							<Link to={"/settings" as never} search={{ tab: "secrets" } as never} className="text-primary underline-offset-4 hover:underline">
+							<Link
+								to={"/settings" as never}
+								search={{ tab: "secrets" } as never}
+								className="text-primary underline-offset-4 hover:underline"
+							>
 								{t5("mcp.manageSecrets")}
 							</Link>
 						</span>

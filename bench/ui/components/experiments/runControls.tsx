@@ -150,7 +150,9 @@ export function PauseControls({ expId, spentUsd }: { expId: string; spentUsd?: n
 						confirm="always"
 						kind="form"
 						estimateAt="title"
-						confirmText={[tc("resume.confirm"), left !== null ? tk("resume.left", { left: formatCost(left), cap: formatCost(cap) }) : ""].filter(Boolean).join(" ")}
+						confirmText={[tc("resume.confirm"), left !== null ? tk("resume.left", { left: formatCost(left), cap: formatCost(cap) }) : ""]
+							.filter(Boolean)
+							.join(" ")}
 						isLoading={resumeState.isLoading}
 						onConfirm={async () => {
 							try {

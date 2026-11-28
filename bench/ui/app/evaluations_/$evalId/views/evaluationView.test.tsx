@@ -103,9 +103,24 @@ describe("EvaluationBody", () => {
 
 	it("shows reliability per task from sealed tries while runs are pending (K2)", async () => {
 		const { useListRunsQuery } = await import("@/lib/store/apis/benchApi");
-		const r = (task: string, trial: number, outcome: string, sealed = true) => ({ run_id: `r${task}${trial}`, task, arm: "A", condition: "clean", trial, counted: true, sealed, outcome });
+		const r = (task: string, trial: number, outcome: string, sealed = true) => ({
+			run_id: `r${task}${trial}`,
+			task,
+			arm: "A",
+			condition: "clean",
+			trial,
+			counted: true,
+			sealed,
+			outcome,
+		});
 		vi.mocked(useListRunsQuery).mockReturnValue(
-			okQuery({ runs: [r("t1", 1, "pass"), r("t1", 2, "fail"), r("t2", 1, "pass"), r("t2", 2, "unknown", false)], total: 4, limit: 500, offset: 0, facets: {} }) as never,
+			okQuery({
+				runs: [r("t1", 1, "pass"), r("t1", 2, "fail"), r("t2", 1, "pass"), r("t2", 2, "unknown", false)],
+				total: 4,
+				limit: 500,
+				offset: 0,
+				facets: {},
+			}) as never,
 		);
 		const html = render(<EvaluationBody evaluation={base} />);
 		expect(html).toContain('data-testid="evaluation-reliability"');
@@ -358,7 +373,8 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 	it("puts the rerun notice below the header, full width (N193)", async () => {
 		const { hostedSession } = await import("@/lib/testing/platformFixtures");
 		// Round 4 (F5): the capped rerun endpoint feeds the notice.
-		const { useRerunEvaluationFailuresCappedMutation: useRerunEvaluationFailuresMutation } = await import("@/components/evaluations/paidCaps");
+		const { useRerunEvaluationFailuresCappedMutation: useRerunEvaluationFailuresMutation } =
+			await import("@/components/evaluations/paidCaps");
 		vi.mocked(useRerunEvaluationFailuresMutation).mockReturnValue([
 			() => undefined,
 			{ isLoading: false, data: { evaluation: { id: "ev_2" }, children: [{}, {}] } },

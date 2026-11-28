@@ -54,7 +54,14 @@ describe("prompt version test picker (round 5 L1)", () => {
 
 describe("past results", () => {
 	it("lists feature, comparison, effect and date", () => {
-		const e = { feature: "semantic_cache", exp_id: "exp-1", result: "saved", headline: "Saved 12% cost", computed_at: "2026-11-20T10:00:00Z", arms: [] } as unknown as GwEffect;
+		const e = {
+			feature: "semantic_cache",
+			exp_id: "exp-1",
+			result: "saved",
+			headline: "Saved 12% cost",
+			computed_at: "2026-11-20T10:00:00Z",
+			arms: [],
+		} as unknown as GwEffect;
 		const html = render(<PastResultsTable effects={[e]} names={{ semantic_cache: "Semantic cache" }} />);
 		expect(html).toContain("Semantic cache");
 		expect(html).toContain("exp-1");

@@ -173,7 +173,11 @@ export default function ConnectView() {
 	const [polling, setPolling] = useState(false);
 	// N105: an answer field the user picked counts as a mapping Save may write.
 	const [userMapped, setUserMapped] = useState(false);
-	const polled = useGetVerifyQuery(jobId ?? "", { skip: !jobId, pollingInterval: polling ? VERIFY_POLL_MS : 0, skipPollingIfUnfocused: true });
+	const polled = useGetVerifyQuery(jobId ?? "", {
+		skip: !jobId,
+		pollingInterval: polling ? VERIFY_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+	});
 	const verify = jobId ? (polled.data ?? inline) : inline;
 	const verifyDone = verify ? isTerminalJob(verify.status) : false;
 	useEffect(() => {
@@ -326,26 +330,22 @@ export default function ConnectView() {
 						<label className="text-sm font-medium" id="connect-platform-label">
 							{t("paste.platform")}
 						</label>
-					<Select value={platform} onValueChange={choosePlatform}>
-						<SelectTrigger className="w-full min-w-0 sm:min-w-56" aria-labelledby="connect-platform-label">
-							<SelectValue placeholder={t("paste.platform")} />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={NO_PLATFORM}>{t("paste.platformNone")}</SelectItem>
-							{platforms.map((p) => (
-								<SelectItem key={p.id} value={p.id}>
-									{p.label} ({p.id_label})
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+						<Select value={platform} onValueChange={choosePlatform}>
+							<SelectTrigger className="w-full min-w-0 sm:min-w-56" aria-labelledby="connect-platform-label">
+								<SelectValue placeholder={t("paste.platform")} />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={NO_PLATFORM}>{t("paste.platformNone")}</SelectItem>
+								{platforms.map((p) => (
+									<SelectItem key={p.id} value={p.id}>
+										{p.label} ({p.id_label})
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 					{showDetectButton(platform, importable, importPlatforms, NO_PLATFORM) && (
-						<Button
-							onClick={() => void runDetect()}
-							isLoading={detectState.isLoading}
-							data-testid="connect-detect"
-						>
+						<Button onClick={() => void runDetect()} isLoading={detectState.isLoading} data-testid="connect-detect">
 							{detectState.isLoading ? t("paste.detecting") : t("paste.detect")}
 						</Button>
 					)}
@@ -431,9 +431,7 @@ export default function ConnectView() {
 							<FailureNote key={`${f.code}-${i}`} failure={f} onPick={onPick} onFix={onFix} />
 						))}
 						<details className="text-sm" data-testid="connect-probes">
-							<summary className="text-muted-foreground cursor-pointer text-xs">
-								{t("result.probes", { count: det.probes.length })}
-							</summary>
+							<summary className="text-muted-foreground cursor-pointer text-xs">{t("result.probes", { count: det.probes.length })}</summary>
 							<ul className="mt-2 flex flex-col gap-1 font-mono text-xs">
 								{det.probes.map((p, i) => (
 									<li key={`${p.url}-${i}`}>

@@ -33,7 +33,9 @@ describe("TraceQualityDetails", () => {
 		expect(html).not.toContain("<script>");
 	});
 	it("says what is missing when the agent has no step parser", () => {
-		const html = renderToStaticMarkup(<TraceQualityDetails arm="A" trace={{ source: "stdout_tail", quality: "degraded", truncated: true }} />);
+		const html = renderToStaticMarkup(
+			<TraceQualityDetails arm="A" trace={{ source: "stdout_tail", quality: "degraded", truncated: true }} />,
+		);
 		expect(html).toContain('data-testid="runs-trace-missing-A"');
 		expect(html).toContain("Steps come from the gateway only: this agent has no step parser.");
 	});
@@ -44,7 +46,9 @@ describe("TraceQualityDetails", () => {
 		expect(html).not.toContain("runs-trace-missing");
 	});
 	it("names the parser when it read only part of the output", () => {
-		const html = renderToStaticMarkup(<TraceQualityDetails arm="B" trace={{ source: "protocol", quality: "partial", parser: "protocol" }} />);
+		const html = renderToStaticMarkup(
+			<TraceQualityDetails arm="B" trace={{ source: "protocol", quality: "partial", parser: "protocol" }} />,
+		);
 		expect(html).toContain("Parser protocol read only part of the agent&#x27;s output.");
 	});
 });
