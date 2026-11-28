@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { FeatureTestDialog } from "./featureTestDialog";
 import { ModelWatchCard } from "./modelWatchCard";
 import { RegisteredAgents } from "./registeredAgents";
+import { PastResults } from "./pastResults";
 import { SkillImportAction } from "./skillImport";
 import "./uf7cI18n";
 import "./uff4I18n";
@@ -356,6 +357,7 @@ export default function GatewayView() {
 					<GatewayHeaderLine gateway={q.data.gateway} />
 					<SourceBox source={q.data.source} admin={canUse(session, "admin")} />
 					<GatewayLines lines={q.data.lines} onStart={setStarting} connected={q.data.source.connected} />
+					<PastResults names={Object.fromEntries(q.data.lines.map((l) => [l.feature, l.name]))} />
 					<ModelWatchCard />
 					<RegisteredAgents connected={q.data.source.connected} />
 					<TraceIngestLine />

@@ -1,0 +1,34 @@
+{
+	"prompt": {
+		"pick": "Pick a prompt",
+		"pickVersion": "Pick a version",
+		"pickFirst": "Pick a prompt first",
+		"loading": "Loading",
+		"connect": "Connect your Bifrost to list its prompts.",
+		"none": "Your Bifrost has no prompts yet.",
+		"noVersions": "This prompt has no versions.",
+		"noPrompt": "No prompt"
+	},
+	"past": {
+		"title": "Past results",
+		"none": "No feature test has finished yet. Start one above.",
+		"loadError": "Past results could not be loaded",
+		"feature": "Feature",
+		"comparison": "Comparison",
+		"effect": "Effect",
+		"date": "Date"
+	},
+	"diff": {
+		"title": "Differences",
+		"measure": "Measure",
+		"difference": "Difference",
+		"range": "Range",
+		"runs": "Runs",
+		"solve": "Solve rate",
+		"cost": "Cost per run",
+		"latency": "Latency per call",
+		"noVerdict": "No verdict: {{reason}}",
+		"fewRuns": "fewer than 10 runs per setup.",
+		"noneSolved": "no setup solved a task."
+	}
+}

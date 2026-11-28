@@ -27,9 +27,10 @@ import { useTranslation } from "react-i18next";
 import "./uf7cI18n";
 import "./w4p6I18n";
 import "./uff4I18n";
+import { PromptPick, PromptVersionPick } from "./promptPicker";
 
 /** How a setting is entered: a model picker, a number, free text, a comma list, yes or no, or one of the budgets typed above. */
-export type OptionKind = "model" | "number" | "text" | "list" | "yesno" | "budgetPick";
+export type OptionKind = "model" | "number" | "text" | "list" | "yesno" | "budgetPick" | "prompt" | "promptVersion";
 
 /** One setting of a feature's own Draft (audit/W4_DESIGN_3_BIFROST.md sections 4 to 13). Its label and hint are uf7c:dialog.opt.<key>. */
 export interface FeatureOption {
@@ -47,9 +48,9 @@ export const FEATURE_OPTIONS: Record<string, FeatureOption[]> = {
 		{ key: "router_when", required: false, kind: "text" },
 	],
 	prompt_version: [
-		{ key: "prompt_id", required: true, kind: "text" },
-		{ key: "variant_version", required: true, kind: "text" },
-		{ key: "control_version", required: false, kind: "text" },
+		{ key: "prompt_id", required: true, kind: "prompt" },
+		{ key: "variant_version", required: true, kind: "promptVersion" },
+		{ key: "control_version", required: false, kind: "promptVersion" },
 	],
 	mcp_tools: [
 		{ key: "tools_b", required: true, kind: "list" },
@@ -633,7 +634,21 @@ export function FeatureTestDialog({
 									{opt(o.key, "label")}
 									{o.required && <span className="text-muted-foreground ml-2 text-xs">{t("dialog.required")}</span>}
 								</label>
-								{o.kind === "model" ? (
+								{o.kind === "prompt" ? (
+									<PromptPick
+										id={`feature-test-opt-${o.key}-input`}
+										value={form.options[o.key] ?? ""}
+										onChange={(v) => set({ options: { ...form.options, [o.key]: v, variant_version: "", control_version: "" } }, o.key)}
+									/>
+								) : o.kind === "promptVersion" ? (
+									<PromptVersionPick
+										id={`feature-test-opt-${o.key}-input`}
+										promptId={form.options.prompt_id ?? ""}
+										value={form.options[o.key] ?? ""}
+										onChange={(v) => setOption(o.key, v)}
+										allowNone={!o.required}
+									/>
+								) : o.kind === "model" ? (
 									<GroupedModelPicker
 										value={form.options[o.key] ? { provider: form.options[`${o.key}_provider`] || "openai", model: form.options[o.key] } : null}
 										onChange={(v) => set({ options: { ...form.options, [o.key]: v.model, [`${o.key}_provider`]: v.provider } }, o.key)}

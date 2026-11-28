@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/gateway/views/uf7cI18n";
 import "@/components/gateway/ufc7I18n";
+import "@/app/gateway/views/ufl1I18n";
 import { UseInBifrostButton } from "./useInBifrost";
 
 /** Text color of a result word: Saved green, Lost and Failed red, Worked gray (status tokens). */
@@ -68,6 +69,70 @@ export function detailText(v: unknown): string {
 	return JSON.stringify(v);
 }
 
+/** Why the effect gives no verdict (round 4 rule): under 10 runs in a setup, or no setup solved a task; null when it may. Pure. */
+export function noVerdictReason(effect: Pick<GwEffect, "arms">): "fewRuns" | "noneSolved" | null {
+	if (effect.arms.length === 0) return null;
+	if (effect.arms.some((a) => a.runs < 10)) return "fewRuns";
+	if (effect.arms.every((a) => !a.solve_rate)) return "noneSolved";
+	return null;
+}
+
+const signed = (v: number, fmt: (x: number) => string) => (v > 0 ? `+${fmt(v)}` : v < 0 ? `-${fmt(-v)}` : fmt(0));
+const DIFF_FMT = {
+	solve: (x: number) => `${Math.round(x * 1000) / 10} pts`,
+	cost: (x: number) => `$${x.toFixed(4)}`,
+	latency: (x: number) => `${Math.round(x)} ms`,
+} as const;
+
+/** The difference rows (variant minus control) with their ranges: kind, difference, range. Pure. */
+export function diffRows(effect: Pick<GwEffect, "solve_delta" | "cost_delta" | "latency_delta">): { key: keyof typeof DIFF_FMT; diff: string; range: string }[] {
+	const out: { key: keyof typeof DIFF_FMT; diff: string; range: string }[] = [];
+	for (const [key, iv] of [
+		["solve", effect.solve_delta],
+		["cost", effect.cost_delta],
+		["latency", effect.latency_delta],
+	] as const) {
+		if (!iv) continue;
+		const fmt = DIFF_FMT[key];
+		const range = iv.low !== undefined && iv.high !== undefined ? `${signed(iv.low, fmt)} to ${signed(iv.high, fmt)}` : "";
+		out.push({ key, diff: signed(iv.point, fmt), range });
+	}
+	return out;
+}
+
+function DiffTable({ effect }: { effect: GwEffect }) {
+	const { t } = useTranslation("ufl1");
+	const rows = diffRows(effect);
+	if (rows.length === 0) return null;
+	const variant = effect.arms.find((a) => a.arm === effect.variant);
+	const control = effect.arms.find((a) => a.arm === effect.control);
+	const runs = control && variant ? `${control.runs} / ${variant.runs}` : "";
+	return (
+		<div className="overflow-x-auto">
+			<table className="w-full text-sm" data-testid="gateway-effect-diffs">
+				<thead className="text-muted-foreground text-left text-xs">
+					<tr>
+						<th className="py-1 pr-3 font-normal">{t("diff.measure")}</th>
+						<th className="py-1 pr-3 font-normal">{t("diff.difference")}</th>
+						<th className="py-1 pr-3 font-normal">{t("diff.range")}</th>
+						<th className="py-1 font-normal">{t("diff.runs")}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{rows.map((r) => (
+						<tr key={r.key} className="border-t" data-testid={`gateway-effect-diff-${r.key}`}>
+							<td className="py-1 pr-3">{t(`diff.${r.key}`)}</td>
+							<td className="py-1 pr-3 tabular-nums">{r.diff}</td>
+							<td className="py-1 pr-3 tabular-nums">{r.range}</td>
+							<td className="py-1 tabular-nums">{runs}</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	);
+}
+
 function ArmsTable({ arms, control }: { arms: GwArmResult[]; control: string }) {
 	const { t } = useTranslation("w4p6");
 	return (
@@ -117,7 +182,9 @@ export function GatewayEffectView({
 	const { t: c } = useTranslation("ufc7");
 	const { t } = useTranslation("w4p6");
 	const { t: u } = useTranslation("uf7c");
+	const { t: l } = useTranslation("ufl1");
 	const { rows, raw } = detailRows((effect.details ?? {}) as Record<string, unknown>);
+	const noVerdict = noVerdictReason(effect);
 	return (
 		<Section title={t("effect.title")} testId="gateway-effect-card">
 			<div className="flex flex-col gap-3" data-state={effect.state}>
@@ -125,7 +192,7 @@ export function GatewayEffectView({
 					<span className="bg-muted rounded-full px-2 py-0.5 text-xs" data-testid="gateway-effect-state">
 						{t(`effect.state.${effect.state}`)}
 					</span>
-					{effect.result && <span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>}
+					{effect.result && !noVerdict && <span className={cn("font-medium", RESULT_TONE[effect.result])}>{t(`line.result.${effect.result}`)}</span>}
 					<span data-testid="gateway-effect-headline">{effect.headline}</span>
 				</div>
 				{effect.reason && effect.state !== "measured" && (
@@ -134,6 +201,12 @@ export function GatewayEffectView({
 					</p>
 				)}
 				<p className="text-muted-foreground text-xs">{t("line.fromNoDate", { source: effect.source.text })}</p>
+				{noVerdict && (
+					<p className="text-muted-foreground text-sm" data-testid="gateway-effect-no-verdict">
+						{l("diff.noVerdict", { reason: l(`diff.${noVerdict}`) })}
+					</p>
+				)}
+				<DiffTable effect={effect} />
 				{effect.arms.length > 0 && <ArmsTable arms={effect.arms} control={effect.control} />}
 				{(rows.length > 0 || raw) && (
 					<div className="flex flex-col gap-1">

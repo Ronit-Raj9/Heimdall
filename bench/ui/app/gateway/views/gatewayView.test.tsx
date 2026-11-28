@@ -28,6 +28,7 @@ vi.mock("@/lib/store/apis/schedulesApi", async (importOriginal) => ({
 	useGetSchedulesQuery: () => okQuery({ rows: [] }),
 }));
 vi.mock("@/lib/store/apis/secretsApi", () => ({ useListSecretsQuery: () => okQuery({ secrets: [{ id: "s1", name: "BIFROST_ADMIN" }] }) }));
+vi.mock("@/lib/store/apis/gatewayPromptsApi", () => ({ useGetGatewayEffectsQuery: () => okQuery({ effects: [] }) }));
 
 const lines: GwCardLine[] = [
 	{
