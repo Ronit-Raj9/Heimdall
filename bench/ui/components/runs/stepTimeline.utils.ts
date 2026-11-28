@@ -175,6 +175,17 @@ export function countedSteps(steps: readonly StepRecord[]): number {
 /** Characters that could reorder or hide displayed text (controls, bidi overrides), shown as U+FFFD. */
 const UNSAFE_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‪-‮⁦-⁩]/g;
 
+/** Key-shaped strings: the per-run Bifrost virtual key (even only its start), other API keys, bearer tokens. */
+const KEY_SHAPED =
+	/(sk-bf-)[A-Za-z0-9_-]{2,}|\b(?:sk-[A-Za-z0-9_-]{12,}|sk_[A-Za-z0-9]{12,}|gh[pousr]_[A-Za-z0-9]{12,}|xox[abpr]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{12,})|(bearer\s+)(?!sk-bf-)[A-Za-z0-9._~+/=-]{8,}/gi;
+
+/** Text with key-shaped strings masked; a known prefix is kept so a reader sees a key was there. */
+export function maskKeys(text: string): string {
+	return text.replace(KEY_SHAPED, (_m, bf?: string, bearer?: string) =>
+		bf ? `${bf}[masked]` : bearer ? `${bearer}[masked]` : "[masked]",
+	);
+}
+
 /**
  * Agent-influenced text made safe to show on one line: control and bidi characters replaced, line
  * breaks folded to spaces, and clipped to max characters with an ellipsis. The result is still
@@ -182,7 +193,7 @@ const UNSAFE_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‪-‮⁦-�
  */
 export function clipText(text: string | undefined, max = MAX_TEXT): string {
 	if (!text) return "";
-	const flat = text.replace(UNSAFE_CHARS, "�").replace(/[\r\n\t]+/g, " ");
+	const flat = maskKeys(text).replace(UNSAFE_CHARS, "�").replace(/[\r\n\t]+/g, " ");
 	const chars = Array.from(flat);
 	return chars.length <= max ? flat : `${chars.slice(0, max - 1).join("")}…`;
 }
